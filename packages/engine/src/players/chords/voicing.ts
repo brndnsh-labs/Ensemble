@@ -3,18 +3,20 @@
 // prefers, led from the voicing before. A pianist carries only that from strike
 // to strike, so nothing here is random and nothing knows about rhythm.
 
+import { PPQ } from "../../chart/types.ts";
 import { choose } from "../../critic/choose.ts";
 import type { Feature } from "../../critic/types.ts";
 import type { Arrival } from "../../perform/harmony.ts";
 import { contextOf } from "../../perform/harmony.ts";
 import type { ChordFamily } from "../../theory/chord.ts";
 import { chordFamily } from "../../theory/chord.ts";
-import { pitchClass } from "../../theory/pitch.ts";
+import { mod12, pitchClass } from "../../theory/pitch.ts";
 import { chordScale } from "../../theory/scale.ts";
 import type { InstrumentIdiom } from "./idiom.ts";
+import type { StrikeLine } from "./line.ts";
 import type { Strike, VoicedStrike, Voicing } from "./strike.ts";
 import type { ChordRegister, ChordStyle } from "./style.ts";
-import { fitTones } from "./tones.ts";
+import { fitTones, identity } from "./tones.ts";
 
 /** A voicing as the critic judges it: where it sits, and what it follows. */
 export interface VoicingCandidate {
@@ -23,6 +25,13 @@ export interface VoicingCandidate {
   readonly previous: Voicing | null;
   readonly register: ChordRegister;
   readonly family: ChordFamily;
+  /** What the strike hears of the soloist; null where the line is silent or the seat does not listen. */
+  readonly line: StrikeLine | null;
+  /**
+   * The hand is out of its own place for a soloist: it hears the line now, or
+   * it did and has not yet come back within reach of its target.
+   */
+  readonly away: boolean;
 }
 
 /**
@@ -45,6 +54,12 @@ export const LOW_LIMITS: Readonly<Record<number, number>> = {
 
 /** E4: below it a dominant's half-step rub on the bottom of the hand is a growl, not a colour (Q-03). */
 export const RUB_FLOOR = 64;
+
+/** A fourth: how far above the bass the bottom of the hand keeps (Q-03, `chords.crowds-the-bass`). */
+const CLEAR_OF_THE_BASS = 5;
+
+/** A fourth: the widest move of the top voice that is still a line. */
+const TOP_LEAP = 5;
 
 const top = (v: Voicing) => v.pitches[v.pitches.length - 1]!;
 
@@ -116,6 +131,27 @@ export const VOICING_FEATURES: readonly Feature<VoicingCandidate>[] = [
     of: ({ voicing, previous }) => (previous ? Math.abs(top(voicing) - top(previous)) : 0),
   },
   {
+    id: "crowds-the-bass-under-the-line",
+    says: "Under the soloist, how far inside a fourth of the bass note the bottom of the hand sits, in semitones: a hand pressed down out of the line's way, onto the bass.",
+    // Without a soloist the hand sits well clear of the bass; it is the room made for the
+    // line that brings it down, so this is asked only there.
+    of: ({ voicing, line }) =>
+      line?.bass === null || line?.bass === undefined
+        ? 0
+        : Math.max(0, CLEAR_OF_THE_BASS - (voicing.pitches[0]! - line.bass)),
+  },
+  {
+    id: "top-leap",
+    says: "Around a solo, how far past a fourth the top voice jumps from the chord before, in semitones: the hand lurching out of the line's way, or lurching home (CH-65).",
+    // The movement costs are what a smooth step saves, so a reason strong enough can buy a
+    // jump of a fifth with them: a soloist sitting on the top note, or, when the solo is
+    // over, a hand that was pressed down out of the line's way and wants to be home. This
+    // prices the jump, so the hand gets out of the way and comes back by steps. It is asked
+    // only while the hand is away: with nobody soloing it never leaps.
+    of: ({ voicing, previous, away }) =>
+      away && previous ? Math.max(0, Math.abs(top(voicing) - top(previous)) - TOP_LEAP) : 0,
+  },
+  {
     id: "minor-ninths",
     says: "Minor ninths between voices: a clash, except on a dominant, where it is the colour.",
     of: (c) => (c.family === "dominant" ? 0 : rubs(c.voicing, true)),
@@ -144,6 +180,30 @@ export const VOICING_FEATURES: readonly Feature<VoicingCandidate>[] = [
     },
   },
   {
+    id: "on-the-soloists-note",
+    says: "Comp voices on the very pitch the soloist is sounding, each by the share of the chord's time the note fills: the comp sitting on the line (CH-59).",
+    of: ({ voicing, line }) => (line ? doubled(voicing, line, (a, b) => a === b) : 0),
+  },
+  {
+    id: "on-the-soloists-octave",
+    says: "Comp voices an octave or more from a pitch the soloist is sounding, by the same share: the line doubled (CH-59).",
+    of: ({ voicing, line }) =>
+      line ? doubled(voicing, line, (a, b) => a !== b && mod12(a - b) === 0) : 0,
+  },
+  {
+    id: "in-the-soloists-register",
+    says: "Comp voices at or above the lowest note the soloist plays in this bar or the bar before, or a half step under it: the piano in the line's register (CH-63).",
+    // The hand makes room only as far down as its own slot goes: under a line lower than the
+    // reach below its target (an alto sax down in its fourth octave) there is no room, and a
+    // hand pressed lower would only crowd the bass and turn to mud.
+    of: ({ voicing, line, register }) => {
+      const lowest = line?.lowest;
+      if (lowest === null || lowest === undefined) return 0;
+      const from = Math.max(lowest - 1, register.target - register.reach);
+      return voicing.pitches.filter((pitch) => pitch >= from).length;
+    },
+  },
+  {
     id: "low-intervals",
     says: "Neighbouring voices too low for the interval between them, which turns to mud (X-B-04).",
     of: ({ voicing }) => {
@@ -159,6 +219,56 @@ export const VOICING_FEATURES: readonly Feature<VoicingCandidate>[] = [
 ];
 
 /**
+ * A half step between the two lowest voices, except on a dominant from E4 up,
+ * where the 13th under the 7th is a colour in the middle of the keyboard (CH-66).
+ */
+function growls(voicing: Voicing, family: ChordFamily): boolean {
+  const [low, next] = voicing.pitches;
+  if (low === undefined || next === undefined || next - low !== 1) return false;
+  return family !== "dominant" || low < RUB_FLOOR;
+}
+
+/** Voices a pitch relation away from the soloist's notes, each by the share of the strike it fills. */
+function doubled(
+  voicing: Voicing,
+  line: StrikeLine,
+  related: (voice: number, solo: number) => boolean,
+): number {
+  let sum = 0;
+  for (const pitch of voicing.pitches) {
+    for (const note of line.over) if (related(pitch, note.pitch)) sum += note.ticks / line.length;
+  }
+  return sum;
+}
+
+/**
+ * What the search could not clear, the strike leaves out (CH-60): a voice on
+ * the soloist's very pitch for half the strike or a full beat goes, the top
+ * voice first. Never a tone the chord is heard by (the 3rd or suspension, the
+ * 7th or 6th, a written alteration: X-B-13), never the bottom of the hand,
+ * and never below two voices.
+ */
+function clear(voicing: Voicing, line: StrikeLine, needed: ReadonlySet<number>, root: number) {
+  const held = (pitch: number) =>
+    line.over.filter((note) => note.pitch === pitch).reduce((sum, note) => sum + note.ticks, 0);
+  const keep = voicing.pitches.map(() => true);
+  let left = voicing.pitches.length;
+  for (let i = voicing.pitches.length - 1; i > 0 && left > 2; i--) {
+    const pitch = voicing.pitches[i]!;
+    const ticks = held(pitch);
+    if (ticks === 0 || (ticks * 2 < line.length && ticks < PPQ)) continue;
+    if (needed.has(mod12(pitch - root))) continue;
+    keep[i] = false;
+    left--;
+  }
+  if (left === voicing.pitches.length) return voicing;
+  return {
+    pitches: voicing.pitches.filter((_, i) => keep[i]),
+    tones: voicing.tones.filter((_, i) => keep[i]),
+  };
+}
+
+/**
  * Voice every strike in order, each led from the one before. The same
  * strikes always get the same voicings.
  *
@@ -166,7 +276,9 @@ export const VOICING_FEATURES: readonly Feature<VoicingCandidate>[] = [
  * three chords all night, so two things are remembered instead of worked out
  * again: the ways a chord can be played (by its kind, root, quality and scale),
  * and where the hand is led from a given voicing to that chord. Both are what
- * would have been computed; nothing is chosen differently.
+ * would have been computed; nothing is chosen differently. A strike that hears
+ * the soloist (`lines`, one per strike) is chosen afresh, since the line
+ * over it is its own; then what the search could not clear is left out.
  */
 export function voiceStrikes(
   strikes: readonly Strike[],
@@ -174,12 +286,15 @@ export function voiceStrikes(
   chords: ChordStyle,
   idiom: InstrumentIdiom,
   weights: Readonly<Record<string, number>>,
+  lines: readonly (StrikeLine | null)[] = [],
 ): VoicedStrike[] {
   const ways = new Map<string, Way>();
   const wayAt = new Map<string, Way>();
   const voiced: VoicedStrike[] = [];
   let previous: Voicing | null = null;
-  for (const strike of strikes) {
+  // Whether the hand is still out of its place after a line it heard.
+  let away = false;
+  for (const [i, strike] of strikes.entries()) {
     const chord = strike.arrival.chord;
     const kind = chords.kinds[strike.kind];
     if (!chord || !kind) continue;
@@ -197,26 +312,42 @@ export function voiceStrikes(
           family: chordFamily(chord.quality),
           voicings: idiom.candidates(tones, root, chords.register),
           led: new Map(),
+          root,
+          needed: new Set(identity(chord, scale).map((tone) => tone.interval)),
         };
         ways.set(name, way);
       }
       wayAt.set(at, way);
     }
-    let next = way.led.get(previous);
+    const line = lines[i] ?? null;
+    if (line) away = true;
+    // A choice that hears the line, or is on its way home from one, is its own: only a
+    // strike with the hand in its own place is remembered.
+    let next: Voicing | null | undefined = away ? undefined : way.led.get(previous);
     if (next === undefined) {
+      // Under the line the hand is pressed down, toward where a half step on the bottom is a
+      // growl: there it is never taken while anything else will do (CH-66, KF-B-37).
+      const clean = line ? way.voicings.filter((voicing) => !growls(voicing, way.family)) : [];
+      const offered = clean.length > 0 ? clean : way.voicings;
       const { family } = way;
-      const candidates = way.voicings.map((voicing) => ({
+      const candidates = offered.map((voicing) => ({
         voicing,
         previous,
         register: chords.register,
         family,
+        line,
+        away,
       }));
       next = choose(candidates, VOICING_FEATURES, weights)?.candidate.voicing ?? null;
-      way.led.set(previous, next);
+      if (!away) way.led.set(previous, next);
     }
     if (next === null) continue;
+    // Home again: the line is gone and the top is back within reach of where the style aims it.
+    const { target, reach } = chords.register;
+    if (!line && Math.abs(top(next) - target) <= reach) away = false;
+    // The hand is led on from the whole voicing it chose, not from what was left sounding.
     previous = next;
-    voiced.push({ strike, voicing: next });
+    voiced.push({ strike, voicing: line ? clear(next, line, way.needed, way.root) : next });
   }
   return voiced;
 }
@@ -227,4 +358,8 @@ interface Way {
   readonly voicings: readonly Voicing[];
   /** From the voicing in hand (null: the first strike) to the one chosen; null when there is none. */
   readonly led: Map<Voicing | null, Voicing | null>;
+  /** The chord's root, as a pitch class. */
+  readonly root: number;
+  /** The tones the chord is heard by, as pitch classes above the root: never left out. */
+  readonly needed: ReadonlySet<number>;
 }

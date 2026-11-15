@@ -97,6 +97,42 @@ export const bluesCritic: CriticStyle = {
     // The opening bar never comes back: none. Loop 0%, scatter 24%, first plan 0.1%.
     "chords.phrases-unrelated": { max: 0.1, kind: "measured", minCases: 6 },
 
+    // ── the piano under the soloist ── counted only where the soloist has the lead, the
+    // pump left out. Three pianos on the same 64 takes: as built; deaf (no listening, the
+    // soloist weights at zero); and the first plan drawn, as written, with no critic.
+    //
+    // The piano on the soloist's very note: at most 15% of the time (CH-62). Delivers 10%
+    // under the vibraphone (deaf 30%). Under the alto sax, which lives in the piano's
+    // register and lands on 3rds and 7ths the hand may not give up, 20% (deaf 37%).
+    "chords.on-the-soloists-note": { max: 0.15, kind: "intent", minCases: 20 },
+    // Notes at or above the line's lowest: 12% (deaf 29%, worst take 35%).
+    "chords.in-the-soloists-register": { max: 0.25, kind: "measured", minCases: 40 },
+    // Strikes under a sounding note: 64% (deaf 67%, first plan 69%). By take the line's own
+    // density decides most of it, so the bound is loose; read it beside the next one.
+    "chords.overlap": { max: 0.78, kind: "measured", minCases: 20 },
+    // The same, over what a hand placed at random would catch: +0.04 by take at the middle
+    // (deaf +0.08, first plan +0.09). A blues figure's backbeats fall where the line is.
+    "chords.overlap-over-chance": { max: 0.09, kind: "measured", minCases: 20 },
+    // The soloist's notes with a strike on the same tick: 28% (deaf 30%).
+    "chords.struck-with-the-soloist": { max: 0.36, kind: "measured", minCases: 20 },
+    // Strikes per sixteenth: 0.148 under the line (deaf 0.163), 0.149 in the breaths (deaf
+    // 0.143). Q-16's 0.10 to 0.155 under the line is the jazz piano's; the blues chops more.
+    "chords.strikes-under-the-line": { min: 0.08, max: 0.2, kind: "measured", minCases: 20 },
+    "chords.strikes-in-breaths": { min: 0.1, max: 0.2, kind: "measured", minCases: 4 },
+    // Busier in the breaths than under the line: 1.03 (deaf 0.89, first plan 0.82). Short
+    // of Q-16's 1.1 to 2.0 for a comp that converses: what is not struck under the line is
+    // left out, and a stab in a breath needs a quarter's room the figure seldom leaves.
+    "chords.breaths-over-the-line": { min: 0.8, kind: "measured", minCases: 4 },
+    // Breaths holding a strike: 97% (deaf 95%). Q-16's 40% to 70% is for a sparser comp;
+    // here the figure itself fills nearly every breath, so this is a floor only.
+    "chords.breaths-answered": { min: 0.8, kind: "measured", minCases: 4 },
+    // Louder in the breaths by 1 to 12 velocity steps as played (Q-16). Delivers 4.2, every
+    // take at least 1 (deaf -1.5: the figure's backbeat accents fall under the line).
+    "chords.answers-louder": { min: 1, max: 12, kind: "intent", minCases: 4 },
+    // The hand does not flip to get out of the way (CH-65: under 1% with the phrase rule).
+    // Delivers 0.1%, deaf none.
+    "chords.top-leaps-under-the-solo": { max: 0.01, kind: "intent", minCases: 20 },
+
     // ── the soloist ──
     // A note on a change is a chord tone, by rule (X-B-06, Q-21).
     "solo.changes-on-chord-tones": { min: 1, kind: "intent" },
@@ -127,6 +163,9 @@ export const bluesCritic: CriticStyle = {
     "solo.long-breaths": { max: 0.12, kind: "intent", minCases: 8 },
     // The usual breath is a real one: 0.4 of a second or more at any tempo (Q-47).
     "solo.breath": { min: 0.4, kind: "intent", minCases: 4 },
+    // The breath above is the usual one of a beat or more; this one sees the short ones. Every
+    // phrase is followed by half a second of air before the next, a pickup into it included.
+    "solo.phrases-breathe": { min: 1, kind: "intent", minCases: 4 },
     // The last chorus has 1.5 to 4 times the notes of the first (SO-02). Delivers 2.1 on
     // average and a little under 1.5 in about one take in seven.
     "solo.builds": { min: 1.5, max: 4, kind: "intent" },
@@ -166,6 +205,26 @@ export const bluesCritic: CriticStyle = {
       "minor-seconds-thin": 24,
       "sharp-nine-under-third": 20,
       "low-intervals": 10,
+      // Under a soloist (CH-59, CH-63). A voice on the soloist's very note costs 26 for the
+      // whole of the strike, its octave 7 (the notes' numbers: at 14 the comp still sat on
+      // the note, at 30 it leapt to escape). Set to zero, the piano is on the vibraphone's
+      // note 16% of the time instead of 10%; without the octave it is on it a little less
+      // (8%) but leaps three times as often.
+      "on-the-soloists-note": 26,
+      "on-the-soloists-octave": 7,
+      // A voice in the line's register, judged by the bar. 3 a voice moves the hand under a
+      // vibraphone line (19% of notes in its register at zero, 12% at 3) without taking it
+      // past its reach; at 6 it gains two points more for a lower hand whose top moves
+      // further (1.43 semitones a change against 1.30).
+      "in-the-soloists-register": 3,
+      // A jump of the top past a fourth: the notes' 26 for sitting on the soloist's note buys
+      // an octave with the movement costs alone, and a hand pressed down under a line jumps
+      // home when the solo ends. At zero, 0.9% of strikes under a solo leap; at 10, 0.1%.
+      // It is asked only around a solo, so with nobody soloing nothing changes.
+      "top-leap": 10,
+      // The hand pressed down under the line must not sit on the bass (it never does
+      // without a soloist). At zero, 5% of takes put the piano on or under the bass once.
+      "crowds-the-bass-under-the-line": 4,
     },
     // What a phrase of comping costs. The first three are in comparable units, a share of
     // the phrase's strikes or strikes a bar; the rest are yes or no. Each was set to zero in
@@ -175,8 +234,27 @@ export const bluesCritic: CriticStyle = {
       // that lean reliably were what sounded right in the old band (ME-23): this moves
       // one strike in twenty, not the figure.
       "off-the-drums": 2,
-      // Stay out from under the soloist. Nothing to hear until there is a soloist (stage 3).
-      "under-the-soloist": 3,
+      // Under a soloist (CH-68 to CH-71): each plan is also offered laid out under the line,
+      // and answering its breaths, and the critic chooses. Stay out from under the soloist:
+      // with this at zero, 67% of strikes under a solo come down under a sounding note; at 3
+      // (before the laid-out ways existed) 65%; at 6, 64%, and 59 takes in 64 lower than a
+      // deaf piano on the same seeds.
+      "under-the-soloist": 6,
+      // But keep the time: a bar laid out below what the energy asks (CH-70, KF-B-35). At
+      // zero the piano lays out to one strike in 30% of the working-level bars under a solo
+      // (11% deaf) and the loud bars fall under three strikes in most takes; at 2, 16%.
+      thinned: 2,
+      // Speak in the breaths. A blues figure already has a strike in 95% of them (chops two
+      // beats apart, breaths most often a bar), so the answer is mostly the lift: at zero the
+      // piano plays half a step quieter in the breaths than under the line, at 0.5 four
+      // steps louder.
+      "breaths-unanswered": 0.5,
+      // An empty breath. With the stab's rules (a quarter clear of every strike) a blues
+      // figure leaves almost no empty breath that can take one: at zero nothing moves.
+      "breaths-left-empty": 1.5,
+      // A strike in the eighth before the soloist comes back in: 14% of breaths at zero, 8%
+      // at 1, 5% at 3, where the overlap starts to rise.
+      "steps-on-the-entrance": 1,
       // As busy as the energy asks: within a tier, a higher bar takes the busier answer.
       "off-the-energy": 1,
       // Not one bar four times, unless everything else about it is better by this much.

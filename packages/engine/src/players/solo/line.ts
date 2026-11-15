@@ -12,7 +12,7 @@ import type { PlanBar } from "../../plan/types.ts";
 import type { Rng } from "../../rng.ts";
 import type { ToneRole } from "../../theory/chord.ts";
 import type { Pool } from "./harmony.ts";
-import { climb, EIGHTH, isChordTone, landing, rubs, rung } from "./harmony.ts";
+import { climb, EIGHTH, isChordTone, landing, onlyPasses, rubs, rung } from "./harmony.ts";
 import type { World } from "./slots.ts";
 import type { Cell, Contour } from "./style.ts";
 
@@ -43,6 +43,8 @@ export interface LineAsk {
   readonly contour: (through: number) => number;
   /** Where the last note may rest, best first. */
   readonly ending: readonly ToneRole[];
+  /** The last note is the last of the tune: it rests on one of `ending`'s tones and no other. */
+  readonly final: boolean;
   /** The pitch the soloist last played, which the first note leans halfway toward (SO-14). */
   readonly from: number | null;
   /** Where the phrase before came to rest: this one rests somewhere else (SO-14). */
@@ -102,6 +104,9 @@ export const placeOf = (bar: PlanBar, tick: number): string =>
 
 const onBeat = (spot: Spot) => (spot.tick - spot.bar.start) % PPQ === 0;
 const long = (spot: Spot) => spot.hold > EIGHTH;
+/** A note the chord does not allow where it would be heard as more than passing. */
+const wrong = (spot: Spot, pitch: number) =>
+  (onBeat(spot) || long(spot)) && onlyPasses(spot.pool, pitch);
 
 /** A remembered pitch over the chord now under it: kept if it still belongs, else the nearest that does (SO-33). */
 function fit(world: World, spot: Spot, pitch: number, lands: boolean, ask: LineAsk): number {
@@ -119,7 +124,9 @@ function fit(world: World, spot: Spot, pitch: number, lands: boolean, ask: LineA
         );
   }
   // The nearest note of the pool that is inside the phrase's register.
-  const reachable = pool.ladder.filter((rung) => rung >= ask.low && rung <= ask.high);
+  const reachable = pool.ladder.filter(
+    (rung) => rung >= ask.low && rung <= ask.high && !wrong(spot, rung),
+  );
   return reachable.reduce(
     (best, rung) => (Math.abs(rung - inside) < Math.abs(best - inside) ? rung : best),
     reachable[0] ?? pool.ladder[rung(pool, inside)]!,
@@ -171,15 +178,14 @@ export function writeLine(world: World, bars: readonly LineBar[], ask: LineAsk):
       const was = ask.given.get(i - 1);
       if (i > 0 && pitch === pitches[i - 1] && was !== undefined && was !== given) {
         const way = Math.sign(given - was);
-        const next = climb(spot.pool, pitch, way);
-        const other = climb(spot.pool, pitch, -way);
+        // The rung beside it that way, else the other way, else a rung further on.
+        const held = pitch;
+        const beside = [way, -way, 2 * way, -2 * way]
+          .map((rungs) => climb(spot.pool, held, rungs))
+          .find((p) => p !== held && p <= high && p >= ask.low && !wrong(spot, p));
         pitch = lands
           ? landing(spot.pool, pitch + 2 * way, solo.arrive, ask.low, high, [pitch])
-          : next <= high && next >= ask.low
-            ? next
-            : other <= high && other >= ask.low
-              ? other
-              : pitch;
+          : (beside ?? pitch);
       }
       pitches[i] = pitch;
       if (lands) [landed, landedAt] = [pitch, i];
@@ -196,7 +202,15 @@ export function writeLine(world: World, bars: readonly LineBar[], ask: LineAsk):
     const not = [landed, last ? ask.notOn : null].filter(
       (pitch): pitch is number => pitch !== null,
     );
-    pitches[i] = landing(spot.pool, ideal, last ? ask.ending : solo.arrive, ask.low, high, not);
+    pitches[i] = landing(
+      spot.pool,
+      ideal,
+      last ? ask.ending : solo.arrive,
+      ask.low,
+      high,
+      not,
+      last && ask.final,
+    );
     [landed, landedAt] = [pitches[i]!, i];
   }
 
@@ -248,7 +262,8 @@ export function writeLine(world: World, bars: readonly LineBar[], ask: LineAsk):
     // An enclosure: the step above the landing, the half step under it, then the landing (SO-26).
     if (left === 2 && !long(spot) && !long(spots[i + 1]!) && !onBeat(spots[i + 1]!)) {
       const above = climb(spot.pool, target, 1);
-      const circles = above !== before && inWindow(above) && inWindow(target - 1);
+      const circles =
+        above !== before && inWindow(above) && inWindow(target - 1) && !wrong(spot, above);
       if (circles && draw.fork("enclosure").chance(solo.habits.enclosure)) {
         pitches[i] = above;
         pitches[i + 1] = target - 1;
@@ -296,7 +311,7 @@ export function writeLine(world: World, bars: readonly LineBar[], ask: LineAsk):
         // On a beat a chord tone beats a passing tone a step and a half nearer (SO-25).
         (onBeat(spot) && !isChordTone(spot.pool, pitch) ? 1.5 : 0) +
         (long(spot) && rubs(spot.pool, pitch) ? 3 : 0) +
-        (spot.pool.passing.has(pitch % 12) && (onBeat(spot) || long(spot)) ? 50 : 0) +
+        (wrong(spot, pitch) ? 1000 : 0) +
         // Coming back to a note just played is a turn the first time and circling after
         // that; a-b-a-b is a trill (SO-49).
         1.5 * [2, 3, 4, 5].filter((back) => pitches[i - back] === pitch).length +
@@ -337,7 +352,8 @@ function approach(
   const sides = (before <= target ? [below, above] : [above, below]).filter(
     (pitch): pitch is number => pitch !== undefined && pitch >= ask.low && pitch <= ask.high,
   );
-  const clean = sides.filter((pitch) => pitch !== before && !(long(spot) && rubs(pool, pitch)));
+  const allowed = (pitch: number) => !(long(spot) && rubs(pool, pitch)) && !wrong(spot, pitch);
+  const clean = sides.filter((pitch) => pitch !== before && allowed(pitch));
   if (clean.length > 0) return clean[0]!;
   // Nothing beside it will do: the nearest note that would, from the line's side if it can.
   const side = before <= target ? -1 : 1;
@@ -348,7 +364,7 @@ function approach(
         pitch <= ask.high &&
         pitch !== target &&
         pitch !== before &&
-        !(long(spot) && rubs(pool, pitch)),
+        allowed(pitch),
     )
     .sort((a, b) => Math.abs(a - target) - Math.abs(b - target));
   return (

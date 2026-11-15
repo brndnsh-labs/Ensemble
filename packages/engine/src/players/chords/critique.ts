@@ -8,6 +8,9 @@ import type { Feature } from "../../critic/types.ts";
 import type { Heard } from "../../perform/notes.ts";
 import type { PlanBar } from "../../plan/types.ts";
 import { GHOST_BELOW } from "../drums/kit.ts";
+import { EIGHTH } from "./bar.ts";
+import type { Hearing, WayName } from "./converse.ts";
+import { inBreath } from "./converse.ts";
 import type { BarRhythm } from "./rhythm.ts";
 import { alike, samePhrase } from "./rhythm.ts";
 import type { Strike } from "./strike.ts";
@@ -19,8 +22,15 @@ export interface PhraseCandidate {
   readonly bars: readonly PlanBar[];
   /** The figure played in each of those bars: the plan as a musician would say it. */
   readonly figures: readonly CompFigure[];
+  /** How the plan is played around the soloist; "as written" where nobody solos. */
+  readonly way: WayName;
+  /** The strikes that would sound, played that way. */
   readonly strikes: readonly Strike[];
-  /** Each bar's rhythm, as it will be heard. */
+  /**
+   * Each bar's rhythm in the plan as written. The phrase's shape (a loop, a
+   * return, the phrase before again) is the plan's; a way of playing it around
+   * the soloist is the same plan, and is judged as such.
+   */
   readonly rhythm: readonly BarRhythm[];
   /** The rhythm of the phrase played before this one. Null at the very top. */
   readonly before: readonly BarRhythm[] | null;
@@ -30,7 +40,12 @@ export interface PhraseCandidate {
   readonly busy: readonly number[];
   /** What the seats that played first wrote: the drummer, and from stage 3 the soloist. */
   readonly heard: Heard;
+  /** The soloist's line and breaths, where the soloist has the lead and the hand listens; else null. */
+  readonly hearing: Hearing | null;
 }
+
+/** The candidate's strikes with those played just before it: what a breath reaching back may hold. */
+const around = ({ strikes, hearing }: PhraseCandidate) => [...(hearing?.before ?? []), ...strikes];
 
 /** The drum strokes a comp can land with: kick and backbeat, not ghosts or a feathered kick. */
 const LANDINGS: readonly string[] = ["kick", "snare", "crossStick"];
@@ -73,6 +88,62 @@ export const COMPING_FEATURES: readonly Feature<PhraseCandidate>[] = [
         ),
       );
       return under.length / strikes.length;
+    },
+  },
+  {
+    id: "breaths-left-empty",
+    says: "The share of the soloist's breaths with nothing from the piano in them: a hole left unanswered.",
+    of: (candidate) => {
+      const breaths = candidate.hearing?.breaths ?? [];
+      if (breaths.length === 0) return 0;
+      const struck = around(candidate);
+      const empty = breaths.filter(
+        (breath) => !struck.some((strike) => inBreath(breath, strike.tick)),
+      );
+      return empty.length / breaths.length;
+    },
+  },
+  {
+    id: "breaths-unanswered",
+    says: "The share of the soloist's breaths in which the piano does not speak up: nothing put in, nothing played harder, only what it was playing anyway.",
+    of: (candidate) => {
+      const breaths = candidate.hearing?.breaths ?? [];
+      if (breaths.length === 0) return 0;
+      const unanswered = breaths.filter(
+        (breath) =>
+          !candidate.strikes.some((strike) => strike.answers && inBreath(breath, strike.tick)),
+      );
+      return unanswered.length / breaths.length;
+    },
+  },
+  {
+    id: "steps-on-the-entrance",
+    says: "The share of the soloist's breaths in which the piano strikes in the eighth before the soloist comes back in: an answer that steps on the line.",
+    of: (candidate) => {
+      const breaths = candidate.hearing?.breaths ?? [];
+      if (breaths.length === 0) return 0;
+      const stepped = breaths.filter(
+        (breath) =>
+          breath.back &&
+          candidate.strikes.some(
+            (strike) => strike.tick >= breath.to - EIGHTH && strike.tick < breath.to,
+          ),
+      );
+      return stepped.length / breaths.length;
+    },
+  },
+  {
+    id: "thinned",
+    says: "The share of the phrase's bars laid out below what the energy asks for (rounded down) where the plan had that much: a piano so far out of the line's way that it no longer keeps the time (CH-70, KF-B-35).",
+    // Off the energy weighs every strike alike; this is the floor under it. Only a way that
+    // leaves strikes out can go below the plan, so the plan as written never pays it.
+    of: (candidate) => {
+      const { bars, rhythm, busy } = candidate;
+      const thin = bars.filter((bar, i) => {
+        const floor = Math.min(rhythm[i]!.steps.length, Math.floor(busy[i]!));
+        return strikesIn(candidate, bar) < floor;
+      });
+      return thin.length / Math.max(1, bars.length);
     },
   },
   {

@@ -47,6 +47,9 @@ export function planBars(
   const bodyBarsPerPass = Math.max(1, options.mode === "jam" ? bodyOf(expanded).length : 1);
 
   const climax = soloClimax(options, passes, open);
+  const breath = climax === undefined ? undefined : soloBreath(climax, passes, open);
+  const rise = (pass: number) =>
+    climax === undefined ? undefined : soloRise(pass, climax, passes, open);
 
   // First the music, bar by bar, without marks that depend on a neighbour.
   const drafts: Draft[] = [];
@@ -77,6 +80,8 @@ export function planBars(
               phraseStart: phraseStart / bodyBarsPerPass,
               phraseEnd: Math.min(1, (phraseStart + phraseLength) / bodyBarsPerPass),
               ...(climax === undefined ? {} : { climax }),
+              ...(breath === undefined ? {} : { breath }),
+              ...(rise(run.pass) === undefined ? {} : { rise: rise(run.pass)! }),
             })
           : 0;
       drafts.push({
@@ -478,6 +483,37 @@ function soloClimax(options: PlanOptions, passes: number, open: boolean): number
     if (best === undefined || Math.abs(pass - wanted) <= Math.abs(best - wanted)) best = pass;
   }
   return best;
+}
+
+/**
+ * The pass a jam with a soloist takes its breath on. A band comes down before
+ * its last chorus, but never under a solo that is under way: there the breath
+ * is the nearest chorus the soloist laid out for, and the band comes back up
+ * with the solo. Undefined where the usual place, the pass before the last, is
+ * the band's own; -1 where there is no chorus of rest after the peak to take
+ * it on.
+ */
+function soloBreath(climax: number, passes: number, open: boolean): number | undefined {
+  const last = passes - 1;
+  if (soloTurn(last - 1, passes, open) === null) return undefined;
+  for (let pass = last - 1; pass > climax; pass--) {
+    if (soloTurn(pass, passes, open) === null) return pass;
+  }
+  return -1;
+}
+
+/**
+ * How far through its build a solo after the jam's peak is on a pass: 0 on its
+ * first chorus, 1 on its last. A long jam has solos after its peak, and the
+ * band builds under each of them as it did under the first (SO-05). Undefined
+ * for a solo of one chorus, and for one that runs into the last pass, which
+ * the jam's own closing lift carries.
+ */
+function soloRise(pass: number, climax: number, passes: number, open: boolean): number | undefined {
+  const turn = soloTurn(pass, passes, open);
+  if (!turn || turn.of < 2 || pass <= climax) return undefined;
+  if (pass - turn.chorus + turn.of - 1 >= passes - 1) return undefined;
+  return turn.chorus / (turn.of - 1);
 }
 
 /** Add a lift without leaving the tier the bar is in. */

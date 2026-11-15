@@ -22,6 +22,8 @@ export interface Strike {
   readonly arrival: Arrival;
   /** The name of the style's voicing kind the strike asks for. */
   readonly kind: string;
+  /** Played as an answer to the soloist: put into a breath, or played harder there (CH-71). */
+  readonly answers?: true;
 }
 
 /**

@@ -9,6 +9,7 @@ import type { Pick } from "./critique.ts";
 import { byCritic } from "./critique.ts";
 import { endingStrikes } from "./ending.ts";
 import { IDIOM_PLAYERS } from "./idiom.ts";
+import { lineOf, strikeLines } from "./line.ts";
 import { compStrikes, comps } from "./phrase.ts";
 import { plainStrikes } from "./plain.ts";
 import { voiceStrikes } from "./voicing.ts";
@@ -32,8 +33,18 @@ export function chordPart(context: PlayerContext, pick?: Pick): WrittenNote[] {
     ...plan.bars.flatMap((bar) => endingStrikes(bar, harmony, chords)),
   ].sort((a, b) => a.tick - b.tick);
 
-  // 2. Voicing.
-  const voiced = voiceStrikes(strikes, harmony, chords, idiom, style.critic.weights.voicing ?? {});
+  // 2. Voicing. Where the seat listens, each strike hears what the soloist plays over it.
+  // When the solo is over the hand is led on from where the line left it, and the pull
+  // of its own register brings it home by steps: it does not jump back.
+  const line = chords.listening ? lineOf(context.heard) : [];
+  const voiced = voiceStrikes(
+    strikes,
+    harmony,
+    chords,
+    idiom,
+    style.critic.weights.voicing ?? {},
+    line.length === 0 ? [] : strikeLines(strikes, plan, line, lineOf(context.heard, "bass")),
+  );
 
   // 3. Idiom.
   return idiom.write(voiced);

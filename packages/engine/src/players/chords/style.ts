@@ -245,6 +245,23 @@ export interface Anticipation {
   readonly stroke: string;
 }
 
+/**
+ * How the hand listens to a soloist (CH-59 to CH-71). Its voicings keep off
+ * the soloist's note and out of its register, by the critic's voicing weights;
+ * and a phrase may be played around the line, leaving out what would come
+ * down under it and speaking in its breaths. Whether a phrase is played that
+ * way is the critic's choice (`critic.weights.comping`); this says what the
+ * ways are made of.
+ */
+export interface Listening {
+  /** The shortest silence of the soloist the hand hears as a breath, in sixteenths (CH-71: six, a dotted quarter). */
+  readonly breath: number;
+  /** The stab put into a breath the figure leaves empty: its written level, and its length in sixteenths (an eighth at most). */
+  readonly answer: Attack;
+  /** How much harder a strike of the figure is played when it falls in a breath. */
+  readonly lift: number;
+}
+
 export interface ChordStyle {
   readonly idiom: Idiom;
   /** The ways of voicing a chord, by name. A strike asks for one of them by name. */
@@ -259,6 +276,14 @@ export interface ChordStyle {
    */
   readonly rhythm: RhythmBook | null;
   readonly anticipation: Anticipation;
+  /**
+   * How the seat listens to a soloist. Null for a seat that does not: it plays
+   * as if nobody were soloing, as the organ does (CH-60, CH-68). Where it
+   * listens, every voicing hears the line, and a phrase may be played around
+   * it; a figure marked `groove` keeps its rhythm whatever this says, as a
+   * funk chop and the boogie pump do (CH-68, ST-blues-33).
+   */
+  readonly listening: Listening | null;
   /** The final chord (CH-74, EN-14 to EN-19). */
   readonly ending: {
     /** The written level of the final chord. */

@@ -24,9 +24,12 @@ import { planBar } from "../../plan/types.ts";
 import type { Tier } from "../../style/types.ts";
 import { TIER_HIGH, TIER_MID, tierOf } from "../../style/types.ts";
 import { barStrikes, EIGHTH, landing } from "./bar.ts";
+import type { Hearing, PhraseHarmony } from "./converse.ts";
+import { hear, waysOf } from "./converse.ts";
 import type { PhraseCandidate, Pick } from "./critique.ts";
 import type { FigureStroke } from "./figure.ts";
 import { strokesOf } from "./figure.ts";
+import { lineOf } from "./line.ts";
 import type { Stretch } from "./plain.ts";
 import { stretches } from "./plain.ts";
 import type { BarRhythm } from "./rhythm.ts";
@@ -247,24 +250,44 @@ export function compStrikes(
     phrases.at(-1)!.push(bar);
   }
 
+  // Around a soloist: where it has the lead in a phrase, and the section's figure is a
+  // conversation and not a groove, each plan is also offered played around the line.
+  const listening = chords.listening;
+  const line = listening ? lineOf(heard) : [];
+  const harmonyOf: PhraseHarmony = {
+    own,
+    changesAfter: (bar) => changeAfter(bar) !== null,
+    hold: book.hold,
+  };
+  const hearing = (bars: readonly PlanBar[], played: readonly Strike[]): Hearing | null =>
+    listening && line.length > 0 && bars.some((bar) => bar.solo !== null) && !home(bars[0]!).groove
+      ? hear(bars, plan.bars, line, listening, played)
+      : null;
+
   const strikes: Strike[] = [];
   let before: readonly BarRhythm[] | null = null;
   const played = new Map<string, readonly BarRhythm[]>();
   for (const bars of phrases) {
     const tier = tierAt(bars[0]!);
     const place = `${bars[0]!.section.identity}/${bars[0]!.phrase.index}`;
-    const candidates = plans(bars[0]!).map((figures): PhraseCandidate => {
+    const heardHere = hearing(bars, strikes);
+    const candidates = plans(bars[0]!).flatMap((figures): PhraseCandidate[] => {
       const struck = realise(bars, tier, figures);
-      return {
+      const plan = {
         bars,
         figures: bars.map((bar) => figures[bar.phrase.bar]!),
-        strikes: struck,
         rhythm: rhythmOf(bars, struck),
         before,
         lastTime: played.get(place) ?? null,
         busy: bars.map((bar) => aim(book.tiers[tier], bar.seats.chords ?? bar.energy)),
         heard,
+        hearing: heardHere,
       };
+      return waysOf(struck, bars, heardHere, listening, harmonyOf).map((way) => ({
+        ...plan,
+        way: way.name,
+        strikes: way.strikes,
+      }));
     });
     const chosen = pick(candidates);
     strikes.push(...chosen.strikes);

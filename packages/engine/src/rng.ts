@@ -22,11 +22,22 @@ export interface Rng {
 }
 
 export function createRng(seed: number | string): Rng {
-  return rngAt(`seed:${seed}`);
+  return rngAt(absorb(START, `seed:${seed}`));
 }
 
-function rngAt(path: string): Rng {
-  const next = sfc32(hashString(path));
+/**
+ * A stream is named by its path of labels from the seed. Only the hash of the
+ * path is kept, part-way through: a fork carries on hashing from there with
+ * its own labels, so naming a stream costs its labels and not the whole path,
+ * and the numbers themselves are not set up until one is asked for. Most
+ * streams are only ever forked from.
+ */
+function rngAt(path: Hash): Rng {
+  let step: (() => number) | undefined;
+  const next = (): number => {
+    step ??= sfc32(finish(path));
+    return step();
+  };
   const rng: Rng = {
     next,
     int: (n) => Math.floor(next() * n),
@@ -48,17 +59,18 @@ function rngAt(path: string): Rng {
       }
       return items[items.length - 1]!;
     },
-    fork: (...labels) => rngAt(`${path}/${labels.join("/")}`),
+    fork: (...labels) => rngAt(absorb(path, `/${labels.join("/")}`)),
   };
   return rng;
 }
 
-/** Four 32-bit words from a string (the cyrb128 mixing function). */
-function hashString(text: string): [number, number, number, number] {
-  let h1 = 1779033703;
-  let h2 = 3144134277;
-  let h3 = 1013904242;
-  let h4 = 2773480762;
+type Hash = readonly [number, number, number, number];
+
+/** The cyrb128 mixing function, in two halves: text is taken in a character at a time... */
+const START: Hash = [1779033703, 3144134277, 1013904242, 2773480762];
+
+function absorb(hash: Hash, text: string): Hash {
+  let [h1, h2, h3, h4] = hash;
   for (let i = 0; i < text.length; i++) {
     const k = text.charCodeAt(i);
     h1 = h2 ^ Math.imul(h1 ^ k, 597399067);
@@ -66,6 +78,12 @@ function hashString(text: string): [number, number, number, number] {
     h3 = h4 ^ Math.imul(h3 ^ k, 951274213);
     h4 = h1 ^ Math.imul(h4 ^ k, 2716044179);
   }
+  return [h1, h2, h3, h4];
+}
+
+/** ...and four well-mixed 32-bit words are drawn from what has been taken in. */
+function finish(hash: Hash): [number, number, number, number] {
+  let [h1, h2, h3, h4] = hash;
   h1 = Math.imul(h3 ^ (h1 >>> 18), 597399067);
   h2 = Math.imul(h4 ^ (h2 >>> 22), 2869860233);
   h3 = Math.imul(h1 ^ (h3 >>> 17), 951274213);

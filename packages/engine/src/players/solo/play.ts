@@ -224,7 +224,17 @@ function realise(world: World, phrase: Phrase, accent: number): SoloNote[] {
       duration = arrival.tick - tick;
       break;
     }
-    if (next && next.spot.tick - (tick + duration) >= breath) breathed = next.spot.tick;
+    // Whether that left a breath is judged as heard too: swing carries the end of a note
+    // cut on an "and" later, and a gap that is a breath on paper may not be one.
+    const heard = (at: number, where: PlanBar) => {
+      const within = at - where.start;
+      const swung = where.meter.unit === 4 && within < where.ticks;
+      return where.start + (swung ? swing(within, world.feel) : within);
+    };
+    if (next) {
+      const gap = heard(next.spot.tick, next.spot.bar) - heard(tick + duration, bar);
+      if (gap >= breath) breathed = next.spot.tick;
+    }
     return [{ bar, tick, duration: Math.max(SHORTEST, duration), pitch, velocity }];
   });
 }

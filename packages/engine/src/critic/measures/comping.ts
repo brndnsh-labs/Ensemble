@@ -119,10 +119,18 @@ export function pumping(take: Take): Set<number> {
   return new Set(bars.filter((bar) => hammered(rhythm.get(bar.index)!)).map((bar) => bar.index));
 }
 
-/** The phrases that are a conversation: three bars or more, none of them hammered. */
+/**
+ * The phrases that are a conversation: three bars or more, none of them
+ * hammered, and none where the soloist has the lead. Under a solo the hand
+ * leaves strikes out and puts answers in around the line, so what is played
+ * there is not the plan's shape; the conversation has its own measures.
+ */
 const spoken = (take: Take) =>
   read(take).phrases.filter(
-    (phrase) => phrase.bars.length >= 3 && !phrase.rhythm.some((bar) => hammered(bar)),
+    (phrase) =>
+      phrase.bars.length >= 3 &&
+      !phrase.rhythm.some((bar) => hammered(bar)) &&
+      phrase.bars.every((bar) => bar.solo === null),
   );
 
 function strikesPerBar(take: Take, tier: Tier): Measurement | null {
@@ -259,7 +267,7 @@ export const compingMeasures: readonly Measure[] = [
   {
     id: "chords.bar-same-as-last",
     seat: "chords",
-    says: "About half the time a bar's rhythm is the bar before it again: the figure is there to be heard, and it does not go round like a loop.",
+    says: "About half the time a bar's rhythm is the bar before it again: the figure is there to be heard, and it does not go round like a loop. Away from a solo.",
     unit: "share",
     of(take) {
       const { bars, rhythm } = read(take);
@@ -271,6 +279,7 @@ export const compingMeasures: readonly Measure[] = [
         const last = take.plan.bars[bar.index - 1];
         if (!before || last?.section.occurrence !== bar.section.occurrence) continue;
         if (hammered(now) || hammered(before)) continue;
+        if (bar.solo !== null || last.solo !== null) continue;
         pairs++;
         if (alike(now, before)) same++;
       }
@@ -280,7 +289,7 @@ export const compingMeasures: readonly Measure[] = [
   {
     id: "chords.phrase-same-as-last",
     seat: "chords",
-    says: "Now and then a phrase is the phrase before it again, bar for bar; mostly it is not.",
+    says: "Now and then a phrase is the phrase before it again, bar for bar; mostly it is not. Away from a solo.",
     unit: "share",
     of(take) {
       const phrases = spoken(take);
@@ -298,7 +307,7 @@ export const compingMeasures: readonly Measure[] = [
   {
     id: "chords.phrase-same-as-last-chorus",
     seat: "chords",
-    says: "A phrase is seldom the very phrase that was played at this place the last time through at this level: the choruses are not copies.",
+    says: "A phrase is seldom the very phrase that was played at this place the last time through at this level: the choruses are not copies. Away from a solo.",
     unit: "share",
     of(take) {
       // The same figure coming back in the same place is the honest count of repetition (ME-22).
@@ -322,21 +331,21 @@ export const compingMeasures: readonly Measure[] = [
   {
     id: "chords.phrases-shaped",
     seat: "chords",
-    says: "Most phrases have a shape: the bar that opens the phrase comes back in it, and some bar answers or turns.",
+    says: "Most phrases have a shape: the bar that opens the phrase comes back in it, and some bar answers or turns. Away from a solo.",
     unit: "share",
     of: (take) => phraseShape(take, (rhythm) => returns(rhythm) && turns(rhythm)),
   },
   {
     id: "chords.phrases-one-bar",
     seat: "chords",
-    says: "Few phrases are one bar played over and over: that is a loop.",
+    says: "Few phrases are one bar played over and over: that is a loop. Away from a solo.",
     unit: "share",
     of: (take) => phraseShape(take, (rhythm) => !turns(rhythm)),
   },
   {
     id: "chords.phrases-unrelated",
     seat: "chords",
-    says: "Few phrases never come back to the bar they opened with: that is bars in a row, not a phrase.",
+    says: "Few phrases never come back to the bar they opened with: that is bars in a row, not a phrase. Away from a solo.",
     unit: "share",
     of: (take) => phraseShape(take, (rhythm) => !returns(rhythm)),
   },

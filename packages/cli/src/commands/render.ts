@@ -3,7 +3,7 @@
 import { basename } from "node:path";
 import { parseArgs } from "node:util";
 import type { Seat, TakeOptions } from "@ensemble/engine";
-import { parseKey } from "@ensemble/engine";
+import { parseKey, SOLO_INSTRUMENTS } from "@ensemble/engine";
 import { STYLES } from "@ensemble/styles";
 import type { Command } from "../command.ts";
 import { readChart, UsageError } from "../command.ts";
@@ -14,7 +14,7 @@ const SEAT_NAMES: readonly Seat[] = ["drums", "bass", "chords", "solo"];
 export const renderCommand: Command = {
   summary: "play the chart and write the performance as a MIDI file",
   usage:
-    "<chart> [--out take.mid] [--save take.json] [--style S] [--seed N] [--minutes M | --passes P] [--song] [--solo] [--tempo BPM] [--energy 0..1] [--key K] [--without seat,seat] [--no-count-in]",
+    "<chart> [--out take.mid] [--save take.json] [--style S] [--seed N] [--minutes M | --passes P] [--song] [--solo] [--solo-instrument NAME] [--tempo BPM] [--energy 0..1] [--key K] [--without seat,seat] [--no-count-in]",
   run(args) {
     const { positionals, values } = parseArgs({
       args,
@@ -28,6 +28,7 @@ export const renderCommand: Command = {
         passes: { type: "string", short: "p" },
         song: { type: "boolean", default: false },
         solo: { type: "boolean", default: false },
+        "solo-instrument": { type: "string" },
         tempo: { type: "string", short: "t" },
         energy: { type: "string", short: "e" },
         key: { type: "string", short: "k" },
@@ -60,6 +61,14 @@ export const renderCommand: Command = {
     if (values.key !== undefined && !key)
       throw new UsageError(`--key: "${values.key}" is not a key (try Bb or F#m)`);
 
+    // Asking for an instrument is asking for the soloist.
+    const instrument = values["solo-instrument"];
+    if (instrument !== undefined && !Object.hasOwn(SOLO_INSTRUMENTS, instrument)) {
+      throw new UsageError(
+        `--solo-instrument: no "${instrument}" (instruments: ${Object.keys(SOLO_INSTRUMENTS).join(", ")})`,
+      );
+    }
+
     const minutes = number("minutes", values.minutes);
     const passes = number("passes", values.passes);
     const tempo = number("tempo", values.tempo);
@@ -71,7 +80,8 @@ export const renderCommand: Command = {
       mode: values.song ? "song" : "jam",
       seed: values.seed,
       countIn: !values["no-count-in"],
-      ...(values.solo ? { solo: true } : {}),
+      ...(values.solo || instrument !== undefined ? { solo: true } : {}),
+      ...(instrument === undefined ? {} : { soloInstrument: instrument }),
       without: without as Seat[],
       ...(minutes === undefined ? {} : { minutes }),
       ...(passes === undefined ? {} : { passes }),

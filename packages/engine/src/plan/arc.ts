@@ -17,6 +17,16 @@ export interface ArcPosition {
    * with its soloist. Left out, the jam peaks about two thirds of the way through.
    */
   readonly climax?: number;
+  /**
+   * The pass the band takes its breath on, when a solo says where; -1 for no
+   * breath at all. Left out, it is the pass before the last.
+   */
+  readonly breath?: number;
+  /**
+   * How far through its build a solo after the peak is on this pass, 0 to 1:
+   * the band comes back up under it, from where it settled to the peak again.
+   */
+  readonly rise?: number;
 }
 
 /** Where a jam of `passes` peaks when nothing else says: its climax pass ends about two thirds in. */
@@ -52,6 +62,7 @@ export function arcOffset(arc: ArcStyle, at: ArcPosition): number {
   }
   if (at.pass === climax) return leaning(shape.climax);
   // One pass of breath before the last; holding back is not building, so it does not lean.
-  if (at.pass === last - 1) return shape.breath;
+  if (at.pass === (at.breath ?? last - 1)) return shape.breath;
+  if (at.rise !== undefined) return shape.settle + (shape.climax - shape.settle) * at.rise;
   return shape.settle;
 }

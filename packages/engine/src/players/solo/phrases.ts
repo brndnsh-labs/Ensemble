@@ -14,7 +14,7 @@ import { cells, STEP } from "../../perform/grid.ts";
 import type { Rng } from "../../rng.ts";
 import type { ToneRole } from "../../theory/chord.ts";
 import { pitchClass } from "../../theory/pitch.ts";
-import { climb, EIGHTH, isChordTone, landing } from "./harmony.ts";
+import { climb, EIGHTH, isChordTone, landing, onlyPasses } from "./harmony.ts";
 import type { LineBar, Spot } from "./line.ts";
 import { contourOf, spotsOf, writeLine } from "./line.ts";
 import type { Slot, World } from "./slots.ts";
@@ -150,10 +150,12 @@ export function phrasesFor(
       contour: ask.contour,
       // The last note of the take rests, whatever the phrase was for.
       ending: final ? solo.settle : ask.ending,
+      final,
       from: memory.rest,
       notOn: memory.rest,
-      // The climb ends on the solo's one top note (SO-05).
-      climbsTo: slot.peak ? { to: slot.top, above: memory.highest } : null,
+      // The climb ends on the solo's one top note (SO-05), unless its last note is the
+      // tune's: a tune comes to rest, it does not stop on the top.
+      climbsTo: slot.peak && !final ? { to: slot.top, above: memory.highest } : null,
       given,
       rng: rng.fork("habits"),
     });
@@ -434,12 +436,19 @@ export function phrasesFor(
  * silence after the phrase before, and it never crosses into a chorus from
  * outside it (SO-37).
  */
+/** A note that says another chord, where it would be heard as more than passing: on a beat or held. */
+const wrong = (spot: Spot, pitch: number): boolean =>
+  ((spot.tick - spot.bar.start) % PPQ === 0 || spot.hold > EIGHTH) && onlyPasses(spot.pool, pitch);
+
 function withPickup(world: World, phrase: Phrase, memory: Memory, rng: Rng): Phrase {
   const { solo, plan } = world;
   const habit = solo.habits.pickup;
   if (habit.figures.length === 0) return phrase;
-  // An eighth of silence after the phrase before (SO-37); a horn needs its whole breath.
-  const breath = (world.instrument.breath?.takes ?? 0) * world.ticksPerSecond;
+  // An eighth of silence after the phrase before (SO-37), and never less than the breath
+  // every phrase is owed (Q-47): at a fast tempo an eighth is no air at all, and a pickup
+  // that fills the breath runs two phrases together. A horn needs its own breath too.
+  const breath =
+    Math.max(solo.space.breath, world.instrument.breath?.takes ?? 0) * world.ticksPerSecond;
   const { slot } = phrase;
   const leads: Placed[] = [];
 
@@ -471,12 +480,18 @@ function withPickup(world: World, phrase: Phrase, memory: Memory, rng: Rng): Phr
           const tone = landing(spot.pool, pitch, solo.arrive, pitch - 4, pitch + 4, [first]);
           return { spot, pitch: tone, lead: true };
         }
-        const better = beat && !isChordTone(spot.pool, pitch) && isChordTone(spot.pool, further);
+        const better =
+          (beat && !isChordTone(spot.pool, pitch) && isChordTone(spot.pool, further)) ||
+          (wrong(spot, pitch) && !wrong(spot, further));
         return { spot, pitch: better ? further : pitch, lead: true };
       });
     const inside = (notes: readonly Placed[]) =>
       notes.every(
-        (note) => note.pitch >= slot.low && note.pitch <= slot.high && note.pitch !== first,
+        (note) =>
+          note.pitch >= slot.low &&
+          note.pitch <= slot.high &&
+          note.pitch !== first &&
+          !wrong(note.spot, note.pitch),
       );
     const pickup = inside(walk(side)) ? walk(side) : walk(-side);
     if (inside(pickup)) leads.push(...pickup);

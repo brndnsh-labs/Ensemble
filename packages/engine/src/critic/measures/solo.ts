@@ -335,6 +335,27 @@ export const soloMeasures: readonly Measure[] = [
     },
   ),
   measure(
+    "phrases-breathe",
+    "share",
+    "A phrase is followed by air before the next one starts, a pickup into it included: the style's breath, in seconds, less a tenth for the player's own timing. Two phrases run together are one long phrase.",
+    (reading) => {
+      const owed = reading.world.solo.space.breath * 0.9 * reading.world.ticksPerSecond;
+      let joins = 0;
+      let aired = 0;
+      for (const solo of reading.solos) {
+        const played = solo.filter((phrase) => phrase.notes.length > 0);
+        played.forEach((phrase, i) => {
+          const next = played[i + 1];
+          if (!next) return;
+          joins++;
+          const ends = Math.max(...phrase.notes.map((note) => note.ends));
+          if (next.notes[0]!.tick - ends >= owed) aired++;
+        });
+      }
+      return share(aired, joins);
+    },
+  ),
+  measure(
     "longest-silence",
     "seconds",
     "The longest the soloist goes without a note inside a solo, in seconds.",

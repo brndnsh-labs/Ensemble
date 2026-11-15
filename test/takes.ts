@@ -1,5 +1,6 @@
 // The material the properties are checked against: every library chart, in
-// every style that ships, across seeds and kinds of jam. Rendered once.
+// every style that ships, across seeds and kinds of jam. A take renders the first time
+// something asks for it, once per process.
 
 import { readdirSync, readFileSync } from "node:fs";
 import type { NoteEvent, Seat, StylePack, Take, TakeOptions } from "@ensemble/engine";
@@ -28,11 +29,37 @@ export const LIBRARY: readonly LibraryChart[] = readdirSync(libraryDir)
     return { file, text, meter: `${meter.beats}/${meter.unit}` };
   });
 
-export interface Jam {
+/** What a take is made from, before it is rendered. */
+export interface JamSpec {
   readonly style: StylePack;
   readonly chart: LibraryChart;
   readonly options: TakeOptions;
+}
+
+export interface Jam extends JamSpec {
   readonly take: Take;
+}
+
+/**
+ * Renders what is asked for and nothing else. The filter sees a take's style, chart, and
+ * options; it is decided before anything renders, and a take rendered once is kept for the
+ * rest of the process, so no take is rendered twice. Specs come in a fixed order and the
+ * filter keeps that order.
+ */
+const rendered = new Map<string, Jam>();
+
+function render1(spec: JamSpec): Jam {
+  const key = `${spec.style.id}\0${spec.chart.file}\0${JSON.stringify(spec.options)}`;
+  let jam = rendered.get(key);
+  if (jam === undefined) {
+    jam = { ...spec, take: render(spec.chart.text, spec.style, spec.options) };
+    rendered.set(key, jam);
+  }
+  return jam;
+}
+
+function renderOnly(specs: readonly JamSpec[], only: (spec: JamSpec) => boolean): Jam[] {
+  return specs.filter(only).map(render1);
 }
 
 /**
@@ -48,20 +75,15 @@ const KINDS: readonly Omit<TakeOptions, "seed">[] = [
   { mode: "jam", passes: 4, solo: true },
 ];
 
-let cache: Jam[] | undefined;
+const TAKE_SPECS: readonly JamSpec[] = STYLES.flatMap((style) =>
+  LIBRARY.flatMap((chart) =>
+    SEEDS.flatMap((seed) => KINDS.map((kind) => ({ style, chart, options: { ...kind, seed } }))),
+  ),
+);
 
-export function takes(only: (jam: Jam) => boolean = () => true): Jam[] {
-  cache ??= STYLES.flatMap((style) =>
-    LIBRARY.flatMap((chart) =>
-      SEEDS.flatMap((seed) =>
-        KINDS.map((kind) => {
-          const options = { ...kind, seed };
-          return { style, chart, options, take: render(chart.text, style, options) };
-        }),
-      ),
-    ),
-  );
-  return cache.filter(only);
+/** The library's takes that pass `only`, which reads the style, chart, and options. */
+export function takes(only: (spec: JamSpec) => boolean = () => true): Jam[] {
+  return renderOnly(TAKE_SPECS, only);
 }
 
 const chartsDir = new URL("./charts/", import.meta.url);
@@ -83,28 +105,55 @@ const STRESS: readonly LibraryChart[] = [
   testChart("awkward.chart"),
 ];
 
-let stressCache: Jam[] | undefined;
+const STRESS_KINDS: readonly Omit<TakeOptions, "seed">[] = [
+  { mode: "jam", passes: 2, energy: 0.3 },
+  { mode: "jam", passes: 2, energy: 0.55 },
+  { mode: "jam", passes: 2, energy: 0.85 },
+  { mode: "jam", passes: 3 },
+  { mode: "jam", passes: 3, solo: true },
+];
 
-/** The stress charts at each level and as a jam with an arc and an ending, over a few seeds. */
-export function stressTakes(): Jam[] {
-  const kinds: readonly Omit<TakeOptions, "seed">[] = [
-    { mode: "jam", passes: 2, energy: 0.3 },
-    { mode: "jam", passes: 2, energy: 0.55 },
-    { mode: "jam", passes: 2, energy: 0.85 },
-    { mode: "jam", passes: 3 },
-    { mode: "jam", passes: 3, solo: true },
-  ];
-  stressCache ??= STYLES.flatMap((style) =>
-    STRESS.flatMap((chart) =>
-      [1, 2, 3, 4].flatMap((seed) =>
-        kinds.map((kind) => {
-          const options = { ...kind, seed };
-          return { style, chart, options, take: render(chart.text, style, options) };
-        }),
-      ),
+const STRESS_SPECS: readonly JamSpec[] = STYLES.flatMap((style) =>
+  STRESS.flatMap((chart) =>
+    [1, 2, 3, 4].flatMap((seed) =>
+      STRESS_KINDS.map((kind) => ({ style, chart, options: { ...kind, seed } })),
     ),
-  );
-  return stressCache;
+  ),
+);
+
+/**
+ * The stress charts at each level and as a jam with an arc and an ending, over a few seeds,
+ * those that pass `only`.
+ */
+export function stressTakes(only: (spec: JamSpec) => boolean = () => true): Jam[] {
+  return renderOnly(STRESS_SPECS, only);
+}
+
+const SOLOIST_KINDS: readonly Omit<TakeOptions, "seed">[] = [
+  { mode: "song", solo: true },
+  { mode: "jam", passes: 3, solo: true, tempo: 160 },
+  { mode: "jam", passes: 3, solo: true, tempo: 60, soloInstrument: "alto-sax" },
+  { mode: "jam", passes: 3, solo: true, energy: 0.3 },
+  { mode: "jam", passes: 3, solo: true, energy: 0.85, soloInstrument: "alto-sax" },
+];
+
+const SOLOIST_SPECS: readonly JamSpec[] = STYLES.flatMap((style) =>
+  [...LIBRARY, ...STRESS].flatMap((chart, c) =>
+    SOLOIST_KINDS.map((kind, k) => ({
+      style,
+      chart,
+      options: { ...kind, seed: 1 + ((c + k) % 2) },
+    })),
+  ),
+);
+
+/**
+ * The soloist where a plain jam does not take it: a song, fast and slow, quiet and
+ * loud, and on the horn, which has to breathe. Every chart in every kind, on one
+ * of two seeds by turns. Only the soloist's properties read these.
+ */
+export function soloistTakes(): Jam[] {
+  return renderOnly(SOLOIST_SPECS, () => true);
 }
 
 /** A take's notes in the order they sound, for one seat or for all. */

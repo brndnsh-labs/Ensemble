@@ -203,6 +203,10 @@ export const bluesChords: ChordStyle = {
     otherwise: "rest",
     stroke: "X",
   },
+  // Under a soloist the hand lays out and answers (ST-blues-33, CH-71): a breath is a dotted
+  // quarter of silence, an empty one gets a stab an eighth long at 92, and what the figure
+  // already plays in a breath is played 8 harder. The pump never converses: it is a groove.
+  listening: { breath: 6, answer: { level: 92, steps: 2 }, lift: 8 },
   // The final chord at 92, 72 when the ending is soft, a button 12 harder (CH-74, EN-17).
   ending: { velocity: 92, soft: 72, accent: 12 },
 };

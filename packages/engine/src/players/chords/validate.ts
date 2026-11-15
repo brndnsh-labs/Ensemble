@@ -200,6 +200,27 @@ export function validateChordStyle(chords: ChordStyle): string[] {
     }
   }
 
+  const listening = chords.listening;
+  if (listening) {
+    say(
+      Number.isInteger(listening.breath) && listening.breath >= 2,
+      `listening: a breath of ${listening.breath} sixteenths is not a silence the hand could answer; write a whole number from 2.`,
+    );
+    level(listening.answer.level, "listening, the answer");
+    say(
+      listening.answer.steps > 0 && listening.answer.steps <= 2,
+      `listening: an answer ${listening.answer.steps} sixteenths long; it is a stab, more than nothing and an eighth at most (CH-71).`,
+    );
+    say(
+      listening.answer.steps <= listening.breath,
+      "listening: the answer is longer than the shortest breath it goes into.",
+    );
+    say(
+      Number.isInteger(listening.lift) && listening.lift >= 0 && listening.lift < LOUDEST,
+      `listening: a strike played ${listening.lift} harder in a breath is not a whole number of velocity steps from 0.`,
+    );
+  }
+
   const ending = chords.ending;
   level(ending.velocity, "ending", LOUDEST - ending.accent);
   level(ending.soft, "soft ending");

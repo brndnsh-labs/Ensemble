@@ -159,7 +159,7 @@ export function fitTones(kind: VoicingKind, chord: Chord, scale: ChordScale): Fi
 }
 
 /** What the chord cannot be heard without: guide tones and written alterations. */
-function identity(chord: Chord, scale: ChordScale): FittedTone[] {
+export function identity(chord: Chord, scale: ChordScale): FittedTone[] {
   const needs: FittedTone[] = [];
   for (const tone of ["3", "7"] as const) {
     const interval = toneOf(tone, chord, scale);
