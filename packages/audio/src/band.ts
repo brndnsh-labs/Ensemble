@@ -108,7 +108,12 @@ export class Player {
 export async function renderBand(
   setup: BandSetup,
   sounds: readonly Sound[],
-  options: { readonly sampleRate?: number; readonly tail?: number } = {},
+  options: {
+    readonly sampleRate?: number;
+    readonly tail?: number;
+    /** Press stop at this second of the performance, to see what is heard afterwards. */
+    readonly stopAt?: number;
+  } = {},
 ): Promise<AudioBuffer> {
   const sampleRate = options.sampleRate ?? 48000;
   const last = sounds.reduce((end, sound) => Math.max(end, sound.at + sound.length), 0);
@@ -116,5 +121,6 @@ export async function renderBand(
   const context = new OfflineAudioContext(2, Math.ceil(seconds * sampleRate), sampleRate);
   const { sampler } = await assemble(context, setup);
   for (const sound of sounds) sampler.play(sound, sound.at);
+  if (options.stopAt !== undefined) sampler.silence(options.stopAt);
   return context.startRendering();
 }

@@ -155,7 +155,12 @@ setInterval(() => {
 
 async function renderWav(): Promise<{ wav: Uint8Array<ArrayBuffer>; performance: Performance }> {
   const performance = await perform();
-  const buffer = await renderBand(performance.setup, performance.sounds);
+  const stopAt = params.get("stop");
+  const buffer = await renderBand(
+    performance.setup,
+    performance.sounds,
+    stopAt === null ? {} : { stopAt: Number(stopAt) },
+  );
   return { wav: toWav(buffer), performance };
 }
 

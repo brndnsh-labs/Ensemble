@@ -536,3 +536,13 @@ The builder's report was checked against the files, not taken on trust: every fi
 - **The starting mix is from measurement, not from an ear**: each seat rendered alone and its loudness read. The blues piano measured 1.7 dB over the soloist and came down 3 dB; the jazz drums (a ride and a feathered kick) measured 6 dB under the blues drums and came up 3. Full mixes of four takes read -17 to -18 LUFS; the master is trimmed 1.5 dB so peaks stay under -2 dBFS.
 - **No dead note on the upright**: the library's "noises" measure as knocks on the body. The fallback (the note itself, short and quiet) stands.
 - **Found for funk**: the Washburn bass Brandon preferred has recorded ghost notes; the clean Fender library has no muted strokes, and Karoryfer's Emilyguitar (CC0) has twenty-five. One pack will draw on both, credited as such.
+
+## first listen: it plays on the laptop and the iPhone; a pop after stop (stage 5)
+
+Brandon listened on his laptop and his iPhone 17: "nice job... the instruments themselves all worked". So Safari on a current iPhone decodes the packs (Opus in WebM) and the tap unlocks audio. One fault: "a popping kind of sound that echoes after stopping playback".
+
+- **Measured before changed.** A render can now press stop part-way (`stop=20`). With a dry mix, the second and a half after the stop still peaked at -17 dBFS, and so did the rest of the file.
+- **The cause was mine.** A recording starts a little before its note's time, by its run-up to the hit. Stop took a queued note out "at its own start" using the note's time, not the earlier moment its recording begins, so every queued note played its run-up and was cut at the hit: a string of clicks, in tempo, into the reverb.
+- **The fix**: a queued recording is stopped at the moment it would begin, so it never sounds. After it, the same measurement reads -72 dBFS from 0.2 s after the stop (notes that had just ended, finishing their own release) and digital silence from 1.7 s.
+- **Stop now fades over 120 ms; a choke stays at 30 ms.** A whole band cut in 30 ms thumps in the bass. A cymbal closed by a foot is that quick; a band stopping is not.
+- No test: the audio layer has none beyond the scheduler (`docs/TESTING.md`), and this lives in the sampler, which needs a browser. The measurement is repeatable: `pnpm render:audio x chart=... stop=20 mix='<dry>'`, then read the level after 20 s.

@@ -5,12 +5,17 @@ import type { LoadedPack } from "./load.ts";
 import type { PackLayer, PackVoice, PackZone } from "./pack.ts";
 import type { Sound } from "./schedule.ts";
 
-/** How long a choked or silenced sound takes to go, in seconds. Short, but not a step. */
-const CUT = 0.03;
+/** How long a choked sound takes to go, in seconds: a hand or a foot closing on a cymbal. */
+const CHOKE = 0.03;
+/** How long everything takes to go when the band is stopped. Longer, so that a low note leaves no thump. */
+const STOP = 0.12;
 
 interface Sounding {
   readonly source: AudioBufferSourceNode;
   readonly gain: GainNode;
+  /** When the recording starts running: a little before `when`, by its run-up to the hit. */
+  readonly begins: number;
+  /** When its hit lands: the note's time. */
   readonly when: number;
   /** When its release begins. Absent for a strike that rings out. */
   readonly end?: number;
@@ -81,7 +86,13 @@ export class Sampler {
     const end = voice.oneShot ? undefined : when + sound.length;
     if (end !== undefined) release(source, gain, level, end, voice.release ?? 0.1);
 
-    const sounding: Sounding = { source, gain, when, ...(end === undefined ? {} : { end }) };
+    const sounding: Sounding = {
+      source,
+      gain,
+      begins: startAt,
+      when,
+      ...(end === undefined ? {} : { end }),
+    };
     const ringing = instrument.sounding.get(name) ?? new Set();
     instrument.sounding.set(name, ringing);
     ringing.add(sounding);
@@ -95,7 +106,7 @@ export class Sampler {
   silence(at: number): void {
     for (const instrument of this.#instruments.values()) {
       for (const ringing of instrument.sounding.values()) {
-        for (const sounding of ringing) fade(sounding, at);
+        for (const sounding of ringing) fade(sounding, at, STOP);
       }
     }
   }
@@ -106,7 +117,7 @@ export class Sampler {
     if (!ringing) return;
     for (const sounding of ringing) {
       if (sounding.when >= at) continue;
-      fade(sounding, at);
+      fade(sounding, at, CHOKE);
       // It is dealt with: the next stroke need not look at it again.
       ringing.delete(sounding);
     }
@@ -160,19 +171,20 @@ function release(
 }
 
 /**
- * Take a sound out at a time. One that has not started by then never sounds:
- * it is stopped at its own start, since fading in a sound to fade it out clicks.
+ * Take a sound out at a time, over `seconds`. One whose recording has not
+ * begun by then never sounds at all: it is stopped where it would have begun,
+ * since letting it start in order to fade it clicks.
  */
-function fade({ source, gain, when, end }: Sounding, at: number): void {
-  if (when >= at) {
-    stop(source, when);
+function fade({ source, gain, begins, end }: Sounding, at: number, seconds: number): void {
+  if (begins >= at) {
+    stop(source, begins);
     return;
   }
   // Already dying away: its own release is the quicker and the cleaner end.
   if (end !== undefined && at >= end) return;
   gain.gain.cancelScheduledValues(at);
-  gain.gain.setTargetAtTime(0, at, CUT / 4);
-  stop(source, at + CUT * 2);
+  gain.gain.setTargetAtTime(0, at, seconds / 5);
+  stop(source, at + seconds);
 }
 
 /** Set when a source stops. Some browsers have refused a second stop time; the first then stands. */
