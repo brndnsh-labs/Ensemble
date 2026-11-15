@@ -6,3 +6,4 @@ coverage/
 dist-test/
 .sources/
 out/audio/
+.cut-tmp/
