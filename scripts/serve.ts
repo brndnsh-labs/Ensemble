@@ -84,7 +84,10 @@ export function serve(options: ServeOptions): Promise<Server> {
 
     const file = normalize(join(ROOT, path.endsWith("/") ? `${path}index.html` : path));
     const top = file.slice(ROOT.length + 1).split(sep)[0] ?? "";
-    if (!file.startsWith(ROOT + sep) || !OPEN.includes(top) || file.includes(`${sep}.`)) {
+    // No hidden file inside the repo is served. (Asked of the path inside it: the repo itself
+    // may sit under a folder whose name starts with a dot, as a clone under .work/ does.)
+    const hidden = file.slice(ROOT.length).includes(`${sep}.`);
+    if (!file.startsWith(ROOT + sep) || !OPEN.includes(top) || hidden) {
       return send(404, "not found");
     }
     try {
