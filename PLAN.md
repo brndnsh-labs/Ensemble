@@ -113,9 +113,9 @@ Done since (`DECISIONS.md`, "funk and jazz ship"): funk and jazz are in `STYLES`
 
 Gate 4 is written: 35 takes from `pnpm gate:4` and `out/gate-4/GATE_REPORT.md` (the two questions, what to listen for in each band, every engine change of the stage and why it was a missing concept, the sixteen tests added). `pnpm check` 8.8 s of 10 with 78 properties, `pnpm test:full` 19 s, `pnpm score` no movement in any style, `out/gate-3` byte for byte unchanged.
 
-**Next: Brandon listens.** His feedback becomes a property or a measure first, then a change. Waiting on him as well:
+**Next: Brandon listens.** His feedback becomes a property or a measure first, then a change. Also queued:
 
-- **A decision for after the gate**: a section's held choices (its beat, riff, strum, figure) are drawn from the seed and the section's label, not the chart, so at one seed every chart with an `[A]` plays the same groove. Fixing it changes every take in every style. Recommended for the start of stage 5 (`DECISIONS.md`, "the funk band read as a band").
+- **A decision for after the gate**: a section's held choices (its beat, riff, strum, figure) are drawn from the seed and the section's label, not the chart, so at one seed every chart with an `[A]` plays the same groove. Fixing it changes every take in every style. Brandon left the timing to me (2026-11-15): **it is the first change of stage 5**, after his gate 4 verdict, so the files he is listening to stay the files the repo writes. It goes in as its own commit with every golden and gate file rewritten and the scorecards shown not to move; widening the funk pool (three kicks, six riffs, four strums) follows it as data (`DECISIONS.md`, "the funk band read as a band").
 - If he hears the band guessing at a change (jazz drums against the piano's push; the funk guitar's push against the bass): the concept is a push marked in the plan that every seat reads.
 
 Known and not yet handled in stage 4: the head out is not played light; in compound meters the soloist's "beat" is still a quarter note; funk's chord seat is the guitar only (the clavinet book is data for later).
