@@ -97,10 +97,11 @@ State on 2026-11-14: **stages 1, 2 and 3 are built, each with gate files and a r
 - Gate 3, second listen (the rewritten files, a few more seeds): "seems pretty good from what i can tell. nice job!" Nothing asked to change. **Gate 3 is passed; stage 4 waits for Brandon's word to start.**
 - Feedback becomes a property or a measure first, then a fix.
 
-**Open for Brandon's ear** (nothing here blocks stage 4; his verdicts are short, and none of these was answered one by one)
+**Brandon's answers to the open questions (2026-11-14, asked one by one)**
 
-- Gate 1: the wide bass drops and the two one-note phrase fills at mid level (`out/gate-1/GATE_REPORT.md`, "Not yet acted on").
-- Gate 3: whether the piano is now too thin under a hot solo (it went from 5.2 strikes a bar to 2.0; the middle setting is to allow the four-stab figures but not the pump, `listening.busiest` in `packages/styles/src/blues/chords.ts`); whether the bass in C and F is too deep (roots stop at E2; `register.highest` in `packages/styles/src/blues/bass.ts`); whether the new bass shapes and turnaround walks sound like the same player; the wide bass drops; whether the worst three solos are acceptable.
+- Settled, keep as built: the piano under a hot solo (2.0 strikes a bar, "right as it is"); the bass's depth in C and F (roots stop at E2, "fine as it is"); the amount of bass variety ("right amount"); the three worst solos of 200 ("acceptable").
+- Not noticed, left as it is: the walk through the fourth (`R 3 4 #4 | 5 #4 4 3`). If the bass is ever called noodly, look here first.
+- For later, not now: the wide bass drops ("okay for now, maybe we can revisit in the future"; about 6% of changes reached by a fall of a sixth or more into the lead-in); the two one-note drum fills at bar 8 at the mid level ("another one for long term improvement"; more phrase fills are style data). Neither blocks stage 4. Each wants a measure first when it is taken up.
 
 **Before or at the start of stage 4** (each is logged in `DECISIONS.md`, "after the soloist's review")
 
