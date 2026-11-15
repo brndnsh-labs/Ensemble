@@ -42,6 +42,9 @@ export function CreditsView({ packsUrl }: { packsUrl: string }) {
             <div key={credit.title} className="credit">
               <p>
                 <a href={credit.url}>{credit.title}</a> by {credit.author}, {credit.licence}.
+                {/* A licence that keeps commercial use back says so in words, not only by name. */}
+                {/-NC\b/.test(credit.licence) &&
+                  " These recordings may not be used commercially: they are here because this app is free and is not sold."}
               </p>
               <p className="changes">Changes made: {credit.changes}</p>
             </div>

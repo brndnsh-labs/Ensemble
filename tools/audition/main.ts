@@ -60,8 +60,16 @@ async function perform(): Promise<Performance> {
     ...(soloInstrument ? { solo: true, soloInstrument } : {}),
   });
   const only = params.get("only")?.split(",");
+  // `packs=chords:electric-piano` puts another instrument in a seat: for hearing a pack
+  // before any style is written for it.
+  const swapped = new Map(
+    (params.get("packs") ?? "")
+      .split(",")
+      .filter(Boolean)
+      .map((pair) => pair.split(":") as [string, string]),
+  );
   const packOf = (seat: Seat, voice: string | undefined): string =>
-    seat === "solo" ? (voice ?? "") : style.sound.packs[seat];
+    swapped.get(seat) ?? (seat === "solo" ? (voice ?? "") : style.sound.packs[seat]);
   const sounds: Sound[] = [];
   const wanted = new Map<string, Seat>();
   // Notes written by hand, to be heard over the take (or alone, with `only=`): a file of
