@@ -70,10 +70,13 @@ export async function renderAudio(
     return await done;
   } finally {
     clearTimeout(timer);
-    chrome.kill();
     server.close();
     server.closeAllConnections();
-    rmSync(profile, { recursive: true, force: true, maxRetries: 5 });
+    // Chrome writes to its profile until it is gone; wait for that before removing it.
+    const gone = new Promise((resolve) => chrome.once("exit", resolve));
+    chrome.kill();
+    await gone;
+    rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   }
 }
 
