@@ -6,6 +6,7 @@ import type { Chart } from "./chart/model.ts";
 import { parse } from "./chart/parse.ts";
 import { transpose } from "./chart/transpose.ts";
 import type { Diagnostic } from "./chart/types.ts";
+import { PPQ } from "./chart/types.ts";
 import type { PerformanceEvent } from "./perform/notes.ts";
 import { perform } from "./perform/perform.ts";
 import { planBars } from "./plan/plan.ts";
@@ -23,6 +24,25 @@ export interface TakeOptions extends PlanOptions {
    * the style's default. The instrument is the player's choice (BRIEF 5.3).
    */
   readonly soloInstrument?: string;
+  /**
+   * With `endAfter`: the tick at which the band was told, the top of a phrase.
+   * Up to there the take is the jam as it was going to be, and from there it is
+   * the jam told to finish, which is what was heard when the word came partway
+   * through. Left out, the band knew from the start.
+   */
+  readonly toldAt?: number;
+}
+
+export const RECIPE_VERSION = 1;
+
+/** Everything that decides a take, as it is saved. Options go in whole, so new ones round-trip untouched. */
+export interface TakeRecipe {
+  readonly version: number;
+  readonly chartName: string;
+  readonly chartText: string;
+  /** The style, by its id. */
+  readonly style: string;
+  readonly options: TakeOptions;
 }
 
 export interface Take {
@@ -38,7 +58,36 @@ export function plan(chart: Chart, style: StylePack, options: PlanOptions): Plan
   return planBars(expand(chart), chart.tempo, style, options);
 }
 
+/**
+ * The two takes are joined this many seconds before the bar line the band was
+ * told at, so a downbeat leaning a hair early comes from the ending's take.
+ */
+const JOIN_LEAD = 0.03;
+
 export function render(text: string, style: StylePack, options: TakeOptions): Take {
+  if (options.endAfter === undefined || options.toldAt === undefined)
+    return whole(text, style, options);
+  // Told partway: the jam as it was going to be, then the jam told to finish.
+  const { endAfter, toldAt, ...before } = options;
+  const untold = whole(text, style, {
+    ...before,
+    // An open jam is made long enough to reach the point it was told at.
+    ...(before.open ? { passes: Math.max(before.passes ?? 1, Math.floor(endAfter) + 1) } : {}),
+  });
+  const told = whole(text, style, options);
+  const join = toldAt - (JOIN_LEAD * told.plan.tempo * PPQ) / 60;
+  const time = (event: PerformanceEvent) =>
+    event.kind === "note" ? event.tick + event.offset : event.tick;
+  return {
+    ...told,
+    events: [
+      ...untold.events.filter((event) => time(event) < join),
+      ...told.events.filter((event) => time(event) >= join),
+    ],
+  };
+}
+
+function whole(text: string, style: StylePack, options: TakeOptions): Take {
   const parsed = parse(text);
   const chart = options.key ? transpose(parsed.chart, options.key) : parsed.chart;
   const roadmap = plan(chart, style, options);

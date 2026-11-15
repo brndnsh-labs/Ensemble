@@ -3,11 +3,11 @@
 import { basename } from "node:path";
 import { parseArgs } from "node:util";
 import type { Seat, TakeOptions } from "@ensemble/engine";
-import { parseKey, SOLO_INSTRUMENTS } from "@ensemble/engine";
+import { parseKey, RECIPE_VERSION, SOLO_INSTRUMENTS } from "@ensemble/engine";
 import { STYLES } from "@ensemble/styles";
 import type { Command } from "../command.ts";
 import { readChart, UsageError } from "../command.ts";
-import { findStyle, playTake, RECIPE_VERSION, writeRecipe } from "../take-output.ts";
+import { findStyle, playTake, writeRecipe } from "../take-output.ts";
 
 const SEAT_NAMES: readonly Seat[] = ["drums", "bass", "chords", "solo"];
 

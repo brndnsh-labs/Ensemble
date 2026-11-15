@@ -18,7 +18,7 @@ import type { ChartChoices, Settings } from "../settings.ts";
 import type { Playhead } from "./ChartView.tsx";
 import { ChartView } from "./ChartView.tsx";
 import type { Reading } from "./ChordSymbol.tsx";
-import type { JamSetup } from "./jam.ts";
+import type { Call, JamSetup } from "./jam.ts";
 import { chartOf, nextChange, SEAT_ORDER, takeOptions } from "./jam.ts";
 import { pageBarOf } from "./page.ts";
 import type { Rig } from "./rig.ts";
@@ -68,7 +68,7 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
 
   const style: StylePack = styleById(choices.style ?? entry.chart.styleId ?? "") ?? STYLES[0]!;
   const tempo = choices.tempo ?? null;
-  const setup: Omit<JamSetup, "seed"> = useMemo(
+  const setup: JamSetup = useMemo(
     () => ({
       text: entry.text,
       style,
@@ -89,7 +89,17 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
     ],
   );
 
-  const jam = useJam(rig, setup);
+  const chart = useMemo(() => chartOf(setup.text, setup.key), [setup.text, setup.key]);
+  const call: Call = useMemo(
+    () => ({
+      name: chart.title,
+      text: setup.text,
+      style: setup.style,
+      options: takeOptions(setup),
+    }),
+    [chart, setup],
+  );
+  const jam = useJam(rig, call);
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, as the screen opens
   useEffect(() => {
     if (!autoplay) return;
@@ -97,12 +107,8 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
     started();
   }, []);
 
-  const chart = useMemo(() => chartOf(setup), [setup]);
   // What play would start, to show its length and shape before it is pressed.
-  const preview = useMemo(
-    () => planOf(chart, setup.style, takeOptions({ ...setup, key: null, seed: 0 })),
-    [chart, setup],
-  );
+  const preview = useMemo(() => planOf(chart, call.style, call.options), [chart, call]);
   const playing = jam.phase === "playing";
   const plan = playing && jam.playing ? jam.playing.plan : preview;
   const shown = playing && jam.playing ? jam.playing.chart : chart;

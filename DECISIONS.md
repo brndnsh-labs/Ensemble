@@ -691,3 +691,14 @@ The builder's diff was read in full, and the editor looked at on a phone and a l
 - **The player's charts are in `localStorage`** (decided in the brief): a chart is a few hundred bytes, the reads are synchronous, and the same eviction rules apply to it as to anything else a site keeps. Export is the backup.
 - **Not verified by anyone yet**: the key row above a real phone keyboard, and whether pressing a key in it keeps the iPhone's keyboard up.
 
+
+## a take, as it is kept (stage 6, part 3)
+
+Done on the main thread before the takes screen was built, because it decides what "exactly as heard" means.
+
+- **A jam told to finish partway is two takes joined, and the engine does the joining.** Finish is heard at the top of a phrase; up to there the band played the jam as it was going to be, and from there the jam told to finish. Replaying the told jam from its start is not the same music: on rhythm changes, told in the third phrase of the last pass, about 360 notes before the join differ. So a take can say when the band was told (`TakeOptions.toldAt`, a tick, beside `endAfter`), and `render` makes both takes and joins them 30 ms before that bar line. The play screen now asks for this joined take when Finish is pressed, which is the same thing it used to assemble itself, and the take it keeps is the one it played.
+- **The saved take is the CLI's**: `TakeRecipe` (chart text, style, options, seed) moved from the CLI into the engine, so `ensemble replay` reads what the app keeps.
+- **An open jam stopped dead is, as a take, the passes it got to**, with no ending, because none was played. Played again it is an open jam again, and goes on until stopped.
+- **The play screen runs on the take** (`play/jam.ts`: a `Call` is a chart, a style and how to play it; with a seed it is one take, without one each press of play is a new take). The worker also writes a take as a MIDI file (`midiOf`), with the same call the CLI makes.
+- **No new property.** The join is a filter over two takes the existing properties already hold to account, and smoke journey 5 will compare the app's file with the CLI's. An ending now costs two renders: 0.6 s for a fifteen-minute jam on this machine, which the page allows for when it picks the phrase to turn at.
+- **A limit, not solved**: a kept take is exact for the build that made it. When a style or a player changes, an old seed plays something else.

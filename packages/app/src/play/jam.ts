@@ -11,11 +11,23 @@ import type {
   StylePack,
   Take,
   TakeOptions,
+  TakeRecipe,
 } from "@ensemble/engine";
-import { chordText, PPQ, parse, planBar, render, timedNotes, transpose } from "@ensemble/engine";
+import {
+  chordText,
+  PPQ,
+  parse,
+  planBar,
+  RECIPE_VERSION,
+  render,
+  secondsAt,
+  timedNotes,
+  transpose,
+} from "@ensemble/engine";
 import type { Chair } from "./rig.ts";
 import { chairName } from "./rig.ts";
 
+/** What the player chose on the play screen. */
 export interface JamSetup {
   readonly text: string;
   readonly style: StylePack;
@@ -28,7 +40,19 @@ export interface JamSetup {
   /** Who plays. */
   readonly band: Readonly<Record<Seat, boolean>>;
   readonly soloInstrument: string;
-  readonly seed: number;
+}
+
+/** How a take is played, with or without the seed that makes it one take. */
+export type HowPlayed = Omit<TakeOptions, "seed"> & { readonly seed?: TakeOptions["seed"] };
+
+/** The tune as called: what a press of play starts. */
+export interface Call {
+  /** The chart's name, for a take that is kept. */
+  readonly name: string;
+  readonly text: string;
+  readonly style: StylePack;
+  /** Without a seed, each press of play is a new take. With one, it is that take again. */
+  readonly options: HowPlayed;
 }
 
 export const SEAT_ORDER: readonly Seat[] = ["drums", "bass", "chords", "solo"];
@@ -36,16 +60,26 @@ export const SEAT_ORDER: readonly Seat[] = ["drums", "bass", "chords", "solo"];
 /** How many times round a jam with no set length is made at first, and how many more each time it runs short. */
 export const OPEN_PASSES = 2;
 
-export function takeOptions(setup: JamSetup, passes = OPEN_PASSES): TakeOptions {
+export function takeOptions(setup: JamSetup): HowPlayed {
   return {
     mode: "jam",
-    seed: setup.seed,
-    ...(setup.minutes === null ? { open: true, passes } : { minutes: setup.minutes }),
+    ...(setup.minutes === null ? { open: true, passes: OPEN_PASSES } : { minutes: setup.minutes }),
     ...(setup.tempo === null ? {} : { tempo: setup.tempo }),
     ...(setup.key === null ? {} : { key: setup.key }),
     solo: setup.band.solo,
     soloInstrument: setup.soloInstrument,
     without: SEAT_ORDER.filter((seat) => seat !== "solo" && !setup.band[seat]),
+  };
+}
+
+/** The take a call becomes when play is pressed: everything that decides what is heard. */
+export function recipeOf(call: Call, seed: TakeOptions["seed"]): TakeRecipe {
+  return {
+    version: RECIPE_VERSION,
+    chartName: call.name,
+    chartText: call.text,
+    style: call.style.id,
+    options: { ...call.options, seed },
   };
 }
 
@@ -57,24 +91,13 @@ export interface Performance {
   readonly sounds: readonly Sound[];
 }
 
-/** What to make of a jam: how long, whether it has been told to finish, and how much of it is wanted. */
-export interface Ask {
-  /** Passes of a jam with no set length. */
-  readonly passes?: number;
-  /** The jam told to finish on this pass (`PlanOptions.endAfter`). */
-  readonly endAfter?: number;
-  /** Leave out the sounds that start before this second: they have been played. */
-  readonly since?: number;
-}
-
-/** Play a jam through: the engine makes the take, and its notes become sounds. */
-export function performanceOf(setup: JamSetup, ask: Ask = {}): Performance {
-  const take = render(setup.text, setup.style, {
-    ...takeOptions(setup, ask.passes),
-    ...(ask.endAfter === undefined ? {} : { endAfter: ask.endAfter }),
-  });
-  const sounds = soundsOf(take, setup);
-  const since = ask.since ?? 0;
+/**
+ * Play a take through: the engine makes it, and its notes become sounds.
+ * `since` leaves out the sounds that start before that second, which have been played.
+ */
+export function performanceOf(recipe: TakeRecipe, style: StylePack, since = 0): Performance {
+  const take = render(recipe.chartText, style, recipe.options);
+  const sounds = soundsOf(take, style, recipe.options);
   return {
     chart: take.chart,
     plan: take.plan,
@@ -83,15 +106,19 @@ export function performanceOf(setup: JamSetup, ask: Ask = {}): Performance {
 }
 
 /** The chart as it will be read while playing: in the key the jam is in. */
-export function chartOf(setup: Pick<JamSetup, "text" | "key">): Chart {
-  const { chart } = parse(setup.text);
-  return setup.key === null ? chart : transpose(chart, setup.key);
+export function chartOf(text: string, key: Key | null | undefined): Chart {
+  const { chart } = parse(text);
+  return key ? transpose(chart, key) : chart;
 }
 
-/** The instruments this jam needs. */
-export function chairsOf(setup: JamSetup): Chair[] {
-  return SEAT_ORDER.filter((seat) => setup.band[seat]).map((seat) => ({
-    pack: seat === "solo" ? setup.soloInstrument : setup.style.sound.packs[seat],
+/** The instruments a take needs. */
+export function chairsOf(style: StylePack, options: HowPlayed): Chair[] {
+  const out = options.without ?? [];
+  return SEAT_ORDER.filter((seat) =>
+    seat === "solo" ? options.solo === true : !out.includes(seat),
+  ).map((seat) => ({
+    pack:
+      seat === "solo" ? (options.soloInstrument ?? style.solo.instrument) : style.sound.packs[seat],
     channel: seat,
   }));
 }
@@ -102,8 +129,8 @@ export function mixOf(style: StylePack): Mix {
 }
 
 /** A take as sounds for the sampler, in the order they start. */
-export function soundsOf(take: Take, setup: JamSetup): Sound[] {
-  const names = new Map(chairsOf(setup).map((chair) => [chair.channel, chairName(chair)]));
+export function soundsOf(take: Take, style: StylePack, options: HowPlayed): Sound[] {
+  const names = new Map(chairsOf(style, options).map((chair) => [chair.channel, chairName(chair)]));
   const sounds: Sound[] = [];
   for (const note of timedNotes(take.plan, take.events)) {
     const pack = names.get(note.seat);
@@ -178,27 +205,27 @@ export function nextChange(
   return undefined;
 }
 
-/** The join is taken this much before its bar line, so a downbeat leaning a hair early comes from the new take. */
-const JOIN_LEAD = 0.03;
+/** A phrase top counts as far enough ahead only with this to spare, so its downbeat is the ending's too. */
+const TOP_MARGIN = 0.05;
 
 /**
  * Where a jam told to finish now turns for home: the pass that becomes its
- * last, and the second from which the music is the ending's. A band is told at
- * the top of a phrase, so that is where the two takes are joined: the first
- * phrase top at least `after` seconds in that is not the top of the pass being
- * played (the last pass's first phrase is played as it was going to be, so a
- * later one of this pass is where it can turn; failing that, the top of the
- * next pass). Undefined when the jam is already ending.
+ * last, and the tick the band is told at. A band is told at the top of a
+ * phrase, so that is where the take becomes the ending's: the first phrase top
+ * at least `after` seconds in that is not the top of the pass being played
+ * (the last pass's first phrase is played as it was going to be, so a later
+ * one of this pass is where it can turn; failing that, the top of the next
+ * pass). Undefined when the jam is already ending.
  */
 export function turnForHome(
   plan: Plan,
   place: Place,
   after: number,
-): { readonly endAfter: number; readonly from: number } | undefined {
+): { readonly endAfter: number; readonly toldAt: number; readonly from: number } | undefined {
   const { bar } = place;
   if (bar.kind === "tail" || bar.lastPass || bar.ending) return undefined;
   const pass = bar.kind === "count-in" ? 0 : bar.pass;
-  const earliest = ticksAt(plan, after + JOIN_LEAD);
+  const earliest = ticksAt(plan, after + TOP_MARGIN);
   // An open jam's roadmap carries the pass after the last one played, which is enough to find a top in.
   const top = [...plan.bars, ...plan.lookahead].find(
     (b) =>
@@ -209,5 +236,9 @@ export function turnForHome(
       (b.pass > pass || (b.pass === pass && b.barInPass > 0)),
   );
   if (!top) return undefined;
-  return { endAfter: top.pass, from: (top.start * 60) / (plan.tempo * PPQ) - JOIN_LEAD };
+  return {
+    endAfter: top.pass,
+    toldAt: top.start,
+    from: secondsAt(plan, top.start) - TOP_MARGIN,
+  };
 }

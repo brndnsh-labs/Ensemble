@@ -2,12 +2,13 @@
 // band is until the tune ends or someone stops it.
 
 import type { Player } from "@ensemble/audio";
+import type { StylePack, TakeRecipe } from "@ensemble/engine";
 import { seconds } from "@ensemble/engine";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Made } from "./band.ts";
 import { perform, warmUp } from "./band.ts";
-import type { JamSetup, Performance, Place } from "./jam.ts";
-import { chairsOf, mixOf, OPEN_PASSES, placeAt, turnForHome } from "./jam.ts";
+import type { Call, Performance, Place } from "./jam.ts";
+import { chairsOf, mixOf, OPEN_PASSES, placeAt, recipeOf, turnForHome } from "./jam.ts";
 import type { Rig } from "./rig.ts";
 
 export type Phase = "idle" | "loading" | "playing";
@@ -19,6 +20,11 @@ export interface Jam {
   readonly place: Place | undefined;
   /** Whole seconds into the performance, as heard. */
   readonly elapsed: number;
+  /**
+   * The take being played, or the last one played, as it was heard: what to
+   * keep to hear it again. An open jam stopped dead is the passes it got to.
+   */
+  readonly take: TakeRecipe | undefined;
   /** Why the band could not start, in words for the player. */
   readonly problem: string | undefined;
   /** Call from a tap. */
@@ -37,6 +43,8 @@ const LOOK_MS = 40;
 const EXTEND_UNDER = 20;
 /** New music takes over this far ahead: past everything already handed to the sampler. */
 const REPLACE_AHEAD = 3;
+/** An ending costs the engine about this many times what the jam it ends did: it makes both and joins them. */
+const ENDING_COST = 2;
 /** How long the last chord and the room are left to ring before the jam counts as over. */
 const RING = 2.5;
 /** A press of Stop this soon after Finish is the same tap twice, not a change of mind. */
@@ -44,9 +52,10 @@ const SAME_TAP_MS = 600;
 
 interface Running {
   readonly player: Player;
-  readonly setup: JamSetup;
+  readonly style: StylePack;
+  /** What is playing, as it now stands: longer when an open jam is given more, told when it is told to finish. */
+  recipe: TakeRecipe;
   made: Made;
-  passes: number;
   /** More of an open jam has been asked for and has not arrived. */
   extending: boolean;
   /** When the band was told to finish, on the page's clock. */
@@ -55,13 +64,16 @@ interface Running {
 
 const newSeed = (): number => Math.floor(Math.random() * 2 ** 31);
 
-export function useJam(rig: Rig, setup: Omit<JamSetup, "seed">): Jam {
+const passesOf = (recipe: TakeRecipe): number => recipe.options.passes ?? OPEN_PASSES;
+
+export function useJam(rig: Rig, call: Call): Jam {
   const [phase, setPhase] = useState<Phase>("idle");
   const [playing, setPlaying] = useState<Performance>();
   const [now, setNow] = useState<{ place: Place | undefined; elapsed: number }>({
     place: undefined,
     elapsed: 0,
   });
+  const [take, setTake] = useState<TakeRecipe>();
   const [problem, setProblem] = useState<string>();
   const [told, setTold] = useState(false);
   const running = useRef<Running>(undefined);
@@ -70,7 +82,7 @@ export function useJam(rig: Rig, setup: Omit<JamSetup, "seed">): Jam {
 
   // Fetch the band's instruments as soon as it is known who is playing, not when play is
   // pressed. Only fetched: seating them changes the mix, which a band already playing owns.
-  const packs = chairsOf({ ...setup, seed: 0 })
+  const packs = chairsOf(call.style, call.options)
     .map((chair) => chair.pack)
     .join(" ");
   useEffect(() => {
@@ -84,6 +96,14 @@ export function useJam(rig: Rig, setup: Omit<JamSetup, "seed">): Jam {
 
   const stop = useCallback(() => {
     presses.current++;
+    const run = running.current;
+    const position = run?.player.position;
+    if (run && position !== undefined && run.made.plan.open) {
+      // An open jam that was not told to finish is, as a take, the passes it got to.
+      const bar = placeAt(run.made.plan, Math.max(0, position - rig.latency))?.bar;
+      const passes = bar?.kind === "music" ? bar.pass + 1 : 1;
+      setTake({ ...run.recipe, options: { ...run.recipe.options, passes } });
+    }
     running.current = undefined;
     rig.stop();
     setPhase("idle");
@@ -95,21 +115,23 @@ export function useJam(rig: Rig, setup: Omit<JamSetup, "seed">): Jam {
     rig.wake();
     stop();
     const mine = ++presses.current;
-    const jam: JamSetup = { ...setup, seed: newSeed() };
+    const { style } = call;
+    const recipe = recipeOf(call, call.options.seed ?? newSeed());
     setProblem(undefined);
     setPhase("loading");
-    Promise.all([perform(jam), rig.seat(chairsOf(jam), mixOf(jam.style))]).then(
+    Promise.all([perform(recipe), rig.seat(chairsOf(style, recipe.options), mixOf(style))]).then(
       ([made]) => {
         if (presses.current !== mine) return;
         running.current = {
           player: rig.play(made.sounds),
-          setup: jam,
+          style,
+          recipe,
           made,
-          passes: OPEN_PASSES,
           extending: false,
           toldAt: undefined,
         };
         setPlaying(made);
+        setTake(recipe);
         setPhase("playing");
       },
       () => {
@@ -126,28 +148,36 @@ export function useJam(rig: Rig, setup: Omit<JamSetup, "seed">): Jam {
     run.toldAt = performance.now();
     setTold(true);
     // The ending has to be made, which takes a moment, and the phrase top it was made for
-    // may have gone by when it arrives. Then the next one is taken instead.
+    // may have gone by when it arrives. Then the next one is taken instead. The take that
+    // comes back is the jam as it was up to that top and the ending from there, so it can
+    // take over anywhere before the top.
     const turnAndJoin = () => {
       const position = run.player.position;
       if (running.current !== run || position === undefined) return;
       const { plan } = run.made;
       const place = placeAt(plan, Math.max(0, position));
-      const allowance = run.made.took * 2 + 0.25;
+      const allowance = run.made.took * ENDING_COST + 0.25;
       const home = place && turnForHome(plan, place, position + REPLACE_AHEAD + allowance);
       if (!home) return;
-      perform(run.setup, { passes: run.passes, endAfter: home.endAfter, since: position }).then(
+      const told: TakeRecipe = {
+        ...run.recipe,
+        options: { ...run.recipe.options, endAfter: home.endAfter, toldAt: home.toldAt },
+      };
+      perform(told, position).then(
         (made) => {
           const at = run.player.position;
           if (running.current !== run || at === undefined) return;
           if (home.from < at + REPLACE_AHEAD) {
-            run.made = { ...run.made, took: made.took };
+            // Too late for that top. This one took as long as the next will.
+            run.made = { ...run.made, took: made.took / ENDING_COST };
             turnAndJoin();
             return;
           }
-          // Where an open jam has run out before the join, the ending takes over where it stops.
-          run.player.replace(Math.min(home.from, seconds(plan)), made.sounds);
+          run.player.replace(at + REPLACE_AHEAD, made.sounds);
           run.made = made;
+          run.recipe = told;
           setPlaying(made);
+          setTake(told);
         },
         () => {
           // The ending could not be made: the band plays on as it was, and can be asked again.
@@ -164,8 +194,10 @@ export function useJam(rig: Rig, setup: Omit<JamSetup, "seed">): Jam {
     /** Give an open jam more to play, well before it runs out. */
     const extend = (run: Running, position: number) => {
       run.extending = true;
-      const passes = run.passes + Math.max(OPEN_PASSES, Math.ceil(run.passes / 4));
-      perform(run.setup, { passes, since: position }).then(
+      const passes =
+        passesOf(run.recipe) + Math.max(OPEN_PASSES, Math.ceil(passesOf(run.recipe) / 4));
+      const longer: TakeRecipe = { ...run.recipe, options: { ...run.recipe.options, passes } };
+      perform(longer, position).then(
         (made) => {
           run.extending = false;
           const at = run.player.position;
@@ -173,8 +205,9 @@ export function useJam(rig: Rig, setup: Omit<JamSetup, "seed">): Jam {
           if (running.current !== run || run.toldAt !== undefined || at === undefined) return;
           run.player.replace(at + REPLACE_AHEAD, made.sounds);
           run.made = made;
-          run.passes = passes;
+          run.recipe = longer;
           setPlaying(made);
+          setTake(longer);
         },
         () => {
           run.extending = false;
@@ -228,6 +261,7 @@ export function useJam(rig: Rig, setup: Omit<JamSetup, "seed">): Jam {
     playing,
     place: now.place,
     elapsed: now.elapsed,
+    take,
     problem,
     play,
     finish,

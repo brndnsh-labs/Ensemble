@@ -1,21 +1,10 @@
 // What `render` and `replay` share: finding a style, playing a take, and the recipe file.
 
 import { writeFileSync } from "node:fs";
-import type { StylePack, TakeOptions } from "@ensemble/engine";
+import type { StylePack, TakeOptions, TakeRecipe } from "@ensemble/engine";
 import { render, seconds, toMidi } from "@ensemble/engine";
 import { styleById, styleIds } from "@ensemble/styles";
 import { reportDiagnostics, UsageError } from "./command.ts";
-
-export const RECIPE_VERSION = 1;
-
-/** Everything that decides a take. Options go in whole, so new ones round-trip untouched. */
-export interface Recipe {
-  readonly version: number;
-  readonly chartName: string;
-  readonly chartText: string;
-  readonly style: string;
-  readonly options: TakeOptions;
-}
 
 export function findStyle(id: string): StylePack {
   const style = styleById(id);
@@ -24,7 +13,7 @@ export function findStyle(id: string): StylePack {
 }
 
 /** Pretty JSON, keys sorted at every level, trailing newline. */
-export function writeRecipe(path: string, recipe: Recipe): void {
+export function writeRecipe(path: string, recipe: TakeRecipe): void {
   const sorted = (_key: string, value: unknown): unknown =>
     value && typeof value === "object" && !Array.isArray(value)
       ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))

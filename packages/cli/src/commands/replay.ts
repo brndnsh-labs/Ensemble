@@ -2,16 +2,16 @@
 
 import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
-import type { TakeOptions } from "@ensemble/engine";
+import type { TakeOptions, TakeRecipe } from "@ensemble/engine";
+import { RECIPE_VERSION } from "@ensemble/engine";
 import type { Command } from "../command.ts";
 import { UsageError } from "../command.ts";
-import type { Recipe } from "../take-output.ts";
-import { findStyle, playTake, RECIPE_VERSION } from "../take-output.ts";
+import { findStyle, playTake } from "../take-output.ts";
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-function readRecipe(path: string): Recipe {
+function readRecipe(path: string): TakeRecipe {
   let raw: string;
   try {
     raw = readFileSync(path, "utf8");
