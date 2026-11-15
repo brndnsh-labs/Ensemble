@@ -1,6 +1,6 @@
 // The engine's public API. Tests and other packages import from here only.
 
-export { arrangedLines, withArrangement } from "./chart/arrange.ts";
+export { arrangedLines, withArrangement, withoutArrangement } from "./chart/arrange.ts";
 export { ARRANGED_SEATS } from "./chart/arrangement.ts";
 export { chartContent, sameChart } from "./chart/compare.ts";
 export type { ChordParts } from "./chart/display.ts";

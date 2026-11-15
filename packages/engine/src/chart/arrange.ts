@@ -61,3 +61,9 @@ export function withArrangement(text: string, lines: readonly ArrangementLine[])
   });
   return `${above}${above === "" ? "" : "\n\n"}${block.join("\n")}\n`;
 }
+
+/** The chart's text with its arrangement taken out: the song goes back to the style's own. */
+export function withoutArrangement(text: string): string {
+  const { arrangement } = parse(text).chart;
+  return arrangement ? `${text.slice(0, arrangement.range.start).trimEnd()}\n` : text;
+}
