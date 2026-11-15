@@ -131,9 +131,44 @@ export interface Section {
   readonly range: SourceRange;
 }
 
-/** Text from a `---` line to the end of the file: kept verbatim, never read. */
+/** A level a section or a player is called at: 1 is the band at its quietest, 4 is flat out. */
+export type ArrangementLevel = 1 | 2 | 3 | 4;
+
+/** What a player is asked for in a section: a level of its own, `"out"` to lay out, or null to follow the section. */
+export type SeatCall = ArrangementLevel | "out" | null;
+
+export type ArrangedSeat = "drums" | "bass" | "chords" | "solo";
+
+/** One section of the song, as it is to be played. */
+export interface ArrangementLine {
+  readonly label: string;
+  /** Null for the level the style gives a section of this name. */
+  readonly energy: ArrangementLevel | null;
+  /** The soloist has the lead wherever its call is not `"out"`. */
+  readonly seats: Readonly<Record<ArrangedSeat, SeatCall>>;
+  /** Comment lines above it, each without its `//`. */
+  readonly leading: readonly string[];
+  /** A comment at the end of the line. */
+  readonly comment: string | null;
+  readonly range: SourceRange;
+}
+
+/** Everything from a `---` line to the end of the file. */
 export interface ArrangementBlock {
-  readonly text: string;
+  /** The lines of an `--- arrangement` block, one for each section played. Null when the block is something else. */
+  readonly lines: readonly ArrangementLine[] | null;
+  /** Comments after the last line. */
+  readonly closing: readonly string[];
+  /**
+   * The block as typed, kept when printing must not rewrite it: it is not an
+   * arrangement, or a line of it could not be read. Null when `lines` say it all.
+   */
+  readonly typed: string | null;
+  /**
+   * The lines are the song's sections in the order it plays them, so the block
+   * is used. When they are not, nobody can say which section a line was meant for.
+   */
+  readonly fits: boolean;
   readonly range: SourceRange;
 }
 

@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Plan, PlanBar, PlanOptions, Take } from "@ensemble/engine";
 import {
+  arrangedLines,
   PPQ,
   parse,
   pitchClass,
@@ -14,6 +15,7 @@ import {
   tierOf,
   toMidi,
   validateStyle,
+  withArrangement,
 } from "@ensemble/engine";
 import { styleIds } from "@ensemble/styles";
 import { corpus } from "./corpus.ts";
@@ -408,6 +410,92 @@ test("a level the player sets is held: every pass plays at that level, with no a
         `the level stays near ${energy}`,
       );
     }
+  }
+});
+
+const SONG = `key: C
+
+[Intro]
+| C | F |
+[Verse]
+| C | F | G | C |
+[Chorus]
+| F | G | C | Am |
+[Verse 2]
+| C | F | G | C |
+[Solo]
+| Am | F | G | C |
+[Chorus]
+[Outro]
+| F | C |
+`;
+
+test("a song is played as it is arranged: a player laid out in a section plays nothing in it, the soloist plays only where it has the lead, a section called at 4 is the band's high playing and one called at 1 its low whatever the section is named, and a player given a level of its own is at it", () => {
+  const arranged = `${SONG}
+--- arrangement
+Intro    4 . - - .
+Verse    2 - - - .
+Chorus   1 - - - .
+Verse 2  2 - . - .
+Solo     3 - - - -
+Chorus   4 - - - -
+Outro    2 1 - - .
+`;
+  for (const style of STYLES) {
+    for (const seed of SEEDS) {
+      const take = render(arranged, style, { mode: "song", solo: true, seed });
+      assert.deepEqual(take.diagnostics, []);
+      const music = take.plan.bars.filter((bar) => bar.kind === "music");
+      /** The notes a seat starts in the section played at a place in the song, from 0. */
+      const played = (seat: "drums" | "bass" | "solo", section: number) =>
+        notesOf(take, seat).filter((note) =>
+          music.some(
+            (bar) =>
+              bar.section.occurrence === section &&
+              note.tick >= bar.start &&
+              note.tick < bar.start + bar.ticks,
+          ),
+        );
+      assert.equal(played("drums", 0).length, 0, "the drummer is out of the intro");
+      assert.ok(played("drums", 1).length > 0, "and in from the verse");
+      assert.equal(played("bass", 3).length, 0, "the bass is out of the second verse");
+      for (let section = 0; section < 7; section++) {
+        const leads = section === 4 || section === 5;
+        assert.equal(
+          played("solo", section).length > 0,
+          leads,
+          `the soloist in section ${section + 1}`,
+        );
+      }
+      for (const bar of music) {
+        const { occurrence } = bar.section;
+        if (occurrence === 0) assert.equal(tierOf(bar.energy), "high", "the intro, called at 4");
+        if (occurrence === 2) assert.equal(tierOf(bar.energy), "low", "a chorus called at 1");
+        if (occurrence === 5) assert.equal(tierOf(bar.energy), "high", "a chorus called at 4");
+        if (occurrence === 6 && !bar.ending) {
+          assert.equal(
+            tierOf(bar.seats.drums ?? 1),
+            "low",
+            "the drummer, called at 1 in the outro",
+          );
+          assert.equal(tierOf(bar.seats.bass ?? 0), "mid", "under a band called at 2");
+        }
+      }
+    }
+
+    // Nothing but `-`, and the soloist out: the song as the style plays it by itself.
+    const plain = withArrangement(
+      SONG,
+      arrangedLines(parse(SONG).chart).map((line) => ({
+        ...line,
+        seats: { ...line.seats, solo: "out" as const },
+      })),
+    );
+    assert.deepEqual(
+      render(plain, style, { mode: "song", seed: 3 }).events,
+      render(SONG, style, { mode: "song", seed: 3 }).events,
+      "an arrangement that asks for nothing changes nothing",
+    );
   }
 });
 

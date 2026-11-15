@@ -342,18 +342,16 @@ style: funk
 
 Layer two: who plays in each section of the song, and how hard. It is optional, it is edited mainly through the grid in the app, and it is read in song mode only. A jam's shape is the band's to plan.
 
-**Not built yet** (stage 6, part 4): until it is, the parser keeps everything from `---` on and does not read it.
-
 ```
 --- arrangement
-//          energy  drums  bass  chords  solo
-Intro       1       .      -     -       .
-Verse       2       -      -     -       .
-Chorus      4       -      -     -       .
-Verse 2     2       -      -     -       .
-Solo        3       -      -     -       -
-Chorus      4       -      -     -       -
-Outro       2       1      -     -       .
+//       energy  drums  bass  chords  solo
+Intro    1       .      -     -       .
+Verse    2       -      -     -       .
+Chorus   4       -      -     -       .
+Verse 2  2       -      -     -       .
+Solo     3       -      -     -       -
+Chorus   4       -      -     -       -
+Outro    2       1      -     -       .
 ```
 
 - The block starts at a line `--- arrangement` and runs to the end of the file.
@@ -362,7 +360,7 @@ Outro       2       1      -     -       .
 - **Energy** is `1` to `4`, or `-` for the level the style gives a section of that name. `1` is the band at its quietest, `2` and `3` are its ordinary playing at two strengths, `4` is flat out. Where a style changes its groove for its loudest playing, `4` is that groove.
 - **A player's value** is `-` to play at the section's energy, `1` to `4` to play at a level of its own, or `.` to lay out.
 - **The soloist** has the lead in every section where its value is not `.`. An arrangement the app writes starts with the soloist out everywhere except a section labelled `Solo`.
-- A block of nothing but `-` (and `.` for the soloist) plays exactly as the chart does without one.
+- A block of nothing but `-` plays exactly as the chart does without one, the soloist aside: without a block the soloist, when there is one, plays the song through.
 - Comments (`//`) and blank lines are allowed. The canonical form writes the heading comment and aligns the columns.
 - A player switched off on the play screen stays off, whatever the block says. The block decides where the soloist plays; the play screen decides whether there is one.
 
@@ -370,7 +368,7 @@ Diagnostics:
 
 | Problem | What happens |
 |---|---|
-| A line that is not a label and five values, or a value that is not `-`, `.` or `1` to `4` | Error on the line or the value. The line counts as all `-`. |
+| A line that is not a label and five values, or a value that is not `-`, `.` or `1` to `4` | Error on the line or the value. The value counts as `-`, and formatting leaves the block as typed. |
 | The lines do not match the song: a different number of them, or a label that is not the label of the section played at that place (case does not matter) | Warning on the first line that does not fit, saying what the song plays there. The block is kept and not used, since nobody can say which section a line was meant for. The grid in the app lines it up again. |
 | `---` followed by anything but `arrangement` | Info on the line. The text from there on is kept and not read. |
 

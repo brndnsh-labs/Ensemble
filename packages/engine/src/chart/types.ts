@@ -3,6 +3,7 @@
 
 import type { Chord } from "../theory/chord.ts";
 import type { Degree, Key } from "../theory/pitch.ts";
+import type { ArrangementLine } from "./model.ts";
 
 /** Ticks per quarter note. All musical time in the engine is in ticks. */
 export const PPQ = 480;
@@ -98,4 +99,10 @@ export interface ExpandedChart {
   readonly body: readonly FlatBar[];
   /** `Outro`, `Ending`, `Coda`, `Tag` sections: played once at the end. Empty if the chart has none. */
   readonly ending: readonly FlatBar[];
+  /**
+   * Song mode: how each section is to be played, one line for each time a
+   * section is played (`runsOf(song)`), when the chart has an arrangement that
+   * fits it. Null for the style's own.
+   */
+  readonly arrangement: readonly ArrangementLine[] | null;
 }

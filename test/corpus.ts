@@ -1939,27 +1939,169 @@ const moreExamples: Row[] = [
   },
 ];
 
-// ── 11. Arrangement block, and 12. Reserved for later ───────────────────────
+// ── 11. Arrangement block ───────────────────────────────────────────────────
 
-const reserved: Row[] = [
+/** A song of seven sections, for an arrangement to be written against. */
+const arrangedSong = `key: C
+
+[Intro]
+| C | F |
+
+[Verse]
+| C | F | G | C |
+
+[Chorus]
+| F | G | C | Am |
+
+[Verse 2]
+| C | F | G | C |
+
+[Solo]
+| Am | F | G | C |
+
+[Chorus]
+
+[Outro]
+| F | C |
+`;
+const arrangedBars =
+  "C:1920 | F:1920 | C:1920 | F:1920 | G:1920 | C:1920 | F:1920 | G:1920 | C:1920 | Am:1920 | " +
+  "C:1920 | F:1920 | G:1920 | C:1920 | Am:1920 | F:1920 | G:1920 | C:1920 | " +
+  "F:1920 | G:1920 | C:1920 | Am:1920 | F:1920 | C:1920";
+const arranged = (block: string): string => `${arrangedSong}\n${block}`;
+
+const arrangement: Row[] = [
   {
-    name: "a line beginning with --- ends the chart: what follows is kept, not read, and noted (spec 11)",
+    name: "an arrangement: one line for each section the song plays, a label then five values (spec 11)",
+    text: arranged(chart`
+      --- arrangement
+      //       energy  drums  bass  chords  solo
+      Intro    1       .      -     -       .
+      Verse    2       -      -     -       .
+      Chorus   4       -      -     -       .
+      Verse 2  2       -      -     -       .
+      Solo     3       -      -     -       -
+      Chorus   4       -      -     -       -
+      Outro    2       1      -     -       .
+    `),
+    bars: arrangedBars,
+    diagnostics: [],
+  },
+  {
+    name: "an arrangement is printed with its heading and its columns in line; its comments stay",
+    text: arranged(chart`
+      ---arrangement
+      // the band comes in after the intro
+      intro 1 . - - .
+      Verse 2 - - - .
+      Chorus 4 - - - .  // loud
+      Verse  2 2 - - - .
+
+      Solo 3 - - - -
+      Chorus 4 - - - -
+      Outro 2 1 - - .
+      // and out
+    `),
+    bars: arrangedBars,
+    diagnostics: [],
+    print: arranged(chart`
+      --- arrangement
+      //       energy  drums  bass  chords  solo
+      // the band comes in after the intro
+      intro    1       .      -     -       .
+      Verse    2       -      -     -       .
+      Chorus   4       -      -     -       .  // loud
+      Verse 2  2       -      -     -       .
+      Solo     3       -      -     -       -
+      Chorus   4       -      -     -       -
+      Outro    2       1      -     -       .
+      // and out
+    `),
+  },
+  {
+    name: "an arrangement value that is not a level is an error at the value, and the block prints as typed",
+    text: arranged(chart`
+      --- arrangement
+      Intro 1 . - - .
+      Verse 5 - x - .
+      Chorus . - - - .
+      Verse 2 - - -
+      Solo 3 - - - -
+      Chorus 4 - - - -
+      Outro 2 1 - - .
+    `),
+    bars: arrangedBars,
+    diagnostics: [
+      ["error", "25:7", "`5` is not a level"],
+      ["error", "25:11", "`x` is not a level"],
+      ["error", "26:8", "A section cannot lay out"],
+      ["error", "27:1", "a section's label and five values"],
+      // The short line reads as `Verse`, which is not what the song plays there.
+      ["warning", "27:1", "The song plays `Verse 2` here"],
+    ],
+    print: arranged(chart`
+      --- arrangement
+      Intro 1 . - - .
+      Verse 5 - x - .
+      Chorus . - - - .
+      Verse 2 - - -
+      Solo 3 - - - -
+      Chorus 4 - - - -
+      Outro 2 1 - - .
+    `),
+  },
+  {
+    name: "an arrangement whose lines are not the song's sections in order is kept and not used: a wrong label",
+    text: arranged(chart`
+      --- arrangement
+      Intro 1 . - - .
+      Verse 2 - - - .
+      Bridge 4 - - - .
+    `),
+    bars: arrangedBars,
+    diagnostics: [
+      ["warning", "26:1", "The song plays `Chorus` here, and this line is for `Bridge`"],
+    ],
+  },
+  {
+    name: "an arrangement with too few lines for the song is marked where it starts; one with too many, at the first to spare",
+    text: chart`
+      key: C
+      [A]
+      | C | F |
+      [B]
+      | G | C |
+      --- arrangement
+      A - - - - .
+    `,
+    bars: "C:1920 | F:1920 | G:1920 | C:1920",
+    diagnostics: [["warning", 6, "The song plays 2 sections, and the arrangement has 1 line"]],
+  },
+  {
+    name: "an arrangement with a line to spare is marked at that line",
+    text: chart`
+      key: C
+      | C | F |
+      --- arrangement
+      A - - - - .
+      B - - - - .
+    `,
+    bars: "C:1920 | F:1920",
+    diagnostics: [["warning", 5, "The song plays 1 section, and this is line 2"]],
+  },
+  {
+    name: "--- followed by anything but `arrangement` ends the chart: what follows is kept, not read, and noted",
     text: chart`
       key: C
       [Intro]
       | C | F |
       [A]
       | G | C |
-      --- arrangement
-               Intro  A  A  B  A  Outro
-      energy   2      2  3  4  3  2
-      drums    .      -  -  -  -  1
-      bass     1      -  -  -  -  1
-      chords   -      -  -  -  -  -
-      solo     .      .  .  3  .  .
+      --- notes
+      play it twice as fast
     `,
     bars: "C:1920 | F:1920 | G:1920 | C:1920",
-    diagnostics: [["info", 6, "arrangement block"]],
+    diagnostics: [["info", 6, "kept and not read"]],
     print: chart`
       key: C
 
@@ -1969,15 +2111,15 @@ const reserved: Row[] = [
       [A]
       | G | C |
 
-      --- arrangement
-               Intro  A  A  B  A  Outro
-      energy   2      2  3  4  3  2
-      drums    .      -  -  -  -  1
-      bass     1      -  -  -  -  1
-      chords   -      -  -  -  -  -
-      solo     .      .  .  3  .  .
+      --- notes
+      play it twice as fast
     `,
   },
+];
+
+// ── 12. Reserved for later ──────────────────────────────────────────────────
+
+const reserved: Row[] = [
   {
     name: "reserved: Nashville digits are not chords yet, and the error points to roman numerals",
     text: inC("| 1 | 4 | 5 | 1 |"),
@@ -2014,5 +2156,6 @@ export const corpus: readonly Row[] = [
   ...transposition,
   ...printing,
   ...moreExamples,
+  ...arrangement,
   ...reserved,
 ];

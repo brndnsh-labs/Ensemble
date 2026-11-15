@@ -5,10 +5,11 @@
 import { toneInterval } from "../theory/chord.ts";
 import type { Key } from "../theory/pitch.ts";
 import { keyToString, mod12, noteNameToString, pitchClass } from "../theory/pitch.ts";
+import { fitsSong, readArrangement } from "./arrangement.ts";
 import type { BarBuilder } from "./bars.ts";
 import { createBarBuilder } from "./bars.ts";
 import { chordText } from "./display.ts";
-import { expandReporting } from "./expand.ts";
+import { expandReporting, runsOf } from "./expand.ts";
 import { labelId, meterToString, parseKey, parseMeter, parseTempo, roleOfLabel } from "./fields.ts";
 import { chooseWidth } from "./layout.ts";
 import type { Line } from "./lex.ts";
@@ -379,12 +380,26 @@ export function parse(text: string): { chart: Chart; diagnostics: Diagnostic[] }
         .join("\n")
         .trimEnd();
       const range = rangeIn(line, from, line.text.trimEnd().length);
-      arrangement = { text: rest, range: { ...range, end: text.length } };
-      say(
-        "info",
-        range,
-        "Everything from `---` on is an arrangement block. This version keeps it and does not read it.",
-      );
+      const whole = { ...range, end: text.length };
+      const cut = commentStart(line.text);
+      const opening = (cut < 0 ? line.text : line.text.slice(0, cut)).trim();
+      if (/^---\s*arrangement$/i.test(opening)) {
+        const read = readArrangement(lines.slice(line.number), say);
+        arrangement = {
+          lines: read.lines,
+          closing: read.closing,
+          typed: read.clean ? null : rest,
+          fits: false,
+          range: whole,
+        };
+      } else {
+        arrangement = { lines: null, closing: [], typed: rest, fits: false, range: whole };
+        say(
+          "info",
+          range,
+          "Everything from `---` on is kept and not read. An arrangement block starts `--- arrangement`.",
+        );
+      }
       break;
     }
     const cut = commentStart(line.text);
@@ -466,7 +481,7 @@ export function parse(text: string): { chart: Chart; diagnostics: Diagnostic[] }
     });
   });
 
-  const chart: Chart = {
+  const draft: Chart = {
     title: title ?? "Untitled",
     key: chartKey,
     tempo,
@@ -481,11 +496,22 @@ export function parse(text: string): { chart: Chart; diagnostics: Diagnostic[] }
   // Mistakes inside bars (slot counts, `%`, `.`) are found by playing the chart
   // through. A bar played many times is reported once.
   const reported = new Set<string>();
-  expandReporting(chart, (range, message) => {
+  const { song } = expandReporting(draft, (range, message) => {
     const id = `${range.start}:${message}`;
     if (!reported.has(id)) say("error", range, message);
     reported.add(id);
   });
+
+  // An arrangement is for the song as it is played, which is only now known.
+  const fits =
+    arrangement !== null &&
+    fitsSong(
+      arrangement,
+      runsOf(song).map((run) => run[0]!.sectionLabel),
+      say,
+    );
+  const chart: Chart =
+    arrangement && fits ? { ...draft, arrangement: { ...arrangement, fits } } : draft;
 
   // A missing key matters once a chord has had to assume one.
   const assumedAt = assumedKeyAt as SourceRange | null;

@@ -189,7 +189,29 @@ export function expandReporting(chart: Chart, report: Report): ExpandedChart {
   });
 
   const withRole = (role: FlatBar["role"]): FlatBar[] => song.filter((bar) => bar.role === role);
-  return { song, intro: withRole("intro"), body: withRole("body"), ending: withRole("ending") };
+  return {
+    song,
+    intro: withRole("intro"),
+    body: withRole("body"),
+    ending: withRole("ending"),
+    arrangement: chart.arrangement?.fits ? chart.arrangement.lines : null,
+  };
+}
+
+/** Bars split into runs, one for each time through a section. */
+export function runsOf(bars: readonly FlatBar[]): FlatBar[][] {
+  const runs: FlatBar[][] = [];
+  for (const bar of bars) {
+    const run = runs.at(-1);
+    const previous = run?.at(-1);
+    const continues =
+      previous !== undefined &&
+      previous.sectionIndex === bar.sectionIndex &&
+      bar.barInSection === previous.barInSection + 1;
+    if (run && continues) run.push(bar);
+    else runs.push([bar]);
+  }
+  return runs;
 }
 
 function slotCountMessage(slots: number, meter: Meter): string {

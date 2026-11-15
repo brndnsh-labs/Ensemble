@@ -18,6 +18,17 @@ export type Tier = "low" | "mid" | "high";
 export const TIER_MID = 0.42;
 export const TIER_HIGH = 0.7;
 
+/**
+ * What an arrangement's levels 1 to 4 mean as energy: the low part, the
+ * ordinary part at two strengths, and the high part.
+ */
+export const LEVEL_ENERGY: Readonly<Record<1 | 2 | 3 | 4, number>> = {
+  1: 0.3,
+  2: 0.5,
+  3: 0.62,
+  4: 0.8,
+};
+
 export function tierOf(energy: number): Tier {
   return energy < TIER_MID ? "low" : energy < TIER_HIGH ? "mid" : "high";
 }

@@ -2,10 +2,12 @@
 // which bars are played, how hard, where the fills and arrivals fall, and how
 // the performance ends.
 
+import { runsOf } from "../chart/expand.ts";
+import type { ArrangementLine } from "../chart/model.ts";
 import type { ChartChord, ChordSpan, ExpandedChart, FlatBar, SourceRange } from "../chart/types.ts";
 import { PPQ } from "../chart/types.ts";
 import type { Seat, StylePack } from "../style/types.ts";
-import { SEATS, TIER_HIGH, TIER_MID, tierOf } from "../style/types.ts";
+import { LEVEL_ENERGY, SEATS, TIER_HIGH, TIER_MID, tierOf } from "../style/types.ts";
 import { chordFamily, chordToString, makeQuality } from "../theory/chord.ts";
 import type { Key } from "../theory/pitch.ts";
 import { pitchClass } from "../theory/pitch.ts";
@@ -74,9 +76,15 @@ export function planBars(
   const drafts: Draft[] = [];
   let occurrence = 0;
   const bridges = bridgeRuns(runs, style);
-  for (const run of runs) {
+  // A song with an arrangement is played as arranged: one line for each run.
+  const arranged = options.mode === "song" ? expanded.arrangement : null;
+  for (const [runIndex, run] of runs.entries()) {
     const first = run.bars[0]!;
-    const level = sectionLevel(bridges.has(run) ? BRIDGE : first.sectionLabel, style);
+    const line = arranged?.[runIndex];
+    const level =
+      line?.energy != null
+        ? LEVEL_ENERGY[line.energy]
+        : sectionLevel(bridges.has(run) ? BRIDGE : first.sectionLabel, style);
     const phrases =
       run.lap === undefined
         ? phraseLengths(run.bars.length)
@@ -108,6 +116,7 @@ export function planBars(
       drafts.push({
         flat: bar,
         run,
+        line,
         occurrence,
         level,
         // A level the player set is held: the band must not drift away from it (CO-05, CO-06).
@@ -234,7 +243,11 @@ export function planBars(
       level: draft.level,
       seats: silent
         ? seatEnergies(energy, new Set(SEATS))
-        : seatEnergies(energy, solos[i] ? without : new Set([...without, "solo" as const])),
+        : seatEnergies(
+            energy,
+            solos[i] ? without : new Set([...without, "solo" as const]),
+            draft.line,
+          ),
       solo: silent || without.has("solo") ? null : solos[i]!,
       fill,
       crash,
@@ -273,6 +286,8 @@ export function planBars(
 interface Draft {
   readonly flat: FlatBar;
   readonly run: Run;
+  /** How the arrangement asks for this bar's section to be played, when there is one. */
+  readonly line: ArrangementLine | undefined;
   readonly occurrence: number;
   readonly level: number;
   readonly energy: number;
@@ -311,22 +326,7 @@ function layOut(
 
 /** Split bars into runs, one per time through a section. */
 function sectionRuns(bars: readonly FlatBar[], pass: number, part: Run["part"]): Run[] {
-  const runs: Run[] = [];
-  let current: FlatBar[] = [];
-  for (const bar of bars) {
-    const previous = current[current.length - 1];
-    const continues =
-      previous !== undefined &&
-      previous.sectionIndex === bar.sectionIndex &&
-      bar.barInSection === previous.barInSection + 1;
-    if (!continues && current.length > 0) {
-      runs.push({ bars: current, pass, part });
-      current = [];
-    }
-    current.push(bar);
-  }
-  if (current.length > 0) runs.push({ bars: current, pass, part });
-  return runs;
+  return runsOf(bars).map((run) => ({ bars: run, pass, part }));
 }
 
 /** Bars of this pass's body that come before a run. */
@@ -476,9 +476,22 @@ function holdTierLine(lifted: number, level: number, style: StylePack): number {
   return Math.max(lifted, TIER_HIGH);
 }
 
-function seatEnergies(energy: number, without: ReadonlySet<Seat>): Record<Seat, number | null> {
+/**
+ * Each seat's energy for a bar. A seat that is `without` is out, whatever the
+ * arrangement says: the player switched it off. Otherwise the arrangement's
+ * line may lay it out or give it a level of its own.
+ */
+function seatEnergies(
+  energy: number,
+  without: ReadonlySet<Seat>,
+  line?: ArrangementLine,
+): Record<Seat, number | null> {
   const seats = {} as Record<Seat, number | null>;
-  for (const seat of SEATS) seats[seat] = without.has(seat) ? null : energy;
+  for (const seat of SEATS) {
+    const call = line?.seats[seat] ?? null;
+    seats[seat] =
+      without.has(seat) || call === "out" ? null : call === null ? energy : LEVEL_ENERGY[call];
+  }
   return seats;
 }
 
@@ -507,6 +520,15 @@ function soloMarks(
     const of = open ? SOLO_CHORUSES : Math.min(SOLO_CHORUSES, count - (index - chorus));
     return { chorus, of };
   };
+
+  // An arrangement says where the soloist has the lead: each section it is in is a chorus of a solo.
+  if (drafts.some((draft) => draft.line)) {
+    const leads = (draft: Draft) => draft.line !== undefined && draft.line.seats.solo !== "out";
+    const times = [...new Set(drafts.filter(leads).map((draft) => draft.occurrence))];
+    return drafts.map((draft) =>
+      leads(draft) ? arc(times.indexOf(draft.occurrence), times.length) : null,
+    );
+  }
 
   const named = (draft: Draft) => sectionIdentity(draft.flat.sectionLabel).startsWith("solo");
   if (drafts.some(named)) {

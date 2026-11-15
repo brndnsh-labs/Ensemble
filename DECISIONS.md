@@ -717,3 +717,17 @@ Built to `prompts/app-takes.md`. What that brief did not settle:
 - **The day a take was kept is in the device's own way of writing dates** ("Nov 15" here, "15 Nov" in Britain), with the year only when it is not this one.
 - **A take that will not plan** (its style gone, or options this engine refuses) says so on its screen and its row, and offers only Delete.
 - **Smoke journey 5 stops the band by going back to the library.** The transport's Stop sits behind Finish, which would make a different take, and a press within 0.6 s of Finish is ignored; waiting that out is a sleep. Leaving the screen is a real way to stop the band, and goes through the same stop. Seen to fail with Export MIDI given a tempo one off.
+
+## the arrangement block, read and played (stage 6, part 4)
+
+The engine half of the arrangement grid, done on the main thread: `docs/CHART_FORMAT.md` section 11 is the design.
+
+- **The text is turned on its side from the provisional sketch**: one line for each section the song plays (label, energy, drums, bass, chords, solo), not sections across the page. Sideways it grows with the song, in an editor whose lines do not wrap, and a label such as `Verse 2` cannot sit in a row of labels split on spaces. Values are read from the right, so a label may have spaces. The grid in the app still shows sections as columns.
+- **Levels 1 to 4 are 0.3, 0.5, 0.62 and 0.8** (`LEVEL_ENERGY`): the band's low playing, its ordinary playing at two strengths, its high playing. They sit where the styles' own section levels do (a break, a verse, a bridge, a chorus). The numbers are the engine's, beside the tier lines they are read against, not a style's.
+- **A block that does not match the song is not used at all**, with a warning on the first line that does not fit. Using the lines that happen to match would play a different arrangement from the one written without saying so. `arrangedLines` lines a block up with the song again (the second `Chorus` line goes to the second time a chorus is played; a section the block does not know is plain), and `withArrangement` writes it back: that is what the grid will call.
+- **A block with a mistake in it prints as typed.** The mistaken value plays as `-`, but formatting must not turn what the player typed into what the parser guessed.
+- **Song mode only.** A jam's shape is the band's to plan; a line for each section played has no meaning when the form goes round an unknown number of times.
+- **The soloist**: the block says where it has the lead, and the play screen's switch says whether there is a soloist at all. Each section it leads is a chorus of its solo, as sections labelled `Solo` already were. A seat the player switched off stays off whatever the block says.
+- **A player's own level is held**: the one-bar build into a bigger section lifts the section's energy, not a level written for one player.
+- **The corpus** has seven rows for section 11 in place of the provisional one, and the `---` note now says what an arrangement block starts with.
+- **One property**: "a song is played as it is arranged" (`test/band.test.ts`), with the levels called against the section names (an intro at 4, a chorus at 1) so the style's own levels cannot pass it by coincidence. Seen to fail with the lay-out ignored and with the levels ignored. It renders one short song per seed and the suite is still 9.1 to 9.2 s of 10. Goldens and scorecards have not moved.

@@ -1,6 +1,7 @@
 // Canonical printing: `fmt`. See docs/CHART_FORMAT.md section 9.
 // Printing a chart and parsing the result gives the same chart.
 
+import { printArrangement } from "./arrangement.ts";
 import { chordText } from "./display.ts";
 import type { Cell, Row, TextLine } from "./layout.ts";
 import { flow } from "./layout.ts";
@@ -10,7 +11,7 @@ import type { Bar, BarToken, Chart, ChartComment, ChartField, Section } from "./
 export function print(chart: Chart): string {
   // Blocks are separated by one blank line: the header, each section, the arrangement.
   const blocks: string[][] = [linesOf(chart.header), ...chart.sections.map(printSection)];
-  if (chart.arrangement) blocks.push(chart.arrangement.text.split("\n"));
+  if (chart.arrangement) blocks.push(printArrangement(chart.arrangement));
   const text = blocks
     .filter((block) => block.length > 0)
     .map((block) => block.join("\n"))
