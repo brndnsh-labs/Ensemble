@@ -17,6 +17,7 @@
     "gate:1": "sh scripts/gate-1.sh",
     "gate:2": "sh scripts/gate-2.sh",
     "gate:3": "sh scripts/gate-3.sh",
+    "gate:4": "sh scripts/gate-4.sh",
     "score": "node scripts/budget.ts 120 node packages/cli/src/main.ts score --check"
   },
   "devDependencies": {
