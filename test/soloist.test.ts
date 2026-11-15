@@ -22,7 +22,6 @@ import { chordsUnder, harmonyOf, POCKET, strikesOf } from "./reading.ts";
 import {
   type Jam,
   type JamSpec,
-  LIBRARY,
   notesOf,
   only,
   ownCharts,

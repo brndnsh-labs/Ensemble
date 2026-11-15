@@ -6,7 +6,7 @@ import { test } from "node:test";
 import type { PlanBar, Take } from "@ensemble/engine";
 import { chordTones, PPQ, pitchClass, render, scaleHas, tierOf } from "@ensemble/engine";
 import { blues, chordsUnder, harmonyOf, POCKET, type Strike, strikesOf } from "./reading.ts";
-import { LIBRARY, only, ownCharts, STYLES, stressTakes, takes } from "./takes.ts";
+import { only, ownCharts, STYLES, stressTakes, takes } from "./takes.ts";
 
 test("the piano stays in its register: nothing under the style's floor, nothing above E6, in every take", () => {
   let strikes = 0;
