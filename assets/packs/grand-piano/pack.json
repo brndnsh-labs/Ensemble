@@ -8,15 +8,15 @@
     "url": "https://github.com/sfzinstruments/SalamanderGrandPiano",
     "version": "3382bf9496bba2486f5ab0de55a264d1dfc38404",
     "licence": "CC-BY-3.0",
-    "changes": "Three of the sixteen velocity layers (v8, v10 and v16) of the sampled notes A1 to C7, the two microphones summed to mono at -3 dB each; trimmed to the hammer's strike, cut at its decay or a length cap and faded; each note levelled to one loudness; encoded as Opus. Release and pedal noises left out."
+    "changes": "Three of the sixteen velocity layers (v8, v10 and v16) of the sampled notes A1 to C7, both microphones kept as stereo; trimmed to the hammer's strike, cut at its decay or a length cap and faded; each note levelled to one loudness; encoded as Opus. Release and pedal noises left out."
   },
   "audio": {
     "container": "webm",
     "codec": "opus",
     "sampleRate": 48000,
-    "channels": 1,
-    "bytes": 3809125,
-    "decodedBytes": 63360000
+    "channels": 2,
+    "bytes": 5979073,
+    "decodedBytes": 114048000
   },
   "level": {
     "measure": "loudness",
@@ -33,7 +33,7 @@
               "takes": [
                 {
                   "file": "n33-v1-1.webm",
-                  "seconds": 7
+                  "seconds": 6
                 }
               ]
             },
@@ -42,7 +42,7 @@
               "takes": [
                 {
                   "file": "n36-v1-1.webm",
-                  "seconds": 6.809521
+                  "seconds": 5.857146
                 }
               ]
             },
@@ -51,7 +51,7 @@
               "takes": [
                 {
                   "file": "n39-v1-1.webm",
-                  "seconds": 6.619042
+                  "seconds": 5.714292
                 }
               ]
             },
@@ -60,7 +60,7 @@
               "takes": [
                 {
                   "file": "n42-v1-1.webm",
-                  "seconds": 6.428562
+                  "seconds": 5.571438
                 }
               ]
             },
@@ -69,7 +69,7 @@
               "takes": [
                 {
                   "file": "n45-v1-1.webm",
-                  "seconds": 6.238104
+                  "seconds": 5.428562
                 }
               ]
             },
@@ -78,7 +78,7 @@
               "takes": [
                 {
                   "file": "n48-v1-1.webm",
-                  "seconds": 6.047625
+                  "seconds": 5.285708
                 }
               ]
             },
@@ -87,7 +87,7 @@
               "takes": [
                 {
                   "file": "n51-v1-1.webm",
-                  "seconds": 5.857146
+                  "seconds": 5.142854
                 }
               ]
             },
@@ -96,7 +96,7 @@
               "takes": [
                 {
                   "file": "n54-v1-1.webm",
-                  "seconds": 5.666667
+                  "seconds": 5
                 }
               ]
             },
@@ -105,7 +105,7 @@
               "takes": [
                 {
                   "file": "n57-v1-1.webm",
-                  "seconds": 5.476187
+                  "seconds": 4.857146
                 }
               ]
             },
@@ -114,7 +114,7 @@
               "takes": [
                 {
                   "file": "n60-v1-1.webm",
-                  "seconds": 5.285708
+                  "seconds": 4.714292
                 }
               ]
             },
@@ -123,7 +123,7 @@
               "takes": [
                 {
                   "file": "n63-v1-1.webm",
-                  "seconds": 5.095229
+                  "seconds": 4.571438
                 }
               ]
             },
@@ -132,7 +132,7 @@
               "takes": [
                 {
                   "file": "n66-v1-1.webm",
-                  "seconds": 4.904771
+                  "seconds": 4.428562
                 }
               ]
             },
@@ -141,7 +141,7 @@
               "takes": [
                 {
                   "file": "n69-v1-1.webm",
-                  "seconds": 4.714292
+                  "seconds": 4.285708
                 }
               ]
             },
@@ -150,7 +150,7 @@
               "takes": [
                 {
                   "file": "n72-v1-1.webm",
-                  "seconds": 4.523813
+                  "seconds": 4.142854
                 }
               ]
             },
@@ -159,7 +159,7 @@
               "takes": [
                 {
                   "file": "n75-v1-1.webm",
-                  "seconds": 4.333333
+                  "seconds": 4
                 }
               ]
             },
@@ -168,7 +168,7 @@
               "takes": [
                 {
                   "file": "n78-v1-1.webm",
-                  "seconds": 4.142854
+                  "seconds": 3.857146
                 }
               ]
             },
@@ -177,7 +177,7 @@
               "takes": [
                 {
                   "file": "n81-v1-1.webm",
-                  "seconds": 3.952375
+                  "seconds": 3.714292
                 }
               ]
             },
@@ -186,7 +186,7 @@
               "takes": [
                 {
                   "file": "n84-v1-1.webm",
-                  "seconds": 3.761896
+                  "seconds": 3.571438
                 }
               ]
             },
@@ -195,7 +195,7 @@
               "takes": [
                 {
                   "file": "n87-v1-1.webm",
-                  "seconds": 3.571438
+                  "seconds": 3.428562
                 }
               ]
             },
@@ -204,7 +204,7 @@
               "takes": [
                 {
                   "file": "n90-v1-1.webm",
-                  "seconds": 3.380958
+                  "seconds": 3.285708
                 }
               ]
             },
@@ -213,7 +213,7 @@
               "takes": [
                 {
                   "file": "n93-v1-1.webm",
-                  "seconds": 3.190479
+                  "seconds": 3.142854
                 }
               ]
             },
@@ -236,7 +236,7 @@
               "takes": [
                 {
                   "file": "n33-v2-1.webm",
-                  "seconds": 7
+                  "seconds": 6
                 }
               ]
             },
@@ -245,7 +245,7 @@
               "takes": [
                 {
                   "file": "n36-v2-1.webm",
-                  "seconds": 6.809521
+                  "seconds": 5.857146
                 }
               ]
             },
@@ -254,7 +254,7 @@
               "takes": [
                 {
                   "file": "n39-v2-1.webm",
-                  "seconds": 6.619042
+                  "seconds": 5.714292
                 }
               ]
             },
@@ -263,7 +263,7 @@
               "takes": [
                 {
                   "file": "n42-v2-1.webm",
-                  "seconds": 6.428562
+                  "seconds": 5.571438
                 }
               ]
             },
@@ -272,7 +272,7 @@
               "takes": [
                 {
                   "file": "n45-v2-1.webm",
-                  "seconds": 6.238104
+                  "seconds": 5.428562
                 }
               ]
             },
@@ -281,7 +281,7 @@
               "takes": [
                 {
                   "file": "n48-v2-1.webm",
-                  "seconds": 6.047625
+                  "seconds": 5.285708
                 }
               ]
             },
@@ -290,7 +290,7 @@
               "takes": [
                 {
                   "file": "n51-v2-1.webm",
-                  "seconds": 5.857146
+                  "seconds": 5.142854
                 }
               ]
             },
@@ -299,7 +299,7 @@
               "takes": [
                 {
                   "file": "n54-v2-1.webm",
-                  "seconds": 5.666667
+                  "seconds": 5
                 }
               ]
             },
@@ -308,7 +308,7 @@
               "takes": [
                 {
                   "file": "n57-v2-1.webm",
-                  "seconds": 5.476187
+                  "seconds": 4.857146
                 }
               ]
             },
@@ -317,7 +317,7 @@
               "takes": [
                 {
                   "file": "n60-v2-1.webm",
-                  "seconds": 5.285708
+                  "seconds": 4.714292
                 }
               ]
             },
@@ -326,7 +326,7 @@
               "takes": [
                 {
                   "file": "n63-v2-1.webm",
-                  "seconds": 5.095229
+                  "seconds": 4.571438
                 }
               ]
             },
@@ -335,7 +335,7 @@
               "takes": [
                 {
                   "file": "n66-v2-1.webm",
-                  "seconds": 4.904771
+                  "seconds": 4.428562
                 }
               ]
             },
@@ -344,7 +344,7 @@
               "takes": [
                 {
                   "file": "n69-v2-1.webm",
-                  "seconds": 4.714292
+                  "seconds": 4.285708
                 }
               ]
             },
@@ -353,7 +353,7 @@
               "takes": [
                 {
                   "file": "n72-v2-1.webm",
-                  "seconds": 4.523813
+                  "seconds": 4.142854
                 }
               ]
             },
@@ -362,7 +362,7 @@
               "takes": [
                 {
                   "file": "n75-v2-1.webm",
-                  "seconds": 4.333333
+                  "seconds": 4
                 }
               ]
             },
@@ -371,7 +371,7 @@
               "takes": [
                 {
                   "file": "n78-v2-1.webm",
-                  "seconds": 4.142854
+                  "seconds": 3.857146
                 }
               ]
             },
@@ -380,7 +380,7 @@
               "takes": [
                 {
                   "file": "n81-v2-1.webm",
-                  "seconds": 3.952375
+                  "seconds": 3.714292
                 }
               ]
             },
@@ -389,7 +389,7 @@
               "takes": [
                 {
                   "file": "n84-v2-1.webm",
-                  "seconds": 3.761896
+                  "seconds": 3.571438
                 }
               ]
             },
@@ -398,7 +398,7 @@
               "takes": [
                 {
                   "file": "n87-v2-1.webm",
-                  "seconds": 3.571438
+                  "seconds": 3.428562
                 }
               ]
             },
@@ -407,7 +407,7 @@
               "takes": [
                 {
                   "file": "n90-v2-1.webm",
-                  "seconds": 3.380958
+                  "seconds": 3.285708
                 }
               ]
             },
@@ -416,7 +416,7 @@
               "takes": [
                 {
                   "file": "n93-v2-1.webm",
-                  "seconds": 3.190479
+                  "seconds": 3.142854
                 }
               ]
             },
@@ -439,7 +439,7 @@
               "takes": [
                 {
                   "file": "n33-v3-1.webm",
-                  "seconds": 7
+                  "seconds": 6
                 }
               ]
             },
@@ -448,7 +448,7 @@
               "takes": [
                 {
                   "file": "n36-v3-1.webm",
-                  "seconds": 6.809521
+                  "seconds": 5.857146
                 }
               ]
             },
@@ -457,7 +457,7 @@
               "takes": [
                 {
                   "file": "n39-v3-1.webm",
-                  "seconds": 6.619042
+                  "seconds": 5.714292
                 }
               ]
             },
@@ -466,7 +466,7 @@
               "takes": [
                 {
                   "file": "n42-v3-1.webm",
-                  "seconds": 6.428562
+                  "seconds": 5.571438
                 }
               ]
             },
@@ -475,7 +475,7 @@
               "takes": [
                 {
                   "file": "n45-v3-1.webm",
-                  "seconds": 6.238104
+                  "seconds": 5.428562
                 }
               ]
             },
@@ -484,7 +484,7 @@
               "takes": [
                 {
                   "file": "n48-v3-1.webm",
-                  "seconds": 6.047625
+                  "seconds": 5.285708
                 }
               ]
             },
@@ -493,7 +493,7 @@
               "takes": [
                 {
                   "file": "n51-v3-1.webm",
-                  "seconds": 5.857146
+                  "seconds": 5.142854
                 }
               ]
             },
@@ -502,7 +502,7 @@
               "takes": [
                 {
                   "file": "n54-v3-1.webm",
-                  "seconds": 5.666667
+                  "seconds": 5
                 }
               ]
             },
@@ -511,7 +511,7 @@
               "takes": [
                 {
                   "file": "n57-v3-1.webm",
-                  "seconds": 5.476187
+                  "seconds": 4.857146
                 }
               ]
             },
@@ -520,7 +520,7 @@
               "takes": [
                 {
                   "file": "n60-v3-1.webm",
-                  "seconds": 5.285708
+                  "seconds": 4.714292
                 }
               ]
             },
@@ -529,7 +529,7 @@
               "takes": [
                 {
                   "file": "n63-v3-1.webm",
-                  "seconds": 5.095229
+                  "seconds": 4.571438
                 }
               ]
             },
@@ -538,7 +538,7 @@
               "takes": [
                 {
                   "file": "n66-v3-1.webm",
-                  "seconds": 4.904771
+                  "seconds": 4.428562
                 }
               ]
             },
@@ -547,7 +547,7 @@
               "takes": [
                 {
                   "file": "n69-v3-1.webm",
-                  "seconds": 4.714292
+                  "seconds": 4.285708
                 }
               ]
             },
@@ -556,7 +556,7 @@
               "takes": [
                 {
                   "file": "n72-v3-1.webm",
-                  "seconds": 4.523813
+                  "seconds": 4.142854
                 }
               ]
             },
@@ -565,7 +565,7 @@
               "takes": [
                 {
                   "file": "n75-v3-1.webm",
-                  "seconds": 4.333333
+                  "seconds": 4
                 }
               ]
             },
@@ -574,7 +574,7 @@
               "takes": [
                 {
                   "file": "n78-v3-1.webm",
-                  "seconds": 4.142854
+                  "seconds": 3.857146
                 }
               ]
             },
@@ -583,7 +583,7 @@
               "takes": [
                 {
                   "file": "n81-v3-1.webm",
-                  "seconds": 3.952375
+                  "seconds": 3.714292
                 }
               ]
             },
@@ -592,7 +592,7 @@
               "takes": [
                 {
                   "file": "n84-v3-1.webm",
-                  "seconds": 3.761896
+                  "seconds": 3.571438
                 }
               ]
             },
@@ -601,7 +601,7 @@
               "takes": [
                 {
                   "file": "n87-v3-1.webm",
-                  "seconds": 3.571438
+                  "seconds": 3.428562
                 }
               ]
             },
@@ -610,7 +610,7 @@
               "takes": [
                 {
                   "file": "n90-v3-1.webm",
-                  "seconds": 3.380958
+                  "seconds": 3.285708
                 }
               ]
             },
@@ -619,7 +619,7 @@
               "takes": [
                 {
                   "file": "n93-v3-1.webm",
-                  "seconds": 3.190479
+                  "seconds": 3.142854
                 }
               ]
             },

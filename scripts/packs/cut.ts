@@ -57,6 +57,8 @@ interface Cut {
   readonly clarity?: number;
   readonly octaveUp?: boolean;
   readonly endedBy: "cap" | "decay" | "file";
+  /** The two channels of a stereo pack's take, cut and scaled as `pcm` (their fold) was. */
+  readonly pair?: readonly [Float32Array, Float32Array];
   /** The fold's loss against its two channels in the worst band, dB, and that band's centre. */
   readonly fold?: { readonly db: number; readonly hz: number; readonly bands: readonly number[] };
 }
@@ -88,12 +90,24 @@ function cutTake(recipe: Recipe, take: Take): Cut {
   const endedBy = length === cap ? "cap" : length === decay ? "decay" : "file";
   const seg = x.slice(start, start + length);
   if (pre > 0) fadeIn(seg, pre);
-  fadeOut(seg, Math.min(length, Math.max(Math.round(0.08 * RATE), Math.round(0.1 * length))));
+  const fadeLength = Math.min(length, Math.max(Math.round(0.08 * RATE), Math.round(0.1 * length)));
+  fadeOut(seg, fadeLength);
 
   const measured = levelOf(recipe, seg);
   const gain = recipe.level.reference - measured;
   const pcm = scale(seg, gain);
   let cut: Cut = { pcm, gain, endedBy };
+  if (recipe.channels === 2 && stereo && !take.shift) {
+    // The same cut, fades and gain on each channel as on their fold.
+    const side = (channel: Float32Array): Float32Array => {
+      const part = channel.slice(start, start + length);
+      if (pre > 0) fadeIn(part, pre);
+      fadeOut(part, fadeLength);
+      return scale(part, gain);
+    };
+    const [l, r] = stereo as [Float32Array, Float32Array];
+    cut = { ...cut, pair: [side(l), side(r)] };
+  }
 
   if (recipe.roots && take.mapped !== undefined) {
     const { skip, seconds } = recipe.roots;
@@ -128,10 +142,17 @@ function levelOf(recipe: Recipe, x: Float32Array): number {
 function encodeLevelled(recipe: Recipe, cut: Cut, path: string): Cut {
   let current = cut;
   for (let pass = 0; pass < 4; pass++) {
-    encodeOpus([current.pcm], path, recipe.kbps);
-    const off = levelOf(recipe, decode(path)[0]!) - recipe.level.reference;
+    encodeOpus(current.pair ?? [current.pcm], path, recipe.kbps);
+    const off = levelOf(recipe, fold(recipe, decode(path))) - recipe.level.reference;
     if (Math.abs(off) <= 0.05) break;
-    current = { ...current, pcm: scale(current.pcm, -off), gain: current.gain - off };
+    current = {
+      ...current,
+      pcm: scale(current.pcm, -off),
+      gain: current.gain - off,
+      ...(current.pair
+        ? { pair: [scale(current.pair[0], -off), scale(current.pair[1], -off)] as const }
+        : {}),
+    };
   }
   return current;
 }
@@ -413,8 +434,10 @@ function roundTrip(pack: Pack, written: readonly Written[], out: string): boolea
   let levelOff = 0;
   let worstLevel = "";
   const late: string[] = [];
+  const recipe = RECIPES.find((r) => r.id === pack.id)!;
   for (const w of written) {
-    const d = decode(join(out, w.file))[0]!;
+    // A stereo file is judged as it was cut: on its fold.
+    const d = fold(recipe, decode(join(out, w.file)));
     const l = lag(w.cut.pcm, d);
     if (Math.abs(l) > Math.abs(worstLag)) worstLag = l;
     strike = Math.max(strike, Math.abs(onset(d, -30) - onset(w.cut.pcm, -30)));

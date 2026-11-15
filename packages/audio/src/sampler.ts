@@ -67,12 +67,17 @@ export class Sampler {
     const context = this.#context;
     const source = context.createBufferSource();
     source.buffer = recording.buffer;
-    if (zone.root !== undefined) source.playbackRate.value = 2 ** ((sound.pitch - zone.root) / 12);
+    const rate = zone.root === undefined ? 1 : 2 ** ((sound.pitch - zone.root) / 12);
+    source.playbackRate.value = rate;
     const gain = context.createGain();
     const level = (sound.velocity / 127) ** 2 * 10 ** ((voice.trim ?? 0) / 20);
-    gain.gain.setValueAtTime(level, when);
+    gain.gain.value = level;
     source.connect(gain).connect(this.#voiceOutput(instrument, name, voice));
-    source.start(when, recording.start);
+    // The recording starts early by its run-up, so that its hit lands on the note's time.
+    // With no time left for the run-up (the very first note), it starts part-way in.
+    const begin = when - recording.hit / rate;
+    const startAt = Math.max(begin, context.currentTime);
+    source.start(startAt, (startAt - begin) * rate);
     const end = voice.oneShot ? undefined : when + sound.length;
     if (end !== undefined) release(source, gain, level, end, voice.release ?? 0.1);
 

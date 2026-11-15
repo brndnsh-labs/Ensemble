@@ -7,11 +7,14 @@ import { PACK_FORMAT } from "./pack.ts";
 export interface Recording {
   readonly buffer: AudioBuffer;
   /**
-   * Where the sound starts in the buffer, in seconds. A pack's files start on
-   * the sound, but a browser's decoder may leave the codec's lead-in at the
-   * front, so the start is found again here rather than trusted.
+   * Seconds from the start of the buffer to the hit: the moment the sound
+   * arrives, which is what a player puts on the beat. A stick on a ride is
+   * there at once; a hi-hat closed with the foot hisses for a fortieth of a
+   * second before its "chick", and a soft saxophone note takes as long to
+   * speak. It is found in the decoded audio, so whatever lead-in a browser's
+   * decoder leaves at the front of a file is counted too.
    */
-  readonly start: number;
+  readonly hit: number;
 }
 
 export interface LoadedPack {
@@ -59,7 +62,7 @@ export async function loadPack(
     [...files].map(async (file) => {
       const bytes = await (await get(base + encodeURIComponent(file))).arrayBuffer();
       const buffer = await context.decodeAudioData(bytes);
-      recordings.set(file, { buffer, start: soundStart(buffer) });
+      recordings.set(file, { buffer, hit: hitTime(buffer) });
       options.progress?.(++done, files.size);
     }),
   );
@@ -93,11 +96,11 @@ function middleLayers(layers: readonly PackLayer[], count: number): readonly Pac
   return kept.map((layer, i) => (i === kept.length - 1 ? { ...layer, top: 127 } : layer));
 }
 
-/**
- * The time of the first sample within 50 dB of the loudest, less a millisecond:
- * the same rule the pack was cut by, so a file that decodes cleanly gives zero.
- */
-function soundStart(buffer: AudioBuffer): number {
+/** How far under its peak a recording is when the hit is said to have arrived, in dB. */
+const HIT_DB = -12;
+
+/** The time of the first sample within 12 dB of the loudest. */
+function hitTime(buffer: AudioBuffer): number {
   let peak = 0;
   const channels: Float32Array[] = [];
   for (let c = 0; c < buffer.numberOfChannels; c++) {
@@ -106,10 +109,10 @@ function soundStart(buffer: AudioBuffer): number {
     for (let i = 0; i < data.length; i++) peak = Math.max(peak, Math.abs(data[i]!));
   }
   if (peak === 0) return 0;
-  const floor = peak * 10 ** (-50 / 20);
+  const floor = peak * 10 ** (HIT_DB / 20);
   for (let i = 0; i < buffer.length; i++) {
     for (const data of channels) {
-      if (Math.abs(data[i]!) >= floor) return Math.max(0, i / buffer.sampleRate - 0.001);
+      if (Math.abs(data[i]!) >= floor) return i / buffer.sampleRate;
     }
   }
   return 0;

@@ -50,7 +50,12 @@ export interface Recipe {
   readonly name: string;
   /** The folder under `.sources/`. */
   readonly source: string;
-  readonly channels: 1;
+  /**
+   * 1: stereo sources are folded to mono. 2: a stereo source keeps its two
+   * channels, cut and levelled alike; where it starts, where it ends and how
+   * loud it is are still judged on the fold.
+   */
+  readonly channels: 1 | 2;
   /** Opus bit rate. */
   readonly kbps: number;
   readonly level: PackLevel;
