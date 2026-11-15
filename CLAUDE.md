@@ -28,7 +28,8 @@ pnpm install            # once
 pnpm check              # typecheck, lint, tests (10-second budget)
 pnpm typecheck          # tsc --build across packages
 pnpm lint               # biome check; `pnpm format` to fix
-pnpm test               # engine suite under the budget
+pnpm test               # engine suite under the budget: every property, two seeds
+pnpm test:full          # the same on six seeds (60-second budget); run before a gate
 pnpm score              # the critic's scorecard against the accepted baseline (2-minute budget)
 pnpm goldens            # rewrite the golden takes (then say why in DECISIONS.md)
 pnpm gate:1             # write a gate's audition files to out/gate-1/ (also gate:2, gate:3)

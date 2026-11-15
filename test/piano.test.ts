@@ -6,7 +6,7 @@ import { test } from "node:test";
 import type { PlanBar, Take } from "@ensemble/engine";
 import { chordTones, PPQ, pitchClass, render, scaleHas, tierOf } from "@ensemble/engine";
 import { blues, chordsUnder, harmonyOf, POCKET, type Strike, strikesOf } from "./reading.ts";
-import { notesOf, only, ownCharts, STYLES, stressTakes, takes } from "./takes.ts";
+import { enough, notesOf, only, ownCharts, SEEDS, STYLES, stressTakes, takes } from "./takes.ts";
 
 test("the piano stays in its register: nothing under the style's floor, nothing above E6, in every take", () => {
   let strikes = 0;
@@ -18,7 +18,7 @@ test("the piano stays in its register: nothing under the style's floor, nothing 
       assert.ok(strike.pitches.at(-1)! <= 88, `${where}: above E6`);
     }
   }
-  assert.ok(strikes > 5000, `only ${strikes} strikes across the library`);
+  assert.ok(strikes > enough(5000), `only ${strikes} strikes across the library`);
 });
 
 test("a chord keeps its identity: every strike of two or more notes has the chord's third (or suspension) and its seventh (or sixth), and every alteration the chart writes", () => {
@@ -238,13 +238,13 @@ test("the eighth before a change belongs to the chord coming: a strike there tha
       }
     }
   }
-  assert.ok(pushes > 500, `only ${pushes} pushed chords across the library`);
+  assert.ok(pushes > enough(500), `only ${pushes} pushed chords across the library`);
 });
 
 test("the piano stays in its part of the keyboard: the top of its chords never wanders more than a sixth from where the style aims it", () => {
   for (const style of STYLES) {
     for (const chart of ownCharts(style)) {
-      for (const seed of [1, 2, 3, 4]) {
+      for (const seed of SEEDS.slice(0, 4)) {
         // Long enough for a hand that drifts a step a chorus to get somewhere.
         const take = render(chart.text, style, { mode: "jam", minutes: 4, seed });
         for (const strike of strikesOf(take)) {
@@ -282,7 +282,10 @@ test(
     }
     const mean = (values: number[]) =>
       values.reduce((sum, value) => sum + value, 0) / values.length;
-    assert.ok(perBar.low.length > 100 && perBar.high.length > 100, "both levels are heard");
+    assert.ok(
+      perBar.low.length > enough(100) && perBar.high.length > enough(100),
+      "both levels are heard",
+    );
     assert.ok(
       mean(perBar.low) < mean(perBar.high),
       `quiet ${mean(perBar.low).toFixed(2)} strikes a bar, loud ${mean(perBar.high).toFixed(2)}`,
@@ -319,7 +322,7 @@ test("a section keeps its figure: away from a solo, every phrase opens on the sa
       }
     }
   }
-  assert.ok(compared > 1000, `only ${compared} phrase openings compared`);
+  assert.ok(compared > enough(1000), `only ${compared} phrase openings compared`);
 });
 
 // ── a guitar in the chord seat ──────────────────────────────────────────────
@@ -352,7 +355,7 @@ test("a guitar's chords can be held: every stroke is three or four notes, one to
       assert.ok(holdable(stroke.pitches), `${where}: no hand holds this`);
     }
   }
-  assert.ok(strokes > 20000, `only ${strokes} strokes`);
+  assert.ok(strokes > enough(20000), `only ${strokes} strokes`);
 });
 
 test("a guitarist holds a grip: the notes under the hand change only where the chord does (or leaning into it), a scratch deadens the grip being held and never goes back to the last one, and after a chord leant into nothing is stroked until it has rung an eighth", {
@@ -406,7 +409,7 @@ test("a guitarist holds a grip: the notes under the hand change only where the c
     }
   }
   assert.ok(
-    moves > 1000 && scratches > 5000 && leant > 100,
+    moves > enough(1000) && scratches > enough(5000) && leant > enough(100),
     `only ${moves} moves, ${scratches} scratches, ${leant} chords leant into`,
   );
 });
@@ -441,5 +444,8 @@ test("the strumming hand is a pendulum: on the grid it strums, a stroke between 
       if (rolled && !between) downs++;
     }
   }
-  assert.ok(ups > 5000 && downs > 5000, `only ${ups} upstrokes and ${downs} downstrokes rolled`);
+  assert.ok(
+    ups > enough(5000) && downs > enough(5000),
+    `only ${ups} upstrokes and ${downs} downstrokes rolled`,
+  );
 });

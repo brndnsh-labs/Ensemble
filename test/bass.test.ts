@@ -17,7 +17,7 @@ import {
   tierOf,
 } from "@ensemble/engine";
 import { blues } from "./reading.ts";
-import { LIBRARY, notesOf, only, STYLES, takes } from "./takes.ts";
+import { enough, LIBRARY, notesOf, only, STYLES, takes } from "./takes.ts";
 
 // ── the bass line ───────────────────────────────────────────────────────────
 
@@ -65,7 +65,7 @@ test("a lead-in resolves by step in actual pitch: a note a step from the next ro
     }
   }
   // A ceiling on bad lead-ins passes trivially when there are none: make sure there are some.
-  assert.ok(leadIns > 500, `only ${leadIns} stepwise lead-ins across the library`);
+  assert.ok(leadIns > enough(500), `only ${leadIns} stepwise lead-ins across the library`);
 });
 
 test("the bass line never leaps more than an octave", () => {
@@ -154,7 +154,7 @@ test("a bass note outside its chord's scale only passes: it is stepped into and 
       );
     });
   }
-  assert.ok(outside > 100, `only ${outside} notes outside their chord's scale`);
+  assert.ok(outside > enough(100), `only ${outside} notes outside their chord's scale`);
 });
 
 test(
@@ -202,7 +202,7 @@ test(
         }
       }
     }
-    assert.ok(compared > 250, `only ${compared} phrase openings compared`);
+    assert.ok(compared > enough(250), `only ${compared} phrase openings compared`);
   },
 );
 
@@ -283,7 +283,7 @@ test("a bass note that leads into a change belongs to the scale of the chord it 
       );
     }
   }
-  assert.ok(leadIns > 500, `only ${leadIns} lead-ins across the library`);
+  assert.ok(leadIns > enough(500), `only ${leadIns} lead-ins across the library`);
 });
 
 // ── a walking bass ──────────────────────────────────────────────────────────
@@ -336,7 +336,10 @@ test(
         }
       }
     }
-    assert.ok(bars > 3000 && approaches > 2000, `only ${bars} bars, ${approaches} approaches`);
+    assert.ok(
+      bars > enough(3000) && approaches > enough(2000),
+      `only ${bars} bars, ${approaches} approaches`,
+    );
   },
 );
 
@@ -397,7 +400,7 @@ test(
       }
     }
     assert.ok(
-      bars > 3000 && kicks > 8000 && dead > 1500,
+      bars > enough(3000) && kicks > enough(8000) && dead > enough(1500),
       `only ${bars} bars, ${kicks} kicks, ${dead} dead notes`,
     );
   },
@@ -441,6 +444,6 @@ test(
         }
       }
     }
-    assert.ok(compared > 3000, `only ${compared} bars compared`);
+    assert.ok(compared > enough(3000), `only ${compared} bars compared`);
   },
 );

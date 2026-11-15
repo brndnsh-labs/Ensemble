@@ -15,19 +15,20 @@ import {
   toMidi,
   validateStyle,
 } from "@ensemble/engine";
+import { styleIds } from "@ensemble/styles";
 import { corpus } from "./corpus.ts";
 import { blues, POCKET } from "./reading.ts";
-import { LIBRARY, notesOf, only, ownCharts, readSmf, SEEDS, STYLES, takes } from "./takes.ts";
+import { FULL, LIBRARY, notesOf, only, ownCharts, readSmf, SEEDS, STYLES, takes } from "./takes.ts";
 
 test("every style that ships is sound data", () => {
   for (const style of STYLES) assert.deepEqual(validateStyle(style), [], style.id);
 });
 
 test("the same chart, style, options, and seed give the identical performance, down to the MIDI bytes", () => {
-  // One seed in three is played again: enough to meet every kind of take on every chart twice.
-  for (const { style, chart, options, take } of takes(
-    (jam) => Number(jam.options.seed) % 3 === 1,
-  )) {
+  // One seed in three is played again: enough to meet every kind of take on every chart
+  // twice. On a push, one take in three of those.
+  const firsts = takes((jam) => Number(jam.options.seed) % 3 === 1);
+  for (const { style, chart, options, take } of firsts.filter((_, i) => FULL || i % 3 === 0)) {
     const again = render(chart.text, style, options);
     assert.deepEqual(again.events, take.events, `${chart.file} seed ${options.seed}`);
     assert.deepEqual(
@@ -183,8 +184,11 @@ test("a take with a count-in is the same music as one without, a bar later", () 
 
 test("a chart with mistakes in it still plays", () => {
   for (const style of STYLES) {
+    // The corpus is a parser's corpus; what a band adds is that it can play whatever
+    // parsed. On a push each style plays a third of it, a different third each.
+    const turn = styleIds().indexOf(style.id) % 3;
     const broken = [
-      ...corpus.map((row) => row.text),
+      ...corpus.filter((_, i) => FULL || i % 3 === turn).map((row) => row.text),
       "",
       "\n\n",
       "| | |",

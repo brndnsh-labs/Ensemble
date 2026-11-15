@@ -20,6 +20,8 @@ import {
 } from "@ensemble/engine";
 import { chordsUnder, harmonyOf, POCKET, strikesOf } from "./reading.ts";
 import {
+  enough,
+  FULL,
   type Jam,
   type JamSpec,
   notesOf,
@@ -191,7 +193,7 @@ test("the soloist plays only where it has the lead (a pickup may lead in by a be
       }
     });
   }
-  assert.ok(notes > 5000, `only ${notes} solo notes`);
+  assert.ok(notes > enough(5000), `only ${notes} solo notes`);
 });
 
 test("the soloist lands the changes: a note struck where a chord arrives is a tone of that chord, and a note held across a change on a beat is a tone of the new chord", () => {
@@ -221,7 +223,7 @@ test("the soloist lands the changes: a note struck where a chord arrives is a to
       }
     }
   }
-  assert.ok(landings > 800, `only ${landings} landings`);
+  assert.ok(landings > enough(800), `only ${landings} landings`);
 });
 
 test("a solo breathes and keeps going: no silence inside it reaches three bars, and it has one top note, in its last chorus", () => {
@@ -247,7 +249,7 @@ test("a solo breathes and keeps going: no silence inside it reaches three bars, 
       );
     }
   }
-  assert.ok(solos > 40, `only ${solos} solos`);
+  assert.ok(solos > enough(40), `only ${solos} solos`);
 });
 
 test("a three-chorus solo builds: its last chorus has more notes than its first, in nine solos in ten", () => {
@@ -266,7 +268,7 @@ test("a three-chorus solo builds: its last chorus has more notes than its first,
       if (inChorus(2) > inChorus(0)) built++;
     }
   }
-  assert.ok(solos > 30, `only ${solos} three-chorus solos`);
+  assert.ok(solos > enough(30), `only ${solos} three-chorus solos`);
   assert.ok(built >= solos * 0.9, `${built} of ${solos} solos built`);
 });
 
@@ -300,7 +302,7 @@ test("a solo that runs into the ending ends with the band: its last note is stru
       assert.ok(note.pitch < highest, `${where}: the solo ends on its top note`);
     }
   }
-  assert.ok(endings > 80, `only ${endings} endings with the soloist`);
+  assert.ok(endings > enough(80), `only ${endings} endings with the soloist`);
 });
 
 test("the soloist plays no wrong note on a beat or held: nothing a half step over a chord tone unless the chord's scale has it, and no major seventh on a chord without one", () => {
@@ -342,7 +344,7 @@ test("the soloist plays no wrong note on a beat or held: nothing a half step ove
       assert.notEqual(pc, (root + 11) % 12, `${where}: the major seventh`);
     }
   }
-  assert.ok(judged > 5000, `only ${judged} notes judged`);
+  assert.ok(judged > enough(5000), `only ${judged} notes judged`);
 });
 
 test("a phrase is followed by a breath: the soloist leaves the style's breath of air before the next phrase, a pickup into it included, at any tempo", () => {
@@ -358,7 +360,7 @@ test("a phrase is followed by a breath: the soloist leaves the style's breath of
       `${chart.file} ${JSON.stringify(options)}: ${Math.round((1 - measured.value) * measured.cases)} of ${measured.cases} phrases run into the next`,
     );
   }
-  assert.ok(joins > 600, `only ${joins} phrase joins`);
+  assert.ok(joins > enough(600), `only ${joins} phrase joins`);
 });
 
 test("a horn breathes: the alto never plays eight seconds without half a second of air, as heard", () => {
@@ -379,8 +381,9 @@ test("a horn breathes: the alto never plays eight seconds without half a second 
     }
   };
   for (const style of STYLES) {
-    for (const chart of ownCharts(style)) {
-      for (const tempo of [66, 120]) {
+    for (const [c, chart] of ownCharts(style).entries()) {
+      // On a push, slow and medium by turns.
+      for (const tempo of [66, 120].filter((_, t) => FULL || (c + t) % 2 === 0)) {
         const take = render(chart.text, style, {
           mode: "jam",
           passes: 4,
@@ -473,7 +476,7 @@ test("a comp that listens makes room: hearing the soloist, fewer of its strikes 
     compared++;
     if (heard.under / heard.strikes <= unheard.under / unheard.strikes) lower++;
   }
-  assert.ok(compared >= 20, `only ${compared} takes compared`);
+  assert.ok(compared >= enough(24), `only ${compared} takes compared`);
   const overlap = sum.under / sum.strikes;
   const deafOverlap = deafSum.under / deafSum.strikes;
   assert.ok(
@@ -520,7 +523,7 @@ test(
         }
       }
     }
-    assert.ok(hot > 300, `only ${hot} hot bars under a solo`);
+    assert.ok(hot > enough(300), `only ${hot} hot bars under a solo`);
     assert.ok(strikes / hot < 3, `${(strikes / hot).toFixed(2)} strikes a bar under a hot solo`);
   },
 );
@@ -578,7 +581,7 @@ test("under a solo the piano leaves the soloist its note: a voice held on the so
       }
     });
   }
-  assert.ok(under > 3000, `only ${under} strikes under a solo`);
+  assert.ok(under > enough(3000), `only ${under} strikes under a solo`);
 });
 
 test("under a solo the hand does not growl: its two lowest notes are a half step apart only on a dominant from E4 up", () => {
@@ -607,7 +610,7 @@ test("under a solo the hand does not growl: its two lowest notes are a half step
       );
     }
   }
-  assert.ok(judged > 3000, `only ${judged} strikes under a line`);
+  assert.ok(judged > enough(3000), `only ${judged} strikes under a line`);
 });
 
 // ── the jazz soloist ────────────────────────────────────────────────────────
@@ -648,6 +651,6 @@ test(
         assert.equal(Math.abs(next.pitch - note.pitch), 1, `${where}: left for ${next.pitch}`);
       });
     }
-    assert.ok(chromatic > 300, `only ${chromatic} notes outside the scale`);
+    assert.ok(chromatic > enough(300), `only ${chromatic} notes outside the scale`);
   },
 );

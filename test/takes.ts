@@ -23,8 +23,25 @@ export const STYLES: readonly StylePack[] = process.env.ENSEMBLE_STYLES
 /** For a property that is one style's own: `test("blues: ...", only("blues"), () => {})`. */
 export const only = (id: string) => ({ skip: !STYLES.some((style) => style.id === id) });
 
-/** Enough seeds to meet every weighted choice a few times, few enough to stay inside the budget. */
-export const SEEDS: readonly number[] = [1, 2, 3, 4, 5, 6];
+/**
+ * How many seeds each property is checked on. Every push plays two, which is what fits three
+ * styles inside the budget; `pnpm test:full` plays six, enough to meet every weighted choice
+ * a few times, and is run before a listening gate and after anything a player's choices
+ * depend on (docs/TESTING.md, "Budgets").
+ */
+export const SEEDS: readonly number[] = Array.from(
+  { length: Number(process.env.ENSEMBLE_SEEDS ?? 2) },
+  (_, i) => i + 1,
+);
+
+/** The full run: every seed, and everything a push only samples. */
+export const FULL = SEEDS.length >= 6;
+
+/**
+ * A floor on how many cases a property must have met to mean anything, written for the full
+ * run of six seeds and scaled to the seeds in play.
+ */
+export const enough = (full: number): number => Math.floor((full * SEEDS.length) / 6);
 
 export interface LibraryChart {
   readonly file: string;
@@ -144,7 +161,7 @@ const STRESS_KINDS: readonly Omit<TakeOptions, "seed">[] = [
 
 const STRESS_SPECS: readonly JamSpec[] = STYLES.flatMap((style) =>
   STRESS.flatMap((chart) =>
-    [1, 2, 3, 4].flatMap((seed) =>
+    SEEDS.slice(0, 4).flatMap((seed) =>
       STRESS_KINDS.map((kind) => ({ style, chart, options: { ...kind, seed } })),
     ),
   ),
@@ -168,11 +185,12 @@ const SOLOIST_KINDS: readonly Omit<TakeOptions, "seed">[] = [
 
 const SOLOIST_SPECS: readonly JamSpec[] = STYLES.flatMap((style) => [
   ...[...ownCharts(style), ...STRESS].flatMap((chart, c) =>
-    SOLOIST_KINDS.map((kind, k) => ({
-      style,
-      chart,
-      options: { ...kind, seed: 1 + ((c + k) % 2) },
-    })),
+    SOLOIST_KINDS.flatMap((kind, k) =>
+      // On a push, every other kind, a chart starting where the last left off.
+      FULL || (c + k) % 2 === 0
+        ? [{ style, chart, options: { ...kind, seed: 1 + ((c + k) % 2) } }]
+        : [],
+    ),
   ),
   ...otherCharts(style).map((chart, c) => ({
     style,
@@ -184,8 +202,8 @@ const SOLOIST_SPECS: readonly JamSpec[] = STYLES.flatMap((style) => [
 /**
  * The soloist where a plain jam does not take it: a song, fast and slow, quiet and
  * loud, and on the horn, which has to breathe. Each of the style's own charts in every
- * kind, on one of two seeds by turns, and every other chart in one. Only the soloist's
- * properties read these.
+ * kind (on a push, every other kind), on one of two seeds by turns, and every other chart
+ * in one. Only the soloist's properties read these.
  */
 export function soloistTakes(): Jam[] {
   return renderOnly(SOLOIST_SPECS, () => true);

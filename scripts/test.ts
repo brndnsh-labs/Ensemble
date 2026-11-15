@@ -1,10 +1,12 @@
 // Runs the engine suite: the properties once for each style that ships, side by
 // side, and the style-free files (the chart corpus, the goldens) once.
 //
-// Each style gets its own processes because a take is rendered once per
-// process: holding three styles to every property in one process renders three
-// times as much on one core. `ENSEMBLE_STYLES=funk node scripts/test.ts` runs
-// the properties for a style that is still being written.
+// Each style gets one process of its own, and all its property files run in
+// it together, because a take is rendered once per process: every file reads
+// the same takes, and rendering them is nearly all the suite costs. The styles
+// run side by side. `ENSEMBLE_STYLES=funk node scripts/test.ts` runs the
+// properties for one style; `ENSEMBLE_SEEDS=6` plays the full count of seeds
+// (`pnpm test:full`).
 import { spawn } from "node:child_process";
 import { readdirSync } from "node:fs";
 import { STYLES } from "../packages/styles/src/index.ts";
@@ -30,7 +32,7 @@ interface Run {
 
 function run(name: string, paths: readonly string[], styleId?: string): Promise<Run> {
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, ["--test", ...paths], {
+    const child = spawn(process.execPath, ["--test", "--test-isolation=none", ...paths], {
       env: { ...process.env, ...(styleId ? { ENSEMBLE_STYLES: styleId } : {}) },
       stdio: ["ignore", "pipe", "pipe"],
     });

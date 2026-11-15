@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { PlanBar, Take } from "@ensemble/engine";
 import { parse, plan, STEP, TIER_MID, tierOf } from "@ensemble/engine";
-import { type Jam, notesOf, only, ownCharts, STYLES, takes } from "./takes.ts";
+import { enough, type Jam, notesOf, only, ownCharts, STYLES, takes } from "./takes.ts";
 
 const in44 = (id: string) => (jam: Pick<Jam, "style" | "chart">) =>
   jam.style.id === id && jam.chart.meter === "4/4";
@@ -59,7 +59,7 @@ test(
         assert.ok(!strikes(kit, "kick", 12), `${where}: a kick on 4`);
       }
     }
-    assert.ok(bars > 2000, `only ${bars} bars`);
+    assert.ok(bars > enough(2000), `only ${bars} bars`);
   },
 );
 
@@ -92,7 +92,7 @@ test(
         else assert.equal(turn, known, `${where}: the section turns round another way`);
       }
     }
-    assert.ok(answers > 600, `only ${answers} answer bars`);
+    assert.ok(answers > enough(600), `only ${answers} answer bars`);
   },
 );
 
@@ -148,7 +148,7 @@ test(
         }
       }
     }
-    assert.ok(bars > 2000, `only ${bars} bars`);
+    assert.ok(bars > enough(2000), `only ${bars} bars`);
   },
 );
 
@@ -192,7 +192,7 @@ test(
           assert.ok(!kit.has("kick"), `${where}: a bass drum in the head`);
       }
     }
-    assert.ok(heads > 500, `only ${heads} bars of head`);
+    assert.ok(heads > enough(500), `only ${heads} bars of head`);
   },
 );
 
@@ -215,5 +215,5 @@ test("a button ending is the whole band's: where the bass plays the short last h
       `${style.id} ${chart.file} seed ${options.seed}: the band buttons without the drummer`,
     );
   }
-  assert.ok(played > 20, `only ${played} buttons`);
+  assert.ok(played > enough(20), `only ${played} buttons`);
 });
