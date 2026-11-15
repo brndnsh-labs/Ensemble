@@ -1,6 +1,6 @@
-// The app: the library, one chart on the play screen, or one of the player's
-// own in the editor. The address says which, so the browser's back button
-// works and a chart can be bookmarked.
+// The app: the library, one chart on the play screen, one of the player's own
+// in the editor, or a take they kept. The address says which, so the
+// browser's back button works and a chart can be bookmarked.
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { CreditsView } from "./CreditsView.tsx";
@@ -11,8 +11,10 @@ import type { Saving } from "./offline.ts";
 import { saveInstruments } from "./offline.ts";
 import { PlayView } from "./play/PlayView.tsx";
 import { Rig } from "./play/rig.ts";
+import { TakeView } from "./play/TakeView.tsx";
 import type { Settings } from "./settings.ts";
 import { loadSettings, saveSettings } from "./settings.ts";
+import { findTake, keptTakes, subscribeTakes } from "./takes.ts";
 
 const subscribe = (listener: () => void) => {
   addEventListener("hashchange", listener);
@@ -25,8 +27,9 @@ const rig = new Rig(PACKS_URL);
 export function App() {
   const hash = useSyncExternalStore(subscribe, () => location.hash);
   const own = useSyncExternalStore(subscribeCharts, ownCharts);
+  const takes = useSyncExternalStore(subscribeTakes, keptTakes);
   const [settings, setSettings] = useState(loadSettings);
-  /** The chart whose play button was tapped in the library: it starts as its screen opens. */
+  /** The address of the chart or take whose play button was tapped in the library: it starts as its screen opens. */
   const [autoplay, setAutoplay] = useState<string>();
 
   const [saving, setSaving] = useState<Saving>();
@@ -43,9 +46,23 @@ export function App() {
     saveSettings(next);
   };
 
-  const [, screen, id] = /^#\/(chart|edit)\/(.+)$/.exec(hash) ?? [];
-  const entry = id === undefined ? undefined : findChart(decodeURIComponent(id));
+  const [, screen, id] = /^#\/(chart|edit|take)\/(.+)$/.exec(hash) ?? [];
+  const found = id === undefined ? undefined : decodeURIComponent(id);
   if (hash === "#/credits") return <CreditsView packsUrl={PACKS_URL} />;
+  const take = screen === "take" && found !== undefined ? findTake(found) : undefined;
+  if (take)
+    return (
+      <TakeView
+        key={take.id}
+        take={take}
+        rig={rig}
+        reading={settings.reading}
+        read={(reading) => change({ ...settings, reading })}
+        autoplay={autoplay === hash}
+        started={() => setAutoplay(undefined)}
+      />
+    );
+  const entry = found === undefined || screen === "take" ? undefined : findChart(found);
   // A built-in is not edited in place: its play screen offers a copy.
   if (screen === "edit" && entry?.own)
     return <EditView key={entry.id} entry={entry} reading={settings.reading} />;
@@ -53,12 +70,13 @@ export function App() {
     return (
       <LibraryView
         own={own}
+        takes={takes}
         saving={saving}
-        play={(chosen) => {
+        play={(address) => {
           // Inside the tap, so the browser lets the band start without another one.
           rig.wake();
-          setAutoplay(chosen.id);
-          location.hash = `#/chart/${chosen.id}`;
+          setAutoplay(address);
+          location.hash = address;
         }}
       />
     );
@@ -69,7 +87,7 @@ export function App() {
       rig={rig}
       settings={settings}
       change={change}
-      autoplay={autoplay === entry.id}
+      autoplay={autoplay === hash}
       started={() => setAutoplay(undefined)}
     />
   );

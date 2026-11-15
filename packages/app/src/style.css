@@ -51,6 +51,7 @@ body {
 }
 
 button,
+input,
 select,
 textarea {
   font: inherit;
@@ -774,6 +775,24 @@ button[aria-pressed="true"] {
   color: var(--ink);
 }
 
+/* Keeping the take: beside the transport, and plainly the lesser of the two. */
+.keep {
+  flex: none;
+  height: 40px;
+  padding: 0 14px;
+  border: 1.5px solid var(--ink);
+  border-radius: 20px;
+  background: none;
+  font-size: 0.95rem;
+  font-weight: 650;
+}
+
+.keep:disabled {
+  border-color: var(--rule);
+  color: var(--faint);
+  cursor: default;
+}
+
 /* ── The editor ──────────────────────────────────────────────────────────── */
 
 /* Pinned to the screen, so that while a phone's keyboard is up it can be fitted to what is left. */
@@ -1102,6 +1121,45 @@ button[aria-pressed="true"] {
     flex: 1;
     padding: 4px 0 12px;
   }
+}
+
+/* ── A kept take ─────────────────────────────────────────────────────────── */
+
+/* In place of the setup: the take's name, and what can be done with it. */
+.take-setup {
+  align-items: end;
+}
+
+.take-name {
+  flex: 1 1 12rem;
+  max-width: 24rem;
+}
+
+.take-name input {
+  width: 100%;
+  height: 36px;
+  padding: 0 8px;
+  border: 1.5px solid var(--ink);
+  border-radius: 6px;
+  background: none;
+  /* Sixteen pixels or more, or a phone zooms the page in when the box is touched. */
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.take-setup .tools {
+  flex: 1 1 auto;
+  padding-bottom: 0;
+}
+
+.take-setup .tools button {
+  height: 36px;
+}
+
+.take-setup .problem {
+  flex-basis: 100%;
+  padding: 0;
+  font-size: 0.875rem;
 }
 
 /* ── A phone held upright ────────────────────────────────────────────────── */

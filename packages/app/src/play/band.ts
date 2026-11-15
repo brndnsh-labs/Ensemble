@@ -47,8 +47,9 @@ export async function perform(recipe: TakeRecipe, since = 0): Promise<Made> {
 }
 
 /** A take as a Standard MIDI File: the same bytes `ensemble replay` writes for it. */
-export async function midiOf(recipe: TakeRecipe): Promise<Uint8Array> {
+export async function midiOf(recipe: TakeRecipe): Promise<Uint8Array<ArrayBuffer>> {
   const reply = await ask({ recipe, midi: true });
   if (!reply.midi) throw new Error("the take could not be written");
-  return reply.midi;
+  // Copied across from the worker, so it sits in a plain buffer of its own, as a file's bytes may.
+  return reply.midi as Uint8Array<ArrayBuffer>;
 }
