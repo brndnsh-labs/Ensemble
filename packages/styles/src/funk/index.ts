@@ -40,6 +40,11 @@ export const funk: StylePack = {
   instruments: { bass: 33, chords: 27 },
   sound: {
     packs: { drums: "drum-kit", bass: "electric-bass", chords: "clean-guitar" },
-    mix: DEFAULT_MIX,
+    // Short strokes measure quieter than a piano's chords at the same level: alone, the
+    // guitar read 3 dB under the bass. It comes up to sit with the bass and drums. No ear yet.
+    mix: {
+      ...DEFAULT_MIX,
+      seats: { ...DEFAULT_MIX.seats, chords: { ...DEFAULT_MIX.seats.chords, level: -3 } },
+    },
   },
 };

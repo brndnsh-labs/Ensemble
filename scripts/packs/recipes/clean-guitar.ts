@@ -44,6 +44,14 @@ const MUTED_ALTERNATES = 5;
 const MUTED_CAP = 0.5;
 const MUTED_RELEASE = 0.03;
 
+/**
+ * A muted stroke is over in a tenth of a second, so it is levelled by its
+ * peak: to -11.1 dBFS, the middle peak of the plain notes once they are at
+ * the pack's loudness. At the same velocity a stroke then peaks where a note
+ * does, and the player's lower velocity is what puts it under.
+ */
+const MUTED_LEVEL = { measure: "peak", reference: -11.1 } as const;
+
 export const cleanGuitar: Recipe = {
   id: "clean-guitar",
   name: "Clean electric guitar",
@@ -122,6 +130,7 @@ export const cleanGuitar: Recipe = {
         name: "muted",
         release: MUTED_RELEASE,
         measureRoots: false,
+        level: MUTED_LEVEL,
         layers: [{ top: 127, zones: strokes }],
       },
     ];

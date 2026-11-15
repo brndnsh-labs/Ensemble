@@ -17,7 +17,7 @@
     "codec": "opus",
     "sampleRate": 48000,
     "channels": 1,
-    "bytes": 1672575,
+    "bytes": 1672489,
     "decodedBytes": 29796908
   },
   "level": {
@@ -921,7 +921,11 @@
           ]
         }
       ],
-      "release": 0.04
+      "release": 0.04,
+      "level": {
+        "measure": "peak",
+        "reference": -9.4
+      }
     }
   }
 }

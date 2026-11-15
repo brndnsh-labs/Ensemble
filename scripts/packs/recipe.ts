@@ -49,6 +49,12 @@ export interface Voice {
    * sound whose pitch is not the note's: a bass's ghost note, a muted stroke.
    */
   readonly measureRoots?: false;
+  /**
+   * This voice's own level, in place of the pack's. For strokes too short for
+   * a loudness to mean much: a loudness is read over 400 ms, and a 90 ms
+   * stroke brought up to it comes out far over full scale.
+   */
+  readonly level?: PackLevel;
 }
 
 /** One source library a pack draws on, and what was done to its recordings. */

@@ -7,7 +7,12 @@
 
 import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { PACK_FORMAT, type Pack, type PackVoice } from "../../packages/audio/src/pack.ts";
+import {
+  PACK_FORMAT,
+  type Pack,
+  type PackLevel,
+  type PackVoice,
+} from "../../packages/audio/src/pack.ts";
 import type { Recipe, Take } from "./recipe.ts";
 import { altoSax } from "./recipes/alto-sax.ts";
 import { cleanGuitar } from "./recipes/clean-guitar.ts";
@@ -78,7 +83,7 @@ function fold(recipe: Recipe, channels: Float32Array[]): Float32Array {
   return mix(channels.map((signal) => ({ signal, db: recipe.foldDb })));
 }
 
-function cutTake(recipe: Recipe, take: Take, measureRoots: boolean): Cut {
+function cutTake(recipe: Recipe, level: PackLevel, take: Take, measureRoots: boolean): Cut {
   // A shifted take is made at a higher rate and played at 48 kHz, which lowers it.
   const rate = take.shift ? Math.round(RATE * 2 ** (-take.shift / 12)) : RATE;
   let stereo: Float32Array[] | undefined;
@@ -103,8 +108,8 @@ function cutTake(recipe: Recipe, take: Take, measureRoots: boolean): Cut {
   const fadeLength = Math.min(length, Math.max(Math.round(0.08 * RATE), Math.round(0.1 * length)));
   fadeOut(seg, fadeLength);
 
-  const measured = levelOf(recipe, seg);
-  const gain = recipe.level.reference - measured;
+  const measured = levelOf(recipe, level, seg);
+  const gain = level.reference - measured;
   const pcm = scale(seg, gain);
   let cut: Cut = { pcm, gain, endedBy };
   if (recipe.channels === 2 && stereo && !take.shift) {
@@ -139,8 +144,17 @@ function cutTake(recipe: Recipe, take: Take, measureRoots: boolean): Cut {
   return cut;
 }
 
-function levelOf(recipe: Recipe, x: Float32Array): number {
-  return recipe.level.measure === "peak" ? db(peak(x)) : loudness(x);
+/** How far two channels played side by side sit over their fold, in dB, when they share little. */
+const PAIR_OVER_FOLD = 3.01;
+
+/**
+ * A take's level by the voice's measure. `x` is the mono signal, or a stereo
+ * pair's fold: a pair's loudness is its two channels' power together, which
+ * for a spaced pair of microphones is about 3 dB over the fold's.
+ */
+function levelOf(recipe: Recipe, level: PackLevel, x: Float32Array): number {
+  if (level.measure === "peak") return db(peak(x));
+  return loudness(x) + (recipe.channels === 2 ? PAIR_OVER_FOLD : 0);
 }
 
 /**
@@ -149,11 +163,11 @@ function levelOf(recipe: Recipe, x: Float32Array): number {
  * reference. A sample peak moves by a decibel or so through the codec; a
  * loudness barely moves.
  */
-function encodeLevelled(recipe: Recipe, cut: Cut, path: string): Cut {
+function encodeLevelled(recipe: Recipe, level: PackLevel, cut: Cut, path: string): Cut {
   let current = cut;
   for (let pass = 0; pass < 4; pass++) {
     encodeOpus(current.pair ?? [current.pcm], path, recipe.kbps);
-    const off = levelOf(recipe, fold(recipe, decode(path))) - recipe.level.reference;
+    const off = levelOf(recipe, level, fold(recipe, decode(path))) - level.reference;
     if (Math.abs(off) <= 0.05) break;
     current = {
       ...current,
@@ -220,9 +234,11 @@ function cutPack(recipe: Recipe): boolean {
       zones: layer.zones.map((zone) => {
         const takes = zone.takes.map((take, ti) => {
           const file = fileName(voice.name, li, take.mapped, ti);
+          const level = voice.level ?? recipe.level;
           const cut = encodeLevelled(
             recipe,
-            cutTake(recipe, take, voice.measureRoots !== false),
+            level,
+            cutTake(recipe, level, take, voice.measureRoots !== false),
             join(out, file),
           );
           const entry: Written = {
@@ -255,6 +271,7 @@ function cutPack(recipe: Recipe): boolean {
       ...(voice.oneShot ? { oneShot: true } : {}),
       ...(voice.release !== undefined ? { release: voice.release } : {}),
       ...(voice.chokes ? { chokes: voice.chokes } : {}),
+      ...(voice.level ? { level: voice.level } : {}),
     };
     voices[voice.name] = v;
   }
@@ -486,8 +503,8 @@ function roundTrip(pack: Pack, written: readonly Written[], out: string): boolea
     onsetMs = Math.max(onsetMs, ms);
     if (ms > 1) late.push(`${w.file} ${ms.toFixed(2)} ms`);
     lengthOff = Math.max(lengthOff, Math.abs(d.length - w.cut.pcm.length));
-    const level = pack.level.measure === "peak" ? db(peak(d)) : loudness(d);
-    const off = level - pack.level.reference;
+    const voiceLevel = pack.voices[w.voice]?.level ?? pack.level;
+    const off = levelOf(recipe, voiceLevel, d) - voiceLevel.reference;
     if (Math.abs(off) > Math.abs(levelOff)) {
       levelOff = off;
       worstLevel = w.file;

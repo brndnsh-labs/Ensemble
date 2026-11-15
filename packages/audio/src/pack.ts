@@ -79,6 +79,11 @@ export interface PackVoice {
    * `top` is 127.
    */
   readonly layers: readonly PackLayer[];
+  /**
+   * This voice's own levelling, when it differs from the pack's: a stroke too
+   * short for a loudness to mean much is levelled by its peak.
+   */
+  readonly level?: PackLevel;
   /** A trim in dB on top of the pack's reference: a hi-hat sits under a snare. */
   readonly trim?: number;
   /** Where the voice sits from left (-1) to right (1). Centre when absent. */

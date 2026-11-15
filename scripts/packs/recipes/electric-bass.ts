@@ -99,6 +99,14 @@ function voice(
   };
 }
 
+/**
+ * A ghost is over in a tenth of a second, so it is levelled by its peak: to
+ * -9.4 dBFS, the middle peak of the plain notes once they are at the pack's
+ * loudness. At the same velocity a dead note then peaks where a note does,
+ * and the player's lower velocity is what puts it under.
+ */
+const DEAD_LEVEL = { measure: "peak", reference: -9.4 } as const;
+
 export const electricBass: Recipe = {
   id: "electric-bass",
   name: "Electric bass",
@@ -139,6 +147,7 @@ export const electricBass: Recipe = {
         ),
         release: DEAD_RELEASE,
         measureRoots: false,
+        level: DEAD_LEVEL,
       },
     ];
   },

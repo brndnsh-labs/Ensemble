@@ -559,3 +559,13 @@ Built from `prompts/cut-funk-packs.md`. `electric-bass` (Black And Blue Basses, 
 - **The guitar's caps fall from 2.45 s to 1.53 s** (the brief's 4 to 2.5 came to about 48 MB). Its notes at G4 and above are recorded at one dynamic: alternates 1 and 2 go to the soft layer, 3 and 4 to the loud.
 - **The muted strokes are placed, not tuned**: roots 51, 55.5, 60, 64.5 and 69 in order of spectral centre (muted 1, 2, 4, 5, 3). The nearest-zone rule moves a stroke by at most 2 semitones between 51 and 69.
 - **Short sounds levelled to -20 LUFS peak above full scale**: the dead notes up to +5.9 dBFS, the muted strokes up to +9.8 (a 0.1 s sound measured over a 400 ms window). ffmpeg's Opus decoder returns them unclipped (round-trip level within 0.19 dB); whether every browser's decoder does is not established.
+
+## funk's packs, checked; two levelling faults fixed in the cutter (stage 5)
+
+The second builder's report was checked against the files the same way as the first: every listed file present and nothing else, lengths exact, levels on reference, licences the sources' own.
+
+- **`electric-bass`** is the Washburn from Karoryfer's Black And Blue Basses, four dynamics, a note every minor third (every recorded note would have been 92 MB against a budget of 30), with a `dead` voice from the library's recorded ghost notes. The ghosts are pitched a little under their fret, so the voice keeps the fret as its root and is not retuned.
+- **`clean-guitar`** is FreePats' clean Fender for the notes and Karoryfer's Emilyguitar for the `muted` voice: five kinds of deadened stroke, five takes each, laid across the strum from the darkest at the bottom to the brightest at the top. Two libraries, so `Pack.credit` became `Pack.credits`, a list.
+- **A short stroke is levelled by its peak, not its loudness.** A loudness is read over 400 ms; a 90 ms stroke brought up to it came out 6 to 10 dB over full scale (the builder reported it; my measurement agreed: the dead notes peaked at +5.9 dBFS, the muted strokes at +9.8). `PackVoice.level` now lets a voice have its own levelling: the dead and muted voices are levelled to the middle peak of their pack's plain notes, so at one velocity a stroke peaks where a note does and the player's lower velocity puts it under.
+- **A stereo pack is levelled as a pair.** The piano had been levelled on the fold of its two channels, and two channels played side by side are about 3 dB over their fold: FFmpeg's meter read -17.5 on files meant to be -20. It now reads the pair. Brandon's first listen was with the piano 3 dB hot; he made no remark on the balance.
+- **Funk's starting mix**: alone, the guitar measured 3 dB under the bass at the default level, and came up 3. No ear yet.
