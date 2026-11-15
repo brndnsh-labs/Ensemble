@@ -524,3 +524,15 @@ Brandon chose the fresh cut: "that sounds like it'll pay off". The sources are p
 - **No dead bass note.** Meatbass's percussive noises measure as body knocks (one resonance near 65 Hz shared by all eight, no harmonic series on a string's pitch), not a damped string.
 - **The kit's sticks are the stickshot** ("one stick strikes other while it is touching drum head", keymap PDF), and its cross-stick is the snare's, from the full kit program, which the basic one leaves out.
 - **Scripts typecheck.** `scripts/packs` has its own `tsconfig.json` in the build; `assets/packs` is generated and out of biome's reach.
+
+## the first five packs, checked (stage 5)
+
+The builder's report was checked against the files, not taken on trust: every file a `pack.json` lists exists and nothing else does; every decoded length matches to the sample; FFmpeg's own loudness meter reads -20.0 on the levelled packs and the kit's peaks are within 0.2 dB of -6; the licence beside each pack is the source's, byte for byte.
+
+- **The piano is stereo.** Summed to mono, 47 of its 66 takes lost more than 6 dB in some third-octave band between 1 and 8 kHz (up to 11.6 dB): the two microphones are a spaced pair and cancel. Stereo costs 114 MB decoded against 63. The quartet is 212 MB in memory, which an iPhone 17 has room for; `loadPack`'s `layers` option is the lever for a phone that has not.
+- **The sampler puts a recording's hit on the note's time, not its first sound.** Measured in the packs: a hi-hat closed with the foot is 24 ms into its file before it is within 20 dB of its peak, a shaker 41 ms, a soft alto note 10 to 20. Started on the beat, the jazz hi-hat on 2 and 4 would have dragged by a fortieth of a second on every stroke. The hit is the first sample within 12 dB of the recording's peak, found when the pack loads (so a decoder's lead-in is covered by the same rule), and the recording starts early by that much. The threshold is one constant; no ear has judged it.
+- **Rendered takes land where the engine wrote them.** `scripts/check-timing.ts`: drums, bass and piano onsets are 10 to 12 ms after their written times, the same for all three within 2 ms. The constant is taken to be the look-ahead of the two compressors on the master (6 ms each in Chrome); it moves the whole band together.
+- **A whole jazz take played live in headless Chrome**: 3,418 notes over three minutes, none late, none dropped.
+- **The starting mix is from measurement, not from an ear**: each seat rendered alone and its loudness read. The blues piano measured 1.7 dB over the soloist and came down 3 dB; the jazz drums (a ride and a feathered kick) measured 6 dB under the blues drums and came up 3. Full mixes of four takes read -17 to -18 LUFS; the master is trimmed 1.5 dB so peaks stay under -2 dBFS.
+- **No dead note on the upright**: the library's "noises" measure as knocks on the body. The fallback (the note itself, short and quiet) stands.
+- **Found for funk**: the Washburn bass Brandon preferred has recorded ghost notes; the clean Fender library has no muted strokes, and Karoryfer's Emilyguitar (CC0) has twenty-five. One pack will draw on both, credited as such.
