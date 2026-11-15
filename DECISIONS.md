@@ -629,3 +629,14 @@ Brandon on the mix after gate 5: "no complaints about the mix so far. we can alw
 - **Two new properties**, each broken on purpose and seen to fail: the scheduler's "when what is to come is changed", and the band's "a jam told to finish". The first version of the second sampled only cases with nothing before the last pass on a push; three deliberate breaks passed it before that was found.
 - **The engine suite is at 9.1 to 9.3 s of 10.** The next property has to be paid for by trimming another.
 
+## hosting: the app as a small image (stage 6)
+
+Brandon: "i'm leaning toward hosting this on docker04 like the current version of ensemble", and "we can replace what we have at ensembletest.brndn.zip".
+
+- **`hosting/`: a Dockerfile, an nginx config of about fifty lines, and a compose file with one service.** No API, no volume, no secret. `pnpm image` builds the site and then the image around it (`ensemble-app:<commit>`, 125 MB, of which the instruments are 18).
+- **It keeps the container contract his test stack's web service already has**, read from the old repo's hosting notes: nginx as uid 101 on port 8080, a read-only root filesystem with `/tmp` as the only writable place, every capability dropped, a `wget` health check on `/index.html`. So only the image reference has to change there.
+- **Cache rules**: `/sw.js` is `no-store`; `/assets/*` (named for their contents) are immutable; everything else, the instruments included, is `no-cache`, because pack files keep their names when a pack is cut again. No rewrite to the page for unknown paths: the app keeps its place after the `#`.
+- **Checked on this machine**: the container runs locked down as above and reports healthy; each kind of file comes back with the type and cache rule intended; the three smoke journeys pass against it (`SMOKE_URL=... pnpm smoke`).
+- **Not done, and Brandon's to decide**: how the image reaches docker04 (the repo is local-only, and his release path pulls from a registry), and what becomes of the test stack's API container and its `/api/*` route, which this app does not use. Nothing on docker04 or in his homelab repo has been touched.
+- **Replacing the test site in place is safe for installed copies**: the new worker is at the same `/sw.js`, so a browser holding the old one updates to it, and on taking over it deletes every cache it does not own.
+

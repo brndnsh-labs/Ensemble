@@ -40,6 +40,8 @@ pnpm packs:cut [id...]   # cut instrument packs into assets/packs/ (needs an ffm
 pnpm app [--host 0.0.0.0] [--port 8766]   # the app, served for development (no service worker)
 pnpm app:build          # build the app into packages/app/dist: a static site, packs and service worker included
 pnpm smoke              # the browser smoke journeys against the built app (60-second budget; needs Google Chrome)
+                        # SMOKE_URL=https://... pnpm smoke runs them against the app wherever it is served
+pnpm image              # build the app and its image (hosting/): ensemble-app:<commit>, an unprivileged nginx; needs docker
 node scripts/look.ts <out.png> <width>x<height> <address> [dark] [click:Text | wait:ms | select:Label=value | eval:js ...]
                         # look at the app in headless Chrome and save a picture; for checking work, not a test
 pnpm audition [--host 0.0.0.0] [--port 8765]   # serve the audition page at /tools/audition/: play a take from the packs
