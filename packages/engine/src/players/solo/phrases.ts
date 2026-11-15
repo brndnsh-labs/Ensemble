@@ -17,7 +17,7 @@ import type { ToneRole } from "../../theory/chord.ts";
 import { pitchClass } from "../../theory/pitch.ts";
 import { climb, EIGHTH, isChordTone, landing, onlyPasses } from "./harmony.ts";
 import type { LineBar, Spot } from "./line.ts";
-import { contourOf, settled, spotsOf, writeLine } from "./line.ts";
+import { contourOf, settled, spotsOf, writeBends, writeLine } from "./line.ts";
 import type { Slot, World } from "./slots.ts";
 import type { Cell, Contour, Idea, Role, Way } from "./style.ts";
 import { CONTOURS } from "./style.ts";
@@ -39,6 +39,8 @@ export interface PhraseBar {
   readonly tied: boolean;
   /** A pitch for each attack of the cell, in order: for a tied bar, the first is the note held into it. */
   readonly pitches: readonly number[];
+  /** For each of those, the semitones under it a string was pushed up from, or 0 for a note played plain. */
+  readonly bends: readonly number[];
 }
 
 /** A phrase written whole: one candidate for a slot. */
@@ -60,6 +62,8 @@ export interface Placed {
   readonly pitch: number;
   /** A note of a pickup: it leads into the line, and is not part of the idea. */
   readonly lead?: boolean;
+  /** Semitones under the note that a string is struck at and pushed up from (SO-53). */
+  readonly bend?: number;
 }
 
 export interface Memory {
@@ -79,7 +83,7 @@ export interface Memory {
   readonly endedEmpty: boolean;
 }
 
-type BarPlan = Omit<PhraseBar, "pitches">;
+type BarPlan = Omit<PhraseBar, "pitches" | "bends">;
 const PLAIN = { again: false, stab: false, tied: false };
 const REST: BarPlan = { part: "R", cell: "", ...PLAIN };
 const playing = (bar: { part: Part }) => bar.part !== "R";
@@ -157,6 +161,8 @@ interface Ask {
   readonly lift?: number;
   /** A remembered pitch for a spot of a bar, where the phrase keeps one. */
   readonly given?: (bar: number, spot: Spot) => number | undefined;
+  /** Whether that note was bent into when it was last said: it is said the same way again. */
+  readonly bent?: (bar: number, spot: Spot) => boolean | undefined;
 }
 
 export function phrasesFor(
@@ -179,6 +185,16 @@ export function phrasesFor(
     : length;
   const lungs = Math.max(1, Math.min(patient, air));
 
+  // Where the hand gets lyrical, and bends: the phrase that climbs to the top note and the
+  // ones beside it, always; any other phrase as often as the style says. The rest are the
+  // space around those (KF-B-10). One decision for the phrase, whichever way it is made.
+  // How far the top note's phrase is comes from where this phrase stands in its solo, not
+  // from looking for it: a jam told to finish early has played the same notes up to then.
+  const { around, elsewhere } = solo.habits.bend;
+  const peakIndex = Math.max(0, slot.count - 1 - solo.arc.peak.fromEnd);
+  const fromPeak = (slot.of - 1 - slot.chorus) * slot.count + peakIndex - slot.index;
+  const lyrical = Math.abs(fromPeak) <= around || rng.fork("lyrical").chance(elsewhere);
+
   const compose = (kind: string, plans: readonly BarPlan[], ask: Ask, fresh = false): Phrase => {
     const bars = slot.bars.map((_, i) => plans[i] ?? REST);
     if (final) bars[length - 1] = { part: "F", cell: "", ...PLAIN };
@@ -189,11 +205,14 @@ export function phrasesFor(
       lift === 0 ? slot.high : Math.min(slot.top - solo.arc.peak.clear, slot.high + lift);
     const low = lift === 0 ? slot.low : Math.min(slot.low + lift, high - 12);
     const given = new Map<number, number>();
+    const bent = new Map<number, boolean>();
     let at = 0;
     lines.forEach((line, b) => {
       for (const spot of line.spots) {
         const pitch = ask.given?.(b, spot);
         if (pitch !== undefined) given.set(at, pitch);
+        const was = ask.bent?.(b, spot);
+        if (was !== undefined) bent.set(at, was);
         at++;
       }
     });
@@ -214,16 +233,33 @@ export function phrasesFor(
       riffs: slot.peak ? "sequence" : solo.habits.riffIs,
       rng: rng.fork("habits"),
     });
+    const bends = writeBends(world, lines, pitches, {
+      lyrical,
+      top: slot.peak && !final,
+      given: bent,
+      rng: rng.fork("habits"),
+    });
     at = 0;
-    const struck = lines.map((bar) => bar.spots.map(() => pitches[at++]!));
+    const struck = lines.map((bar) => bar.spots.map(() => at++));
+    // A bar tied into keeps the note held into it as its first: the idea come back
+    // without the tie strikes that note on the downbeat.
+    const attacks = (b: number) =>
+      lines[b]!.tied ? [struck[b - 1]!.at(-1)!, ...struck[b]!] : struck[b]!;
     const written = bars.map((bar, b) => ({
       ...bar,
       tied: lines[b]!.tied,
-      // A bar tied into keeps the note held into it as its first: the idea come back
-      // without the tie strikes that note on the downbeat.
-      pitches: lines[b]!.tied ? [struck[b - 1]!.at(-1)!, ...struck[b]!] : struck[b]!,
+      pitches: attacks(b).map((i) => pitches[i]!),
+      bends: attacks(b).map((i) => bends[i]!),
     }));
-    const line = lines.flatMap((bar) => bar.spots).map((spot, i) => ({ spot, pitch: pitches[i]! }));
+    const line = lines
+      .flatMap((bar) => bar.spots)
+      .map(
+        (spot, i): Placed => ({
+          spot,
+          pitch: pitches[i]!,
+          ...(bends[i]! > 0 ? { bend: bends[i]! } : {}),
+        }),
+      );
     return { kind, slot, bars: written, line, pickup: [], fresh };
   };
 
@@ -389,6 +425,14 @@ export function phrasesFor(
       return pitch === undefined ? undefined : move(pitch, spot);
     };
 
+  /** Whether each note of an idea was bent into, for the same bars of it. */
+  const rememberedBends =
+    (idea: Phrase, from: readonly number[], upTo = from.length) =>
+    (b: number, spot: Spot) => {
+      const bend = b < upTo ? idea.bars[from[b] ?? -1]?.bends[spot.onset] : undefined;
+      return bend === undefined ? undefined : bend > 0;
+    };
+
   /** The idea again, each note where it was or moved by `move`. */
   const again = (
     kind: string,
@@ -400,6 +444,7 @@ export function phrasesFor(
       contour: shaped("arch"),
       ending,
       given: remembered(idea, from, move),
+      bent: rememberedBends(idea, from),
     });
   };
 
@@ -417,6 +462,7 @@ export function phrasesFor(
       contour: () => anchor + (direction * span) / 2,
       ending,
       given: remembered(idea, from, (pitch) => pitch, at),
+      bent: rememberedBends(idea, from, at),
     });
   };
 
@@ -453,6 +499,10 @@ export function phrasesFor(
             given: (b: number, spot: Spot) => {
               const pitch = b === starts ? first.pitches[spot.onset] : undefined;
               return pitch === undefined ? undefined : climb(spot.pool, pitch, lift);
+            },
+            bent: (b: number, spot: Spot) => {
+              const bend = b === starts ? first.bends[spot.onset] : undefined;
+              return bend === undefined ? undefined : bend > 0;
             },
           }
         : {}),

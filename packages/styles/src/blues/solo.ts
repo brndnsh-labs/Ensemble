@@ -300,6 +300,11 @@ export const bluesSolo: SoloStyle = {
       // Walked in by the scale.
       approach: false,
     },
+    // On a guitar: the blue third pushed up into the third, the flat 7th into the root
+    // (SO-53, ST-blues-41).
+    bend: { third: 0.65, rootOrFifth: 0.45, around: 1, elsewhere: 0.5 },
+    // A note held a dotted quarter is shaken (SO-52).
+    shake: 1.5,
   },
 
   // SO-51: louder as it goes up, a short "and" leaned on, the bottom of a run ghosted.

@@ -21,6 +21,8 @@ export interface Pool {
   /** The chord's tones as pitch classes, with their roles. */
   readonly tones: readonly { readonly role: ToneRole; readonly pc: number }[];
   readonly chord: ReadonlySet<number>;
+  /** The chord's own scale as pitch classes, whether or not the style's lines run it. */
+  readonly scale: ReadonlySet<number>;
   /** Pitch classes that may only pass: never held, never on a beat. */
   readonly passing: ReadonlySet<number>;
   /**
@@ -84,7 +86,7 @@ export function poolOf(
   for (let pitch = instrument.range[0]; pitch <= instrument.range[1]; pitch++) {
     if (all.has(mod12(pitch))) ladder.push(pitch);
   }
-  return { arrival, tones, chord: chordPcs, passing, leading, ladder };
+  return { arrival, tones, chord: chordPcs, scale: inScale, passing, leading, ladder };
 }
 
 export const isChordTone = (pool: Pool, pitch: number): boolean => pool.chord.has(mod12(pitch));
