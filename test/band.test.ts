@@ -4,7 +4,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { Plan, PlanBar, Take } from "@ensemble/engine";
+import type { Plan, PlanBar, PlanOptions, Take } from "@ensemble/engine";
 import {
   PPQ,
   parse,
@@ -471,6 +471,45 @@ test("at full energy the band still has accents: almost nothing is pinned to the
         pinned <= notes.length * 0.02,
         `${chart.file}: ${pinned} of ${notes.length} notes at 127`,
       );
+    }
+  }
+});
+
+test("a bridge is a bridge whatever it is called: the second-to-last section of a chorus of three or more, unlike both its first and its last, is played at the level of a section labelled Bridge; a tune in two parts and an ABAC tune have none", () => {
+  const a = "| C | Am7 | Dm7 | G7 | C | Am7 | Dm7 | G7 |";
+  const b = "| E7 | % | A7 | % | D7 | % | G7 | % |";
+  const c = "| F | Fm | C | A7 | Dm7 | G7 | C | G7 |";
+  const d = "| Am7 | D7 | Gmaj7 | % | Gm7 | C7 | F | G7 |";
+  const tune = (...sections: [label: string, bars: string][]) =>
+    `key: C\n${sections.map(([label, bars]) => `[${label}]\n${bars}`).join("\n")}`;
+  const called = (name: string) => [
+    tune(["A", a], ["A2", a], [name, b], ["A3", a]),
+    tune(["A", a], ["B", c], [name, b], ["D", d]),
+  ];
+  const levels = (text: string, style: (typeof STYLES)[number], options: PlanOptions) =>
+    plan(parse(text).chart, style, options).bars.map((bar) => bar.energy);
+  for (const style of STYLES) {
+    called("Bridge").forEach((labelled, i) => {
+      const lettered = called("X")[i]!;
+      for (const options of [
+        { mode: "jam", passes: 3 },
+        { mode: "jam", minutes: 3 },
+        { mode: "song" },
+      ] as const) {
+        const where = `${style.id}, tune ${i}, ${JSON.stringify(options)}`;
+        assert.deepEqual(levels(lettered, style, options), levels(labelled, style, options), where);
+      }
+      // And the bridge is not at the level of the rest, when the style gives a bridge its own.
+      const song = plan(parse(lettered).chart, style, { mode: "song" }).bars;
+      const at = (label: string) => song.find((bar) => bar.section.label === label)!.energy;
+      assert.notEqual(at("X"), at("A"), `${style.id}, tune ${i}: the bridge at the tune's level`);
+    });
+    // Played once as written, a tune with no bridge is at one level all through.
+    for (const text of [tune(["A", a], ["B", b]), tune(["A", a], ["B", b], ["A", ""], ["C", c])]) {
+      const levels = plan(parse(text).chart, style, { mode: "song" })
+        .bars.filter((bar) => bar.kind === "music" && !bar.ending)
+        .map((bar) => bar.energy);
+      assert.ok(Math.max(...levels) - Math.min(...levels) < 0.001, `${style.id}: ${levels}`);
     }
   }
 });

@@ -412,3 +412,26 @@ Every seat of both styles is its own, so both are in `STYLES` and `UNFINISHED` i
 - **Scorecard baselines** `scorecard/funk.json` and `scorecard/jazz.json` accept what the two styles deliver today, including the targets they miss (listed in the gate 4 report). `ensemble score` with no style named now scores every shipping style against its own baseline, so `pnpm score` guards all three. The blues baseline is unchanged.
 - **Neither style borrows the blues critic weights any more.** Each seat build replaced its group; the spread of `bluesCritic.weights` under them was dead and is removed. Both scorecards are identical before and after.
 - **Suite time**: 9.4 to 9.7 s with the goldens and the jazz piano in. Two properties that render their own long takes ("making an open jam one pass longer", "the piano stays in its part of the keyboard") now play one seed per chart on a push, the charts taking the seeds by turns, and all of them on `pnpm test:full`. Push 8.8 s, full 19.5 s. The limit stays at 10 s.
+
+## 2026-11-15: the jazz band read as a band (an independent review), and the bridge
+
+An Opus reviewer read the four jazz seats together from `prompts/review-style.md`, in its own clone, changing nothing: fifteen takes bar by bar and counts over every jazz chart. Each finding was checked against the code here before anything was done.
+
+**Acted on: a tune's bridge is a bridge whatever it is called.** The head's bridge never opened up: a section's level was matched by its label alone, the library charts call their bridges `[B]`, and the claim above ("a bridge whose own level is higher reaches the working tier and walks") was true of no library chart (270 head bridges of 270 in two on the hat). The notes give the rule (CO-27): the bridge is a section labelled so, or failing that the second-to-last section of a chorus of three or more when it is unlike both the first and the last; ABAC, a two-part tune and a blues have none. The planner now reads it (`bridgeRuns`): such a section, when its own label asks for no level, takes the level of one labelled Bridge. An intro and a written ending are not part of the chorus (the first draft made the middle of Intro, A, Outro a bridge, and a blues golden caught it).
+
+- Property first, then checked by removing the planner change: "a bridge is a bridge whatever it is called" (the levels of a tune with its bridge lettered are those of the same tune with it labelled, in a jam, a timed jam and a song; a two-part tune and ABAC are at one level), and the jazz head property now says the head is light "all but its bridge".
+- Jazz gives a bridge 0.63, not the default arc's 0.60: under the head the default landed on the line between the tiers exactly (0.42).
+- The blues and funk scorecards did not move and the blues goldens are identical; `jazz-rhythm-changes-bb-solo.mid` was rewritten (its head's bridge now walks on the ride) and the jazz baseline accepted again (`solo.builds` in target 90% to 87%, nothing else by more than three points).
+
+**Checked and left, each a listening question in the gate 4 report:**
+
+- **The drummer's kicks into a change and the piano's pushes are separate coins** (ST-jazz-45 says the drums mirror the pushes). The drummer plays the shot with the bomb where the piano does not push 68% of the time; the piano pushes with no snare on that "and" half the time. Making a push the band's, as a fill is (a mark in the plan both seats read), is a real concept and would re-tune two merged seats. Not built before the gate: if Brandon hears the band as loose into the changes, this is the cause and the fix.
+- **The jazz waltz piano is one held chord a bar** (94% of bars), under the soloist too: the book is written in 4/4 and 3/4 falls back to the pad (CH-54). A book per meter is the missing concept.
+- **In a solo's first chorus the piano's top note is above the alto** on 63 to 72% of the alto's notes (later choruses 8 to 34%): the first chorus is played three semitones under home, which is the piano's register. The lever is the soloist's (`arc.stages[0].register`), and moving it changes how every jazz solo builds.
+- **The alto repeats a phrase's rhythm** 35% of the time (the blues alto on the same charts 28%); on the ballad two one-bar rhythms can alternate for sixteen bars.
+- **On a chord that lasts many bars the piano keeps one voicing** (the modal tune: 16 to 20 bars on the same four notes). The hand has no reason to move when the chord does not.
+- **80% of the jazz piano's strikes are the pitches the blues piano plays on the same chord**: the blues piano has been rootless since gate 2. The two differ in rhythm, length and a step of register, not in harmony.
+- **In two, a lead-in is sometimes the root an octave away** (51 of 804: G1, G2, then C on a ii-V in one bar). The fifth of the chord coming is the root being left. A player does this; the notes' "never repeats the note before it" is about the walk.
+- Song mode has no light head (the head offset is for a jam that goes round more than once): as designed.
+
+**Dismissed:** "the walk's passing tones are floored at the open E, not at the style's lowest root". The open E is the instrument's lowest note and `register.lowest` is the lowest root; the blues line has the same two floors.

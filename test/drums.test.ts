@@ -153,7 +153,7 @@ test(
 );
 
 test(
-  "jazz: the band states the tune before it opens up: the first chorus of a jam is played a level down, on the closed hat with no bass drum, and the second chorus is on the ride",
+  "jazz: the band states the tune before it opens up: the first chorus of a jam is played a level down, on the closed hat with no bass drum, all but its bridge, and the second chorus is on the ride",
   only("jazz"),
   () => {
     for (const style of STYLES.filter((candidate) => candidate.id === "jazz")) {
@@ -173,6 +173,29 @@ test(
           const where = `${chart.file} ${JSON.stringify(options)}`;
           assert.equal(tierOf(first.energy), "low", `${where}: the head at ${first.energy}`);
           assert.notEqual(tierOf(second.energy), "low", `${where}: the second chorus`);
+        }
+      }
+    }
+    // The head's bridge opens up for contrast: it is on the ride, and the bass walks (ST-jazz-20).
+    const aaba = parse(
+      "key: Bb\n[A]\n| Bb6 | Cm7 F7 | Bb6 | Cm7 F7 |\n[A2]\n| Bb6 | Cm7 F7 | Bb6 | % |\n[Bridge]\n| D7 | G7 | C7 | F7 |\n[A3]\n| Bb6 | Cm7 F7 | Bb6 | % |",
+    ).chart;
+    for (const style of STYLES.filter((candidate) => candidate.id === "jazz")) {
+      for (const options of [
+        { mode: "jam", passes: 4 },
+        { mode: "jam", minutes: 4 },
+        { mode: "jam", open: true, passes: 3 },
+      ] as const) {
+        for (const bar of plan(aaba, style, options).bars) {
+          if (bar.kind !== "music" || bar.pass !== 0 || bar.ending) continue;
+          const bridge = bar.section.label === "Bridge";
+          // The bar before a step up already plays where it is going, and builds into it.
+          if (!bridge && bar.barInSection === 3) continue;
+          assert.equal(
+            tierOf(bar.energy) === "low",
+            !bridge,
+            `${JSON.stringify(options)} ${bar.section.label} bar ${bar.index} at ${bar.energy}`,
+          );
         }
       }
     }

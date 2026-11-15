@@ -56,8 +56,8 @@ take "3-funk-intro-outro-c-song" library/funk-intro-outro-c.chart --song --solo 
 take "3-funk-vamp-a-no-solo" library/funk-vamp-a.chart --passes 4 --seed 1
 take "3-funk-vamp-a-timed-4min" library/funk-vamp-a.chart --minutes 4 --solo --seed 1
 
-echo "4. The blues again: gate 3's seeds 1 and 2, and its other tunes:"
-for seed in 1 2; do
+echo "4. The blues again: gate 3's seeds 2 and 4 (seed 1 is the first file of section 1), and its other tunes:"
+for seed in 2 4; do
   take "4-blues-12-bar-a-seed-$seed" library/blues-12-bar-a.chart --passes 5 --solo --seed "$seed"
 done
 take "4-blues-slow-g" library/blues-slow-g.chart --passes 4 --solo --seed 1

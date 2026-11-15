@@ -60,9 +60,10 @@ export function planBars(
   // First the music, bar by bar, without marks that depend on a neighbour.
   const drafts: Draft[] = [];
   let occurrence = 0;
+  const bridges = bridgeRuns(runs, style);
   for (const run of runs) {
     const first = run.bars[0]!;
-    const level = sectionLevel(first.sectionLabel, style);
+    const level = sectionLevel(bridges.has(run) ? BRIDGE : first.sectionLabel, style);
     const phrases =
       run.lap === undefined
         ? phraseLengths(run.bars.length)
@@ -396,13 +397,49 @@ function seamSpans(bar: FlatBar, previous: FlatBar | undefined): readonly ChordS
 
 // ── energy ──────────────────────────────────────────────────────────────────
 
-function sectionLevel(label: string, style: StylePack): number {
+/** The level a label asks for, or undefined when the style has none for it (A, B, Head). */
+function namedLevel(label: string, style: StylePack): number | undefined {
   const name = label.trim().toLowerCase();
-  for (const [prefix, energy] of style.arc.levels) {
-    if (name.startsWith(prefix)) return energy;
-  }
-  return style.arc.defaultLevel;
+  return style.arc.levels.find(([prefix]) => name.startsWith(prefix))?.[1];
 }
+
+function sectionLevel(label: string, style: StylePack): number {
+  return namedLevel(label, style) ?? style.arc.defaultLevel;
+}
+
+/** What a tune's bridge is called when it is called anything. */
+const BRIDGE = "bridge";
+
+/**
+ * The runs that are a tune's bridge without being labelled so (CO-27): in a chorus of three
+ * or more sections with no section labelled a bridge, the second-to-last, when it is unlike
+ * both the first and the last (the B of AABA, the C of ABCD). ABAC, a two-part tune and a
+ * blues have none. A section whose label already asks for a level keeps it.
+ */
+function bridgeRuns(runs: readonly Run[], style: StylePack): Set<Run> {
+  const found = new Set<Run>();
+  const said = (run: Run) =>
+    run.bars.map((bar) => `${bar.ticks}:${bar.spans.map(spanText).join(" ")}`).join("|");
+  for (const [, chorus] of Map.groupBy(
+    // Song mode plays every section in one pass: an intro and a written ending are not the tune.
+    runs.filter(
+      (run) => run.part === "body" && run.lap === undefined && run.bars[0]!.role === "body",
+    ),
+    (run) => run.pass,
+  )) {
+    if (chorus.length < 3) continue;
+    const label = (run: Run) => run.bars[0]!.sectionLabel.trim().toLowerCase();
+    if (chorus.some((run) => label(run).startsWith(BRIDGE))) continue;
+    const candidate = chorus[chorus.length - 2]!;
+    if (namedLevel(label(candidate), style) !== undefined) continue;
+    const unlike = (other: Run) => said(other) !== said(candidate);
+    if (unlike(chorus[0]!) && unlike(chorus[chorus.length - 1]!)) found.add(candidate);
+  }
+  return found;
+}
+
+const spanText = (span: ChordSpan): string =>
+  `${span.start}=${span.chord === null ? "-" : chordToString(span.chord)}`;
 
 /** A, A2 and A' are one section for every held choice. */
 export function sectionIdentity(label: string): string {

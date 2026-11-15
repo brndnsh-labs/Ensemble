@@ -24,7 +24,9 @@ export const jazz: StylePack = {
   // The head is played a tier under the blowing: in two, on the hat, and the move to the
   // ride and the walk is the band opening up (ST-jazz-09, ST-jazz-50). A louder section of
   // the head (a bridge) reaches the working level and walks, as it should.
-  arc: { ...DEFAULT_ARC, head: -0.15 },
+  // The bridge sits a little higher than the default arc's, so that under the head it is
+  // clear of the line between the tiers however the jam is shaped (0.45 to 0.48, not 0.42).
+  arc: { ...DEFAULT_ARC, levels: [["bridge", 0.63], ...DEFAULT_ARC.levels], head: -0.15 },
   ending: {
     // The tonic 6th: no major-seventh rub under a melody resting on the root (ST-jazz-47).
     finalChord: { major: "6", minor: "m6", dominant: "6" },
