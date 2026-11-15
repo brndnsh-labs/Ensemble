@@ -17,7 +17,7 @@ import type { ToneRole } from "../../theory/chord.ts";
 import { pitchClass } from "../../theory/pitch.ts";
 import { climb, EIGHTH, isChordTone, landing, onlyPasses } from "./harmony.ts";
 import type { LineBar, Spot } from "./line.ts";
-import { contourOf, spotsOf, writeLine } from "./line.ts";
+import { contourOf, settled, spotsOf, writeLine } from "./line.ts";
 import type { Slot, World } from "./slots.ts";
 import type { Cell, Contour, Idea, Role, Way } from "./style.ts";
 import { CONTOURS } from "./style.ts";
@@ -521,9 +521,12 @@ export function phrasesFor(
   const all = offer(ways);
   // And something new, whatever the form asked for, when the idea is too thin for where
   // the arc has got to: a new one at this slot's own pace is better than the old one starved.
+  const { levels, thin } = book.outgrown;
+  const played = motif ? motif.line.length / motif.slot.bars.length : 0;
   const outgrown =
     motif !== null &&
-    solo.levels.indexOf(slot.level) - solo.levels.indexOf(motif.slot.level) >= book.outgrown.levels;
+    (solo.levels.indexOf(slot.level) - solo.levels.indexOf(motif.slot.level) >= levels ||
+      (thin !== undefined && played < thin * slot.level.notesPerBar));
   if (!slot.peak && outgrown && !ways.some((way) => way.make === "new")) {
     all.push(...offer(book.outgrown.ways));
   }
@@ -591,7 +594,22 @@ function withPickup(world: World, phrase: Phrase, memory: Memory, rng: Rng): Phr
     // Its last note may be the line's own approach: the half step under the first note,
     // short and off the beat (SO-36).
     const leans = habit.approach && draw.fork("approach").chance(solo.habits.chromatic);
-    const walk = (direction: number): Placed[] =>
+    const walk = (direction: number): Placed[] => leadingOn(walked(direction));
+    // A tone from outside the chord's scale leads to the note a half step on, here as in
+    // the line: the phrase's first note, for the last of the pickup.
+    const leadingOn = (notes: readonly Placed[]): Placed[] =>
+      notes.map((note, i) => {
+        const next = notes[i + 1];
+        const pitch = settled(
+          note.spot,
+          note.pitch,
+          notes[i - 1]?.pitch,
+          next ? { tick: next.spot.tick, pitch: next.pitch } : { tick: bar.start, pitch: first },
+          (other) => other >= slot.low && other <= slot.high,
+        );
+        return { ...note, pitch };
+      });
+    const walked = (direction: number): Placed[] =>
       spots.map((spot, i) => {
         const pitch = climb(spot.pool, first, direction * (spots.length - i));
         const further = climb(spot.pool, first, direction * (spots.length - i + 1));

@@ -23,6 +23,11 @@ export interface Pool {
   readonly chord: ReadonlySet<number>;
   /** Pitch classes that may only pass: never held, never on a beat. */
   readonly passing: ReadonlySet<number>;
+  /**
+   * Of those, the ones the style adds from outside the chord's scale (the bebop
+   * scale's passing tone): each is on its way to the note a half step from it.
+   */
+  readonly leading: ReadonlySet<number>;
   /** Every pitch of the pool on the instrument, low to high: the ladder a line walks. */
   readonly ladder: readonly number[];
 }
@@ -57,11 +62,13 @@ export function poolOf(
     all.add(pc);
   }
   const passing = new Set<number>();
+  const leading = new Set<number>();
   for (const extra of solo.notes.passing) {
     const pc = mod12(root + extra.interval);
     if (extra.scale !== scale.name || all.has(pc)) continue;
     all.add(pc);
     passing.add(pc);
+    leading.add(pc);
   }
 
   // A note of the key that says a different chord: a half step over one of this chord's
@@ -77,13 +84,16 @@ export function poolOf(
   for (let pitch = instrument.range[0]; pitch <= instrument.range[1]; pitch++) {
     if (all.has(mod12(pitch))) ladder.push(pitch);
   }
-  return { arrival, tones, chord: chordPcs, passing, ladder };
+  return { arrival, tones, chord: chordPcs, passing, leading, ladder };
 }
 
 export const isChordTone = (pool: Pool, pitch: number): boolean => pool.chord.has(mod12(pitch));
 
 /** A note that may only pass: never on a beat, never held. */
 export const onlyPasses = (pool: Pool, pitch: number): boolean => pool.passing.has(mod12(pitch));
+
+/** A note from outside the chord's scale, there to lead to the note a half step on. */
+export const leads = (pool: Pool, pitch: number): boolean => pool.leading.has(mod12(pitch));
 
 /** A held note a half step from a chord tone, and not one itself, is a rub, not a colour (X-B-08). */
 export const rubs = (pool: Pool, pitch: number): boolean =>

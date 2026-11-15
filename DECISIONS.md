@@ -279,3 +279,29 @@ Built by an Opus agent from `prompts/drums-jazz-funk.md` in its own clone; the d
 - Not built: the head out played light again, trading, brushes.
 
 **A measure of one way of playing is reported only where a style targets it** (`Measure.idiom`). With three styles, "the backbeat" read off a jazz take says 0% and means nothing. A measure marked `idiom` is on the scorecard of a style that sets it a target and of no other. Twelve drum measures are marked; the general ones (fills that repeat) are reported everywhere.
+
+## 2026-11-14: the soloist for jazz and funk (stage 4)
+
+Built by a Fable agent from `prompts/solo-jazz-funk.md` in its own clone. On the main thread: the diff and printed solos were read; the blues goldens are byte-identical and `pnpm score` reports no movement; one property was added (`test/soloist.test.ts`, the chromatic note that resolves) and one widened (`test/drums.test.ts`, swung eighths for the soloist too), each checked by breaking the rule.
+
+**Engine changes, each a concept the soloist's data lacked.** Every one of these was a constant or a branch that said "blues" without saying so; the blues pack now carries the old values and plays what it played.
+
+- **The book** (`SoloStyle.book`): which ways of making a phrase are offered for each thing a form asks (state, again, changed, answer), for a solo's first phrase, for the peak, and when an idea is outgrown. The engine keeps how each way is made; a style lists and orders them. Before, the lists were four `if` branches.
+- **Forms by length, and two more things a form can ask**: a form is for a chorus of as many phrases as it has letters (twelve bars `s r a`, thirty-two `s a v a c r b a`); `c` is a contrast set beside the idea (a bridge) and `b` brings back the idea the chorus opened on. Memory gains "the phrase this chorus opened on".
+- **A new statement can be set apart and lifted** (`apart`, `lift`): in rhythms the idea did not use, its register raised with it. What a bridge is.
+- **The peak phrase and the wind-down as data** (`arc.peak.fromEnd`, `shape`, `contour`, `sequence`; `arc.windDown.contour`). The blues climbs in sequence in the phrase before the last; funk plays `L L E R`; jazz runs up.
+- **What a move costs the line** (`line`): what a step is (a minor third in a pentatonic, a whole step where the line runs the chord's scale), skips, leaps, half steps, a non-chord tone on a beat; and `strandsTheBeat`, which is what makes the bebop passing tone get used.
+- **How a landing is ranked** (`landing.perRank`, `reach`) and **how alike is alike** (`likeness.related`, `same`), which the measures read too.
+- **Habits**: a tie over the barline (`tie`, new to the engine), a figure's first note stabbed two to four times (`stab`), a riff bar said as a sequence or note for note (`riffIs`), a pickup ending on the half step under the line's first note (`pickup.approach`).
+- **An idea can be outgrown by being thin** (`book.outgrown.thin`): fresh ways are also offered when the idea as last played has under a set share of the notes the arc now asks. The builder declared this and set it in both packs but nothing read it; wired up on the main thread. Funk sets 0.6 (solos that build 1.5 times or more went from 87% to 93%, the flattest from 1.00 to 1.40); jazz does not set it (it made no take better and three in a hundred worse).
+- **A tone from outside the chord's scale goes somewhere** (`Pool.leading`, `settled` in `line.ts`; main thread). Reading the jazz solos, about three notes a take were the bebop scale's passing tone jumped onto and off again (a major third over a minor chord, between two notes a third away): an idea come back over another chord, a sequence moved onto it, a pickup walked off the old chord's ladder. Now such a tone stays only off the beat with the note a half step from it straight after; otherwise the scale's own note beside it is played. Only a style that adds passing tones has any, so the blues and funk are untouched.
+- **Critic features** `rocks`, `beats-off-the-chord`, `changes-down-the-list`, `note-for-note`, none with a blues weight; five measures marked `idiom` (`barlines-tied`, `chromatic-approaches`, `silent-sixteenths`, `roots-and-fifths-on-changes`, `short-notes`).
+
+**Two fixes that change the blues, on other styles' charts only** (72 of 1,242 blues takes compared, none in the blues library, goldens and scorecard unmoved):
+
+- An end bar struck too late to leave a breath: a four-beat ending rhythm cut to a 3/4 bar kept its attacks in the bar's last beat. An end bar's later notes are not struck when they cannot leave an eighth and the breath, as heard. `off-the-density` asks a 3/4 bar for three quarters of a 4/4 bar's notes.
+- A one-phrase solo that is also the tune's last phrase climbed and stopped on its top note. It now comes to rest.
+
+**Choices in the data** (the builder's, kept): jazz solos are eighths only, so the triplet pickup of ST-jazz-38 is left out; the chromatic approach is from below only; ST-jazz-36 and ST-funk-31 give head forms, so the solo forms are the builder's; funk has no pickups, ties, scoops or falls; a later chorus mostly brings a new idea.
+
+**Known, not fixed:** three slow-waltz takes in 1,258 (jazz at 60 on the alto) run nine seconds on one breath, because a pickup's breath is judged on paper and swing takes a tenth of a second back; one three-bar silence on the waltz at 240. A funk property was tried ("no pickups, nothing over the barline") and dropped: both are settings in the data, and the test could not be made to fail by anything but changing them.

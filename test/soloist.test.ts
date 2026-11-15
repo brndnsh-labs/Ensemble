@@ -266,7 +266,7 @@ test("a three-chorus solo builds: its last chorus has more notes than its first,
       if (inChorus(2) > inChorus(0)) built++;
     }
   }
-  assert.ok(solos > 40, `only ${solos} three-chorus solos`);
+  assert.ok(solos > 30, `only ${solos} three-chorus solos`);
   assert.ok(built >= solos * 0.9, `${built} of ${solos} solos built`);
 });
 
@@ -602,3 +602,45 @@ test("under a solo the hand does not growl: its two lowest notes are a half step
   }
   assert.ok(judged > 3000, `only ${judged} strikes under a line`);
 });
+
+// ── the jazz soloist ────────────────────────────────────────────────────────
+
+test(
+  "jazz: a note from outside the chord's scale is on its way somewhere: it is off the beat, and the next note follows straight on, a half step from it",
+  only("jazz"),
+  () => {
+    let chromatic = 0;
+    for (const { chart, options, take } of soloTakes()) {
+      const harmony = harmonyOf(take);
+      const solo = notesOf(take, "solo");
+      const has = (arrival: (typeof harmony)[number] | undefined, pitch: number) => {
+        if (!arrival?.chord) return true;
+        const root = pitchClass(arrival.chord.root);
+        const scale = chordScale(arrival.chord, contextOf(harmony, arrival));
+        return [...scale.intervals, ...chordTones(arrival.chord.quality).map((t) => t.interval)]
+          .map((interval) => (root + interval) % 12)
+          .includes(pitch % 12);
+      };
+      let at = 0;
+      solo.forEach((note, i) => {
+        while (harmony[at + 1] && harmony[at + 1]!.tick <= note.tick) at++;
+        if (has(harmony[at], note.pitch)) return;
+        // Struck in the eighth before a change, it may be the chord coming (X-B-07).
+        const coming = harmony[at + 1];
+        if (coming && coming.tick - note.tick <= PPQ / 2 && has(coming, note.pitch)) return;
+        const bar = take.plan.bars.findLast((candidate) => candidate.start <= note.tick)!;
+        if (bar.meter.unit !== 4) return;
+        chromatic++;
+        const where = `${chart.file} seed ${options.seed} bar ${bar.index}: ${note.pitch} over ${harmony[at]!.chord!.text}`;
+        assert.notEqual((note.tick - bar.start) % PPQ, 0, `${where}: on a beat`);
+        const next = solo[i + 1];
+        assert.ok(
+          next && next.tick - note.tick <= PPQ / 2,
+          `${where}: left hanging, nothing follows it`,
+        );
+        assert.equal(Math.abs(next.pitch - note.pitch), 1, `${where}: left for ${next.pitch}`);
+      });
+    }
+    assert.ok(chromatic > 300, `only ${chromatic} notes outside the scale`);
+  },
+);

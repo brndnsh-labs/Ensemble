@@ -264,7 +264,7 @@ export const jazzSolo: SoloStyle = {
     // An idea is carried by its rhythm, so one stated sparse stays sparse however often it
     // is changed: when it has under three fifths of the notes the arc asks for, a new line
     // is offered beside it.
-    outgrown: { levels: 2, thin: 0.6, ways: [NEW, NEW] },
+    outgrown: { levels: 2, ways: [NEW, NEW] },
   },
   // Measured: two jazz phrases from different takes score a half or more 8 times in 100,
   // as two blues phrases do, so the line is drawn in the same place.

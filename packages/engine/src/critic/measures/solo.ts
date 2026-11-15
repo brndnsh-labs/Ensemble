@@ -179,6 +179,12 @@ const measure = (
   },
 });
 
+/** A measure of one way of playing: on the scorecard only of a style that sets it a target. */
+const idiom = (...args: Parameters<typeof measure>): Measure => ({
+  ...measure(...args),
+  idiom: true,
+});
+
 export const soloMeasures: readonly Measure[] = [
   measure(
     "changes-on-chord-tones",
@@ -526,7 +532,7 @@ export const soloMeasures: readonly Measure[] = [
       return share(all.filter(([a, b]) => a.pitch === b.pitch).length, all.length);
     },
   ),
-  measure(
+  idiom(
     "roots-and-fifths-on-changes",
     "share",
     "The share of changes landed on the new chord's root or 5th: most of them where the soloist is a horn section riffing, few where the line spells the changes.",
@@ -547,7 +553,7 @@ export const soloMeasures: readonly Measure[] = [
       return share(plain.length, landings.length);
     },
   ),
-  measure(
+  idiom(
     "chromatic-approaches",
     "share",
     "The share of changes landed on from a half step away, by a note the new chord's scale does not have: the bebop approach, measured where it happens (Q-29).",
@@ -572,7 +578,7 @@ export const soloMeasures: readonly Measure[] = [
       return share(chromatic, landings);
     },
   ),
-  measure(
+  idiom(
     "short-notes",
     "share",
     "The share of notes that are an eighth or shorter as heard: most of a bebop line, nearly all of a funk riff (Q-34).",
@@ -582,7 +588,7 @@ export const soloMeasures: readonly Measure[] = [
         reading.notes.length,
       ),
   ),
-  measure(
+  idiom(
     "silent-sixteenths",
     "share",
     "Inside the bars the soloist plays in, the share of sixteenths with nothing sounding: the holes in a riff (Q-33).",
@@ -605,7 +611,7 @@ export const soloMeasures: readonly Measure[] = [
       return share(silent, all);
     },
   ),
-  measure(
+  idiom(
     "barlines-tied",
     "share",
     "Of the barlines a run crosses (a note on the last eighth of the bar, running straight on), the share where that note is held over the barline and the downbeat is not struck: a line that does not treat the barline as a wall (SO-38).",

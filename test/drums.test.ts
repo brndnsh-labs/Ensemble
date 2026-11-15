@@ -99,17 +99,17 @@ test(
 // ── jazz ────────────────────────────────────────────────────────────────────
 
 test(
-  'jazz: the drummer plays swung eighths only: nothing between a beat and its "and"',
+  'jazz: the drummer and the soloist play swung eighths only: nothing between a beat and its "and"',
   only("jazz"),
   () => {
     for (const { chart, options, take } of takes((jam) => jam.style.id === "jazz")) {
-      for (const note of notesOf(take, "drums")) {
+      for (const note of [...notesOf(take, "drums"), ...notesOf(take, "solo")]) {
         const bar = take.plan.bars.findLast((candidate) => candidate.start <= note.tick)!;
         if (bar.kind !== "music" || bar.meter.unit !== 4) continue;
         assert.equal(
           (note.tick - bar.start) % (2 * STEP),
           0,
-          `${chart.file} seed ${options.seed} bar ${bar.index}: ${note.voice} between the eighths`,
+          `${chart.file} seed ${options.seed} bar ${bar.index}: the ${note.seat} (${note.voice}) between the eighths`,
         );
       }
     }

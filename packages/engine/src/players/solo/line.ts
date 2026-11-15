@@ -12,7 +12,7 @@ import type { PlanBar } from "../../plan/types.ts";
 import type { Rng } from "../../rng.ts";
 import type { ToneRole } from "../../theory/chord.ts";
 import type { Pool } from "./harmony.ts";
-import { climb, EIGHTH, isChordTone, landing, onlyPasses, rubs, rung } from "./harmony.ts";
+import { climb, EIGHTH, isChordTone, landing, leads, onlyPasses, rubs, rung } from "./harmony.ts";
 import type { World } from "./slots.ts";
 import type { Cell, Contour } from "./style.ts";
 
@@ -393,7 +393,44 @@ export function writeLine(world: World, bars: readonly LineBar[], ask: LineAsk):
     }
     pitches[i] = best;
   }
+
+  // 3. A tone from outside the chord's scale has to go somewhere (an idea come back over
+  // another chord, a sequence moved onto it, a run that turned: none of them excuse it).
+  for (let i = 0; i < count; i++) {
+    const next = spots[i + 1];
+    pitches[i] = settled(
+      spots[i]!,
+      pitches[i]!,
+      pitches[i - 1],
+      next && { tick: next.tick, pitch: pitches[i + 1]! },
+      inWindow,
+    );
+  }
   return pitches as number[];
+}
+
+/**
+ * A tone from outside the chord's scale has to go somewhere: off the beat, with
+ * the note a half step from it straight after. One left any other way gives
+ * its place to the scale's own note beside it, a chord tone if there is one.
+ */
+export function settled(
+  spot: Spot,
+  pitch: number,
+  before: number | undefined,
+  next: { readonly tick: number; readonly pitch: number } | undefined,
+  allowed: (pitch: number) => boolean,
+): number {
+  if (!leads(spot.pool, pitch)) return pitch;
+  const onward = next && next.tick - spot.tick <= EIGHTH ? next.pitch : undefined;
+  if (!onBeat(spot) && onward !== undefined && Math.abs(onward - pitch) === 1) return pitch;
+  const beside = [
+    spot.pool.ladder.findLast((other) => other < pitch),
+    spot.pool.ladder.find((other) => other > pitch),
+  ].filter((other): other is number => other !== undefined && allowed(other));
+  const fresh = beside.filter((other) => other !== before && other !== onward);
+  const choices = fresh.length > 0 ? fresh : beside;
+  return choices.find((other) => isChordTone(spot.pool, other)) ?? choices[0] ?? pitch;
 }
 
 /**
