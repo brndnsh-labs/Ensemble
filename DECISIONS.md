@@ -681,3 +681,13 @@ Built to `prompts/app-editor.md`. What that brief did not settle:
 - **Saving is 400 ms after typing pauses**, and at once on Play, Format, leaving the screen, `pagehide` and the page being hidden.
 - **On the play screen of a phone, "Edit a copy" reads "Edit"** (its accessible name stays "Edit a copy"): the header had no room, and the title was already down to a few letters.
 - **Smoke journey 3** (`smoke/app.spec.ts`): a new chart, eight typed bars on the page, then `Hq7` typed: its message is listed and the error mark is exactly `Hq7`, inside the box. Seen to fail with the mark moved one letter. The four journeys take 7 s of 60.
+
+## the editor, checked and merged (stage 6, part 2)
+
+The builder's diff was read in full, and the editor looked at on a phone and a laptop with a clean chart and one full of mistakes. Merged as built, with two changes on the main thread:
+
+- **The play screen's header holds only the way back, the title and Edit.** With Edit added, a phone had 78 px left for the title. How the page is read (names, numerals, both; focus) moved to a line of its own under the header, beside the line that says the style, key and tempo, which is now shown before playing as well as during.
+- **"Edit a copy" opens the copy already made**, if the player made one and has not changed it. Pressing it twice no longer leaves two.
+- **The player's charts are in `localStorage`** (decided in the brief): a chart is a few hundred bytes, the reads are synchronous, and the same eviction rules apply to it as to anything else a site keeps. Export is the backup.
+- **Not verified by anyone yet**: the key row above a real phone keyboard, and whether pressing a key in it keeps the iPhone's keyboard up.
+

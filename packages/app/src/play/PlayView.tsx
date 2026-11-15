@@ -12,7 +12,7 @@ import {
 } from "@ensemble/engine";
 import { STYLES, styleById } from "@ensemble/styles";
 import { useEffect, useMemo, useState } from "react";
-import { addChart } from "../charts.ts";
+import { copyOf } from "../charts.ts";
 import type { LibraryChart } from "../library.ts";
 import type { ChartChoices, Settings } from "../settings.ts";
 import type { Playhead } from "./ChartView.tsx";
@@ -160,15 +160,20 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
           <button
             type="button"
             className="edit-link"
-            aria-label="Edit a copy"
             onClick={() => {
-              location.hash = `#/edit/${addChart(entry.text)}`;
+              location.hash = `#/edit/${copyOf(entry.text)}`;
             }}
           >
-            {/* A phone's header has no room for the whole of it. */}
-            Edit<span className="roomy"> a copy</span>
+            Edit a copy
           </button>
         )}
+      </header>
+
+      {/* What is being played, and how the page is read. */}
+      <div className="view">
+        <p className="summary">
+          {style.name} in {keyToString(shown.key)}, {shownTempo} bpm
+        </p>
         <fieldset className="reading" aria-label="Show chords as">
           {READINGS.map((reading) => (
             <button
@@ -190,13 +195,9 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
         >
           Focus
         </button>
-      </header>
+      </div>
 
-      {playing ? (
-        <p className="summary">
-          {style.name} in {keyToString(shown.key)}, {shownTempo} bpm
-        </p>
-      ) : (
+      {!playing && (
         <div className="setup">
           <label>
             <span>Style</span>

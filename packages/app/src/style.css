@@ -324,11 +324,22 @@ button[aria-pressed="true"] {
   color: var(--paper);
 }
 
+.view {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 var(--gutter) 8px;
+}
+
 .summary {
+  flex: 1;
+  min-width: 0;
   margin: 0;
-  padding: 0 var(--gutter) 6px;
+  overflow: hidden;
   color: var(--faint);
   font-size: 0.875rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .setup {
@@ -1096,8 +1107,7 @@ button[aria-pressed="true"] {
 /* ── A phone held upright ────────────────────────────────────────────────── */
 
 @media (max-width: 480px) {
-  .back span,
-  .roomy {
+  .back span {
     display: none;
   }
 

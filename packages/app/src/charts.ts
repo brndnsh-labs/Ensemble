@@ -109,6 +109,15 @@ export function addChart(text: string): string {
   return id;
 }
 
+/**
+ * The player's copy of a text to edit: the copy they already have, if they
+ * made one and have not changed it, or a new one. Asking twice does not leave
+ * two.
+ */
+export function copyOf(text: string): string {
+  return stored.find((chart) => chart.text === text)?.id ?? addChart(text);
+}
+
 export function saveChart(id: string, text: string): void {
   const item = stored.find((chart) => chart.id === id);
   if (!item || item.text === text) return;
