@@ -1,0 +1,10 @@
+title: Slow Neo-Soul Two-Five-One in F
+key: F
+tempo: 76
+style: neosoul
+
+// The cadence slowed down and coloured: a minor ninth, a thirteenth and a
+// major ninth, then round through the six to the two again. Eight bars.
+[A]
+| Gm9 | C13 | Fmaj9 | Dm9 |
+| Gm9 | C13 | Fmaj9 | %   |

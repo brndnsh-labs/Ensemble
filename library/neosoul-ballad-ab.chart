@@ -1,0 +1,11 @@
+title: Neo-Soul Ballad in A-flat
+key: Ab
+tempo: 72
+style: neosoul
+
+// A slow eight-bar form: the one and the six, a two-five into the four, the
+// four made a dominant ninth on its way down to the three, and a two-five back
+// to the top.
+[A]
+| Abmaj9 | Fm9 | Bbm9 Eb13 | Dbmaj9 |
+| Db9    | Cm9 | Bbm9      | Eb13   |

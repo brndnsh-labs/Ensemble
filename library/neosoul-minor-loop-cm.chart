@@ -1,0 +1,9 @@
+title: Minor Neo-Soul Loop in C minor
+key: Cm
+tempo: 88
+style: neosoul
+
+// A minor loop of four bars: the one, the six, the four, and the dominant
+// that turns it round to the top.
+[A]
+| Cm9 | Abmaj9 | Fm9 | G7b9 |

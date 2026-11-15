@@ -21,7 +21,9 @@ function read(path: string): { loudness: number; peak: number } {
   const run = spawnSync(
     "ffmpeg",
     ["-hide_banner", "-nostats", "-i", path, "-af", "ebur128=peak=true", "-f", "null", "-"],
-    { encoding: "utf8" },
+    // The filter logs every tenth of a second: a take of twelve minutes writes more than the
+    // default megabyte, and a summary cut off reads as NaN.
+    { encoding: "utf8", maxBuffer: 1 << 28 },
   );
   const summary = run.stderr.slice(run.stderr.lastIndexOf("Summary:"));
   return {

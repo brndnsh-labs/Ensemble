@@ -1,0 +1,9 @@
+title: Two-Chord Neo-Soul Vamp in E-flat minor
+key: Ebm
+tempo: 84
+style: neosoul
+
+// Two ninths, a bar each: the minor one and the dominant four, the dorian
+// vamp the pocket sits on.
+[A]
+| Ebm9 | Ab9 |

@@ -1,0 +1,42 @@
+title: Neo-Soul Song in B-flat
+key: Bb
+tempo: 84
+style: neosoul
+
+// An intro on the two-five, a verse on the one and the six, a chorus that
+// opens on the four, a bridge that hangs on a suspended five, and an outro
+// that borrows the minor four on its way home.
+[Intro]
+| Cm9 | F13 | Bbmaj9 | % |
+
+[Verse]
+| Bbmaj9 | Gm9 | Cm9 | F13 |
+| Bbmaj9 | Gm9 | Cm9 | F13 |
+
+[Chorus]
+| Ebmaj9 | Dm9 | Gm9 | Cm9 F13 |
+| Ebmaj9 | Dm9 | Gm9 | Cm9 F13 |
+
+[Verse]
+
+[Chorus]
+
+[Bridge]
+| Gm9 | Ebmaj9 | Cm9 | F7sus4 |
+| Gm9 | Ebmaj9 | Cm9 | F7sus4 |
+
+[Chorus]
+
+[Outro]
+| Ebmaj9 | Ebm9 | Bbmaj9 | % |
+
+--- arrangement
+//      energy  drums  bass  chords  solo
+Intro   1       -      .     -       .
+Verse   2       -      -     -       .
+Chorus  3       -      -     -       .
+Verse   2       -      -     -       .
+Chorus  3       -      -     -       .
+Bridge  2       -      -     -       .
+Chorus  4       -      -     -       -
+Outro   1       -      -     -       .

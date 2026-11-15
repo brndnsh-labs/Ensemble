@@ -93,6 +93,21 @@ export const GOLDENS: readonly Golden[] = [
     style: "disco",
     options: { mode: "song", seed: 2 },
   },
+  // Neo-soul: a four-chord loop with a solo over it (the two-bar loop, the late line, the
+  // Rhodes spread opening and closing round the guitar, at all three tiers).
+  {
+    file: "neosoul-four-chord-d-solo.mid",
+    chart: "neosoul-four-chord-d.chart",
+    style: "neosoul",
+    options: { mode: "jam", passes: 4, seed: 1, solo: true },
+  },
+  // Neo-soul: the arranged song, in song mode (an intro without the bass, a bridge, the soft ending).
+  {
+    file: "neosoul-song-bb.mid",
+    chart: "neosoul-song-bb.chart",
+    style: "neosoul",
+    options: { mode: "song", seed: 2 },
+  },
 ];
 
 export const goldenUrl = (golden: Golden): URL =>

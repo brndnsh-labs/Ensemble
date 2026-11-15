@@ -1,0 +1,9 @@
+title: Four-Chord Neo-Soul in D
+key: D
+tempo: 82
+style: neosoul
+
+// A loop of ninths, a bar each: the one, down to the six, over to the four,
+// and the four made minor, borrowed from the minor key, before the one again.
+[A]
+| Dmaj9 | Bm9 | Gmaj9 | Gm9 |

@@ -1,0 +1,286 @@
+// The neo-soul soloist: a clean electric guitar behind a singer, over the
+// Rhodes. The pentatonic on each chord's own root; changes landed on the 3rd or
+// the chord's written colour; phrases left floating on the 9th; late entries on
+// the "e"s and "a"s; the most space of any lead (ST-neosoul-29 to ST-neosoul-33).
+// A slide into a note is not in the instrument model and is not played; the
+// heads (ST-neosoul-32, ST-neosoul-34) are not built, as no style's is.
+//
+// Reading the rhythms: sixteen sixteenths to the bar, grouped by beat. `x`
+// strikes a note, `-` holds it, `.` is silence.
+
+import type { SoloStyle, Way } from "@ensemble/engine";
+
+const NEW: Way = { name: "statement", make: "new", oneRhythm: false };
+const NEW_RIFFED: Way = { name: "statement", make: "new", oneRhythm: true };
+const ENDING_UP: Way = { name: "new ending, up", make: "ending", direction: 1 };
+const ENDING_DOWN: Way = { name: "new ending, down", make: "ending", direction: -1 };
+const AS_A_RIFF: Way = {
+  name: "the idea, as a riff",
+  make: "grown",
+  contour: "arch",
+  keepOpening: true,
+  oneRhythm: true,
+};
+// A bridge: other rhythms than the idea used, a little higher.
+const ELSE = {
+  name: "something else",
+  make: "new",
+  oneRhythm: false,
+  apart: true,
+  lift: 2,
+} satisfies Way;
+
+export const neosoulSolo: SoloStyle = {
+  instrument: "clean-guitar",
+  // Home a major third over the instrument's own, over the Rhodes (ST-neosoul-30).
+  lift: 4,
+
+  notes: {
+    // The pentatonic on each chord's own root (ST-neosoul-29): major 1 2 3 5 6, a dominant the
+    // same with its flat 7th, minor 1 b3 4 5 b7. The chord's own tones are always in, so only
+    // the 2nd and 6th (the 4th on a minor chord) are added. A suspended chord takes the 2nd.
+    chordScale: false,
+    overRoot: { major: [2, 9], dominant: [2, 9], minor: [5], suspended: [2] },
+    key: { major: [], minor: [] },
+    blue: [],
+    passing: [],
+  },
+  // Changes land on the 3rd, then the chord's written colour, then the 7th, 5th and root;
+  // phrases float on the written 9th where there is one, else the 3rd (ST-neosoul-29). An
+  // altered tension is a written ninth or thirteenth too, which the ranking cannot tell apart.
+  arrive: ["third", "ninth", "eleventh", "thirteenth", "seventh", "fifth", "root"],
+  settle: ["ninth", "third", "fifth", "root"],
+  hang: ["fifth", "seventh", "ninth", "third"],
+  landing: { perRank: 1.25, reach: 4 },
+  // A pentatonic's step is up to a minor third; the half step is a way into a chord tone.
+  line: {
+    step: 3,
+    skip: 5,
+    skipCosts: 1.5,
+    leapCosts: 3,
+    halfStepOffChord: 2,
+    halfStepsInARow: 4,
+    offChordOnBeat: 3,
+    strandsTheBeat: 0,
+  },
+
+  // ST-neosoul-31's cells: late entries on the "e"s and "a"s.
+  levels: [
+    {
+      name: "sparse",
+      notesPerBar: 1.8,
+      span: 7,
+      cells: [
+        "...x -x-- ---- ....",
+        "..x- x--x ---- -...",
+        "x--x ---- -... ....",
+        ".... ..x- xx-x ----",
+        ".x-x ---- ---. ....",
+      ],
+      shapes: [
+        { weight: 4.3, bars: "L E R R" },
+        { weight: 4.3, bars: "R L E R" },
+        { weight: 3.6, bars: "E R L E" },
+        { weight: 2.4, bars: "L L E R" },
+      ],
+    },
+    {
+      name: "medium",
+      notesPerBar: 3.4,
+      span: 9,
+      cells: [
+        "..xx -x-- -x-x ----",
+        "x--x -xx- x--- ----",
+        "...x -x-x x-x- -...",
+        "x-.x -x-- -..x -x--",
+        ".x-x -x-- x-x- ----",
+      ],
+      shapes: [
+        { weight: 6, bars: "L L E R" },
+        { weight: 3.6, bars: "E R L E" },
+        { weight: 2, bars: "L E L E" },
+      ],
+    },
+    {
+      name: "busy",
+      notesPerBar: 5.5,
+      span: 12,
+      cells: [
+        "x-xx x-x- xx-x ----",
+        "..xx xx-x -x-x x-x-",
+        "xxx- x--x x-x- x---",
+        "x-x- xxx- x--x -x--",
+        ".xxx -x-x -xxx -x--",
+      ],
+      shapes: [
+        { weight: 4, bars: "L L L E" },
+        { weight: 4.8, bars: "L L E R" },
+        { weight: 2, bars: "L E L E" },
+      ],
+    },
+  ],
+  // ST-neosoul-31's phrase endings.
+  endings: [
+    "..x- x--- ---- ----",
+    "x--x ---- ---- ----",
+    "...x -x-- ---- ----",
+    "x--- ---- ---- ....",
+    ".x-x -x-- ---- ----",
+  ],
+
+  // What a chorus is made of. The notes give only the heads' period (ST-neosoul-32); these are
+  // the rock and disco forms, by length.
+  forms: [
+    { weight: 4, phrases: "s a" },
+    { weight: 2, phrases: "v a" },
+    { weight: 2, phrases: "r a" },
+    { weight: 4, phrases: "s r a" },
+    { weight: 4, phrases: "s v a" },
+    { weight: 2, phrases: "v r a" },
+    { weight: 4, phrases: "s r v a" },
+    { weight: 2, phrases: "s r c a" },
+    { weight: 1.5, phrases: "v r v a" },
+    { weight: 4, phrases: "s r v a c a" },
+    { weight: 1.5, phrases: "v r v a c a" },
+    { weight: 1, phrases: "s r v a c r b a" },
+  ],
+  contours: { arch: 4, fall: 3, climb: 2, wave: 2 },
+
+  book: {
+    opening: [NEW, NEW_RIFFED, NEW, NEW_RIFFED],
+    roles: {
+      s: [
+        NEW,
+        NEW_RIFFED,
+        NEW,
+        {
+          name: "the first idea back",
+          make: "grown",
+          of: "first",
+          contour: "arch",
+          keepOpening: true,
+          oneRhythm: false,
+        },
+      ],
+      r: [
+        { name: "again", make: "again", by: 0 },
+        { name: "again, moved with the chord", make: "again", by: "chord" },
+        ENDING_UP,
+        AS_A_RIFF,
+      ],
+      v: [
+        ENDING_UP,
+        ENDING_DOWN,
+        { name: "a step along", make: "again", by: 1 },
+        AS_A_RIFF,
+        {
+          name: "the idea, opened out",
+          make: "grown",
+          contour: "arch",
+          keepOpening: true,
+          oneRhythm: false,
+        },
+      ],
+      a: [
+        { name: "answer", make: "turned", contour: { rose: "fall", fell: "climb" } },
+        { name: "answer", make: "turned", contour: "arch" },
+        { name: "answer", make: "turned", contour: { rose: "wave", fell: "fall" } },
+        {
+          name: "answer, as a riff",
+          make: "grown",
+          contour: "fall",
+          keepOpening: false,
+          oneRhythm: true,
+        },
+      ],
+      c: [ELSE, ELSE, { ...ELSE, name: "something else, one rhythm", oneRhythm: true }],
+      b: [
+        { name: "the opening idea back", make: "again", of: "opening", by: 0 },
+        {
+          name: "the opening idea, grown",
+          make: "grown",
+          of: "opening",
+          contour: "arch",
+          keepOpening: true,
+          oneRhythm: false,
+        },
+      ],
+    },
+    peak: [
+      {
+        name: "the idea, climbing",
+        make: "grown",
+        contour: "climb",
+        keepOpening: false,
+        oneRhythm: false,
+      },
+      NEW,
+      NEW_RIFFED,
+    ],
+    outgrown: { levels: 2, ways: [NEW, NEW_RIFFED] },
+  },
+  likeness: { related: 0.5, same: 0.9 },
+
+  arc: {
+    stages: [
+      { density: "sparse", register: -3 },
+      { density: "sparse", register: -1 },
+      { density: "medium", register: 0 },
+      { density: "medium", register: 1 },
+      { density: "busy", register: 3 },
+      { density: "medium", register: 2 },
+    ],
+    peak: {
+      above: 12,
+      clear: 3,
+      density: "busy",
+      fromEnd: 1,
+      shape: "L L E R",
+      contour: "climb",
+      sequence: true,
+      ending: "x--- ---- .... ....",
+    },
+    windDown: { density: "sparse", register: 0, contour: "fall" },
+  },
+
+  // A neo-soul bar is nearly three seconds at 85.
+  tempo: { slowBar: 3.4, fastBar: 1.8 },
+
+  space: {
+    breath: 0.6,
+    // A phrase takes a roomier shape almost half the time: the most space of any lead
+    // (ST-neosoul-33).
+    roomier: 0.45,
+    emptyBars: 1,
+    patience: 7,
+  },
+
+  habits: {
+    // A riff repeated 0.15; a chromatic approach 0.30, an enclosure 0.12 (ST-neosoul-33).
+    riff: 0.15,
+    riffIs: "the same",
+    stab: 0,
+    tie: 0,
+    chromatic: 0.3,
+    enclosure: 0.12,
+    pickup: { chance: 0, figures: [], rising: 0.6, approach: false },
+    // On a guitar, a bend into the 3rd 0.40 and into the root 0.08 (ST-neosoul-33, SO-53), in
+    // phrases the hand gets lyrical in, as every guitar style has it.
+    bend: { third: 0.4, rootOrFifth: 0.08, around: 1, elsewhere: 0.5 },
+    // Vibrato only on notes of eight sixteenths or longer: a half note (ST-neosoul-33, SO-52).
+    shake: 2,
+  },
+
+  // Behind a singer: a touch under the horns, legato.
+  touch: {
+    level: 86,
+    peak: 96,
+    perSemitone: 0.8,
+    offbeat: 4,
+    valley: 10,
+    pickup: 6,
+    floor: 40,
+    ceiling: 116,
+    legato: 0.92,
+  },
+};

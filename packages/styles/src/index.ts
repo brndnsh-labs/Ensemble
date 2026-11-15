@@ -5,12 +5,13 @@ import { blues } from "./blues/index.ts";
 import { disco } from "./disco/index.ts";
 import { funk } from "./funk/index.ts";
 import { jazz } from "./jazz/index.ts";
+import { neosoul } from "./neosoul/index.ts";
 import { rock } from "./rock/index.ts";
 
-export { blues, disco, funk, jazz, rock };
+export { blues, disco, funk, jazz, neosoul, rock };
 
 /** The styles that ship: the suite holds every one of them to every property. */
-export const STYLES: readonly StylePack[] = [blues, funk, jazz, rock, disco];
+export const STYLES: readonly StylePack[] = [blues, funk, jazz, rock, disco, neosoul];
 
 export function styleById(id: string): StylePack | undefined {
   return STYLES.find((style) => style.id === id);
