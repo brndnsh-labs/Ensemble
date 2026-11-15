@@ -1,9 +1,10 @@
 // The editor: one of the player's charts as text on one side and as a page on
 // the other, the page following the text as it is typed. The text is the
-// player's own; nothing here changes it but their typing and the Format
-// button.
+// player's own; nothing here changes it but their typing, the Format button,
+// and the arrangement grid, which writes its block and nothing else.
 
 import { parse, print } from "@ensemble/engine";
+import { STYLES, styleById } from "@ensemble/styles";
 import type { CSSProperties } from "react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { deleteChart, keptOnDevice, saveChart } from "../charts.ts";
@@ -11,6 +12,7 @@ import { download, fileName } from "../download.ts";
 import type { LibraryChart } from "../library.ts";
 import { ChartView } from "../play/ChartView.tsx";
 import type { Reading } from "../play/ChordSymbol.tsx";
+import { ArrangementGrid } from "./ArrangementGrid.tsx";
 import { Source } from "./Source.tsx";
 import { useVisibleArea } from "./viewport.ts";
 
@@ -18,13 +20,22 @@ interface Props {
   /** One of the player's own charts. */
   readonly entry: LibraryChart;
   readonly reading: Reading;
+  /** The style chosen for this chart on the play screen, if one was. */
+  readonly style: string | undefined;
 }
+
+type Side = "chords" | "arrangement";
+const SIDES: readonly [Side, string][] = [
+  ["chords", "Chords"],
+  ["arrangement", "Arrangement"],
+];
 
 /** How long typing must pause before the text is written to storage. Leaving the screen writes it at once. */
 const SAVE_AFTER_MS = 400;
 
-export function EditView({ entry, reading }: Props) {
+export function EditView({ entry, reading, style: chosen }: Props) {
   const [text, setText] = useState(entry.text);
+  const [side, setSide] = useState<Side>("chords");
   const [typing, setTyping] = useState(false);
   const area = useVisibleArea(typing);
   const { chart, diagnostics } = useMemo(() => parse(text), [text]);
@@ -91,6 +102,19 @@ export function EditView({ entry, reading }: Props) {
           {page.sections.length === 0 && <p className="empty-page">The bars appear here.</p>}
         </div>
         <div className="pane-text">
+          <fieldset className="sides" aria-label="Edit">
+            {SIDES.map(([way, name]) => (
+              <button
+                key={way}
+                type="button"
+                className="side"
+                aria-pressed={side === way}
+                onClick={() => setSide(way)}
+              >
+                {name}
+              </button>
+            ))}
+          </fieldset>
           <div className="tools">
             <button type="button" onClick={format}>
               Format
@@ -113,13 +137,25 @@ export function EditView({ entry, reading }: Props) {
               it to keep it.
             </p>
           )}
-          <Source
-            text={text}
-            diagnostics={diagnostics}
-            change={change}
-            typing={setTyping}
-            area={area}
-          />
+          {side === "chords" ? (
+            <Source
+              text={text}
+              diagnostics={diagnostics}
+              change={change}
+              typing={setTyping}
+              area={area}
+            />
+          ) : (
+            <ArrangementGrid
+              text={text}
+              chart={chart}
+              diagnostics={diagnostics}
+              change={change}
+              // The style play would use, so a section left to it is drawn at the level it will be played.
+              style={styleById(chosen ?? chart.styleId ?? "") ?? STYLES[0]!}
+              showText={() => setSide("chords")}
+            />
+          )}
         </div>
       </div>
     </main>

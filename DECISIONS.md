@@ -731,3 +731,21 @@ The engine half of the arrangement grid, done on the main thread: `docs/CHART_FO
 - **A player's own level is held**: the one-bar build into a bigger section lifts the section's energy, not a level written for one player.
 - **The corpus** has seven rows for section 11 in place of the provisional one, and the `---` note now says what an arrangement block starts with.
 - **One property**: "a song is played as it is arranged" (`test/band.test.ts`), with the levels called against the section names (an intro at 4, a chorus at 1) so the style's own levels cannot pass it by coincidence. Seen to fail with the lay-out ignored and with the levels ignored. It renders one short song per seed and the suite is still 9.1 to 9.2 s of 10. Goldens and scorecards have not moved.
+
+## song mode and the arrangement grid (stage 6, part 4)
+
+Built to `prompts/app-arrangement.md`. What that brief did not settle:
+
+- **"The song" is kept as `ChartChoices.song`**, true or false once the player has chosen; unset, it follows whether the chart's arrangement fits. Choosing a length writes `false` for that chart as well as the length for all of them, so the next chart keeps its own choice.
+- **A song's strip names its section to the last chord**, and says "Ending" only while the chord rings: an outro is a section the player reads, and "Ending" over its last bar would hide where they are. Before play it says "7 sections" beside the length, as a jam says "3 passes".
+- **The way home in a song is its last section**: the strip's pencil cue, the shaded end of the arc, and the final bar showing the ending the band plays (as the last pass of a jam does). One helper, `homeStretch`, answers for both.
+- **The arc is drawn once for both**: its rules mark the tops of passes in a jam and the starts of sections in a song. No labels in the arc; the line above it names the section, and at 22 px a label could not be read.
+- **There is no Finish in a song** in the hook as well as on the button (`useJam.finish` does nothing for a song), so a take's screen cannot reach it either.
+- **The grid's quiet levels come from the style play would use**: the one chosen for the chart on the play screen, else the chart's own. A section left to the style is drawn at the arrangement level nearest the level the style gives it, read from a song planned without the arrangement.
+- **The grid waits when the block has a mistake**: it shows what could be read and its choices are disabled until "Write it out clean" is pressed, because a change would quietly turn the mistaken value into `-`. A block that is not an arrangement (`---` and anything else) is not offered a clean copy or Remove at all: both would delete text the player wrote and the parser does not read.
+- **A chart with no block says, above the grid, that the soloist plays the song through until something is set.** The plain arrangement the grid shows (and the first change writes) has the soloist out but in `Solo`, as the spec says; without a block it plays everywhere. The grid shows what it will write, and the line says what plays now.
+- **Setting a cell to the value it has writes nothing**, so a tap on the selected choice never gives a chart a block.
+- **The switch is a row of its own** above Format, Export and Delete: at phone width the five do not fit on one line. Which side is shown is not remembered; the editor opens on Chords.
+- **The first cell (the opening section's energy) is selected on opening**, so the row of choices is never empty. The selection is drawn with the highlighter, as the bar being played is.
+- **The grid is a table of buttons with the arrow keys, not an ARIA `grid`**: the linter refuses an interactive role on a table, and buttons with one in the tab order (the selected one) read well enough: each says its player, section, place and value.
+- **Cells are 48 by 44 px**, 40 high on a screen under 500 px tall (a phone on its side), where the grid still scrolls inside its pane to reach the choices.
