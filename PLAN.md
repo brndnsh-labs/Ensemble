@@ -83,7 +83,7 @@ An open jam of k passes is planned as k passes plus one look-ahead pass that pla
 
 ## Resume here
 
-State on 2026-11-15: **stages 1 to 5 are built and their gates passed.** **Stage 6 (the app) is under way: parts 1 to 3 are built and on the test site; part 4, the arrangement grid, is next.**
+State on 2026-11-15: **stages 1 to 5 are built and their gates passed.** **Stage 6 (the app) is under way: parts 1 to 4 are built and on the test site; part 5, the remaining styles, is next.**
 
 ### Stage 6: where it stands
 
@@ -94,7 +94,8 @@ State on 2026-11-15: **stages 1 to 5 are built and their gates passed.** **Stage
 - **Part 2, the editor, is built, on the test site, and passed by Brandon** on his iPhone: the key row sits right above the keyboard, Export downloads, and a long line scrolling sideways "is okay for now".
 - **Part 3, takes and export, is built and on the test site** (`DECISIONS.md`, "a take, as it is kept", "takes and export"): Keep beside the transport, a Takes shelf, a screen for each take (`#/take/<id>`) that plays it again by its seed, Export MIDI, Export take (the file `ensemble replay` reads); smoke journey 5. A jam told to finish partway is kept as heard (`TakeOptions.toldAt`). **Waiting on Brandon**: Export MIDI on the iPhone, and whether a replayed take is the one he remembers.
 - **The interface is a draft, by Brandon's word** (2026-11-15, after exporting a take on his phone: "export works, but the way to get there was pretty confusing. we'll want to make the interface much more intuitive at some point, and that goes for everything"). The parts are being built to work; a pass over the whole app for how it is found and used comes after them, before gate 6. Do not polish screen by screen until then; do write down what he trips on.
-- **Next**: part 4, the arrangement grid. The block's text is designed (`docs/CHART_FORMAT.md` section 11: one line for each section the song plays). To build: the parser and printer for it, song mode reading it in the planner (a property to hold it, paid for by trimming another: the suite is at 9.1 to 9.3 s of 10), song mode on the play screen, then the grid. Then the remaining styles.
+- **Part 4, song mode and the arrangement grid, is built and on the test site** (`DECISIONS.md`, "the arrangement block, read and played", "song mode and the arrangement grid"): the block is one line for each section the song plays (`docs/CHART_FORMAT.md` section 11); the play screen's Length has "The song, once through"; the editor has Chords and Arrangement, the second a grid of sections by players. Not yet seen by Brandon.
+- **Next**: part 5, the remaining styles (rock, disco, neo-soul, reggae, acoustic, with the acoustic guitar idiom), their packs first. Then the pass over the whole interface, then gate 6.
 - **Left open by gate 5**, holding until an ear says otherwise (`DECISIONS.md`, "gate 5 passed"): the mix stays at the measured numbers; packs load every layer; one kit serves all three styles; both soloists stay.
 
 ### Stage 5: how it was built

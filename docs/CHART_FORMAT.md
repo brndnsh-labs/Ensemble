@@ -359,8 +359,8 @@ Outro    2       1      -     -       .
 - A line is the section's label, then five values: the section's energy, then drums, bass, chords and solo. The values are read from the right, so a label may have spaces.
 - **Energy** is `1` to `4`, or `-` for the level the style gives a section of that name. `1` is the band at its quietest, `2` and `3` are its ordinary playing at two strengths, `4` is flat out. Where a style changes its groove for its loudest playing, `4` is that groove.
 - **A player's value** is `-` to play at the section's energy, `1` to `4` to play at a level of its own, or `.` to lay out.
-- **The soloist** has the lead in every section where its value is not `.`. An arrangement the app writes starts with the soloist out everywhere except a section labelled `Solo`.
-- A block of nothing but `-` plays exactly as the chart does without one, the soloist aside: without a block the soloist, when there is one, plays the song through.
+- **The soloist** has the lead in every section where its value is not `.`. An arrangement the app writes starts with the soloist where it plays in a song with no arrangement: in the sections labelled `Solo` when the song has any, and otherwise everywhere but an intro and a written ending.
+- A block of nothing but `-` for the band plays the band exactly as the chart does without one.
 - Comments (`//`) and blank lines are allowed. The canonical form writes the heading comment and aligns the columns.
 - A player switched off on the play screen stays off, whatever the block says. The block decides where the soloist plays; the play screen decides whether there is one.
 

@@ -185,8 +185,8 @@ export function ArrangementGrid({ text, chart, diagnostics, change, style, showT
     <div className="arrangement">
       {block === null && (
         <p className="grid-note">
-          No arrangement yet: this is the one the first change writes. Until then the band plays the
-          style's own, with the soloist, when there is one, all the way through.
+          No arrangement yet. This is how the band plays the song left to itself, and the first
+          change writes it into the chart.
         </p>
       )}
       {outgrown && (

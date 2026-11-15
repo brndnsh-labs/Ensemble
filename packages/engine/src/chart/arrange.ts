@@ -9,16 +9,13 @@ import type { SourceRange } from "./types.ts";
 
 const NOWHERE: SourceRange = { start: 0, end: 0, line: 1, column: 1 };
 
-/** A section as the style would play it by itself, the soloist in only where the section is a `Solo`. */
-const plainLine = (label: string): ArrangementLine => ({
+const isSolo = (label: string): boolean => label.trim().toLowerCase().startsWith("solo");
+
+/** A section as the style would play it by itself, with the soloist in or out. */
+const plainLine = (label: string, solo: boolean): ArrangementLine => ({
   label,
   energy: null,
-  seats: {
-    drums: null,
-    bass: null,
-    chords: null,
-    solo: label.trim().toLowerCase().startsWith("solo") ? null : "out",
-  },
+  seats: { drums: null, bass: null, chords: null, solo: solo ? null : "out" },
   leading: [],
   comment: null,
   range: NOWHERE,
@@ -28,9 +25,11 @@ const plainLine = (label: string): ArrangementLine => ({
  * An arrangement for the song as it now is: one line for each section it
  * plays. Where the chart's block has a line for a section it is kept (the
  * second line labelled `Chorus` is for the second time a chorus is played,
- * wherever that now falls); a section the block does not know is plain. So a
- * chart with no block gets a plain arrangement, and a block the song has
- * outgrown is lined up with it again.
+ * wherever that now falls); a section the block does not know is plain, with
+ * the soloist where it would play in a song with no arrangement: in the
+ * sections labelled `Solo` when there are any, and otherwise through the body
+ * of the song. So a chart with no block gets the arrangement it is already
+ * played with, and a block the song has outgrown is lined up with it again.
  */
 export function arrangedLines(chart: Chart): ArrangementLine[] {
   const key = (label: string) => label.trim().replace(/\s+/g, " ").toLowerCase();
@@ -38,10 +37,14 @@ export function arrangedLines(chart: Chart): ArrangementLine[] {
   for (const line of chart.arrangement?.lines ?? []) {
     written.set(key(line.label), [...(written.get(key(line.label)) ?? []), line]);
   }
-  return runsOf(expand(chart).song).map((run) => {
-    const label = run[0]!.sectionLabel;
+  const runs = runsOf(expand(chart).song);
+  const soloSections = runs.some((run) => isSolo(run[0]!.sectionLabel));
+  return runs.map((run) => {
+    const { sectionLabel: label, role } = run[0]!;
     const line = written.get(key(label))?.shift();
-    return line ? { ...line, label } : plainLine(label);
+    return line
+      ? { ...line, label }
+      : plainLine(label, soloSections ? isSolo(label) : role === "body");
   });
 }
 
