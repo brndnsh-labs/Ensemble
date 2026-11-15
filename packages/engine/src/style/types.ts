@@ -214,7 +214,8 @@ export const DEFAULT_MIX: MixStyle = {
     drums: { level: 0, reverb: -17 },
     bass: { level: 0, reverb: -24 },
     chords: { level: -6, reverb: -14, highpass: 90 },
-    solo: { level: 0, reverb: -12, highpass: 120 },
+    // About a decibel under the band it plays over, as `pnpm levels` reads them.
+    solo: { level: 1.5, reverb: -12, highpass: 120 },
   },
   room: { seconds: 1.2, predelay: 0.012, level: 0 },
   // Rendered takes peaked within a decibel of full scale at 0; this leaves room.

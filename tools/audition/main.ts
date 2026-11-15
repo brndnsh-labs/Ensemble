@@ -248,7 +248,11 @@ for (const [id, key] of [
   if (value !== null) $<HTMLSelectElement | HTMLInputElement>(id).value = value;
 }
 if (!params.has("style")) followChart();
-else drawMix();
+else {
+  // A style asked for by name brings its own mix, as one chosen on the page does.
+  mix = structuredClone(chosenStyle().sound.mix);
+  drawMix();
+}
 if (params.has("mix")) {
   mix = JSON.parse(params.get("mix")!) as MixStyle;
   drawMix();

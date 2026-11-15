@@ -4,7 +4,8 @@
 // the starting point: thinned below 90 Hz, clipped softly and a little
 // unevenly, a speaker that rolls off at 4 kHz with some body at 450 Hz and a
 // little presence at 2.4 kHz. How hard it is driven is the knob that is set
-// by ear, so there are two of them until an ear has chosen.
+// by ear: three times, chosen over six ("they both sound pretty good", leaning
+// to the lesser).
 
 import type { Amp, Recipe } from "../recipe.ts";
 import { cleanGuitar, plainVoice } from "./clean-guitar.ts";
@@ -57,12 +58,5 @@ function driven(id: string, name: string, drive: number, said: string): Recipe {
   };
 }
 
-/** Three times drive: "a bluesy edge" by the old band's ear. */
+/** Three times drive: "a bluesy edge" by the old band's ear, and the one chosen over six by this one's. */
 export const drivenGuitar = driven("driven-guitar", "Overdriven guitar", 3, "three times drive");
-/** Six: "more grit". */
-export const drivenGuitarGrit = driven(
-  "driven-guitar-grit",
-  "Overdriven guitar, more grit",
-  6,
-  "six times drive",
-);

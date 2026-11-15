@@ -41,9 +41,13 @@ export const rock: StylePack = {
   instruments: { bass: 33, chords: 0 },
   sound: {
     packs: { drums: "drum-kit", bass: "electric-bass", chords: "grand-piano" },
-    // The old band's make-up gain for rock was 3 dB under the blues' (ST-rock-33: 8.1 dB
-    // against 11.1, ST-blues-59): eighth notes on the bass and the piano, every beat of the
-    // hat accented when hot, are a louder band. No ear yet.
-    mix: { ...DEFAULT_MIX, master: DEFAULT_MIX.master - 3 },
+    // Measured (`pnpm levels`). The old band's rock ran 3 dB under its blues; this one, 3 dB
+    // under, read 2 dB quieter than this blues, so it is half a decibel under. The soloist
+    // measured 4.9 dB under the band, where the blues' was 2.5, and comes up.
+    mix: {
+      ...DEFAULT_MIX,
+      seats: { ...DEFAULT_MIX.seats, solo: { ...DEFAULT_MIX.seats.solo, level: 3 } },
+      master: DEFAULT_MIX.master - 0.5,
+    },
   },
 };

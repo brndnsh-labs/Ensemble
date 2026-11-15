@@ -17,7 +17,7 @@ import { throughAmp } from "./amp.ts";
 import type { Recipe, Take } from "./recipe.ts";
 import { altoSax } from "./recipes/alto-sax.ts";
 import { cleanGuitar } from "./recipes/clean-guitar.ts";
-import { drivenGuitar, drivenGuitarGrit } from "./recipes/driven-guitar.ts";
+import { drivenGuitar } from "./recipes/driven-guitar.ts";
 import { drumKit } from "./recipes/drum-kit.ts";
 import { electricBass } from "./recipes/electric-bass.ts";
 import { grandPiano } from "./recipes/grand-piano.ts";
@@ -53,7 +53,6 @@ const RECIPES: readonly Recipe[] = [
   electricBass,
   cleanGuitar,
   drivenGuitar,
-  drivenGuitarGrit,
 ];
 
 const ROOT = join(import.meta.dirname, "..", "..");

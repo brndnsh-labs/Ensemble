@@ -52,6 +52,8 @@ export const jazz: StylePack = {
         ...DEFAULT_MIX.seats,
         drums: { ...DEFAULT_MIX.seats.drums, level: 3 },
         chords: { ...DEFAULT_MIX.seats.chords, level: -5 },
+        // A jazz band is the quietest of the four, and its soloist is nearer its level already.
+        solo: { ...DEFAULT_MIX.seats.solo, level: 0.5 },
       },
     },
   },

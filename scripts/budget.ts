@@ -1,9 +1,14 @@
 // Runs a command and fails if it exceeds a wall-clock budget in seconds.
-// Usage: node scripts/budget.ts <seconds> <command> [args...]
+// Usage: node scripts/budget.ts <seconds | engine> <command> [args...]
+//
+// `engine` is the engine suite's budget, which grows with the styles that ship
+// and with nothing else: 10 seconds for three, and 2 more for each style after
+// the third (docs/TESTING.md, "Budgets").
 import { spawnSync } from "node:child_process";
+import { STYLES } from "../packages/styles/src/index.ts";
 
 const [limitArg, ...words] = process.argv.slice(2);
-const limit = Number(limitArg);
+const limit = limitArg === "engine" ? 10 + 2 * Math.max(0, STYLES.length - 3) : Number(limitArg);
 const command = words.join(" ");
 if (!command || !Number.isFinite(limit)) {
   console.error("usage: budget.ts <seconds> <command> [args...]");

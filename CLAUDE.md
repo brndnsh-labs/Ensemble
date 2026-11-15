@@ -26,7 +26,7 @@ A browser-based generative backing band. Read these before doing anything:
 
 ```sh
 pnpm install            # once
-pnpm check              # typecheck, lint, tests (10-second budget)
+pnpm check              # typecheck, lint, tests (budget: 10 seconds, and 2 more for each style after the third)
 pnpm typecheck          # tsc --build across packages
 pnpm lint               # biome check; `pnpm format` to fix
 pnpm test               # engine suite under the budget: every property, two seeds
@@ -47,6 +47,7 @@ pnpm image              # build the app and its image (hosting/): ensemble-app:<
 node scripts/look.ts <out.png> <width>x<height> <address> [dark] [click:Text | wait:ms | select:Label=value | eval:js ...]
                         # look at the app in headless Chrome and save a picture; for checking work, not a test
 pnpm audition [--host 0.0.0.0] [--port 8765]   # serve the audition page at /tools/audition/: play a take from the packs
+pnpm levels [style...]  # each seat's loudness and the soloist's against the band, rendered and measured; before an ear is asked
 pnpm render:audio <name> chart=<file> [style=] [seed=] [passes=] [solo=alto-sax] [only=bass] [live=1]
                          # render a take to out/audio/<name>.wav in headless Chrome; live=1 plays it in real time and counts late notes
 ```

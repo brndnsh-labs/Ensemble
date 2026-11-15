@@ -44,7 +44,13 @@ export const funk: StylePack = {
     // guitar read 3 dB under the bass. It comes up to sit with the bass and drums. No ear yet.
     mix: {
       ...DEFAULT_MIX,
-      seats: { ...DEFAULT_MIX.seats, chords: { ...DEFAULT_MIX.seats.chords, level: -3 } },
+      seats: {
+        ...DEFAULT_MIX.seats,
+        chords: { ...DEFAULT_MIX.seats.chords, level: -3 },
+        // A funk soloist's stabs are short and the band under them is busy: left at the
+        // default it measured 5.4 dB under the band, where the blues' was 2.5.
+        solo: { ...DEFAULT_MIX.seats.solo, level: 4.5 },
+      },
     },
   },
 };
