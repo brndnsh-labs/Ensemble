@@ -85,6 +85,13 @@ export interface ArcStyle {
     /** A building pass runs from this far under its mean to this far over, phrase by phrase. */
     readonly lean: number;
   };
+  /**
+   * Added to the first time through the form of a jam that goes round more
+   * than once: the band states the tune before it opens up. Zero for a band
+   * that starts as it means to go on; a jazz band's is enough to put the head
+   * a tier under the blowing, so the change of part is the cue (ST-jazz-50).
+   */
+  readonly head: number;
   /** Scales every offset above. A style that should not swell much plays the arc shallower. */
   readonly depth: number;
   /**
@@ -172,6 +179,7 @@ export const DEFAULT_ARC: ArcStyle = {
     lastTo: 0.2,
     lean: 0.05,
   },
+  head: 0,
   depth: 1,
   liftsCrossHigh: true,
 };

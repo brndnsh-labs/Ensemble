@@ -3,7 +3,7 @@
 import { writeFileSync } from "node:fs";
 import type { StylePack, TakeOptions } from "@ensemble/engine";
 import { render, seconds, toMidi } from "@ensemble/engine";
-import { STYLES, styleById } from "@ensemble/styles";
+import { styleById, styleIds } from "@ensemble/styles";
 import { reportDiagnostics, UsageError } from "./command.ts";
 
 export const RECIPE_VERSION = 1;
@@ -19,8 +19,7 @@ export interface Recipe {
 
 export function findStyle(id: string): StylePack {
   const style = styleById(id);
-  if (!style)
-    throw new UsageError(`no style "${id}" (styles: ${STYLES.map((s) => s.id).join(", ")})`);
+  if (!style) throw new UsageError(`no style "${id}" (styles: ${styleIds().join(", ")})`);
   return style;
 }
 

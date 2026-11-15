@@ -87,8 +87,6 @@ function candidates(drums: DrumStyle, bar: PlanBar): Candidate[] {
   const barSteps = beats.reduce((sum, pulse) => sum + pulse, 0);
 
   let wanted = drums.fills.length[mark.boundary][mark.tier];
-  // Half length only when there is something left to halve (CO-46).
-  if (mark.half && wanted >= 4) wanted = Math.floor(wanted / 2);
   // The first beat of a fill bar always keeps time (DR-13, CO-44).
   wanted = Math.min(wanted, barSteps - (beats[0] ?? barSteps));
   if (wanted <= 0) return [];

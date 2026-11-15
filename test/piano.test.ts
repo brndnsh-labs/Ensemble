@@ -6,7 +6,7 @@ import { test } from "node:test";
 import type { PlanBar, Take } from "@ensemble/engine";
 import { chordTones, PPQ, pitchClass, render, scaleHas, tierOf } from "@ensemble/engine";
 import { blues, chordsUnder, harmonyOf, POCKET, type Strike, strikesOf } from "./reading.ts";
-import { LIBRARY, STYLES, stressTakes, takes } from "./takes.ts";
+import { LIBRARY, only, STYLES, stressTakes, takes } from "./takes.ts";
 
 test("the piano stays in its register: nothing under the style's floor, nothing above E6, in every take", () => {
   let strikes = 0;
@@ -122,19 +122,23 @@ test("one hand, one chord: a strike has stopped sounding before the next one sta
   }
 });
 
-test("the piano's last chord is the final chord, struck once where it lands and never early", () => {
+test("the piano's last chord is the final chord, struck once where it lands and never early; a style that ends on a button strikes it once more, and that is all", () => {
   for (const { chart, options, take } of takes((jam) => !jam.options.open)) {
     const last = take.plan.bars.findLast((bar) => bar.kind === "music")!;
     if (!last.ending) continue;
     const landing = last.start + last.ending.at;
     const strikes = strikesOf(take);
     const where = `${chart.file} seed ${options.seed}`;
-    assert.equal(
-      strikes.at(-1)?.tick,
-      landing,
-      `${where}: the last strike is not on the final chord`,
+    const final = strikes.filter((strike) => strike.tick >= landing);
+    assert.equal(final[0]?.tick, landing, `${where}: the final chord is not struck where it lands`);
+    const allowed = last.ending.gesture.kind === "button" ? 2 : 1;
+    assert.ok(final.length <= allowed, `${where}: ${final.length} strikes of the final chord`);
+    assert.deepEqual(
+      final.at(-1)!.pitches,
+      final[0]!.pitches,
+      `${where}: the button is not the final chord`,
     );
-    assert.ok(strikes.at(-1)!.pitches.length >= 3, `${where}: a thin final chord`);
+    assert.ok(final[0]!.pitches.length >= 3, `${where}: a thin final chord`);
     const early = strikes.filter(
       (strike) => strike.tick < landing && strike.ends > landing + POCKET,
     );
@@ -249,31 +253,36 @@ test("the piano stays in its part of the keyboard: the top of its chords never w
   }
 });
 
-test("blues: the piano comps on beats and their offbeats only, and a quiet band's piano is sparser than a loud one's", () => {
-  const perBar = { low: [] as number[], high: [] as number[] };
-  for (const { chart, options, take } of takes(blues)) {
-    const byBar = strikesByBar(take);
-    for (const bar of take.plan.bars) {
-      if (bar.kind !== "music" || bar.ending || bar.seats.chords === null) continue;
-      const own = byBar.get(bar.index) ?? [];
-      for (const strike of own) {
-        assert.equal(
-          (strike.tick - bar.start) % (PPQ / 2),
-          0,
-          `${chart.file} seed ${options.seed} bar ${bar.index}: off the eighth-note grid`,
-        );
+test(
+  "blues: the piano comps on beats and their offbeats only, and a quiet band's piano is sparser than a loud one's",
+  only("blues"),
+  () => {
+    const perBar = { low: [] as number[], high: [] as number[] };
+    for (const { chart, options, take } of takes(blues)) {
+      const byBar = strikesByBar(take);
+      for (const bar of take.plan.bars) {
+        if (bar.kind !== "music" || bar.ending || bar.seats.chords === null) continue;
+        const own = byBar.get(bar.index) ?? [];
+        for (const strike of own) {
+          assert.equal(
+            (strike.tick - bar.start) % (PPQ / 2),
+            0,
+            `${chart.file} seed ${options.seed} bar ${bar.index}: off the eighth-note grid`,
+          );
+        }
+        const tier = tierOf(bar.seats.chords);
+        if (tier !== "mid") perBar[tier].push(own.length);
       }
-      const tier = tierOf(bar.seats.chords);
-      if (tier !== "mid") perBar[tier].push(own.length);
     }
-  }
-  const mean = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
-  assert.ok(perBar.low.length > 100 && perBar.high.length > 100, "both levels are heard");
-  assert.ok(
-    mean(perBar.low) < mean(perBar.high),
-    `quiet ${mean(perBar.low).toFixed(2)} strikes a bar, loud ${mean(perBar.high).toFixed(2)}`,
-  );
-});
+    const mean = (values: number[]) =>
+      values.reduce((sum, value) => sum + value, 0) / values.length;
+    assert.ok(perBar.low.length > 100 && perBar.high.length > 100, "both levels are heard");
+    assert.ok(
+      mean(perBar.low) < mean(perBar.high),
+      `quiet ${mean(perBar.low).toFixed(2)} strikes a bar, loud ${mean(perBar.high).toFixed(2)}`,
+    );
+  },
+);
 
 test("a section keeps its figure: away from a solo, every phrase opens on the same rhythm each time the section comes round at the same level", () => {
   let compared = 0;

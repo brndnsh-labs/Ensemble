@@ -17,7 +17,7 @@ import {
 } from "@ensemble/engine";
 import { corpus } from "./corpus.ts";
 import { blues, POCKET } from "./reading.ts";
-import { LIBRARY, notesOf, readSmf, SEEDS, STYLES, takes } from "./takes.ts";
+import { LIBRARY, notesOf, only, readSmf, SEEDS, STYLES, takes } from "./takes.ts";
 
 test("every style that ships is sound data", () => {
   for (const style of STYLES) assert.deepEqual(validateStyle(style), [], style.id);
@@ -196,7 +196,7 @@ test("a chart with mistakes in it still plays", () => {
       "\u0000\u{1F3B8} | C",
     ];
     for (const text of broken) {
-      const take = render(text, style, { mode: "jam", passes: 2, seed: 1 });
+      const take = render(text, style, { mode: "jam", passes: 1, seed: 1 });
       const hasChords = take.plan.bars.some((bar) => bar.spans.some((span) => span.chord !== null));
       if (hasChords) {
         assert.ok(notesOf(take, "bass").length > 0, `the bass plays: ${JSON.stringify(text)}`);
@@ -366,7 +366,7 @@ test("a level the player sets is held: every pass plays at that level, with no a
 
 // ── blues ───────────────────────────────────────────────────────────────────
 
-test("blues: the offbeat eighth is the last note of a triplet, for everyone", () => {
+test("blues: the offbeat eighth is the last note of a triplet, for everyone", only("blues"), () => {
   for (const { chart, take } of takes(blues)) {
     for (const note of notesOf(take)) {
       const inBeat = note.tick % PPQ;
@@ -378,32 +378,40 @@ test("blues: the offbeat eighth is the last note of a triplet, for everyone", ()
   }
 });
 
-test("blues: the time is kick on 1 and 3 and a backbeat on 2 and 4, in every bar the drummer plays time", () => {
-  for (const { chart, options, take } of takes(blues)) {
-    const drums = notesOf(take, "drums");
-    for (const bar of take.plan.bars) {
-      if (bar.kind !== "music" || bar.ending) continue;
-      const at = (beat: number, ...voices: string[]) =>
-        drums.some(
-          (note) => note.tick === bar.start + beat * PPQ && voices.includes(note.voice ?? ""),
-        );
-      const where = `${chart.file} seed ${options.seed} bar ${bar.index}`;
-      assert.ok(at(0, "kick"), `${where}: no kick on 1`);
-      assert.ok(at(2, "kick"), `${where}: no kick on 3`);
-      assert.ok(at(1, "snare", "crossStick"), `${where}: no backbeat on 2`);
-      // A long fill takes the hands off the backbeat on 4; a short one never does.
-      if (!bar.fill) assert.ok(at(3, "snare", "crossStick"), `${where}: no backbeat on 4`);
+test(
+  "blues: the time is kick on 1 and 3 and a backbeat on 2 and 4, in every bar the drummer plays time",
+  only("blues"),
+  () => {
+    for (const { chart, options, take } of takes(blues)) {
+      const drums = notesOf(take, "drums");
+      for (const bar of take.plan.bars) {
+        if (bar.kind !== "music" || bar.ending) continue;
+        const at = (beat: number, ...voices: string[]) =>
+          drums.some(
+            (note) => note.tick === bar.start + beat * PPQ && voices.includes(note.voice ?? ""),
+          );
+        const where = `${chart.file} seed ${options.seed} bar ${bar.index}`;
+        assert.ok(at(0, "kick"), `${where}: no kick on 1`);
+        assert.ok(at(2, "kick"), `${where}: no kick on 3`);
+        assert.ok(at(1, "snare", "crossStick"), `${where}: no backbeat on 2`);
+        // A long fill takes the hands off the backbeat on 4; a short one never does.
+        if (!bar.fill) assert.ok(at(3, "snare", "crossStick"), `${where}: no backbeat on 4`);
+      }
     }
-  }
-});
+  },
+);
 
-test("blues: nothing is ever played on the last sixteenth of a beat, which would flam against the triplet", () => {
-  for (const { chart, take } of takes(blues)) {
-    for (const note of notesOf(take)) {
-      assert.notEqual(note.tick % PPQ, (PPQ * 3) / 4, `${chart.file}: ${note.seat} on an "a"`);
+test(
+  "blues: nothing is ever played on the last sixteenth of a beat, which would flam against the triplet",
+  only("blues"),
+  () => {
+    for (const { chart, take } of takes(blues)) {
+      for (const note of notesOf(take)) {
+        assert.notEqual(note.tick % PPQ, (PPQ * 3) / 4, `${chart.file}: ${note.seat} on an "a"`);
+      }
     }
-  }
-});
+  },
+);
 
 test("an arrival is one crash with a kick under it, and the cymbal that keeps time gives way to it", () => {
   for (const { chart, options, take } of takes()) {
@@ -462,12 +470,42 @@ test("at full energy the band still has accents: almost nothing is pinned to the
   }
 });
 
-test("on a short vamp the drummer does not change cymbal every lap: the cymbal that keeps time holds for 16 bars", () => {
+test("a short vamp is played in choruses of several laps: a chorus is at least twelve bars and a whole number of laps, a phrase is never shorter than three bars and is four on a vamp of one or two, and the soloist's chorus is the band's", () => {
+  const changes = ["A7", "D7", "A7", "E7", "D7", "A7", "E7"];
+  for (const style of STYLES) {
+    for (let lap = 1; lap <= 7; lap++) {
+      const text = `key: A\n| ${changes.slice(0, lap).join(" | ")} |`;
+      const roadmap = plan(parse(text).chart, style, { mode: "jam", passes: 5, solo: true });
+      const body = roadmap.bars.filter((bar) => bar.kind === "music");
+      const chorus = body.filter((bar) => bar.pass === 0).length;
+      assert.ok(chorus >= 12, `a vamp of ${lap}: a chorus of ${chorus} bars`);
+      assert.equal(chorus % lap, 0, `a vamp of ${lap}: a chorus of ${chorus} bars cuts a lap`);
+      assert.equal(body.length, chorus * 5, `a vamp of ${lap}: five choruses`);
+      const harmony = (bar: PlanBar) => JSON.stringify(bar.spans.map((span) => span.chord));
+      let solos = 0;
+      for (const [i, bar] of body.entries()) {
+        const where = `a vamp of ${lap}, bar ${i + 1}`;
+        assert.ok(bar.phrase.length >= 3, `${where}: a phrase of ${bar.phrase.length}`);
+        if (lap <= 2) assert.equal(bar.phrase.length, 4, `${where}: phrase length`);
+        assert.equal(bar.section.bars, chorus, `${where}: the chorus is the section`);
+        if (i >= lap && !bar.ending) {
+          assert.equal(harmony(bar), harmony(body[i - lap]!), `${where}: not the lap as written`);
+        }
+        const top = body[i - bar.barInSection]!;
+        assert.deepEqual(bar.solo, top.solo, `${where}: the solo changes hands inside a chorus`);
+        if (bar.solo) solos++;
+      }
+      assert.equal(solos, chorus * 3, `a vamp of ${lap}: a solo of three choruses`);
+    }
+  }
+});
+
+test("on a short vamp the drummer does not change cymbal every lap: the cymbal that keeps time holds for a chorus of 16 bars", () => {
   const text = "key: A\n| A7 | D7 | A7 | E7 |";
   for (const style of STYLES) {
     const perSeed = new Set<string>();
     for (const seed of SEEDS) {
-      const take = render(text, style, { mode: "jam", passes: 16, energy: 0.85, seed });
+      const take = render(text, style, { mode: "jam", passes: 4, energy: 0.85, seed });
       const music = take.plan.bars.filter((bar) => bar.kind === "music");
       const drums = notesOf(take, "drums");
       for (let from = 0; from < music.length; from += 16) {
@@ -502,7 +540,6 @@ test("in a jam on a one-section form, the biggest fill is kept for where the ban
       (bar) => bar.kind === "music" && bar.section.role === "body",
     );
     if (new Set(body.map((bar) => bar.section.identity)).size !== 1) continue;
-    if (body[0]!.section.bars < 8) continue; // a short vamp counts its own lines
     for (let i = 0; i + 1 < body.length; i++) {
       const bar = body[i]!;
       const next = body[i + 1]!;

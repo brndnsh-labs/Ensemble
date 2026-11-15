@@ -90,7 +90,7 @@ export function heldRng(rng: Rng, purpose: string, hold: Hold, bar: PlanBar): Rn
     case "section":
       return rng.fork(purpose, "section", bar.section.identity);
     case "pass":
-      return rng.fork(purpose, "pass", bar.section.identity, bar.stretch);
+      return rng.fork(purpose, "pass", bar.section.identity, bar.section.occurrence);
     case "phrase":
       return rng.fork(purpose, "phrase", bar.section.occurrence, bar.phrase.index);
     case "bar":

@@ -16,12 +16,16 @@ import type { EndingMark, FillMark, Plan, PlanBar, PlanOptions, SoloMark } from 
 const DEFAULT_MINUTES = 3;
 /** A single section shorter than this that just goes round is a vamp, not a form. */
 const VAMP_BARS = 8;
+/** A vamp's chorus is the fewest laps, doubled until they make this many bars. */
+const VAMP_CHORUS = 12;
 
 /** One time through one section: the unit that phrases, fills and held choices hang on. */
 interface Run {
   readonly bars: readonly FlatBar[];
   readonly pass: number;
   readonly part: "intro" | "body" | "ending";
+  /** On a vamp's chorus, the bars in one lap of it. */
+  readonly lap?: number;
 }
 
 export function planBars(
@@ -41,10 +45,12 @@ export function planBars(
     return { mode: options.mode, tempo, bars: [], lookahead: [], passes: 0, open, ticks: 0 };
   }
 
-  const vamp = isVamp(expanded, options);
   const oneSection = runs.filter((run) => run.part === "body" && run.pass === 0).length === 1;
   const without = new Set<Seat>(options.without ?? []);
-  const bodyBarsPerPass = Math.max(1, options.mode === "jam" ? bodyOf(expanded).length : 1);
+  const bodyBarsPerPass = Math.max(
+    1,
+    options.mode === "jam" ? chorusOf(expanded, options).bars.length : 1,
+  );
 
   const climax = soloClimax(options, passes, open);
   const breath = climax === undefined ? undefined : soloBreath(climax, passes, open);
@@ -54,14 +60,14 @@ export function planBars(
   // First the music, bar by bar, without marks that depend on a neighbour.
   const drafts: Draft[] = [];
   let occurrence = 0;
-  let lapBars = 0;
   for (const run of runs) {
     const first = run.bars[0]!;
     const level = sectionLevel(first.sectionLabel, style);
-    const phrases = phraseLengths(run.bars.length);
+    const phrases =
+      run.lap === undefined
+        ? phraseLengths(run.bars.length)
+        : vampPhrases(run.lap, run.bars.length);
     const barInPassBase = run.part === "body" ? passOffset(runs, run) : 0;
-    const before = lapBars;
-    if (run.part === "body") lapBars += run.bars.length;
     let phraseIndex = 0;
     let barInPhrase = 0;
     run.bars.forEach((bar, i) => {
@@ -98,8 +104,6 @@ export function planBars(
         barInPass,
         phrase: { index: phraseIndex, bar: barInPhrase, length: phraseLength },
         lastOfRun: i === run.bars.length - 1,
-        lapBarsBefore: before,
-        lapBarsAfter: lapBars,
       });
       barInPhrase++;
       if (barInPhrase === phraseLength) {
@@ -152,43 +156,30 @@ export function planBars(
       const nextEnergy = next ? energies[i + 1]! : energy;
       const tier = tierOf(Math.max(energy, nextEnergy));
       const lastOfPhrase = draft.phrase.bar === draft.phrase.length - 1;
-      if (vamp && draft.run.part === "body") {
-        // A short vamp is not filled every lap: count bars toward 8- and 16-bar lines.
-        if (draft.lastOfRun) {
-          const line16 = Math.floor(draft.lapBarsAfter / 16);
-          const line8 = Math.floor(draft.lapBarsAfter / 8);
-          if (line16 > Math.floor(draft.lapBarsBefore / 16)) {
-            fill = { boundary: "section", top: true, tier, half: line16 % 2 === 1 };
-          } else if (line8 > Math.floor(draft.lapBarsBefore / 8)) {
-            fill = { boundary: "phrase", top: false, tier, half: ((line8 - 1) / 2) % 2 === 0 };
-          }
-        }
-      } else if (draft.lastOfRun) {
+      if (draft.lastOfRun) {
         const newPass = next !== undefined && next.run.pass !== draft.run.pass;
         // "Is the next section bigger" is asked of the levels the band will actually play.
         // The one-bar build stays inside its tier, so it cannot hide the step it leads into.
         const bigger = next !== undefined && tierRank(nextEnergy) > tierRank(energy);
         // On a one-section form every turnaround is the top of the form. The biggest fill is
         // kept for where the band steps up, or it is the only fill the turnaround ever gets.
-        fill = { boundary: "section", top: bigger || (newPass && !oneSection), tier, half: false };
+        fill = { boundary: "section", top: bigger || (newPass && !oneSection), tier };
       } else if (lastOfPhrase && draft.phrase.index % 2 === 1) {
-        fill = { boundary: "phrase", top: false, tier, half: false };
+        fill = { boundary: "phrase", top: false, tier };
       }
       if (isSetup) {
         // A quiet tune still rolls into its last hit; a style that ends softly plays time into it.
         // Nobody rolls into a bar of written silence.
         fill =
           style.ending.setupFill && !ending?.silent
-            ? { boundary: "section", top: true, tier: "high", half: false }
+            ? { boundary: "section", top: true, tier: "high" }
             : null;
       }
     }
     if (previous && !isEnding) {
       const previousFill = bars[bars.length - 1]?.fill ?? null;
       const newSection = draft.barInSection === 0;
-      if (vamp && draft.run.part === "body" && previous.run.part === "body") {
-        crash = previousFill?.boundary === "section";
-      } else if (newSection) {
+      if (newSection) {
         crash = true;
       } else {
         crash = previousFill?.boundary === "phrase" && energy >= 0.5;
@@ -224,12 +215,6 @@ export function planBars(
         ? seatEnergies(energy, new Set(SEATS))
         : seatEnergies(energy, solos[i] ? without : new Set([...without, "solo" as const])),
       solo: silent || without.has("solo") ? null : solos[i]!,
-      // What a choice held "per pass" is held for. A lap of a short vamp is too short to be a
-      // pass: there it is the 16 bars between the vamp's own section lines.
-      stretch:
-        vamp && draft.run.part === "body"
-          ? Math.floor((draft.lapBarsBefore + draft.barInSection) / 16)
-          : draft.occurrence,
       fill,
       crash,
       lastPass: !open && options.mode === "jam" && draft.run.pass === passes - 1,
@@ -274,9 +259,6 @@ interface Draft {
   readonly barInPass: number;
   readonly phrase: { readonly index: number; readonly bar: number; readonly length: number };
   readonly lastOfRun: boolean;
-  /** Body bars played before and after this section's run, for counting a vamp's laps. */
-  readonly lapBarsBefore: number;
-  readonly lapBarsAfter: number;
 }
 
 // ── layout ──────────────────────────────────────────────────────────────────
@@ -297,8 +279,11 @@ function layOut(
   const runs: Run[] = hasBody ? sectionRuns(expanded.intro, 0, "intro") : [];
   // An open jam is planned one pass further than it is played, as look-ahead.
   const total = open ? passes + 1 : passes;
-  for (let pass = 0; pass < total; pass++)
-    runs.push(...sectionRuns(bodyOf(expanded), pass, "body"));
+  const chorus = chorusOf(expanded, options);
+  for (let pass = 0; pass < total; pass++) {
+    if (chorus.lap === undefined) runs.push(...sectionRuns(chorus.bars, pass, "body"));
+    else runs.push({ bars: chorus.bars, pass, part: "body", lap: chorus.lap });
+  }
   if (!open && hasBody) runs.push(...sectionRuns(expanded.ending, passes - 1, "ending"));
   return runs;
 }
@@ -339,7 +324,7 @@ function countPasses(expanded: ExpandedChart, tempo: number, options: PlanOption
   if (options.open) return 1;
   const secondsOf = (bars: readonly FlatBar[]) =>
     bars.reduce((sum, bar) => sum + bar.ticks, 0) * (60 / tempo / PPQ);
-  const body = secondsOf(bodyOf(expanded));
+  const body = secondsOf(chorusOf(expanded, options).bars);
   if (body <= 0) return 1;
   const fixed =
     expanded.body.length > 0 ? secondsOf(expanded.intro) + secondsOf(expanded.ending) : 0;
@@ -348,10 +333,36 @@ function countPasses(expanded: ExpandedChart, tempo: number, options: PlanOption
   return Math.max(1, Math.round((limit - fixed) / body));
 }
 
-function isVamp(expanded: ExpandedChart, options: PlanOptions): boolean {
-  if (options.mode !== "jam") return false;
+/**
+ * One time through the form of a jam. A short vamp is not a form a lap at a
+ * time: a band plays it in choruses, as it would a twelve-bar blues, so that a
+ * phrase, a fill, a solo and the arc of the jam each have something to belong
+ * to. Its chorus is one section of 2, 4, 8 or 16 laps: the fewest, doubling,
+ * that make twelve bars.
+ */
+function chorusOf(
+  expanded: ExpandedChart,
+  options: PlanOptions,
+): { readonly bars: readonly FlatBar[]; readonly lap?: number } {
   const body = bodyOf(expanded);
-  return body.length < VAMP_BARS && sectionRuns(body, 0, "body").length === 1;
+  const vamp =
+    options.mode === "jam" &&
+    body.length > 0 &&
+    body.length < VAMP_BARS &&
+    sectionRuns(body, 0, "body").length === 1;
+  if (!vamp) return { bars: body };
+  let laps = 2;
+  while (laps * body.length < VAMP_CHORUS) laps *= 2;
+  return { bars: Array.from({ length: laps }, () => body).flat(), lap: body.length };
+}
+
+/**
+ * A vamp's phrases. A lap of three bars or more is phrased as it is written;
+ * a lap of one or two is too short to be a phrase, and is played in fours.
+ */
+function vampPhrases(lap: number, bars: number): number[] {
+  if (lap <= 2) return Array.from({ length: bars / 4 }, () => 4);
+  return Array.from({ length: bars / lap }, () => phraseLengths(lap)).flat();
 }
 
 /** Four-bar phrases from the top; a leftover of one or two bars joins the last phrase. */

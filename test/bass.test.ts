@@ -16,7 +16,7 @@ import {
   tierOf,
 } from "@ensemble/engine";
 import { blues, POCKET } from "./reading.ts";
-import { LIBRARY, notesOf, STYLES, takes } from "./takes.ts";
+import { LIBRARY, notesOf, only, STYLES, takes } from "./takes.ts";
 
 // ── the bass line ───────────────────────────────────────────────────────────
 
@@ -155,93 +155,105 @@ test("a bass note outside its chord's scale only passes: it is stepped into and 
   assert.ok(outside > 200, `only ${outside} notes outside their chord's scale`);
 });
 
-test("blues: the bass keeps its line: away from the quiet level, a phrase opens on the same shape each time its section comes round at that level", () => {
-  let compared = 0;
-  for (const { chart, options, take } of takes(blues)) {
-    const bass = notesOf(take, "bass");
-    const openings = new Map<string, string>();
-    for (const bar of take.plan.bars) {
-      if (bar.kind !== "music" || bar.ending || bar.seats.bass === null) continue;
-      if (bar.phrase.bar !== 0 || tierOf(bar.seats.bass) === "low") continue;
-      const next = take.plan.bars[bar.index + 1];
-      // A bar of one chord with the same chord after it: the first half of a box, with no
-      // change at the barline to lead into.
-      const one = (b: PlanBar | undefined) =>
-        b?.kind === "music" &&
-        b.spans.filter((span) => !span.tied).length === 1 &&
-        b.spans[0]!.chord;
-      const [here, there] = [one(bar), one(next)];
-      if (!here || !there || here.text !== there.text) continue;
-      const notes = bass.filter(
-        (note) => note.tick >= bar.start && note.tick < bar.start + bar.ticks,
-      );
-      if (notes.length === 0) continue;
-      const shape = notes
-        .map((note) => `${note.tick - bar.start}:${note.pitch - notes[0]!.pitch}`)
-        .join(" ");
-      const quality = JSON.stringify(here.quality);
-      const key = `${bar.section.identity} ${tierOf(bar.seats.bass)} ${quality}`;
-      const known = openings.get(key);
-      if (known === undefined) openings.set(key, shape);
-      else {
-        compared++;
-        assert.equal(shape, known, `${chart.file} seed ${options.seed} bar ${bar.index} (${key})`);
-      }
-    }
-  }
-  assert.ok(compared > 250, `only ${compared} phrase openings compared`);
-});
-
-test("blues: the bass does not play one line all night: in a jam of five choruses at the working level it plays more than one two-bar shape in bars 3 and 4, and at least one chorus ends by walking into the top", () => {
-  const twelve = LIBRARY.find((chart) => chart.file === "blues-12-bar-a.chart")!;
-  let varied = 0;
-  let walked = 0;
-  const seeds = [1, 2, 3, 4, 5, 6, 7, 8];
-  for (const style of STYLES.filter((candidate) => candidate.id === "blues")) {
-    for (const seed of seeds) {
-      const take = render(twelve.text, style, { mode: "jam", passes: 5, seed, energy: 0.55 });
+test(
+  "blues: the bass keeps its line: away from the quiet level, a phrase opens on the same shape each time its section comes round at that level",
+  only("blues"),
+  () => {
+    let compared = 0;
+    for (const { chart, options, take } of takes(blues)) {
       const bass = notesOf(take, "bass");
-      const shapes = new Set<string>();
-      let walks = 0;
+      const openings = new Map<string, string>();
       for (const bar of take.plan.bars) {
-        if (bar.kind !== "music" || bar.ending) continue;
+        if (bar.kind !== "music" || bar.ending || bar.seats.bass === null) continue;
+        if (bar.phrase.bar !== 0 || tierOf(bar.seats.bass) === "low") continue;
+        const next = take.plan.bars[bar.index + 1];
+        // A bar of one chord with the same chord after it: the first half of a box, with no
+        // change at the barline to lead into.
+        const one = (b: PlanBar | undefined) =>
+          b?.kind === "music" &&
+          b.spans.filter((span) => !span.tied).length === 1 &&
+          b.spans[0]!.chord;
+        const [here, there] = [one(bar), one(next)];
+        if (!here || !there || here.text !== there.text) continue;
         const notes = bass.filter(
-          (note) => note.tick >= bar.start && note.tick < bar.start + 2 * bar.ticks,
+          (note) => note.tick >= bar.start && note.tick < bar.start + bar.ticks,
         );
-        // Bars 3 and 4 of the form: the second box on the I, where an answer may be played
-        // (the first box is always the section's own line).
-        if (bar.barInSection === 2 && notes.length > 0) {
-          shapes.add(
-            notes
-              .map((note) => `${note.tick - bar.start}:${note.pitch - notes[0]!.pitch}`)
-              .join(" "),
+        if (notes.length === 0) continue;
+        const shape = notes
+          .map((note) => `${note.tick - bar.start}:${note.pitch - notes[0]!.pitch}`)
+          .join(" ");
+        const quality = JSON.stringify(here.quality);
+        const key = `${bar.section.identity} ${tierOf(bar.seats.bass)} ${quality}`;
+        const known = openings.get(key);
+        if (known === undefined) openings.set(key, shape);
+        else {
+          compared++;
+          assert.equal(
+            shape,
+            known,
+            `${chart.file} seed ${options.seed} bar ${bar.index} (${key})`,
           );
         }
-        // The last bar of the form, going round again: four quarters by step into the top.
-        const next = take.plan.bars[bar.index + 1];
-        if (next?.kind === "music" && next.barInSection === 0 && !next.ending) {
-          const last = bass.filter((note) => note.tick >= bar.start && note.tick < next.start);
-          const landing = bass.find((note) => note.tick === next.start);
-          const line = [...last.map((note) => note.pitch), landing?.pitch ?? Number.NaN];
-          const steps = line.slice(1).map((pitch, i) => pitch - line[i]!);
-          const oneWay = steps.every((step) => Math.sign(step) === Math.sign(steps[0]!));
-          if (last.length === 4 && oneWay && steps.slice(1).every((step) => Math.abs(step) <= 2))
-            walks++;
-        }
       }
-      if (shapes.size > 1) varied++;
-      if (walks > 0) walked++;
     }
-  }
-  assert.ok(
-    varied >= seeds.length / 2,
-    `more than one shape on the I in only ${varied} of ${seeds.length} takes`,
-  );
-  assert.ok(
-    walked >= seeds.length / 2,
-    `a walk into the top in only ${walked} of ${seeds.length} takes`,
-  );
-});
+    assert.ok(compared > 250, `only ${compared} phrase openings compared`);
+  },
+);
+
+test(
+  "blues: the bass does not play one line all night: in a jam of five choruses at the working level it plays more than one two-bar shape in bars 3 and 4, and at least one chorus ends by walking into the top",
+  only("blues"),
+  () => {
+    const twelve = LIBRARY.find((chart) => chart.file === "blues-12-bar-a.chart")!;
+    let varied = 0;
+    let walked = 0;
+    const seeds = [1, 2, 3, 4, 5, 6, 7, 8];
+    for (const style of STYLES.filter((candidate) => candidate.id === "blues")) {
+      for (const seed of seeds) {
+        const take = render(twelve.text, style, { mode: "jam", passes: 5, seed, energy: 0.55 });
+        const bass = notesOf(take, "bass");
+        const shapes = new Set<string>();
+        let walks = 0;
+        for (const bar of take.plan.bars) {
+          if (bar.kind !== "music" || bar.ending) continue;
+          const notes = bass.filter(
+            (note) => note.tick >= bar.start && note.tick < bar.start + 2 * bar.ticks,
+          );
+          // Bars 3 and 4 of the form: the second box on the I, where an answer may be played
+          // (the first box is always the section's own line).
+          if (bar.barInSection === 2 && notes.length > 0) {
+            shapes.add(
+              notes
+                .map((note) => `${note.tick - bar.start}:${note.pitch - notes[0]!.pitch}`)
+                .join(" "),
+            );
+          }
+          // The last bar of the form, going round again: four quarters by step into the top.
+          const next = take.plan.bars[bar.index + 1];
+          if (next?.kind === "music" && next.barInSection === 0 && !next.ending) {
+            const last = bass.filter((note) => note.tick >= bar.start && note.tick < next.start);
+            const landing = bass.find((note) => note.tick === next.start);
+            const line = [...last.map((note) => note.pitch), landing?.pitch ?? Number.NaN];
+            const steps = line.slice(1).map((pitch, i) => pitch - line[i]!);
+            const oneWay = steps.every((step) => Math.sign(step) === Math.sign(steps[0]!));
+            if (last.length === 4 && oneWay && steps.slice(1).every((step) => Math.abs(step) <= 2))
+              walks++;
+          }
+        }
+        if (shapes.size > 1) varied++;
+        if (walks > 0) walked++;
+      }
+    }
+    assert.ok(
+      varied >= seeds.length / 2,
+      `more than one shape on the I in only ${varied} of ${seeds.length} takes`,
+    );
+    assert.ok(
+      walked >= seeds.length / 2,
+      `a walk into the top in only ${walked} of ${seeds.length} takes`,
+    );
+  },
+);
 
 test("a bass note that leads into a change belongs to the scale of the chord it is played over, unless it is a half step from where it lands", () => {
   let leadIns = 0;

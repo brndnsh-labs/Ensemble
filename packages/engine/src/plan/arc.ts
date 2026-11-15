@@ -36,6 +36,12 @@ export function defaultClimax(passes: number): number {
 }
 
 export function arcOffset(arc: ArcStyle, at: ArcPosition): number {
+  // The first time round is the tune; an open jam always has a next pass to open up on.
+  const head = at.part === "body" && at.pass === 0 && (at.open || at.passes > 1) ? arc.head : 0;
+  return head + shapeOffset(arc, at);
+}
+
+function shapeOffset(arc: ArcStyle, at: ArcPosition): number {
   // An open jam cannot know how long it is: later passes are a little fuller, and that is all.
   if (at.open) return Math.min(arc.passLift.cap, arc.passLift.step * at.pass);
 

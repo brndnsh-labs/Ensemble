@@ -24,6 +24,7 @@ import {
   type JamSpec,
   LIBRARY,
   notesOf,
+  only,
   STYLES,
   soloistTakes,
   stressTakes,
@@ -269,21 +270,22 @@ test("a three-chorus solo builds: its last chorus has more notes than its first,
   assert.ok(built >= solos * 0.9, `${built} of ${solos} solos built`);
 });
 
-test("a solo that runs into the ending ends with the band: its last note is struck where the final chord lands, on that chord's root, third or fifth", () => {
+test("a solo that runs into the ending ends with the band: its last note is struck where the final chord lands (and once more with the band's button), on that chord's root, third or fifth", () => {
   let endings = 0;
   for (const { chart, options, take } of soloTakes()) {
     const last = take.plan.bars.findLast((bar) => bar.kind === "music")!;
     if (!last.ending || !last.solo) continue;
     const final = last.spans.findLast((span) => span.chord !== null)?.chord;
-    const note = notesOf(take, "solo").at(-1);
+    const landing = last.start + last.ending.at;
+    const landed = notesOf(take, "solo").filter((other) => other.tick >= landing);
+    const note = landed.at(-1);
     const where = `${chart.file} seed ${options.seed}`;
     assert.ok(final && note, `${where}: no last note`);
     endings++;
-    assert.equal(
-      note.tick,
-      last.start + last.ending.at,
-      `${where}: the last note is not on the final chord`,
-    );
+    assert.equal(landed[0]!.tick, landing, `${where}: the last note is not on the final chord`);
+    const allowed = last.ending.gesture.kind === "button" ? 2 : 1;
+    assert.ok(landed.length <= allowed, `${where}: ${landed.length} notes on the final chord`);
+    assert.equal(note.pitch, landed[0]!.pitch, `${where}: the button is not the last note again`);
     const resting = chordTones(final.quality)
       .filter((tone) => ["root", "third", "fifth"].includes(tone.role))
       .map((tone) => (pitchClass(final.root) + tone.interval) % 12);
@@ -479,38 +481,42 @@ test("the piano makes room: hearing the soloist, fewer of its strikes come down 
   );
 });
 
-test("blues: under a solo the piano does not get busier as the band gets louder: where the soloist has the lead it never hammers a bar, and at the band's hot level it averages under three strikes a bar", () => {
-  let hot = 0;
-  let strikes = 0;
-  for (const { style, chart, options, take } of soloTakes()) {
-    if (style.id !== "blues" || chart.meter !== "4/4") continue;
-    const perBar = new Map<number, number>();
-    const bars = take.plan.bars;
-    for (const strike of strikesOf(take)) {
-      const bar = bars.findLast((candidate) => candidate.start <= strike.tick)!;
-      perBar.set(bar.index, (perBar.get(bar.index) ?? 0) + 1);
-    }
-    for (const bar of bars) {
-      if (bar.kind !== "music" || !bar.solo || bar.ending || bar.seats.chords === null) continue;
-      const count = perBar.get(bar.index) ?? 0;
-      // A chord gets its strike however many the bar has, so only bars of one or two chords
-      // say anything about how busy the hand chose to be.
-      const chords = bar.spans.filter((span) => !span.tied && span.chord !== null).length;
-      if (chords <= 2) {
-        assert.ok(
-          count <= 5,
-          `${chart.file} ${JSON.stringify(options)} bar ${bar.index}: ${count} strikes under the solo`,
-        );
+test(
+  "blues: under a solo the piano does not get busier as the band gets louder: where the soloist has the lead it never hammers a bar, and at the band's hot level it averages under three strikes a bar",
+  only("blues"),
+  () => {
+    let hot = 0;
+    let strikes = 0;
+    for (const { style, chart, options, take } of soloTakes()) {
+      if (style.id !== "blues" || chart.meter !== "4/4") continue;
+      const perBar = new Map<number, number>();
+      const bars = take.plan.bars;
+      for (const strike of strikesOf(take)) {
+        const bar = bars.findLast((candidate) => candidate.start <= strike.tick)!;
+        perBar.set(bar.index, (perBar.get(bar.index) ?? 0) + 1);
       }
-      if (tierOf(bar.energy) === "high" && chords <= 1) {
-        hot++;
-        strikes += count;
+      for (const bar of bars) {
+        if (bar.kind !== "music" || !bar.solo || bar.ending || bar.seats.chords === null) continue;
+        const count = perBar.get(bar.index) ?? 0;
+        // A chord gets its strike however many the bar has, so only bars of one or two chords
+        // say anything about how busy the hand chose to be.
+        const chords = bar.spans.filter((span) => !span.tied && span.chord !== null).length;
+        if (chords <= 2) {
+          assert.ok(
+            count <= 5,
+            `${chart.file} ${JSON.stringify(options)} bar ${bar.index}: ${count} strikes under the solo`,
+          );
+        }
+        if (tierOf(bar.energy) === "high" && chords <= 1) {
+          hot++;
+          strikes += count;
+        }
       }
     }
-  }
-  assert.ok(hot > 300, `only ${hot} hot bars under a solo`);
-  assert.ok(strikes / hot < 3, `${(strikes / hot).toFixed(2)} strikes a bar under a hot solo`);
-});
+    assert.ok(hot > 300, `only ${hot} hot bars under a solo`);
+    assert.ok(strikes / hot < 3, `${(strikes / hot).toFixed(2)} strikes a bar under a hot solo`);
+  },
+);
 
 test("with nobody soloing, a piano that listens plays exactly what a deaf one plays", () => {
   for (const style of STYLES) {

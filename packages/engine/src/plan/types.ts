@@ -10,7 +10,10 @@ export interface PlanOptions {
   readonly mode: "song" | "jam";
   /** Overrides the chart's tempo, which overrides the style's default. */
   readonly tempo?: number;
-  /** Jam mode: how many times through the form. Wins over `minutes`. */
+  /**
+   * Jam mode: how many times through the form. Wins over `minutes`. A vamp
+   * shorter than eight bars is counted in choruses of several laps.
+   */
   readonly passes?: number;
   /** Jam mode: a loose time limit, turned into the nearest whole number of passes. */
   readonly minutes?: number;
@@ -45,8 +48,6 @@ export interface FillMark {
   readonly top: boolean;
   /** Sized by where the music is going: the bigger of this bar's tier and the next bar's. */
   readonly tier: Tier;
-  /** Half length, so consecutive laps of a short vamp differ. */
-  readonly half: boolean;
 }
 
 /**
@@ -100,11 +101,10 @@ export interface PlanBar {
     readonly bars: number;
   };
   /**
-   * Counts the stretches a choice held "per pass" lasts, from 0: each time
-   * through a section, except on a short vamp, where it is every 16 bars.
+   * Which time through the form, from 0. The intro belongs to pass 0. On a
+   * short vamp the form is a chorus of several laps (twelve bars or more), not
+   * a lap: the chorus is one section, and every count below is counted in it.
    */
-  readonly stretch: number;
-  /** Which time through the form, from 0. The intro belongs to pass 0. */
   readonly pass: number;
   readonly barInSection: number;
   /** Bars since the top of this pass (intro and written ending count from their own top). */

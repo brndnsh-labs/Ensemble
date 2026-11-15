@@ -8,7 +8,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import type { Baseline, ScoredTake, ScoreLine, TakeOptions } from "@ensemble/engine";
 import { MEASURES, regressions, render, scorecard, toBaseline } from "@ensemble/engine";
-import { STYLES, styleById } from "@ensemble/styles";
+import { STYLES, styleById, styleIds } from "@ensemble/styles";
 import type { Command } from "../command.ts";
 import { UsageError } from "../command.ts";
 
@@ -50,7 +50,7 @@ export const scoreCommand: Command = {
     const styleId = values.style ?? STYLES[0]!.id;
     const style = styleById(styleId);
     if (!style) {
-      throw new UsageError(`no style "${styleId}" (styles: ${STYLES.map((s) => s.id).join(", ")})`);
+      throw new UsageError(`no style "${styleId}" (styles: ${styleIds().join(", ")})`);
     }
     const seeds = Number(values.seeds);
     if (!Number.isInteger(seeds) || seeds < 1) throw new UsageError("--seeds is a whole number");

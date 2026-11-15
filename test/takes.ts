@@ -5,9 +5,23 @@
 import { readdirSync, readFileSync } from "node:fs";
 import type { NoteEvent, Seat, StylePack, Take, TakeOptions } from "@ensemble/engine";
 import { parse, render } from "@ensemble/engine";
-import { STYLES } from "@ensemble/styles";
+import { STYLES as SHIPPING, styleById } from "@ensemble/styles";
 
-export { STYLES };
+/**
+ * The styles the properties are checked in: every style that ships. While a style
+ * is being written, `ENSEMBLE_STYLES=funk,jazz node --test test/` holds it to the
+ * same properties before it joins them.
+ */
+export const STYLES: readonly StylePack[] = process.env.ENSEMBLE_STYLES
+  ? process.env.ENSEMBLE_STYLES.split(",").map((id) => {
+      const style = styleById(id.trim());
+      if (!style) throw new Error(`ENSEMBLE_STYLES: no style "${id}"`);
+      return style;
+    })
+  : SHIPPING;
+
+/** For a property that is one style's own: `test("blues: ...", only("blues"), () => {})`. */
+export const only = (id: string) => ({ skip: !STYLES.some((style) => style.id === id) });
 
 /** Enough seeds to meet every weighted choice a few times, few enough to stay inside the budget. */
 export const SEEDS: readonly number[] = [1, 2, 3, 4, 5, 6];
