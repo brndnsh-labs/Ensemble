@@ -1,0 +1,16 @@
+title: Funk in C with Intro and Outro
+key: C
+tempo: 112
+style: funk
+
+// A four-bar intro on the five, an eight-bar groove, and a written ending
+// that walks up to the last chord.
+[Intro]
+| G9sus4 | % | % | G9 |
+
+[A]
+| C9 | % | F9     | C9    |
+| C9 | % | F9 Eb9 | D9 G9 |
+
+[Outro]
+| C9 | F9 | C9 . Bb9 B9 | C9 |

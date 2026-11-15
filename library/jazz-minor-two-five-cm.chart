@@ -1,0 +1,12 @@
+title: Minor Two-Five in C minor
+key: Cm
+tempo: 120
+style: jazz
+
+// The minor cadence: a half-diminished two, an altered five, and a minor
+// tonic that takes a sixth. The second line borrows the relative major.
+[A]
+| Dm7b5      | G7b9    | Cm6        | %          |
+| Fm7        | Bb7     | Ebmaj7     | Abmaj7     |
+| Dm7b5      | G7alt   | Cm7        | Am7b5 D7b9 |
+| Gm7b5 C7b9 | Fm7 Bb7 | Dm7b5 G7b9 | Cm6        |

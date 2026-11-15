@@ -1,0 +1,22 @@
+title: Rhythm Changes in Bb
+key: Bb
+tempo: 176
+style: jazz
+
+// Thirty-two bars, AABA. The A sections go round the key; the bridge is
+// four dominants, two bars each, falling by fifths back to the top.
+[A]
+| Bbmaj7 G7 | Cm7 F7    | Dm7 G7    | Cm7 F7 |
+| Fm7 Bb7   | Eb7 Edim7 | Bbmaj7 G7 | Cm7 F7 |
+
+[A2]
+| Bbmaj7 G7 | Cm7 F7    | Dm7 G7 | Cm7 F7 |
+| Fm7 Bb7   | Eb7 Edim7 | Cm7 F7 | Bb6    |
+
+[B]
+| D7 | % | G7 | % |
+| C7 | % | F7 | % |
+
+[A3]
+| Bbmaj7 G7 | Cm7 F7    | Dm7 G7 | Cm7 F7 |
+| Fm7 Bb7   | Eb7 Edim7 | Cm7 F7 | Bb6    |

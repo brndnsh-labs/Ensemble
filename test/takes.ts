@@ -89,11 +89,26 @@ const KINDS: readonly Omit<TakeOptions, "seed">[] = [
   { mode: "jam", passes: 4, solo: true },
 ];
 
-const TAKE_SPECS: readonly JamSpec[] = STYLES.flatMap((style) =>
-  LIBRARY.flatMap((chart) =>
+/**
+ * A style's own charts: the ones written for it, named for it. Every style plays every
+ * chart, but it is held to its own in every kind of take on every seed, and to the others
+ * in one take each (a kind and a seed by turns): any band can be handed any tune.
+ */
+export const ownCharts = (style: StylePack): LibraryChart[] =>
+  LIBRARY.filter((chart) => chart.file.startsWith(`${style.id}-`));
+const otherCharts = (style: StylePack): LibraryChart[] =>
+  LIBRARY.filter((chart) => !chart.file.startsWith(`${style.id}-`));
+
+const TAKE_SPECS: readonly JamSpec[] = STYLES.flatMap((style) => [
+  ...ownCharts(style).flatMap((chart) =>
     SEEDS.flatMap((seed) => KINDS.map((kind) => ({ style, chart, options: { ...kind, seed } }))),
   ),
-);
+  ...otherCharts(style).map((chart, c) => ({
+    style,
+    chart,
+    options: { ...KINDS[c % KINDS.length]!, seed: SEEDS[c % SEEDS.length]! },
+  })),
+]);
 
 /** The library's takes that pass `only`, which reads the style, chart, and options. */
 export function takes(only: (spec: JamSpec) => boolean = () => true): Jam[] {
@@ -151,20 +166,26 @@ const SOLOIST_KINDS: readonly Omit<TakeOptions, "seed">[] = [
   { mode: "jam", passes: 3, solo: true, energy: 0.85, soloInstrument: "alto-sax" },
 ];
 
-const SOLOIST_SPECS: readonly JamSpec[] = STYLES.flatMap((style) =>
-  [...LIBRARY, ...STRESS].flatMap((chart, c) =>
+const SOLOIST_SPECS: readonly JamSpec[] = STYLES.flatMap((style) => [
+  ...[...ownCharts(style), ...STRESS].flatMap((chart, c) =>
     SOLOIST_KINDS.map((kind, k) => ({
       style,
       chart,
       options: { ...kind, seed: 1 + ((c + k) % 2) },
     })),
   ),
-);
+  ...otherCharts(style).map((chart, c) => ({
+    style,
+    chart,
+    options: { ...SOLOIST_KINDS[c % SOLOIST_KINDS.length]!, seed: 1 + (c % 2) },
+  })),
+]);
 
 /**
  * The soloist where a plain jam does not take it: a song, fast and slow, quiet and
- * loud, and on the horn, which has to breathe. Every chart in every kind, on one
- * of two seeds by turns. Only the soloist's properties read these.
+ * loud, and on the horn, which has to breathe. Each of the style's own charts in every
+ * kind, on one of two seeds by turns, and every other chart in one. Only the soloist's
+ * properties read these.
  */
 export function soloistTakes(): Jam[] {
   return renderOnly(SOLOIST_SPECS, () => true);

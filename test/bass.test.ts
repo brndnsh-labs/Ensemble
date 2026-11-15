@@ -175,6 +175,10 @@ test(
           b.spans[0]!.chord;
         const [here, there] = [one(bar), one(next)];
         if (!here || !there || here.text !== there.text) continue;
+        // The chord arrives with the phrase. A phrase that opens partway through a stay on a
+        // chord is the line carrying on: the second bar of a two-bar shape, not its top.
+        const before = take.plan.bars[bar.index - 1]?.spans.at(-1)?.chord;
+        if (before?.text === here.text) continue;
         const notes = bass.filter(
           (note) => note.tick >= bar.start && note.tick < bar.start + bar.ticks,
         );

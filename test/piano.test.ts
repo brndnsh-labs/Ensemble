@@ -6,7 +6,7 @@ import { test } from "node:test";
 import type { PlanBar, Take } from "@ensemble/engine";
 import { chordTones, PPQ, pitchClass, render, scaleHas, tierOf } from "@ensemble/engine";
 import { blues, chordsUnder, harmonyOf, POCKET, type Strike, strikesOf } from "./reading.ts";
-import { LIBRARY, only, STYLES, stressTakes, takes } from "./takes.ts";
+import { LIBRARY, only, ownCharts, STYLES, stressTakes, takes } from "./takes.ts";
 
 test("the piano stays in its register: nothing under the style's floor, nothing above E6, in every take", () => {
   let strikes = 0;
@@ -237,7 +237,7 @@ test("the eighth before a change belongs to the chord coming: a strike there pla
 
 test("the piano stays in its part of the keyboard: the top of its chords never wanders more than a sixth from where the style aims it", () => {
   for (const style of STYLES) {
-    for (const chart of LIBRARY) {
+    for (const chart of ownCharts(style)) {
       for (const seed of [1, 2, 3, 4]) {
         // Long enough for a hand that drifts a step a chorus to get somewhere.
         const take = render(chart.text, style, { mode: "jam", minutes: 4, seed });

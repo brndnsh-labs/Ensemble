@@ -1,0 +1,17 @@
+title: Funk in E with a Bridge
+key: E
+tempo: 106
+style: funk
+
+// A verse that sits on the one, a chorus on the four, and a bridge that
+// climbs back to the five.
+[Verse]
+|: E9 | % | % | A9 :|
+
+[Chorus]
+| A9 | % | E9 | %    |
+| A9 | % | B9 | B7#9 |
+
+[Bridge]
+| C#m7 | F#9 | C#m7   | F#9 |
+| A13  | %   | B9sus4 | B9  |

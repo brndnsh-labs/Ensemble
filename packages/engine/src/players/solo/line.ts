@@ -170,7 +170,8 @@ export function writeLine(world: World, bars: readonly LineBar[], ask: LineAsk):
     const next = spots[i + 1];
     const beforeRest = next !== undefined && next.tick - (spot.tick + spot.hold) >= PPQ;
     const lands = i === 0 || last || spot.lands || beforeRest;
-    const given = ask.given.get(i);
+    // Where the tune ends, a remembered idea gives way: the last note rests by rule.
+    const given = last && ask.final ? undefined : ask.given.get(i);
     if (given !== undefined) {
       let pitch = fit(world, spot, given, lands, room);
       // Two remembered notes never collapse onto one pitch: the second keeps moving the

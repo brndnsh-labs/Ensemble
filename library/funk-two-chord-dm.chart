@@ -1,0 +1,8 @@
+title: Two-Chord Funk in D minor
+key: Dm
+tempo: 100
+style: funk
+
+// A two-bar vamp: the minor one and its dominant four.
+[A]
+| Dm7 | G9 |

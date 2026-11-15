@@ -1,0 +1,8 @@
+title: Four-Bar Funk in A
+key: A
+tempo: 108
+style: funk
+
+// Three bars on the one and a bar that turns it round.
+[A]
+| A7 | % | % | D9 E9 |

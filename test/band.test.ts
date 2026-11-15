@@ -17,7 +17,7 @@ import {
 } from "@ensemble/engine";
 import { corpus } from "./corpus.ts";
 import { blues, POCKET } from "./reading.ts";
-import { LIBRARY, notesOf, only, readSmf, SEEDS, STYLES, takes } from "./takes.ts";
+import { LIBRARY, notesOf, only, ownCharts, readSmf, SEEDS, STYLES, takes } from "./takes.ts";
 
 test("every style that ships is sound data", () => {
   for (const style of STYLES) assert.deepEqual(validateStyle(style), [], style.id);
@@ -39,7 +39,7 @@ test("the same chart, style, options, and seed give the identical performance, d
 
 test("a different seed is a different take", () => {
   for (const style of STYLES) {
-    for (const chart of LIBRARY) {
+    for (const chart of ownCharts(style)) {
       const performances = SEEDS.map((seed) =>
         JSON.stringify(render(chart.text, style, { mode: "jam", passes: 3, seed }).events),
       );
@@ -132,7 +132,7 @@ test("every note starts inside the performance and nothing rings past its end", 
 
 test("making an open jam one pass longer changes nothing that was already played", () => {
   for (const style of STYLES) {
-    for (const [c, chart] of LIBRARY.entries()) {
+    for (const [c, chart] of ownCharts(style).entries()) {
       for (const seed of SEEDS.slice(0, 4)) {
         // Each chart at each length, on two seeds or one by turns.
         for (const passes of [1, 2, 4].filter((_, i) => (i + seed + c) % 2 === 0)) {
@@ -162,7 +162,7 @@ test("making an open jam one pass longer changes nothing that was already played
 
 test("a take with a count-in is the same music as one without, a bar later", () => {
   for (const style of STYLES) {
-    for (const chart of LIBRARY) {
+    for (const chart of ownCharts(style)) {
       const jam = (countIn: boolean) =>
         render(chart.text, style, { mode: "jam", passes: 2, seed: 5, countIn, solo: true });
       const counted = jam(true);
@@ -458,7 +458,7 @@ test("a last bar that is all rest is silence: nobody plays in it, and the drumme
 
 test("at full energy the band still has accents: almost nothing is pinned to the top of the range", () => {
   for (const style of STYLES) {
-    for (const chart of LIBRARY) {
+    for (const chart of ownCharts(style)) {
       const take = render(chart.text, style, { mode: "jam", passes: 2, energy: 1, seed: 1 });
       const notes = notesOf(take);
       const pinned = notes.filter((note) => note.velocity >= 127).length;

@@ -1,0 +1,15 @@
+title: Modal in D minor
+key: Dm
+tempo: 132
+style: jazz
+
+// One chord for sixteen bars, up a half step for the bridge, and back.
+// Nothing changes for a long time: the players have to make the shape.
+[A]
+|: Dm7 | % | % | % :| x4
+
+[B]
+|: Ebm7 | % | % | % :|
+
+[A2]
+|: Dm7 | % | % | % :|

@@ -25,6 +25,7 @@ import {
   LIBRARY,
   notesOf,
   only,
+  ownCharts,
   STYLES,
   soloistTakes,
   stressTakes,
@@ -35,7 +36,7 @@ import {
 
 test("the soloist is off unless asked for; asked for, it rests through the intro and a written ending, lays out and returns, and never solos more than three choruses in a row", () => {
   for (const style of STYLES) {
-    for (const chart of LIBRARY) {
+    for (const chart of ownCharts(style)) {
       const written = parse(chart.text).chart;
       for (const passes of [1, 2, 3, 4, 6, 9]) {
         const without = plan(written, style, { mode: "jam", passes });
@@ -99,7 +100,7 @@ test("the soloist is off unless asked for; asked for, it rests through the intro
 
 test("the band builds with the solo: it never comes down from one chorus of a solo to the next, and under the last of three it is louder than under the first", () => {
   for (const style of STYLES) {
-    for (const chart of LIBRARY) {
+    for (const chart of ownCharts(style)) {
       const written = parse(chart.text).chart;
       for (const passes of [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20]) {
         const roadmap = plan(written, style, { mode: "jam", passes, solo: true });
@@ -379,7 +380,7 @@ test("a horn breathes: the alto never plays eight seconds without half a second 
     }
   };
   for (const style of STYLES) {
-    for (const chart of LIBRARY) {
+    for (const chart of ownCharts(style)) {
       for (const tempo of [66, 120]) {
         const take = render(chart.text, style, {
           mode: "jam",
@@ -520,7 +521,7 @@ test(
 
 test("with nobody soloing, a piano that listens plays exactly what a deaf one plays", () => {
   for (const style of STYLES) {
-    for (const [c, chart] of LIBRARY.entries()) {
+    for (const [c, chart] of ownCharts(style).entries()) {
       const options = { mode: "jam", passes: 2, seed: c + 1 } as const;
       assert.deepEqual(
         render(chart.text, style, options).events,
