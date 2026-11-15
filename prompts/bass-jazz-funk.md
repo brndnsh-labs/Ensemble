@@ -71,6 +71,8 @@ In `critic/measures/bass.ts`, each with a `says` sentence a bassist would agree 
 
 Report every measure three ways on the same 200 seeds, for each style: the bass as built; the first plan drawn with no critic; and for jazz, the old band's way (one weighted draw per note, no candidates), which your candidate drawer is if you draw one and take it.
 
+A measure of one way of playing (a walk, a riff, a scratch) is marked `idiom: true` in its definition: it is then on the scorecard only of a style that sets it a target (`critic/types.ts`). Mark yours, and mark any existing measure you find does not apply outside the style it was written for.
+
 ### 5. Validation
 
 Extend `validate.ts` for everything you add to the type.

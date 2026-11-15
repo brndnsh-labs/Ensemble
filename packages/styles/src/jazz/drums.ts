@@ -29,7 +29,11 @@ const RIDE = { ride: "x... X.x. x... X.x." };
 const RIDE_SOFT = { ride: "o... x.o. o... x.o." };
 /** The light head: the swing pattern on the closed hat, the ride silent (ST-jazz-09). */
 const HEAD_HAT = { closedHat: "x... X.x. x... X.x." };
-/** The hat foot on 2 and 4, at every level (ST-jazz-08). */
+/**
+ * The hat foot on 2 and 4 wherever the ride keeps time (ST-jazz-08). Under the
+ * light head the stick is on the closed hat on those beats already, and a foot
+ * closing the same cymbal at the same moment is one sound struck twice.
+ */
 const FOOT = { pedalHat: ".... x... .... x..." };
 /** Feathered quarters: a bass drum that is felt, not heard. */
 const FEATHER = { kick: "g... g... g... g..." };
@@ -39,7 +43,12 @@ const ride = (lines: GrooveOption["lines"]): GrooveLayer => ({
   hold: "section",
   options: [{ weight: 1, lines }],
 });
-const foot: GrooveLayer = { id: "foot", hold: "song", options: [{ weight: 1, lines: FOOT }] };
+const foot: GrooveLayer = {
+  id: "foot",
+  hold: "song",
+  when: { playing: "ride" },
+  options: [{ weight: 1, lines: FOOT }],
+};
 const feather: GrooveLayer = {
   id: "feather",
   hold: "song",

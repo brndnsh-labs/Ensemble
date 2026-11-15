@@ -100,7 +100,7 @@ Seat builds, each from a brief in `prompts/`, each in its own clone under the se
 
 | Round | Brief | Model | State |
 |---|---|---|---|
-| 1 | `drums-jazz-funk.md` | Opus | launched |
+| 1 | `drums-jazz-funk.md` | Opus | merged; six properties in `test/drums.test.ts` |
 | 1 | `solo-jazz-funk.md` | Fable | launched |
 | 2 | `bass-jazz-funk.md` (the walk; the riff, dead notes, the kick) | Fable | brief written |
 | 2 | `chords-funk-guitar.md` (the guitar idiom) | Fable | brief written |

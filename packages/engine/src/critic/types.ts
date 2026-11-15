@@ -20,6 +20,13 @@ export interface Measure {
   /** One sentence, in a musician's words, saying what a good value means. */
   readonly says: string;
   /**
+   * A measure of one way of playing (a backbeat, a ride on every beat, the
+   * boogie box's sixth). It says something only about a style that plays that
+   * way, so it is on the scorecard only of a style that sets it a target:
+   * "no backbeat" is not a finding about a jazz drummer.
+   */
+  readonly idiom?: boolean;
+  /**
    * - `share`: a fraction of cases, 0 to 1
    * - `semitones`, `per bar`, `per beat`, `velocity`: a mean in those units
    * - `pitch`: a mean MIDI note number

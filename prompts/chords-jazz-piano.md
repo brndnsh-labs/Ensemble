@@ -55,6 +55,8 @@ Targets under the `// ── chords ──` heading of `jazz/critic.ts`, labelle
 
 Report, over 200 seeds on the jazz charts, three ways on the same seeds: the piano as built; deaf to the soloist (`listening: null` and the soloist weights at zero; `scripts/deaf-piano.ts` shows how); and with the first candidate taken.
 
+A measure of one way of playing (a walk, a riff, a scratch) is marked `idiom: true` in its definition: it is then on the scorecard only of a style that sets it a target (`critic/types.ts`). Mark yours, and mark any existing measure you find does not apply outside the style it was written for.
+
 ### 5. Validation
 
 Extend `validate.ts` for anything you add to the type.

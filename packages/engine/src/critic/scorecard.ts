@@ -45,6 +45,7 @@ export function scorecard(
   const lines: ScoreLine[] = [];
   for (const measure of measures) {
     const target = style.critic.targets[measure.id] ?? null;
+    if (measure.idiom && !target) continue;
     const minCases = target?.minCases ?? 1;
     const values: { label: string; value: number }[] = [];
     let hits = 0;

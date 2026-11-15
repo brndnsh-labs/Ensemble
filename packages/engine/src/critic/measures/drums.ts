@@ -50,6 +50,7 @@ function answerPairs(take: Take): [PlanBar, PlanBar][] {
 export const drumMeasures: readonly Measure[] = [
   {
     id: "drums.kick-on-one",
+    idiom: true,
     seat: "drums",
     says: "The kick is on beat 1 of the bar.",
     unit: "share",
@@ -64,6 +65,7 @@ export const drumMeasures: readonly Measure[] = [
   },
   {
     id: "drums.backbeat",
+    idiom: true,
     seat: "drums",
     says: "The snare (or cross-stick) is on 2 and 4, except where a long fill takes the hands away.",
     unit: "share",
@@ -82,6 +84,7 @@ export const drumMeasures: readonly Measure[] = [
   },
   {
     id: "drums.same-groove",
+    idiom: true,
     seat: "drums",
     says: "A section keeps its groove: a bar of time is the same bar the section usually plays.",
     unit: "share",
@@ -111,6 +114,7 @@ export const drumMeasures: readonly Measure[] = [
   },
   {
     id: "drums.triplet-fills",
+    idiom: true,
     seat: "drums",
     says: "Some fills are triplets and some are eighths: neither all the time.",
     unit: "share",
@@ -150,6 +154,7 @@ export const drumMeasures: readonly Measure[] = [
   },
   {
     id: "drums.cymbal-under-backbeat",
+    idiom: true,
     seat: "drums",
     says: "The cymbal that keeps time sits under the backbeat, however loud the band is.",
     unit: "share",
@@ -172,6 +177,7 @@ export const drumMeasures: readonly Measure[] = [
   },
   {
     id: "drums.ghosts",
+    idiom: true,
     seat: "drums",
     says: "From the working level up, a bar of time has one to five ghost notes round the backbeat: enough to move, not a roll.",
     unit: "share",
@@ -187,6 +193,7 @@ export const drumMeasures: readonly Measure[] = [
   },
   {
     id: "drums.answer-bars",
+    idiom: true,
     seat: "drums",
     says: "The second bar of a pair answers the first: it turns round, it is not a copy.",
     unit: "share",
@@ -202,6 +209,7 @@ export const drumMeasures: readonly Measure[] = [
   },
   {
     id: "drums.turn-held",
+    idiom: true,
     seat: "drums",
     says: "A section turns its answer bars round the same way every time.",
     unit: "share",
@@ -229,6 +237,7 @@ export const drumMeasures: readonly Measure[] = [
   },
   {
     id: "drums.ride-every-beat",
+    idiom: true,
     seat: "drums",
     says: "Once the band has opened up, the ride is on every beat, through the fills (a crash counts on its beat).",
     unit: "share",
@@ -252,6 +261,7 @@ export const drumMeasures: readonly Measure[] = [
   },
   {
     id: "drums.phrase-end-shot",
+    idiom: true,
     seat: "drums",
     says: 'Once the band has opened up, some phrase ends get the shot, not all: snare and bass drum together on the "and" of the last beat, "ba-BOP".',
     unit: "share",
@@ -277,6 +287,7 @@ export const drumMeasures: readonly Measure[] = [
   },
   {
     id: "drums.snare-with-piano",
+    idiom: true,
     seat: "drums",
     says: "The snare comps where the piano strikes: the two read the same chart (DR-39).",
     unit: "share",
@@ -298,6 +309,7 @@ export const drumMeasures: readonly Measure[] = [
   },
   {
     id: "drums.on-the-eighths",
+    idiom: true,
     seat: "drums",
     says: "Nothing is played on a sixteenth that is not an eighth: swung, it would land between the eighths and flam.",
     unit: "share",

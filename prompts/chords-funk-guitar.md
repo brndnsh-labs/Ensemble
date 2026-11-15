@@ -51,6 +51,8 @@ Every chord the chart writes is still struck (CH-34): on a guitar the arrival st
 
 In `critic/measures/chords.ts` or `comping.ts`, each with a `says` sentence a guitarist would agree with, with targets under the `// ── chords ──` heading of `funk/critic.ts`, labelled `intent` or `measured`, with `minCases`; and the `comping` and `voicing` weights in `funk/critic.ts` (replace the blues weights the placeholder spreads in for your seat; leave the other seats'). From ST-funk-28 and CH-52: strokes a bar, the share that are scratches, stabs off the beat, stabs that are short. Add: how far the hand moves on the neck between consecutive chords, and how often a section's line is the line it had last time. Check that every existing chord and comping measure still says something true reading a guitar part (several count "strikes" and will count scratches unless told what a scratch is), and say which do not apply.
 
+A measure of one way of playing (a walk, a riff, a scratch) is marked `idiom: true` in its definition: it is then on the scorecard only of a style that sets it a target (`critic/types.ts`). Mark yours, and mark any existing measure you find does not apply outside the style it was written for.
+
 ### 4. Validation
 
 Extend `validate.ts` for the idiom and everything you add to the type.
