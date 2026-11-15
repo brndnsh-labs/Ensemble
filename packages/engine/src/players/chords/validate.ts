@@ -242,6 +242,9 @@ export function validateChordStyle(chords: ChordStyle): string[] {
         `${where}: a chord struck where it arrives cannot be a scratch (CH-34).`,
       );
       level(vocabulary.arrival.level, `${where}, a chord struck where it arrives`);
+      if (vocabulary.restrike !== undefined) {
+        level(vocabulary.restrike, `${where}, a held chord struck again at the barline`);
+      }
       say(
         vocabulary.arrival.steps > 0,
         `${where}: a chord struck where it arrives needs a length.`,

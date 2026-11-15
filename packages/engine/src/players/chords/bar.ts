@@ -113,7 +113,14 @@ export function barStrikes(chords: ChordStyle, book: RhythmBook, setting: BarSet
     strike(
       stroke.at,
       ring(stroke, stretch),
-      stroke.level,
+      // A chord carried over the barline is kept alive, not struck anew (CH-48).
+      vocabulary.restrike !== undefined &&
+        setting.heldOver &&
+        stroke.at === bar.start &&
+        stretch === own[0] &&
+        !stroke.muted
+        ? vocabulary.restrike
+        : stroke.level,
       stretch.arrival,
       stroke.muted ? { muted: true } : {},
     );

@@ -277,6 +277,13 @@ export interface RhythmTier {
    * by (CH-34): its level, and its length in sixteenths or to the chord's end.
    */
   readonly arrival: Attack;
+  /**
+   * The level of the figure's strike on the downbeat when the bar opens on the
+   * chord the bar before ended on: the chord is not new, and the hand only keeps
+   * it alive on an instrument that dies away, more softly than it first struck
+   * it (CH-48: 64 against 80). Left out, that strike is played as written.
+   */
+  readonly restrike?: number;
 }
 
 /**
