@@ -45,6 +45,19 @@ export interface TakeRecipe {
   readonly options: TakeOptions;
 }
 
+/**
+ * A recipe as a file: pretty JSON, keys sorted at every level, a trailing
+ * newline. The app and the CLI write the same text for the same take, so a
+ * file from either reads the same in a diff.
+ */
+export function recipeText(recipe: TakeRecipe): string {
+  const sorted = (_key: string, value: unknown): unknown =>
+    value && typeof value === "object" && !Array.isArray(value)
+      ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+      : value;
+  return `${JSON.stringify(recipe, sorted, 2)}\n`;
+}
+
 export interface Take {
   readonly chart: Chart;
   /** Problems found in the text. A chart with errors still plays. */

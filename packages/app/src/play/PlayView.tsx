@@ -1,28 +1,24 @@
 // The play screen: the chart, who is playing it and how, and the transport.
 
-import type { Key, Seat, StylePack } from "@ensemble/engine";
+import type { Key, Seat, StylePack, TakeRecipe } from "@ensemble/engine";
 import {
   conventionalKey,
   keyToString,
   parseKey,
   pitchClass,
-  planBar,
   plan as planOf,
   SOLO_INSTRUMENTS,
 } from "@ensemble/engine";
 import { STYLES, styleById } from "@ensemble/styles";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { copyOf } from "../charts.ts";
 import type { LibraryChart } from "../library.ts";
 import type { ChartChoices, Settings } from "../settings.ts";
-import type { Playhead } from "./ChartView.tsx";
-import { ChartView } from "./ChartView.tsx";
-import type { Reading } from "./ChordSymbol.tsx";
+import { followTake, keepTake } from "../takes.ts";
 import type { Call, JamSetup } from "./jam.ts";
-import { chartOf, nextChange, SEAT_ORDER, takeOptions } from "./jam.ts";
-import { pageBarOf } from "./page.ts";
+import { chartOf, SEAT_ORDER, takeOptions } from "./jam.ts";
 import type { Rig } from "./rig.ts";
-import { StatusStrip } from "./StatusStrip.tsx";
+import { Stage } from "./Stage.tsx";
 import { useJam } from "./useJam.ts";
 
 interface Props {
@@ -36,16 +32,7 @@ interface Props {
   readonly started: () => void;
 }
 
-/** How many bars ahead the play screen tells the chart about: enough to find the next line from anywhere. */
-const COMING = 16;
 const LENGTHS: readonly (number | null)[] = [2, 3, 5, 10, 15, 20, null];
-const READINGS: readonly Reading[] = ["names", "numerals", "both"];
-/** Each way of reading shown by example, and said in full for a screen reader. */
-const READING_NAMES: Readonly<Record<Reading, readonly [shown: string, said: string]>> = {
-  names: ["C7", "Chord names"],
-  numerals: ["V7", "Numerals"],
-  both: ["Both", "Names with numerals under them"],
-};
 const SEAT_NAMES: Readonly<Record<Seat, string>> = {
   drums: "Drums",
   bass: "Bass",
@@ -64,7 +51,6 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
       ...settings,
       charts: { ...settings.charts, [entry.id]: { ...choices, ...patch } },
     });
-  const [focus, setFocus] = useState(false);
 
   const style: StylePack = styleById(choices.style ?? entry.chart.styleId ?? "") ?? STYLES[0]!;
   const tempo = choices.tempo ?? null;
@@ -99,7 +85,18 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
     }),
     [chart, setup],
   );
-  const jam = useJam(rig, call);
+  // The take kept from this screen, and the seed that makes it that jam and no other: while that
+  // jam is the one playing, or the last played, every change to it is the kept take's too.
+  const [kept, setKept] = useState<{
+    readonly id: string;
+    readonly seed: TakeRecipe["options"]["seed"];
+  }>();
+  const following = useRef(kept);
+  following.current = kept;
+  const jam = useJam(rig, call, (take) => {
+    const to = following.current;
+    if (to && take.options.seed === to.seed) followTake(to.id, take);
+  });
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, as the screen opens
   useEffect(() => {
     if (!autoplay) return;
@@ -107,57 +104,22 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
     started();
   }, []);
 
-  // What play would start, to show its length and shape before it is pressed.
+  // What play would start: the tempo shown before it is pressed is the one it would play at.
   const preview = useMemo(() => planOf(chart, call.style, call.options), [chart, call]);
-  const playing = jam.phase === "playing";
-  const plan = playing && jam.playing ? jam.playing.plan : preview;
-  const shown = playing && jam.playing ? jam.playing.chart : chart;
-
-  let playhead: Playhead | undefined;
-  if (playing && jam.place) {
-    const { bar } = jam.place;
-    const next = nextChange(plan, jam.place);
-    const nextBar = next && pageBarOf(next.bar);
-    const coming: string[] = [];
-    for (let index = bar.index + 1; index <= bar.index + COMING; index++) {
-      const id = pageBarOf(planBar(plan, index) ?? bar);
-      if (id !== undefined) coming.push(id);
-    }
-    // On the last pass the final bar is the ending the band will play, not the turnaround written there.
-    const last = bar.lastPass || bar.kind === "tail" ? plan.bars.find((b) => b.ending) : undefined;
-    const lastBar = last && pageBarOf(last);
-    playhead = {
-      bar: pageBarOf(bar) ?? "",
-      coming,
-      ...(next && nextBar ? { next: { bar: nextBar, at: next.at } } : {}),
-      ...(last && lastBar
-        ? {
-            landing: {
-              bar: lastBar,
-              chords: last.spans
-                .filter((span) => !span.tied)
-                .map((span) => ({
-                  chord: span.chord,
-                  at: span.start / last.ticks,
-                  span: span.duration / last.ticks,
-                })),
-            },
-          }
-        : {}),
-    };
-  }
-
-  const shownTempo = Math.round(plan.tempo);
-  const soloist = SOLO_INSTRUMENTS[settings.soloInstrument]?.name;
+  const shownTempo = Math.round(preview.tempo);
+  const take = jam.phase === "loading" ? undefined : jam.take;
+  const isKept = take !== undefined && kept?.seed === take.options.seed;
 
   return (
-    <main className={`play${playing ? " playing" : ""}`}>
-      <header className="bar-top">
-        <a className="back" href="#/" aria-label="Back to the charts">
-          ‹<span>Charts</span>
-        </a>
-        <h1>{shown.title}</h1>
-        {entry.own ? (
+    <Stage
+      jam={jam}
+      call={call}
+      chart={chart}
+      preview={preview}
+      reading={settings.reading}
+      read={(reading) => change({ ...settings, reading })}
+      side={
+        entry.own ? (
           <a className="edit-link" href={`#/edit/${entry.id}`}>
             Edit
           </a>
@@ -172,38 +134,21 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
           >
             Edit a copy
           </button>
-        )}
-      </header>
-
-      {/* What is being played, and how the page is read. */}
-      <div className="view">
-        <p className="summary">
-          {style.name} in {keyToString(shown.key)}, {shownTempo} bpm
-        </p>
-        <fieldset className="reading" aria-label="Show chords as">
-          {READINGS.map((reading) => (
-            <button
-              key={reading}
-              type="button"
-              aria-pressed={settings.reading === reading}
-              aria-label={READING_NAMES[reading][1]}
-              onClick={() => change({ ...settings, reading })}
-            >
-              {READING_NAMES[reading][0]}
-            </button>
-          ))}
-        </fieldset>
-        <button
-          type="button"
-          className="focus-toggle"
-          aria-pressed={focus}
-          onClick={() => setFocus(!focus)}
-        >
-          Focus
-        </button>
-      </div>
-
-      {!playing && (
+        )
+      }
+      aside={
+        take && (
+          <button
+            type="button"
+            className="keep"
+            disabled={isKept}
+            onClick={() => setKept({ id: keepTake(take), seed: take.options.seed })}
+          >
+            {isKept ? "Kept" : "Keep"}
+          </button>
+        )
+      }
+      before={
         <div className="setup">
           <label>
             <span>Style</span>
@@ -312,39 +257,7 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
             </fieldset>
           </div>
         </div>
-      )}
-
-      <ChartView chart={shown} reading={settings.reading} playhead={playhead} focus={focus} />
-
-      {jam.problem && (
-        <p className="problem" role="alert">
-          {jam.problem}
-        </p>
-      )}
-
-      <footer className="bar-bottom">
-        <StatusStrip
-          plan={plan}
-          place={playing ? jam.place : undefined}
-          elapsed={jam.elapsed}
-          playing={playing}
-          soloist={settings.band.solo ? soloist : undefined}
-        />
-        {jam.phase === "idle" ? (
-          <button type="button" className="go" onClick={jam.play}>
-            Play
-          </button>
-        ) : jam.canFinish ? (
-          // One press brings the band to an ending; the button then stops it dead.
-          <button type="button" className="go stop" onClick={jam.finish}>
-            Finish
-          </button>
-        ) : (
-          <button type="button" className="go stop" onClick={jam.stop}>
-            {jam.phase === "loading" ? "Loading" : "Stop"}
-          </button>
-        )}
-      </footer>
-    </main>
+      }
+    />
   );
 }

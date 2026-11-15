@@ -7,6 +7,7 @@ import { parse, print } from "@ensemble/engine";
 import type { CSSProperties } from "react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { deleteChart, keptOnDevice, saveChart } from "../charts.ts";
+import { download, fileName } from "../download.ts";
 import type { LibraryChart } from "../library.ts";
 import { ChartView } from "../play/ChartView.tsx";
 import type { Reading } from "../play/ChordSymbol.tsx";
@@ -21,10 +22,6 @@ interface Props {
 
 /** How long typing must pause before the text is written to storage. Leaving the screen writes it at once. */
 const SAVE_AFTER_MS = 400;
-
-/** A file name for a chart: its title, without the characters some systems refuse in one. */
-const fileName = (title: string): string =>
-  `${title.replace(/[\\/:*?"<>|]+/g, "-").trim() || "chart"}.chart`;
 
 export function EditView({ entry, reading }: Props) {
   const [text, setText] = useState(entry.text);
@@ -67,15 +64,6 @@ export function EditView({ entry, reading }: Props) {
     save();
   };
 
-  const download = () => {
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(new Blob([text], { type: "text/plain;charset=utf-8" }));
-    link.download = fileName(chart.title);
-    link.click();
-    // Some browsers read the file after the click has returned.
-    setTimeout(() => URL.revokeObjectURL(link.href), 30_000);
-  };
-
   const remove = () => {
     if (!confirm(`Delete “${chart.title}”? This cannot be undone.`)) return;
     clearTimeout(timer.current);
@@ -107,7 +95,12 @@ export function EditView({ entry, reading }: Props) {
             <button type="button" onClick={format}>
               Format
             </button>
-            <button type="button" onClick={download}>
+            <button
+              type="button"
+              onClick={() =>
+                download(text, "text/plain;charset=utf-8", fileName(chart.title, "chart", ".chart"))
+              }
+            >
               Export
             </button>
             <button type="button" onClick={remove}>

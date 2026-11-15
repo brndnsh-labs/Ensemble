@@ -1,6 +1,9 @@
 // What only a real browser can prove about the app. The list is fixed in
-// docs/TESTING.md; journey 5 arrives with export.
+// docs/TESTING.md.
 
+import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { expect, test } from "@playwright/test";
 
 test("the app loads and shows the library", async ({ page }) => {
@@ -88,4 +91,36 @@ test("pressing play starts audio and advances the playhead", async ({ page }) =>
     .toBeGreaterThan(0.01);
   await expect(bars.nth(1)).toHaveAttribute("aria-current", "true");
   await expect(bars.nth(0)).not.toHaveAttribute("aria-current", "true");
+});
+
+test("export downloads a MIDI file that matches the CLI's output for the same take", async ({
+  page,
+}, info) => {
+  await page.goto("./#/chart/jazz-rhythm-changes-bb");
+  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page.getByRole("button", { name: "Keep" }).click();
+  await expect(page.getByRole("button", { name: "Kept" })).toBeDisabled();
+  // Leaving the screen stops the band: the transport's own Stop waits behind Finish, which would change the take.
+  await page.getByRole("link", { name: "Back to the charts" }).click();
+  await page.getByRole("link", { name: /^Rhythm Changes in Bb.*kept/ }).click();
+
+  const exported = async (button: string, path: string) => {
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      page.getByRole("button", { name: button }).click(),
+    ]);
+    await download.saveAs(path);
+    return download.suggestedFilename();
+  };
+  const take = info.outputPath("take.json");
+  const app = info.outputPath("app.mid");
+  const cli = info.outputPath("cli.mid");
+  expect(await exported("Export take", take)).toBe("Rhythm Changes in Bb.take.json");
+  expect(await exported("Export MIDI", app)).toBe("Rhythm Changes in Bb.mid");
+
+  const root = resolve(import.meta.dirname, "..");
+  execFileSync("node", ["packages/cli/src/main.ts", "replay", take, "--out", cli], { cwd: root });
+  const ours = readFileSync(app);
+  expect(ours.length).toBeGreaterThan(100);
+  expect(ours.equals(readFileSync(cli))).toBe(true);
 });

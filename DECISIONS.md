@@ -702,3 +702,18 @@ Done on the main thread before the takes screen was built, because it decides wh
 - **The play screen runs on the take** (`play/jam.ts`: a `Call` is a chart, a style and how to play it; with a seed it is one take, without one each press of play is a new take). The worker also writes a take as a MIDI file (`midiOf`), with the same call the CLI makes.
 - **No new property.** The join is a filter over two takes the existing properties already hold to account, and smoke journey 5 will compare the app's file with the CLI's. An ending now costs two renders: 0.6 s for a fifteen-minute jam on this machine, which the page allows for when it picks the phrase to turn at.
 - **A limit, not solved**: a kept take is exact for the build that made it. When a style or a player changes, an old seed plays something else.
+
+## takes and export (stage 6, part 3)
+
+Built to `prompts/app-takes.md`. What that brief did not settle:
+
+- **The charts and the takes share one stored-list module** (`stored.ts`): loading with a filter, writing, the `storage` event, listeners, new ids. Each keeps its own shape and what the screens are shown. Anything not a take is dropped from the list, so the next write removes it from storage too, as with charts: an older build opened after a newer one would lose the newer one's takes.
+- **The take file's text is written by the engine** (`recipeText` beside `TakeRecipe`), and the CLI's `writeRecipe` calls it, so the app and the CLI cannot drift apart on the format.
+- **"The jam a take came from" is its seed.** A new press of Play is a new random seed; the play screen follows a kept take only while `jam.take` carries that seed. Keep is hidden while a new take loads, so it never keeps the one before.
+- **`useJam` takes a listener for every change to the take**, because the last change (an open jam made into the passes it got to) happens as the screen closes, when no effect of the screen can run any more.
+- **Kept is the same button, disabled.** Pressing it again would mean nothing; removing is on the take's screen.
+- **A take's row has the round play button like every other row**, starting the take as its screen opens (the address is remembered, not the chart id, so a chart and a take cannot be confused).
+- **The take's screen is headed by its name**, and the key and tempo line under it is the one the play screen has.
+- **The day a take was kept is in the device's own way of writing dates** ("Nov 15" here, "15 Nov" in Britain), with the year only when it is not this one.
+- **A take that will not plan** (its style gone, or options this engine refuses) says so on its screen and its row, and offers only Delete.
+- **Smoke journey 5 stops the band by going back to the library.** The transport's Stop sits behind Finish, which would make a different take, and a press within 0.6 s of Finish is ignored; waiting that out is a sleep. Leaving the screen is a real way to stop the band, and goes through the same stop. Seen to fail with Export MIDI given a tempo one off.

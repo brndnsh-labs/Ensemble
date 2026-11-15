@@ -66,14 +66,25 @@ const newSeed = (): number => Math.floor(Math.random() * 2 ** 31);
 
 const passesOf = (recipe: TakeRecipe): number => recipe.options.passes ?? OPEN_PASSES;
 
-export function useJam(rig: Rig, call: Call): Jam {
+/**
+ * `changed`, when given, is told each time the take changes, as `take` is. It
+ * is told even as the screen closes, when the band is stopped and an open jam
+ * becomes the passes it got to, which `take` can no longer show.
+ */
+export function useJam(rig: Rig, call: Call, changed?: (take: TakeRecipe) => void): Jam {
   const [phase, setPhase] = useState<Phase>("idle");
   const [playing, setPlaying] = useState<Performance>();
   const [now, setNow] = useState<{ place: Place | undefined; elapsed: number }>({
     place: undefined,
     elapsed: 0,
   });
-  const [take, setTake] = useState<TakeRecipe>();
+  const [take, setShownTake] = useState<TakeRecipe>();
+  const tell = useRef(changed);
+  tell.current = changed;
+  const setTake = useCallback((next: TakeRecipe) => {
+    setShownTake(next);
+    tell.current?.(next);
+  }, []);
   const [problem, setProblem] = useState<string>();
   const [told, setTold] = useState(false);
   const running = useRef<Running>(undefined);
@@ -109,7 +120,7 @@ export function useJam(rig: Rig, call: Call): Jam {
     setPhase("idle");
     setTold(false);
     setNow({ place: undefined, elapsed: 0 });
-  }, [rig]);
+  }, [rig, setTake]);
 
   const play = () => {
     rig.wake();
@@ -243,7 +254,7 @@ export function useJam(rig: Rig, call: Call): Jam {
     };
     const timer = setInterval(look, LOOK_MS);
     return () => clearInterval(timer);
-  }, [phase, rig, stop]);
+  }, [phase, rig, stop, setTake]);
 
   // Leaving the screen stops the band.
   useEffect(() => stop, [stop]);
