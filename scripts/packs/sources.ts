@@ -137,13 +137,13 @@ export const SOURCES: readonly Source[] = [
     licenceFile: "EGuitarFSBS-clean SFZ+FLAC-20260807/LICENSE.txt",
   },
   {
-    id: "jrhodes3c",
-    title: "jRhodes3c",
+    id: "jrhodes3d",
+    title: "jRhodes3d",
     author: "Jeff Learman",
-    repo: "https://github.com/sfzinstruments/jlearman.jRhodes3c",
-    commit: "ba6000f633d0a1d405049d877851ff7cc43f108b",
-    // Not a permissive licence: non-commercial and share-alike. See DECISIONS.md.
-    licence: "CC-BY-NC-SA-4.0",
+    repo: "https://github.com/sfzinstruments/jlearman.jRhodes3d",
+    commit: "aea5b8d3e11e2f7102593789a4e0a0e41b30271a",
+    // Not a permissive licence: non-commercial. See DECISIONS.md.
+    licence: "CC-BY-NC-4.0",
     licenceFile: "LICENSE",
   },
   {
