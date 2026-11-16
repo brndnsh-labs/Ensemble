@@ -108,7 +108,7 @@ async function perform(): Promise<Performance> {
   const setup: BandSetup = {
     packs,
     packsUrl: "/assets/packs/",
-    mix: audioMix(mix),
+    mix: audioMix(levelled(mix, style, swapped)),
     ...(layers ? { load: { layers: Number(layers) } } : {}),
   };
   return {
@@ -118,6 +118,21 @@ async function perform(): Promise<Performance> {
     missing,
     bandKey: JSON.stringify([packs, layers, mix.room.seconds, mix.room.predelay]),
   };
+}
+
+/**
+ * The mix with each seat levelled for the instrument put in it, where that is one the style
+ * offers for the seat (`SoundStyle.choices`): as the app plays it.
+ */
+function levelled(mix: MixStyle, style: StylePack, swapped: ReadonlyMap<string, string>): MixStyle {
+  const seats = { ...mix.seats };
+  for (const seat of ["drums", "bass", "chords"] as const) {
+    const offered = style.sound.choices?.[seat]?.find(
+      (choice) => choice.pack === swapped.get(seat),
+    );
+    if (offered?.level) seats[seat] = { ...seats[seat], level: seats[seat].level + offered.level };
+  }
+  return { ...mix, seats };
 }
 
 function audioMix(style: MixStyle): Mix {

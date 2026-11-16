@@ -11,7 +11,7 @@ import type { PerformanceEvent } from "./perform/notes.ts";
 import { perform } from "./perform/perform.ts";
 import { planBars } from "./plan/plan.ts";
 import type { Plan, PlanOptions } from "./plan/types.ts";
-import type { StylePack } from "./style/types.ts";
+import type { Seat, StylePack } from "./style/types.ts";
 import type { Key } from "./theory/pitch.ts";
 
 export interface TakeOptions extends PlanOptions {
@@ -24,6 +24,13 @@ export interface TakeOptions extends PlanOptions {
    * the style's default. The instrument is the player's choice (BRIEF 5.3).
    */
   readonly soloInstrument?: string;
+  /**
+   * The instrument a seat is heard on, by its pack, where the style offers
+   * more than one (`SoundStyle.choices`) and the player chose. The notes are
+   * the same on any of them: nothing the engine plays reads this. It is here
+   * because it is part of what a take is when it is kept and played again.
+   */
+  readonly instruments?: Readonly<Partial<Record<Exclude<Seat, "solo">, string>>>;
   /**
    * With `endAfter`: the tick at which the band was told, the top of a phrase.
    * Up to there the take is the jam as it was going to be, and from there it is

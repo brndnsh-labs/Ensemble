@@ -8,6 +8,7 @@ import {
   pitchClass,
   plan as planOf,
   SOLO_INSTRUMENTS,
+  seatChoice,
 } from "@ensemble/engine";
 import { STYLES, styleById } from "@ensemble/styles";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -40,6 +41,9 @@ const SEAT_NAMES: Readonly<Record<Seat, string>> = {
   solo: "Soloist",
 };
 
+/** The seats whose instrument a style may offer a choice of. The soloist's has its own list. */
+const BAND_SEATS = ["drums", "bass", "chords"] as const;
+
 /** The twelve keys of a mode, as they are conventionally written. */
 const keysOf = (mode: Key["mode"]): Key[] =>
   Array.from({ length: 12 }, (_, pc) => conventionalKey(pc, mode, true));
@@ -70,8 +74,19 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
       key: choices.key === undefined ? null : parseKey(choices.key),
       band: settings.band,
       soloInstrument,
+      instruments: choices.instruments,
     }),
-    [entry.text, style, song, settings.minutes, tempo, choices.key, settings.band, soloInstrument],
+    [
+      entry.text,
+      style,
+      song,
+      settings.minutes,
+      tempo,
+      choices.key,
+      settings.band,
+      soloInstrument,
+      choices.instruments,
+    ],
   );
 
   const chart = useMemo(() => chartOf(setup.text, setup.key), [setup.text, setup.key]);
@@ -154,8 +169,8 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
             <select
               value={style.id}
               onChange={(e) => {
-                // Another style brings its own soloist: an instrument chosen for the last one goes.
-                const { soloInstrument: _, ...rest } = choices;
+                // Another style brings its own band: instruments chosen for the last one go.
+                const { soloInstrument: _, instruments: __, ...rest } = choices;
                 change({
                   ...settings,
                   charts: { ...settings.charts, [entry.id]: { ...rest, style: e.target.value } },
@@ -258,6 +273,27 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
                   {SEAT_NAMES[seat]}
                 </button>
               ))}
+              {BAND_SEATS.map((seat) => {
+                // An instrument is chosen only where the style has more than one for the seat.
+                const offered = style.sound.choices?.[seat];
+                if (!offered || !settings.band[seat]) return null;
+                return (
+                  <select
+                    key={seat}
+                    aria-label={`${SEAT_NAMES[seat]}: the instrument`}
+                    value={seatChoice(style, seat, choices.instruments).pack}
+                    onChange={(e) =>
+                      choose({ instruments: { ...choices.instruments, [seat]: e.target.value } })
+                    }
+                  >
+                    {offered.map((choice) => (
+                      <option key={choice.pack} value={choice.pack}>
+                        {choice.name}
+                      </option>
+                    ))}
+                  </select>
+                );
+              })}
               {settings.band.solo && (
                 <select
                   aria-label="The soloist's instrument"

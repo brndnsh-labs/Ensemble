@@ -10,6 +10,12 @@ import { STYLES } from "@ensemble/styles";
 export const PACK_IDS: readonly string[] = [
   ...new Set([
     ...STYLES.flatMap((style) => Object.values(style.sound.packs)),
+    // The instruments a seat may be played on in place of the style's own.
+    ...STYLES.flatMap((style) =>
+      Object.values(style.sound.choices ?? {}).flatMap((offered) =>
+        offered.map((choice) => choice.pack),
+      ),
+    ),
     ...Object.keys(SOLO_INSTRUMENTS),
   ]),
 ].sort();

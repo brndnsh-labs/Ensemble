@@ -54,8 +54,18 @@ for (const style of STYLES.filter((s) => wanted.length === 0 || wanted.includes(
     read((await renderAudio("levels", { ...take, ...query })).path);
 
   console.log(`\n${style.name} (${chart})`);
-  for (const seat of ["drums", "bass", "chords"]) {
-    console.log(`  ${seat.padEnd(18)}${show((await measure({ only: seat })).loudness)} LUFS`);
+  for (const seat of ["drums", "bass", "chords"] as const) {
+    const own = (await measure({ only: seat })).loudness;
+    console.log(`  ${seat.padEnd(18)}${show(own)} LUFS`);
+    // Another instrument the seat may be played on, at its own level in the mix: it should
+    // read what the style's own does.
+    for (const choice of (style.sound.choices?.[seat] ?? []).slice(1)) {
+      const other = (await measure({ only: seat, packs: `${seat}:${choice.pack}` })).loudness;
+      console.log(
+        `  ${`  on ${choice.name}`.padEnd(18)}${show(other)} LUFS, ${show(other - own)} dB against the style's own ` +
+          `(its level in the mix: ${choice.level ?? 0} dB)`,
+      );
+    }
   }
   const band = await measure({ only: "drums,bass,chords" });
   console.log(`  ${"the band".padEnd(18)}${show(band.loudness)} LUFS`);

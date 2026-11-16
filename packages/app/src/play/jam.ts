@@ -20,6 +20,7 @@ import {
   planBar,
   RECIPE_VERSION,
   render,
+  seatChoice,
   secondsAt,
   timedNotes,
   transpose,
@@ -42,6 +43,8 @@ export interface JamSetup {
   /** Who plays. */
   readonly band: Readonly<Record<Seat, boolean>>;
   readonly soloInstrument: string;
+  /** The instrument a seat is played on, where the player chose one of the style's others. */
+  readonly instruments: HowPlayed["instruments"];
 }
 
 /** How a take is played, with or without the seed that makes it one take. */
@@ -75,6 +78,9 @@ export function takeOptions(setup: JamSetup): HowPlayed {
     ...(setup.key === null ? {} : { key: setup.key }),
     solo: setup.band.solo,
     soloInstrument: setup.soloInstrument,
+    ...(setup.instruments && Object.keys(setup.instruments).length > 0
+      ? { instruments: setup.instruments }
+      : {}),
     without: SEAT_ORDER.filter((seat) => seat !== "solo" && !setup.band[seat]),
   };
 }
@@ -125,14 +131,30 @@ export function chairsOf(style: StylePack, options: HowPlayed): Chair[] {
     seat === "solo" ? options.solo === true : !out.includes(seat),
   ).map((seat) => ({
     pack:
-      seat === "solo" ? (options.soloInstrument ?? style.solo.instrument) : style.sound.packs[seat],
+      seat === "solo"
+        ? (options.soloInstrument ?? style.solo.instrument)
+        : seatChoice(style, seat, options.instruments).pack,
     channel: seat,
   }));
 }
 
-export function mixOf(style: StylePack): Mix {
+/** The style's mix, with each seat levelled for the instrument that plays it in this take. */
+export function mixOf(style: StylePack, options: HowPlayed): Mix {
   const { seats, room, master } = style.sound.mix;
-  return { channels: seats, room, master };
+  const levelled = (seat: Exclude<Seat, "solo">) => ({
+    ...seats[seat],
+    level: seats[seat].level + (seatChoice(style, seat, options.instruments).level ?? 0),
+  });
+  return {
+    channels: {
+      ...seats,
+      drums: levelled("drums"),
+      bass: levelled("bass"),
+      chords: levelled("chords"),
+    },
+    room,
+    master,
+  };
 }
 
 /** A take as sounds for the sampler, in the order they start. */

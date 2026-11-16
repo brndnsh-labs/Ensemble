@@ -130,7 +130,10 @@ export function useJam(rig: Rig, call: Call, changed?: (take: TakeRecipe) => voi
     const recipe = recipeOf(call, call.options.seed ?? newSeed());
     setProblem(undefined);
     setPhase("loading");
-    Promise.all([perform(recipe), rig.seat(chairsOf(style, recipe.options), mixOf(style))]).then(
+    Promise.all([
+      perform(recipe),
+      rig.seat(chairsOf(style, recipe.options), mixOf(style, recipe.options)),
+    ]).then(
       ([made]) => {
         if (presses.current !== mine) return;
         running.current = {

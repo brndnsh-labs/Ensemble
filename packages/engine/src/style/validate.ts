@@ -55,6 +55,35 @@ export function validateStyle(style: StylePack): string[] {
   for (const [seat, pack] of Object.entries(style.sound.packs)) {
     check(pack.length > 0, `sound: ${seat} needs a pack`);
   }
+  for (const [seat, offered] of Object.entries(style.sound.choices ?? {})) {
+    const own = style.sound.packs[seat as keyof typeof style.sound.packs];
+    check(
+      offered.length >= 2,
+      `sound: ${seat} offers ${offered.length} instruments; a choice is two or more`,
+    );
+    check(
+      offered[0]?.pack === own,
+      `sound: the first instrument offered for ${seat} is the style's own, "${own}"`,
+    );
+    check(
+      new Set(offered.map((choice) => choice.pack)).size === offered.length,
+      `sound: ${seat} offers an instrument twice`,
+    );
+    for (const choice of offered) {
+      check(
+        choice.pack.length > 0 && choice.name.length > 0,
+        `sound: an instrument offered for ${seat} needs a pack and a name`,
+      );
+      check(
+        choice.level === undefined || Math.abs(choice.level) <= 12,
+        `sound: "${choice.pack}" on ${seat} is levelled by ${choice.level} dB; within 12`,
+      );
+    }
+    check(
+      offered[0]?.level === undefined,
+      `sound: the mix is set for ${seat}'s own instrument, which takes no level of its own`,
+    );
+  }
   for (const [seat, mix] of Object.entries(style.sound.mix.seats)) {
     check(mix.level >= -40 && mix.level <= 12, `sound: ${seat} level is -40 to 12 dB`);
     check(mix.pan === undefined || Math.abs(mix.pan) <= 1, `sound: ${seat} pan is -1 to 1`);

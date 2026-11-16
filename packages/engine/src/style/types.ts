@@ -174,7 +174,47 @@ export interface SoundStyle {
    * has none: its pack is named after its instrument, which is the player's choice.
    */
   readonly packs: Readonly<Record<Exclude<Seat, "solo">, string>>;
+  /**
+   * Where a seat's part can be played on more than one instrument (a strummed
+   * part on a steel-string guitar or a nylon-string one), the instruments the
+   * player may choose from. The first is the style's own, the pack `packs`
+   * names, listed so that it has a name to be chosen by. Left out for a seat,
+   * there is nothing to choose. The notes are the same whichever plays them.
+   */
+  readonly choices?: Readonly<Partial<Record<Exclude<Seat, "solo">, readonly SeatChoice[]>>>;
   readonly mix: MixStyle;
+}
+
+/** An instrument a seat's part can be played on. */
+export interface SeatChoice {
+  /** The pack's id. */
+  readonly pack: string;
+  /** The name the player chooses it by. */
+  readonly name: string;
+  /**
+   * Decibels added to the seat's level in the mix while this instrument plays
+   * it, so that the band is as loud on one as on another. Measured, like the
+   * mix (`pnpm levels`). Left out: none.
+   */
+  readonly level?: number;
+}
+
+/**
+ * The instrument that plays a seat in a take: the one the player chose
+ * (`TakeOptions.instruments`), where the style offers it, and otherwise the
+ * style's own.
+ */
+export function seatChoice(
+  style: StylePack,
+  seat: Exclude<Seat, "solo">,
+  chosen: Readonly<Partial<Record<Exclude<Seat, "solo">, string>>> | undefined,
+): SeatChoice {
+  const own = style.sound.packs[seat];
+  const offered = style.sound.choices?.[seat] ?? [];
+  return (
+    offered.find((choice) => choice.pack === chosen?.[seat]) ??
+    offered.find((choice) => choice.pack === own) ?? { pack: own, name: own }
+  );
 }
 
 export interface MixStyle {

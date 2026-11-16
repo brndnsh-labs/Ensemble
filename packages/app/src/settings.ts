@@ -20,6 +20,11 @@ export interface ChartChoices {
    * Unset: the style's own (a lead guitar in rock, an alto in the blues).
    */
   readonly soloInstrument?: string;
+  /**
+   * The instrument a seat is played on, by its pack, where the style offers
+   * more than one and the player has chosen for this chart. Unset: the style's own.
+   */
+  readonly instruments?: Readonly<Partial<Record<Exclude<Seat, "solo">, string>>>;
 }
 
 export interface Settings {
