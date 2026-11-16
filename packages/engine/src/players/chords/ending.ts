@@ -29,7 +29,13 @@ export function endingStrikes(
   const own = stretches(bar, harmony, Math.max(0, first));
   const final = own.find((stretch) => stretch.start === from && stretch.chord !== null);
   const strikes: Strike[] = [];
-  const strike = (tick: number, duration: number, velocity: number, arrival: Arrival) =>
+  const strike = (
+    tick: number,
+    duration: number,
+    velocity: number,
+    arrival: Arrival,
+    again = false,
+  ) =>
     strikes.push({
       bar: bar.index,
       tick,
@@ -39,6 +45,7 @@ export function endingStrikes(
       kind,
       // The final chord is a downstroke on a guitar, wherever it lands (CH-74).
       down: true,
+      ...(again ? { again: true as const } : {}),
     });
 
   // A chord on the way to the final one (the V of a last bar that gets home itself).
@@ -74,7 +81,7 @@ export function endingStrikes(
         break;
       }
       strike(from, button - from, level, arrival);
-      strike(button, Math.min(EIGHTH, until - button), level + chords.ending.accent, arrival);
+      strike(button, Math.min(EIGHTH, until - button), level + chords.ending.accent, arrival, true);
       break;
     }
     case "hits": {

@@ -42,6 +42,12 @@ export interface Strike {
    * the grip under it is the one a strum would sound.
    */
   readonly pluck?: readonly PickPlace[];
+  /**
+   * The chord just struck, struck again: an ending's button (EN-17). The hand
+   * has not moved, so it sounds the notes the strike before it did, whatever
+   * the soloist has done since.
+   */
+  readonly again?: true;
 }
 
 /**

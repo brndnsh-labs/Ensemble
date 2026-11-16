@@ -340,6 +340,13 @@ export function voiceStrikes(
       }
       wayAt.set(at, way);
     }
+    // The chord just struck, struck again (the button): the hand is where it was, and a
+    // soloist still sounding over it does not make it choose again.
+    const before = voiced.at(-1);
+    if (strike.again && before && before.strike.arrival === strike.arrival) {
+      voiced.push({ strike, voicing: before.voicing });
+      continue;
+    }
     const line = lines[i] ?? null;
     if (line) away = true;
     // A choice that hears the line, or is on its way home from one, is its own: only a

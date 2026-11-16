@@ -298,7 +298,30 @@ function approach(
   let candidates = playable.filter(
     (pitch) => previous === null || Math.abs(pitch - previous) <= OCTAVE,
   );
-  // Nothing in reach, and the line is about to leap further still: break the fall where it can.
+  // Nothing in reach, and the line is about to leap further still (it has climbed, and the
+  // next root sits more than an octave under it with every note beside that root out of
+  // reach too). The line comes down through the chord it is on: a note no more than an
+  // octave from the line and from the landing, so that neither move is a leap (BA-21); the
+  // chord's root before its fifth before its other tones, and then a note of its scale. Not
+  // the landing's own note, which is not heard early (BA-34), and not a note a step from it
+  // by name: that would be a leading tone that does not lead (BA-05). With no such note, the
+  // fall is broken where it can be.
+  if (candidates.length === 0 && bridging && previous !== null) {
+    const tones = chordTones(chord.quality);
+    const rank = (pitch: number): number => {
+      const at = tones.findIndex((tone) => mod12(pitch - root - tone.interval) === 0);
+      if (at < 0) return tones.length;
+      return tones[at]!.role === "root" ? -2 : tones[at]!.role === "fifth" ? -1 : at;
+    };
+    const through: number[] = [];
+    for (let pitch = LOW_E; pitch <= TOP; pitch++) {
+      const named = Math.min(mod12(pitch - target), mod12(target - pitch));
+      if (named <= 2 || !(rank(pitch) < tones.length || inScale(pitch))) continue;
+      if (Math.abs(pitch - previous) > OCTAVE || Math.abs(pitch - target) > OCTAVE) continue;
+      through.push(pitch);
+    }
+    candidates = through.sort((x, y) => rank(x) - rank(y) || nearLine(x, y)).slice(0, 1);
+  }
   if (candidates.length === 0 && bridging) candidates = [...playable].sort(nearLine).slice(0, 1);
   // A lead-in that repeats the note before it is a repeat, not a lead-in (BA-10), unless
   // it is the only way onto the string.
