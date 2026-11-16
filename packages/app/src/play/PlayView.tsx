@@ -131,6 +131,14 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
     return all && settings.band[seat] ? [[seat, all] as const] : [];
   });
 
+  // What is heard is who is in the take and still switched on. A seat switched off while the
+  // band plays is its channel taken down, and its part goes on underneath, so switching it
+  // on again brings it back in time. The take is not changed: kept or exported, it is what
+  // the whole band played.
+  useEffect(() => {
+    for (const seat of jam.seats ?? []) rig.hush(seat, !settings.band[seat]);
+  }, [rig, jam.seats, settings.band]);
+
   return (
     <Stage
       jam={jam}
@@ -306,10 +314,14 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
           )}
           <fieldset className="seats" aria-label="Band">
             {SEAT_ORDER.map((seat) => {
+              // Switched on while the band plays a take it is not in: there is no part to bring in,
+              // so the button says when it will be heard.
+              const waiting = jam.seats !== undefined && !jam.seats.includes(seat);
               return (
                 <button
                   key={seat}
                   type="button"
+                  className={waiting && settings.band[seat] ? "next" : undefined}
                   aria-pressed={settings.band[seat]}
                   onClick={() =>
                     change({
@@ -319,6 +331,8 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
                   }
                 >
                   {SEAT_NAMES[seat]}
+                  {/* The space is for whoever hears the button read out. */}
+                  {waiting && settings.band[seat] && <small> next time</small>}
                 </button>
               );
             })}

@@ -145,6 +145,8 @@ export function useJam(rig: Rig, call: Call, changed?: (take: TakeRecipe) => voi
     const recipe = recipeOf(call, call.options.seed ?? newSeed());
     setProblem(undefined);
     setPhase("loading");
+    // Whoever was silenced in the last take is heard in this one, if they are in it.
+    rig.unhush();
     setSeats(seatsOf(recipe.options));
     Promise.all([
       perform(recipe),
