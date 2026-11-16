@@ -1245,3 +1245,49 @@ From the study (2026-11-16): "neo-soul - B / reggae - F / funk - B".
 - **Disco: the softer touch too, by the main thread's reading and not by his ear.** Disco was not in the study. He named it among the styles whose bass was harsh, it plays the hardest recordings as often as funk does (51% of notes), and he chose this for funk. To be told plainly and undone if he says so.
 - **Rock is left as it was**: he passed it earlier and did not name it.
 - Measured after (`pnpm levels`): with everyone playing, funk -17.1 LUFS, disco -17.0, neo-soul -17.6, reggae -17.1 with the alto 1.1 dB under the band. All where they were. Notes are untouched: no golden and no scorecard reads a sound.
+
+## the interface pass, first half (stage 6)
+
+Built to `prompts/app-interface-pass.md`. What that brief did not settle:
+
+**Stopping**
+
+- **Play and Stop are one button, in one place and the same ink**, and Finish is an outline to its left. Stop in the pencil's red was tried and taken out: red is for what is wrong and for the last pass, and a red button was louder than the chart.
+- **Finish is there from the press of Play**, not from the first note, so nothing arrives beside Stop a second later. It cannot be pressed until the band is in, says "Finishing" once the band is told or is in its last pass by itself, and is as wide as that word so the change moves nothing. A song has no Finish, and nothing in its place.
+- **A press of Stop within 0.4 s of Play is the same tap twice** and is ignored, now that Stop is where Play was. The old guard (Stop within 0.6 s of Finish) is gone: they are two buttons.
+- **The space bar is the transport wherever the focus is, except in a text box or a list of choices.** A seat silenced with the mouse keeps the focus, and a space bar that brought it back when the player reached to stop the band would be the wrong thing. A button under the focus is still pressed with Enter.
+- **The setup leaves at the press of Play**, not when the band starts: the press is answered at once, and nothing set while the band loads could change that take anyway. While it loads the strip says "Loading the band" and the button, already Stop, calls it off.
+
+**Mutes**
+
+- **The band's seats are a row under the chart**, over the transport, in the same place before and during play; the rest of the setup still leaves. The footer is three rows on a phone (the strip, the seats, what to press), two from 820 px wide, one from 1100.
+- **A mute is the seat's channel taken all the way down through `Mixer.adjust`** (a level of minus infinity; the reverb is fed after the level). Nothing was added to the audio package. Everyone is heard again at each press of Play.
+- **Four separate switches, not a joined row**, since any of them can be on; a joined row is kept for choices of one (how the page is read, the editor's two sides). A seat in the band is a tint of ink, one out of it an empty outline; filled ink is left to the transport.
+- **"next time" is written in the button**, hatched and with a dashed edge, for a seat switched on while the band plays a take it is not in.
+- **While the band plays, the strip's soloist line follows the take, not the switches**: a soloist silenced still has its solos marked, for a player who wants to take them.
+- **The instrument choices sit over the seats, named "Chords played on" and "Soloist plays"**, from the right so the soloist's stands over its seat. Before play only. Any seat a style gives a choice for gets one.
+
+**The home screen**
+
+- **Recent is what had its play button pressed**, on its own screen or its row: five shown, twelve remembered (`recent.ts`, a stored list like the charts and takes). Keeping a take does not put it there; its chart, just played, is.
+- **Until something has been played, "Start here" stands in Recent's place**: a blues in A, a four-chord song in G and a funk vamp in A.
+- **A chart's actions are behind the word More on its row**, one row open at a time: Edit, Rename, Duplicate, Export, Delete. Four buttons on every row was a wall of them on a phone. Rename is typed in the row, and rewrites only the chart's `title:` line (or adds one), so the rest of the text stays as typed. A duplicate is named "… copy".
+- **With nothing typed and no style chosen, the built-in charts are shown as their styles**, each a row naming its charts and a tap from them: eight rows in place of fifty-one. Search looks for each word in the title and the style's name, or as the key. What is being looked for is kept by the app for the visit, so it is still set on coming back from a chart.
+- **Home keeps no Takes shelf.** A take is a performance of a chart and is found on that chart's play screen, before the band starts, as a line of links (the time it was kept if today, else the day, and its length). A take now records its chart's id (`KeptTake.chart`); one kept before is matched by the chart's text, then its title. **Takes whose chart is gone get a shelf on the home screen**, there only when there are any. A take's screen goes back to its chart.
+
+**Export**
+
+- **Export MIDI is beside Keep**, for the take as it stands: for a jam with no set length still playing, that is the passes made so far. The file is named for the chart.
+
+**The look**
+
+- **`--chart-face`** is used by the chart (chords, section marks) and by the screen's title on the play screen, a take's screen and the editor. Checked with a system serif that has no width axis, on four charts at both sizes: every bar inside the frame and no chord wider than its slot; a crowded chord is then made smaller, where Archivo is made narrower first.
+- **A choice carries its name inside its own box**, small, over what is chosen, and the box draws its own arrow. A row of labels over the row of boxes cost a phone 16 px a row.
+- **Anything pressed is 44 px tall**, 38 under a mouse on a wide screen (`--control`).
+- **A phone on its side** (under 500 px tall) puts the screen's name and how it is read on one line.
+- **Fixed in passing: the chart chose its layout after the 8 px floor was applied**, so a long song on a short screen kept four bars to a line and ran off the bottom when eight would have fitted. The two layouts are now compared before the floor.
+- **`out/ui-pass/`** (the pictures of this pass) is ignored by git.
+
+**Tests**
+
+- **Smoke journey 1** also finds a built-in chart through the search box, since they are no longer all listed. **Journey 5** exports the MIDI file from the play screen while the band plays, keeps the take, leaves (which stops the band), comes back through Recent, opens the kept take from the chart's screen, and exports the take and the MIDI file again there; both MIDI files are compared with the CLI's. Seen to fail with the play screen's export given a tempo one off. Journeys 2, 3 and 4 are as they were.

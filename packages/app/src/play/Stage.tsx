@@ -27,6 +27,8 @@ interface Props {
   readonly preview: Plan;
   /** The screen's name, when it is not the chart's title. */
   readonly title?: string;
+  /** What kind of thing the screen shows, when it is not a chart: said before the style, key and tempo. */
+  readonly about?: string;
   /** Where the way back goes, when it is not to the charts. */
   readonly back?: { readonly href?: string; readonly label?: string; readonly said?: string };
   readonly reading: Reading;
@@ -107,8 +109,8 @@ const READING_NAMES: Readonly<Record<Reading, readonly [shown: string, said: str
 };
 
 export function Stage(props: Props) {
-  const { jam, call, chart, preview, title, back, reading, read, side, before, band, aside } =
-    props;
+  const { jam, call, chart, preview, reading, read } = props;
+  const { title, about, back, side, before, band, aside } = props;
   const problem = jam.problem ?? props.problem;
   const [focus, setFocus] = useState(false);
 
@@ -162,38 +164,42 @@ export function Stage(props: Props) {
 
   return (
     <main className={`play${playing ? " playing" : ""}`}>
-      <header className="bar-top">
-        <Back {...back} />
-        <h1>{title ?? shown.title}</h1>
-        {side}
-      </header>
+      {/* The screen's name and how the page is read: two lines, or one where a phone on its side has no height to spare. */}
+      <div className="top">
+        <header className="bar-top">
+          <Back {...back} />
+          <h1>{title ?? shown.title}</h1>
+          {side}
+        </header>
 
-      {/* What is being played, and how the page is read. */}
-      <div className="view">
-        <p className="summary">
-          {style.name} in {keyToString(shown.key)}, {Math.round(plan.tempo)} bpm
-        </p>
-        <fieldset className="reading" aria-label="Show chords as">
-          {READINGS.map((way) => (
-            <button
-              key={way}
-              type="button"
-              aria-pressed={reading === way}
-              aria-label={READING_NAMES[way][1]}
-              onClick={() => read(way)}
-            >
-              {READING_NAMES[way][0]}
-            </button>
-          ))}
-        </fieldset>
-        <button
-          type="button"
-          className="focus-toggle"
-          aria-pressed={focus}
-          onClick={() => setFocus(!focus)}
-        >
-          Focus
-        </button>
+        {/* What is being played, and how the page is read. */}
+        <div className="view">
+          <p className="summary">
+            {about && `${about}: `}
+            {style.name} in {keyToString(shown.key)}, {Math.round(plan.tempo)} bpm
+          </p>
+          <fieldset className="reading" aria-label="Show chords as">
+            {READINGS.map((way) => (
+              <button
+                key={way}
+                type="button"
+                aria-pressed={reading === way}
+                aria-label={READING_NAMES[way][1]}
+                onClick={() => read(way)}
+              >
+                {READING_NAMES[way][0]}
+              </button>
+            ))}
+          </fieldset>
+          <button
+            type="button"
+            className="focus-toggle"
+            aria-pressed={focus}
+            onClick={() => setFocus(!focus)}
+          >
+            Focus
+          </button>
+        </div>
       </div>
 
       {/* Gone from the press of play, not from the first note: the press is answered at once. */}

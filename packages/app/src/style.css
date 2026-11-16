@@ -89,6 +89,106 @@ fieldset {
   outline-offset: 2px;
 }
 
+/* ── Things pressed ──────────────────────────────────────────────────────── */
+
+/* A plain control is an outline in ink, a fingertip tall. What is switched on is filled,
+   and the one thing a screen is for (Play) is filled and round. */
+.reading button,
+.focus-toggle,
+.edit-link,
+.tools button,
+.seats button,
+.keep,
+.actions button,
+.actions label,
+.tune-tools a,
+.tune-tools button,
+.shelf-note button,
+.side,
+.fix,
+.grid-remove,
+.choice {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--control);
+  padding: 0 14px;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--round);
+  background: none;
+  color: var(--ink);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+button[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* What cannot be undone is the red pencil's. */
+button.danger {
+  border-color: var(--pencil);
+  color: var(--pencil);
+}
+
+button:disabled {
+  cursor: default;
+}
+
+/* A press is answered where it lands. */
+button:active:not(:disabled),
+.actions label:active,
+.tune-tools a:active,
+.edit-link:active,
+.to-play:active {
+  transform: translateY(1px);
+}
+
+/* Under a mouse, a control says it can be pressed before it is. */
+@media (hover: hover) {
+  :is(
+    .reading button,
+    .focus-toggle,
+    .edit-link,
+    .tools button,
+    .seats button,
+    .keep,
+    .actions button,
+    .actions label,
+    .tune-tools a,
+    .tune-tools button,
+    .shelf-note button,
+    .side,
+    .fix,
+    .grid-remove,
+    .choice,
+    .finish,
+    .tune-more,
+    .stepper button,
+    .kept a,
+    .back
+  ):not(:disabled, [aria-pressed="true"], .first):hover {
+    background: var(--wash);
+  }
+
+  .tune:hover .tune-title,
+  .style-line:hover .tune-title {
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
+  }
+
+  .tune-play:hover {
+    border-color: var(--on-marker);
+    background: var(--marker);
+    color: var(--on-marker);
+  }
+}
+
 /* ── A choice in a box ───────────────────────────────────────────────────── */
 
 /* A choice with its name written inside its own box, small, over what is chosen: the box
@@ -152,7 +252,9 @@ fieldset {
   pointer-events: none;
 }
 
-.field :focus-visible {
+/* The ring goes round the whole box, not the choice inside it. */
+.field select:focus-visible,
+.field input:focus-visible {
   outline: none;
 }
 
@@ -297,9 +399,9 @@ fieldset {
 }
 
 .tune-play:active {
+  border-color: var(--on-marker);
   background: var(--marker);
   color: var(--on-marker);
-  border-color: var(--on-marker);
 }
 
 /* What can be done to a chart of the player's own waits behind this word. */
@@ -318,26 +420,6 @@ fieldset {
 .tune-more[aria-expanded="true"] {
   background: var(--wash);
   color: var(--ink);
-}
-
-/* The plain controls of the home screen: outlines, as everywhere. */
-.actions button,
-.actions label,
-.tune-tools a,
-.tune-tools button,
-.shelf-note button {
-  display: inline-flex;
-  align-items: center;
-  height: var(--control);
-  padding: 0 14px;
-  border: 1.5px solid var(--ink);
-  border-radius: var(--round);
-  background: none;
-  color: inherit;
-  font-size: 0.9375rem;
-  font-weight: 600;
-  text-decoration: none;
-  cursor: pointer;
 }
 
 .actions {
@@ -383,13 +465,6 @@ fieldset {
   cursor: default;
 }
 
-/* What cannot be undone is the red pencil's. */
-.danger,
-.tune-tools .danger {
-  border-color: var(--pencil);
-  color: var(--pencil);
-}
-
 .tune-tools .danger {
   margin-left: auto;
 }
@@ -407,6 +482,19 @@ fieldset {
 
 .finder .field.pick {
   flex: 0 0 9.5rem;
+}
+
+/* The cross that empties the search box, drawn in the page's ink in place of each browser's own. */
+.finder input::-webkit-search-cancel-button {
+  width: 18px;
+  height: 18px;
+  margin: 0 0 0 6px;
+  background: var(--faint);
+  cursor: pointer;
+  appearance: none;
+  mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cpath d='M4 4l10 10M14 4L4 14' stroke='black' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E")
+    center / contain no-repeat;
 }
 
 .finder input::placeholder {
@@ -452,6 +540,13 @@ fieldset {
 .colophon a,
 .credits a {
   color: var(--ink);
+}
+
+/* A line of small print is still pressed with a fingertip. */
+.colophon a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control);
 }
 
 .credits h1 {
@@ -535,28 +630,6 @@ fieldset {
   white-space: nowrap;
 }
 
-/* A plain control is an outline in ink. What is switched on is filled. */
-.reading button,
-.focus-toggle,
-.edit-link,
-.tools button,
-.seats button,
-.keep {
-  height: var(--control);
-  padding: 0 12px;
-  border: 1.5px solid var(--ink);
-  border-radius: var(--round);
-  background: none;
-  font-size: 0.9375rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-button[aria-pressed="true"] {
-  background: var(--ink);
-  color: var(--paper);
-}
-
 /* One of several ways to read the page: a row of joined buttons, since only one is ever on. */
 .reading {
   display: flex;
@@ -584,15 +657,6 @@ button[aria-pressed="true"] {
 .focus-toggle,
 .edit-link {
   flex: none;
-}
-
-.edit-link,
-.to-play {
-  display: inline-flex;
-  align-items: center;
-  color: inherit;
-  text-decoration: none;
-  white-space: nowrap;
 }
 
 .view {
@@ -688,12 +752,13 @@ button[aria-pressed="true"] {
 /* What a seat is played on, over the seats: it grows upward, so the seats do not move. */
 .band-picks {
   display: flex;
-  gap: 8px;
+  justify-content: flex-end;
+  gap: 6px;
 }
 
+/* Half the row each, from the right: the soloist's choice stands over the soloist's seat. */
 .band-picks .field {
-  flex: 1 1 0;
-  max-width: 16rem;
+  flex: 0 1 calc(50% - 3px);
 }
 
 /* Four switches, each its own button: any of them can be on. */
@@ -703,11 +768,8 @@ button[aria-pressed="true"] {
 }
 
 .seats button {
-  display: flex;
   flex: 1 1 0;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
   min-width: 0;
   padding: 0 4px;
   font-weight: 650;
@@ -1029,7 +1091,7 @@ button[aria-pressed="true"] {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 10px;
+  gap: 8px;
   padding: 8px var(--gutter) 10px;
 }
 
@@ -1117,7 +1179,7 @@ button[aria-pressed="true"] {
 .take-tools {
   display: flex;
   flex: 1 1 auto;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
 }
 
@@ -1125,7 +1187,7 @@ button[aria-pressed="true"] {
   display: flex;
   flex: none;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   margin-left: auto;
 }
 
@@ -1133,7 +1195,7 @@ button[aria-pressed="true"] {
    so that whichever it says, it is the first choice. */
 .go {
   flex: none;
-  width: 108px;
+  width: 96px;
   height: 52px;
   border: 2px solid var(--ink);
   border-radius: 26px;
@@ -1148,60 +1210,137 @@ button[aria-pressed="true"] {
    that saying the band is on its way home moves nothing. */
 .finish {
   flex: none;
-  width: 92px;
+  width: 84px;
   height: var(--control);
+  padding: 0;
   border: 1.5px solid var(--ink);
   border-radius: calc(var(--control) / 2);
   background: none;
   font-size: 1rem;
-  font-stretch: 80%;
+  font-stretch: 78%;
   font-weight: 700;
 }
 
 .finish:disabled {
   border-color: var(--rule);
   color: var(--faint);
-  cursor: default;
 }
 
 /* Keeping the take and taking it away: quieter still. */
 .keep {
   flex: none;
-  height: var(--control);
-  padding: 0 14px;
-  border: 1.5px solid var(--ink);
-  border-radius: var(--round);
-  background: none;
-  font-size: 0.9375rem;
-  font-stretch: 88%;
+  padding: 0 10px;
+  font-stretch: 85%;
   font-weight: 650;
-  white-space: nowrap;
 }
 
 .keep:disabled {
   border-color: var(--rule);
   color: var(--faint);
-  cursor: default;
 }
 
+/* A tablet, or a phone on its side: the band beside the strip, and what to press under them. */
 @media (min-width: 820px) {
   .bar-bottom {
-    flex-wrap: nowrap;
-    gap: 20px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 8px 20px;
+    padding-bottom: 12px;
+  }
+
+  .band {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: end;
+  }
+
+  .strip {
+    grid-column: 2 / -1;
+    grid-row: 1;
+  }
+
+  /* A take's screen has no band: its strip starts at the edge. */
+  .bar-bottom:not(:has(.band)) .strip {
+    grid-column: 1 / -1;
+  }
+
+  .take-tools {
+    grid-column: 1 / 3;
+    grid-row: 2;
+    gap: 8px;
+  }
+
+  .transport {
+    grid-column: 3;
+    grid-row: 2;
+    gap: 10px;
+  }
+
+  .keep {
+    padding: 0 14px;
+  }
+
+  .finish {
+    width: 96px;
+  }
+
+  .go {
+    width: 112px;
+  }
+}
+
+/* A laptop: everything under the chart in one row. */
+@media (min-width: 1100px) {
+  .bar-bottom {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
     padding-bottom: 14px;
   }
 
   .strip {
-    flex: 1 1 0;
+    grid-column: 2;
+  }
+
+  .bar-bottom:not(:has(.band)) .strip {
+    grid-column: 1 / 3;
   }
 
   .take-tools {
-    flex: none;
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .transport {
+    grid-column: 4;
+    grid-row: 1;
   }
 
   .go {
     height: 56px;
     border-radius: 28px;
+  }
+}
+
+/* A phone on its side has width and no height: the screen's name and how it is read share a line. */
+@media (max-height: 500px) and (min-width: 600px) {
+  .top {
+    display: flex;
+    align-items: center;
+  }
+
+  .top .bar-top {
+    flex: 0 1 auto;
+    max-width: 58%;
+    padding: 4px 0 4px var(--gutter);
+  }
+
+  .top .view {
+    flex: 1;
+    padding: 4px var(--gutter) 4px 12px;
+  }
+
+  .bar-bottom {
+    padding-top: 4px;
+    padding-bottom: 6px;
   }
 }
 
@@ -1221,14 +1360,21 @@ button[aria-pressed="true"] {
   overflow: hidden;
 }
 
+/* The editor's way to the band: the one filled thing in its header. */
 .to-play {
+  display: inline-flex;
   flex: none;
-  padding: 6px 16px;
+  align-items: center;
+  height: var(--control);
+  padding: 0 18px;
   border: 1.5px solid var(--ink);
-  border-radius: 6px;
+  border-radius: calc(var(--control) / 2);
   background: var(--ink);
   color: var(--paper);
-  font-weight: 700;
+  font-stretch: 80%;
+  font-weight: 750;
+  text-decoration: none;
+  white-space: nowrap;
 }
 
 /* A phone held upright: the page above, about two fifths of the height, and the text under it. */
@@ -1269,11 +1415,7 @@ button[aria-pressed="true"] {
 .tools {
   display: flex;
   gap: 8px;
-  padding-bottom: 6px;
-}
-
-.tools button {
-  border-radius: 6px;
+  padding-bottom: 8px;
 }
 
 .tools .danger {
@@ -1291,7 +1433,7 @@ button[aria-pressed="true"] {
   flex: 1;
   min-height: 0;
   border: 1.5px solid var(--rule);
-  border-radius: 6px;
+  border-radius: var(--round);
 }
 
 .source:focus-within {
@@ -1319,7 +1461,7 @@ button[aria-pressed="true"] {
   width: 100%;
   height: 100%;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--round);
   background: transparent;
   overflow: auto;
   resize: none;
@@ -1460,6 +1602,13 @@ button[aria-pressed="true"] {
 
   .more {
     display: block;
+    min-width: var(--control);
+    min-height: var(--control);
+  }
+
+  /* A fingertip tall, however short the message. */
+  .problems li button {
+    min-height: var(--control);
   }
 
   .problems .said {
@@ -1540,25 +1689,22 @@ button[aria-pressed="true"] {
 .sides {
   display: flex;
   flex: none;
-  padding-bottom: 6px;
+  padding-bottom: 8px;
 }
 
 .side {
   flex: 1;
-  height: 36px;
-  border: 1.5px solid var(--ink);
-  background: none;
-  font-size: 0.875rem;
+  border-radius: 0;
   font-weight: 650;
 }
 
 .side:first-child {
-  border-radius: 6px 0 0 6px;
+  border-radius: var(--round) 0 0 var(--round);
 }
 
 .side:last-child {
   border-left: 0;
-  border-radius: 0 6px 6px 0;
+  border-radius: 0 var(--round) var(--round) 0;
 }
 
 .arrangement {
@@ -1595,19 +1741,6 @@ button[aria-pressed="true"] {
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 6px;
-}
-
-.fix,
-.grid-remove,
-.choice {
-  min-height: 40px;
-  padding: 0 12px;
-  border: 1.5px solid var(--ink);
-  border-radius: 6px;
-  background: none;
-  color: var(--ink);
-  font-size: 0.875rem;
-  font-weight: 650;
 }
 
 /* The sections scroll sideways under the row names, which stay put. */
@@ -1744,17 +1877,16 @@ button[aria-pressed="true"] {
 }
 
 .choice:first-child {
-  border-radius: 6px 0 0 6px;
+  border-radius: var(--round) 0 0 var(--round);
 }
 
 .choice:last-child {
-  border-radius: 0 6px 6px 0;
+  border-radius: 0 var(--round) var(--round) 0;
 }
 
 .choice:disabled {
   border-color: var(--rule);
   color: var(--faint);
-  cursor: default;
 }
 
 .choice[aria-pressed="true"]:disabled {
@@ -1762,6 +1894,7 @@ button[aria-pressed="true"] {
 }
 
 .grid-remove {
+  flex: none;
   align-self: flex-start;
   margin-top: auto;
   border-color: var(--pencil);
@@ -1772,39 +1905,32 @@ button[aria-pressed="true"] {
 
 /* In place of the setup: the take's name, and what can be done with it. */
 .take-setup {
-  align-items: end;
+  align-items: center;
 }
 
-.take-name {
-  flex: 1 1 12rem;
-  max-width: 24rem;
-}
-
-.take-name input {
-  width: 100%;
-  height: 36px;
-  padding: 0 8px;
-  border: 1.5px solid var(--ink);
-  border-radius: 6px;
-  background: none;
-  /* Sixteen pixels or more, or a phone zooms the page in when the box is touched. */
-  font-size: 16px;
-  font-weight: 600;
+.setup .field.take-name {
+  flex: 1 1 100%;
 }
 
 .take-setup .tools {
-  flex: 1 1 auto;
+  flex: 1 1 100%;
   padding-bottom: 0;
-}
-
-.take-setup .tools button {
-  height: 36px;
 }
 
 .take-setup .problem {
   flex-basis: 100%;
   padding: 0;
   font-size: 0.875rem;
+}
+
+@media (min-width: 820px) {
+  .setup .field.take-name {
+    flex: 0 1 24rem;
+  }
+
+  .take-setup .tools {
+    flex: 1 1 auto;
+  }
 }
 
 /* ── A phone held upright ────────────────────────────────────────────────── */

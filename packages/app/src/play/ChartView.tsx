@@ -67,7 +67,10 @@ const columnsOf = (sections: readonly PageSection[]): number =>
 
 /** The largest type at which a page of so many units and columns fits a box. */
 const fit = (units: number, columns: number, w: number, h: number): number =>
-  Math.max(8, Math.min(h / units, w / columns / BAR_WIDTH));
+  Math.min(h / units, w / columns / BAR_WIDTH);
+
+/** Type is never set smaller than this, in pixels: under it nothing is read, whether it fits or not. */
+const SMALLEST = 8;
 
 /**
  * Focus: the line being played and the line that comes after it, which at the
@@ -107,9 +110,11 @@ export function ChartView({ chart, reading, playhead, focus }: Props) {
     for (const widen of [1, 2]) {
       const sections = pageOf(chart, widen);
       const size = fit(unitsOf(sections, reading), columnsOf(sections), box.w, box.h);
+      // Compared before the floor is applied: of two layouts both too small to read as they
+      // stand, the one that fits the screen is still the one to take.
       if (!best || size > best.size * 1.15) best = { sections, size };
     }
-    return best!;
+    return { sections: best!.sections, size: Math.max(SMALLEST, best!.size) };
   }, [chart, reading, focus, box]);
 
   const showLabels = labelled(layout.sections);
@@ -120,7 +125,7 @@ export function ChartView({ chart, reading, playhead, focus }: Props) {
   const units = focus
     ? 2 * LINE[reading] + (showLabels ? 2 * LABEL : 0) + SECTION_GAP
     : unitsOf(sections, reading);
-  const size = focus ? fit(units, columns, box.w, box.h) : layout.size;
+  const size = focus ? Math.max(SMALLEST, fit(units, columns, box.w, box.h)) : layout.size;
   // When the width is what limits the type, the height left over opens the lines up, to a point.
   const lines = focus ? 2 : sections.reduce((sum, section) => sum + section.lines.length, 0);
   const spare = box.h / size - units;

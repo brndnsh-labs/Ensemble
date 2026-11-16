@@ -11,7 +11,7 @@ import { download, fileName } from "../download.ts";
 import type { LibraryChart } from "../library.ts";
 import { notePlayed } from "../recent.ts";
 import type { Heard, KeptTake } from "../takes.ts";
-import { deleteTake, heardAs, renameTake, takesKeptOnDevice } from "../takes.ts";
+import { dayOf, deleteTake, heardAs, renameTake, takesKeptOnDevice } from "../takes.ts";
 import { midiOf } from "./band.ts";
 import type { Reading } from "./ChordSymbol.tsx";
 import type { Call } from "./jam.ts";
@@ -125,12 +125,13 @@ function TakeStage({
       chart={heard.chart}
       preview={heard.plan}
       title={named}
+      about={`Take kept ${dayOf(take.kept)}`}
       back={backOf(chart)}
       reading={reading}
       read={read}
       before={
         <div className="setup take-setup">
-          <label className="take-name">
+          <label className="field take-name">
             <span>Name</span>
             <input
               type="text"
