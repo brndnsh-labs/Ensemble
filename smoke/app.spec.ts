@@ -12,10 +12,14 @@ test("the app loads and shows the library", async ({ page }) => {
   // Somewhere to start, a tap from playing, before anything has been played.
   await expect(page.getByRole("link", { name: "12-Bar Blues in A" })).toBeVisible();
   await expect(page.getByRole("button", { name: /^Play / })).not.toHaveCount(0);
-  // The built-in charts wait behind their styles and a search box: one of another style is a few letters away.
-  await expect(page.getByRole("button", { name: /^Jazz/ })).toBeVisible();
-  await page.getByRole("searchbox", { name: "Search" }).fill("rhythm");
+  // The wall: each style is a way into the one library. A chart of any style is a few letters
+  // away, and what the search finds is the library showing it, with the way home at its top.
+  await expect(page.getByRole("link", { name: /^Jazz/ })).toBeVisible();
+  await page.getByRole("searchbox", { name: "Find a chart" }).fill("rhythm");
   await expect(page.getByRole("link", { name: "Rhythm Changes in Bb" })).toBeVisible();
+  await expect(
+    page.getByRole("navigation", { name: "Where you are" }).getByRole("link", { name: "Home" }),
+  ).toBeVisible();
 });
 
 test("after install, the app loads offline", async ({ page, context }) => {
@@ -126,10 +130,14 @@ test("export downloads a MIDI file that matches the CLI's output for the same ta
   expect(await exported("Export MIDI", app)).toBe("Rhythm Changes in Bb.mid");
 
   // The CLI plays a take from its recipe, which a kept take's own screen exports. Leaving the
-  // screen stops the band; the chart is then first under Recent, and its kept take is on its screen.
+  // screen by its row of places stops the band; the chart is then the poster at the top of home,
+  // and its kept take is on its screen.
   await page.getByRole("button", { name: "Keep" }).click();
   await expect(page.getByRole("button", { name: "Kept" })).toBeDisabled();
-  await page.getByRole("link", { name: "Back to the charts" }).click();
+  await page
+    .getByRole("navigation", { name: "Where you are" })
+    .getByRole("link", { name: "Home" })
+    .click();
   await page.getByRole("link", { name: "Rhythm Changes in Bb" }).click();
   await page
     .getByRole("navigation", { name: "Kept takes of this chart" })

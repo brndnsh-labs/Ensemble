@@ -7,7 +7,8 @@ import type { Chart, Plan } from "@ensemble/engine";
 import { keyToString, planBar, SOLO_INSTRUMENTS } from "@ensemble/engine";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
-import { Back } from "../Back.tsx";
+import type { Place } from "../Trail.tsx";
+import { Trail } from "../Trail.tsx";
 import type { Playhead } from "./ChartView.tsx";
 import { ChartView } from "./ChartView.tsx";
 import type { Reading } from "./ChordSymbol.tsx";
@@ -29,8 +30,8 @@ interface Props {
   readonly title?: string;
   /** What kind of thing the screen shows, when it is not a chart: said before the style, key and tempo. */
   readonly about?: string;
-  /** Where the way back goes, when it is not to the charts. */
-  readonly back?: { readonly href?: string; readonly label?: string; readonly said?: string };
+  /** The place above this screen: the part of the library it belongs under, or the takes. */
+  readonly place: Place;
   readonly reading: Reading;
   readonly read: (reading: Reading) => void;
   /** At the end of the header: the way to the editor. */
@@ -110,7 +111,7 @@ const READING_NAMES: Readonly<Record<Reading, readonly [shown: string, said: str
 
 export function Stage(props: Props) {
   const { jam, call, chart, preview, reading, read } = props;
-  const { title, about, back, side, before, band, aside } = props;
+  const { title, about, place, side, before, band, aside } = props;
   const problem = jam.problem ?? props.problem;
   const [focus, setFocus] = useState(false);
 
@@ -163,14 +164,15 @@ export function Stage(props: Props) {
     : undefined;
 
   return (
-    <main className={`play${playing ? " playing" : ""}`}>
-      {/* The screen's name and how the page is read: two lines, or one where a phone on its side has no height to spare. */}
+    // The screen takes the ink of the style the band plays in: Play is printed in it.
+    <main className={`play${playing ? " playing" : ""}`} data-style={style.id}>
+      {/* The way back, the screen's name and how the page is read: three lines, or one where a phone on its side has no height to spare. */}
       <div className="top">
         <header className="bar-top">
-          <Back {...back} />
-          <h1>{title ?? shown.title}</h1>
+          <Trail place={place} />
           {side}
         </header>
+        <h1 className="chart-title">{title ?? shown.title}</h1>
 
         {/* What is being played, and how the page is read. */}
         <div className="view">
