@@ -49,7 +49,9 @@ export function CreditsView({ packsUrl }: { packsUrl: string }) {
             </div>
           ))}
           <p>
-            <a href={`${packsUrl}${pack.id}/LICENCE`}>Read the licence</a>
+            <a className="licence" href={`${packsUrl}${pack.id}/LICENCE`}>
+              Read the licence
+            </a>
           </p>
         </section>
       ))}

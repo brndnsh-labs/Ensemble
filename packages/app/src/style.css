@@ -542,8 +542,9 @@ button:active:not(:disabled),
   color: var(--ink);
 }
 
-/* A line of small print is still pressed with a fingertip. */
-.colophon a {
+/* A link on a line of its own is still pressed with a fingertip. */
+.colophon a,
+.credits .licence {
   display: inline-flex;
   align-items: center;
   min-height: var(--control);
