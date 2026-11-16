@@ -147,6 +147,18 @@ export const SOURCES: readonly Source[] = [
     licenceFile: "LICENSE",
   },
   {
+    id: "spanish-classical-guitar",
+    title: "Spanish Classical Guitar",
+    author: "FreePats (roberto@zenvoid.org)",
+    home: "https://freepats.zenvoid.org/Guitar/acoustic-guitar.html",
+    release: "2019-06-18",
+    archive:
+      "https://freepats.zenvoid.org/Guitar/SpanishClassicalGuitar/SpanishClassicalGuitar-SFZ+FLAC-20190618.7z",
+    sha256: "903916921a21662d2237ade7f0e98e55de93cb7b86da219e4e10f4ad385b8f5e",
+    licence: "CC0-1.0",
+    licenceFile: "SpanishClassicalGuitar-SFZ+FLAC-20190618/cc0.txt",
+  },
+  {
     id: "emilyguitar",
     title: "Emilyguitar",
     author: "Karoryfer Samples",
