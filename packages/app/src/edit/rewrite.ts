@@ -374,6 +374,16 @@ export function withSection(text: string, index: number): { text: string; sectio
   return { text: carried(chart, next, from), section: index + 1 };
 }
 
+/** A chart with no bars at all, given a first section: a label and a line of empty bars, above any arrangement. */
+export function withFirstSection(text: string): string {
+  const { chart } = parse(text);
+  const at = chart.arrangement ? lineStart(text, chart.arrangement.range.start) : text.length;
+  const above = text.slice(0, at).trimEnd();
+  const below = text.slice(at);
+  const block = `[${fresh(chart)}]\n| ${NEW_LINE.join(" | ")} |`;
+  return `${above}${above === "" ? "" : "\n\n"}${block}\n${below === "" ? "" : `\n${below}`}`;
+}
+
 /**
  * The chart without a section. When sections further down play it again by
  * name, the first of them is given its bars, so the song loses this one place

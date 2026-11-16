@@ -110,6 +110,7 @@ fieldset {
 .fix,
 .grid-remove,
 .choice,
+.empty-page button,
 :is(.bar-panel, .section-panel) :is(.dock-acts button, .dock-step) {
   display: inline-flex;
   align-items: center;
@@ -169,6 +170,7 @@ button:active:not(:disabled),
     .fix,
     .grid-remove,
     .choice,
+    .empty-page button,
     :is(.bar-panel, .section-panel) :is(.dock-acts button, .dock-step),
     .steps button,
     .finish,
@@ -1529,8 +1531,11 @@ button:active:not(:disabled),
 .empty-page {
   position: absolute;
   inset: 0;
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
   margin: 0;
   color: var(--faint);
 }
@@ -1877,7 +1882,7 @@ button.mark {
 button.mark::after {
   content: "";
   position: absolute;
-  inset: -9px -12px;
+  inset: -10px -12px;
 }
 
 button.mark.unnamed {
@@ -2004,7 +2009,8 @@ button.mark[aria-expanded="true"] {
   border: 1.5px solid var(--ink);
   border-radius: var(--round);
   background: var(--paper);
-  box-shadow: 0 8px 22px color-mix(in srgb, var(--ink) 22%, transparent);
+  /* A slip of paper laid on the page: its edge, and the page it covers a shade darker beside it. */
+  box-shadow: 4px 5px 0 var(--wash);
 }
 
 .bar-panel {

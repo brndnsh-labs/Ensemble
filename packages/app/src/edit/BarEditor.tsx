@@ -34,6 +34,9 @@ const ENDINGS = [
 /** How long a mistake must stand before it is put into words: a chord half typed is not one. */
 const SAY_AFTER_MS = 700;
 
+/** How long after a press in the dock a browser may still move the focus on account of it. */
+const SETTLE_MS = 300;
+
 export type BarAction = "before" | "after" | "repeat" | "delete";
 
 interface Props {
@@ -70,10 +73,10 @@ interface Props {
 }
 
 const ACTIONS: readonly [BarAction, string][] = [
-  ["before", "Bar before"],
-  ["after", "Bar after"],
+  ["before", "Add before"],
+  ["after", "Add after"],
   ["repeat", "Repeat %"],
-  ["delete", "Delete bar"],
+  ["delete", "Delete"],
 ];
 
 export function BarEditor(props: Props) {
@@ -157,12 +160,15 @@ export function BarEditor(props: Props) {
     event.preventDefault();
     pressing.current = true;
     const over = () => {
-      pressing.current = false;
       removeEventListener("pointerup", over);
       removeEventListener("pointercancel", over);
-      // Where a browser moved the focus anyway, it comes back.
-      if (field.current && document.activeElement !== field.current)
-        field.current.focus({ preventScroll: true });
+      // A browser that moves the focus anyway does it a moment after the finger lifts: the
+      // press is not over until then, and the focus comes back if it went.
+      setTimeout(() => {
+        pressing.current = false;
+        if (field.current && document.activeElement !== field.current)
+          field.current.focus({ preventScroll: true });
+      }, SETTLE_MS);
     };
     addEventListener("pointerup", over);
     addEventListener("pointercancel", over);
@@ -274,7 +280,7 @@ export function BarEditor(props: Props) {
           tabIndex={-1}
           className="dock-more"
           aria-pressed={acting}
-          aria-label="This bar: add one beside it, repeat the bar before, delete it"
+          aria-label="This bar: add a bar beside it, repeat the bar before, delete it"
           onClick={() => setActing(!acting)}
         >
           Bar

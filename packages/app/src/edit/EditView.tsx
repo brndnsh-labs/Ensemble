@@ -35,6 +35,7 @@ import {
   retyped,
   sourceOf,
   withBar,
+  withFirstSection,
   withoutBar,
   withoutSection,
   withSection,
@@ -397,7 +398,8 @@ export function EditView({ entry, reading, style: chosen }: Props) {
       ),
     [known],
   );
-  const toFix = diagnostics.filter((diagnostic) => diagnostic.severity !== "info").length;
+  // Mistakes in a bar are marked on the bar. The rest (a header line, a label, a repeat sign) are marked in the text.
+  const toFix = diagnostics.filter((diagnostic) => diagnostic.severity === "error").length;
   const where = here ? `${here.label || "The chart"}, bar ${here.bar + 1} of ${here.of}` : "";
   const at = here ? order.indexOf(here) : -1;
 
@@ -568,15 +570,25 @@ export function EditView({ entry, reading, style: chosen }: Props) {
             focus={false}
             edit={edit}
           />
-          {page.chart.sections.length === 0 && <p className="empty-page">The bars appear here.</p>}
-          <p className="chart-foot">
-            <span>Press a bar to type its chords, or a section’s name to change the section.</span>
-            {toFix > 0 && side === "chart" && (
-              <button type="button" onClick={() => setSide("text")}>
-                {toFix} to look at in the text
+          {known.size === 0 ? (
+            <p className="empty-page">
+              <span>No bars yet.</span>
+              <button type="button" onClick={() => commit(withFirstSection(latest.current))}>
+                Add a line of bars
               </button>
-            )}
-          </p>
+            </p>
+          ) : (
+            <p className="chart-foot">
+              <span>
+                Press a bar to type its chords, or a section’s name to change the section.
+              </span>
+              {toFix > 0 && side === "chart" && (
+                <button type="button" onClick={() => setSide("text")}>
+                  {toFix} to fix in the text
+                </button>
+              )}
+            </p>
+          )}
         </div>
         {side !== "chart" && (
           <div className="pane-text">
