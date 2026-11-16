@@ -83,7 +83,7 @@ An open jam of k passes is planned as k passes plus one look-ahead pass that pla
 
 ## Resume here
 
-State on 2026-11-15: **stages 1 to 5 are built and their gates passed.** **Stage 6 (the app) is under way: parts 1 to 4 are built and on the test site, and part 5 has its first style, rock.**
+State on 2026-11-15: **stages 1 to 5 are built and their gates passed.** **Stage 6 (the app) is under way: parts 1 to 4 are built and on the test site; of part 5's five styles, rock, disco, neo-soul and reggae are on the test site and acoustic is being built.** Brandon has heard and passed rock and the lead guitar; disco, neo-soul and reggae wait on his ear.
 
 ### Stage 6: where it stands
 
@@ -108,6 +108,8 @@ State on 2026-11-15: **stages 1 to 5 are built and their gates passed.** **Stage
 - **A steel-string guitar is chosen for acoustic** (Brandon, from three clips: Karoryfer's Shinyguitar, an archtop through a microphone, CC0; `DECISIONS.md`, "the acoustic guitar is a steel-string archtop"). The source is pinned and fetched; the cut is briefed (`prompts/cut-steel-guitar.md`, a Sonnet job in a clone `.work/steel` with `.sources` linked in and excluded from git) and **waits for the acoustic build to report**. Then: point acoustic's chord seat and its soloist at `steel-guitar`, `pnpm levels acoustic` again, deploy.
 - **Nylon stays as an option** (Brandon). Needs a seat's instrument chosen by the player where a style lists more than one that plays the same part: a list in the style's `sound`, a control in the band setup shown only where there is a choice, the choice kept with the chart like the soloist's. Not built; do it after acoustic and the steel pack are in.
 - **Packs, as the shelf grows** (no manager is planned): the app saves every pack for offline use up front (24 MB for ten); if that grows past what a phone should fetch unasked, save a style's packs when it is first played. The credits page lists packs by itself.
+- **Committed and not yet on the test site** (goes out with the next deploy): the background save of packs waits for a band being loaded and fetches shared instruments first (`DECISIONS.md`, "the first visit, timed"). Brandon does not want more than that built: "i don't think we need to over-engineer it yet".
+- **After every builder**: look for shells it left running (`ps` for children of the session; a `pgrep -f` wait loop matches itself and never ends) and stop them by process ID. The briefs since acoustic's say not to leave any.
 - **Then**: the pass over the whole interface for how things are found and used (collect what Brandon trips on), then gate 6.
 - **Left out of part 5, for later if wanted**: slides stepped by frets, a horn's scoops and falls, a head for the soloist, the keyboard books for disco, reggae and acoustic, an organ (FreePats' drawbar emulation is CC0 and does not loop), reggae's fast count and its drop in 3/4, a lead-in decision made once for a section, a push the whole band makes together, a steel-string guitar.
 - **Left open by gate 5**, holding until an ear says otherwise (`DECISIONS.md`, "gate 5 passed"): the mix stays at the measured numbers; packs load every layer; one kit serves all three styles; both soloists stay.
