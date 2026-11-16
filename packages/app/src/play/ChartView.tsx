@@ -4,7 +4,7 @@
 
 import type { Chart } from "@ensemble/engine";
 import { keyToString } from "@ensemble/engine";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Reading } from "./ChordSymbol.tsx";
 import { ChordSymbol, Simile } from "./ChordSymbol.tsx";
@@ -25,12 +25,34 @@ export interface Playhead {
   readonly landing?: { readonly bar: string; readonly chords: readonly PageChord[] };
 }
 
+/**
+ * The chart as something pressed: the editor's. Every bar is a button and so is every
+ * section's name, the page is set at the size it is wanted at and scrolls (so nothing on it
+ * changes size when a phone's keyboard takes half the screen), and every section shows its name.
+ */
+export interface Editing {
+  /** The bar open for typing. */
+  readonly open: string | undefined;
+  /** The section whose actions are showing, by its place in the chart. */
+  readonly section: number | undefined;
+  /** The bars that cannot be read, and what is written in each. */
+  readonly wrong: ReadonlyMap<string, string>;
+  /** A bar in words, for a screen reader. */
+  readonly said: (bar: string) => string;
+  readonly pressBar: (bar: string) => void;
+  readonly pressSection: (index: number) => void;
+  /** Where the chart is typed in place: what is drawn in the open bar, and under the chosen section's name. */
+  readonly barSlot?: ReactNode;
+  readonly sectionSlot?: ReactNode;
+}
+
 interface Props {
   readonly chart: Chart;
   readonly reading: Reading;
   readonly playhead: Playhead | undefined;
   /** Show only the line being played and the one after it, large. */
   readonly focus: boolean;
+  readonly edit?: Editing;
 }
 
 /** Heights in units of the root's type size. */
@@ -107,7 +129,8 @@ function focused(sections: readonly PageSection[], playhead: Playhead | undefine
   return [first, second].map(({ section, line }) => ({ ...section, lines: [line] }));
 }
 
-export function ChartView({ chart, reading, playhead, focus }: Props) {
+export function ChartView({ chart, reading, playhead, focus, edit }: Props) {
+  const editing = edit !== undefined;
   const frame = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ w: 0, h: 0 });
 
@@ -123,6 +146,15 @@ export function ChartView({ chart, reading, playhead, focus }: Props) {
   // Wider lines when that makes the type bigger: a long form on a laptop reads better eight bars across.
   const layout = useMemo((): Layout => {
     if (focus) return { sections: pageOf(chart, box.w < PHONE ? 0.5 : 1), size: 0, scrolls: false };
+    if (editing) {
+      // As written, at the size it is wanted at, whatever the height: the page scrolls.
+      const written = pageOf(chart, 1);
+      const wanted = Math.min(
+        box.w / columnsOf(written) / BAR_WIDTH,
+        box.w < PHONE ? WANTED.phone : WANTED.wide,
+      );
+      return { sections: written, size: Math.max(SMALLEST, wanted), scrolls: true };
+    }
     let best: Layout | undefined;
     for (const widen of [1, 2]) {
       const sections = pageOf(chart, widen);
@@ -141,9 +173,10 @@ export function ChartView({ chart, reading, playhead, focus }: Props) {
     if (box.w === 0 || whole.size >= wanted * NEAR_ENOUGH)
       return { sections: whole.sections, size: Math.max(SMALLEST, whole.size), scrolls: false };
     return { sections: written, size: wanted, scrolls: true };
-  }, [chart, reading, focus, box]);
+  }, [chart, reading, focus, editing, box]);
 
-  const showLabels = labelled(layout.sections);
+  // A section's name is where its actions are, so the editor shows every one.
+  const showLabels = editing || labelled(layout.sections);
   const sections = focus ? focused(layout.sections, playhead) : layout.sections;
   const columns = columnsOf(layout.sections);
   // In focus the type is one size for the whole tune: sized for the tallest pair of lines there
@@ -154,7 +187,8 @@ export function ChartView({ chart, reading, playhead, focus }: Props) {
   const size = focus ? Math.max(SMALLEST, fit(units, columns, box.w, box.h)) : layout.size;
   // When the width is what limits the type, the height left over opens the lines up, to a point.
   const lines = focus ? 2 : sections.reduce((sum, section) => sum + section.lines.length, 0);
-  const spare = box.h / size - units;
+  // (Not in the editor, where the height is the keyboard's to take and the page must not move for it.)
+  const spare = editing ? 0 : box.h / size - units;
   const line =
     LINE[reading] + Math.max(0, Math.min(spare / Math.max(1, lines), LINE[reading] * 0.5));
 
@@ -168,7 +202,8 @@ export function ChartView({ chart, reading, playhead, focus }: Props) {
     const squeeze = () => {
       const page = frame.current!.querySelector<HTMLElement>(".chart")!;
       const bars = [...page.querySelectorAll<HTMLElement>(".bar")].map((bar) => {
-        const slots = [...bar.querySelectorAll<HTMLElement>(".slot")];
+        // (What is shown as typed, in the editor, is cut short where it does not fit, not made smaller.)
+        const slots = [...bar.querySelectorAll<HTMLElement>(".slot:not(.typed)")];
         const chords = slots
           .map((slot) => slot.firstElementChild as HTMLElement | null)
           .filter((chord): chord is HTMLElement => chord !== null);
@@ -203,7 +238,7 @@ export function ChartView({ chart, reading, playhead, focus }: Props) {
       };
       /** Set the page in a size, its lines opened up by whatever height that leaves over. */
       const set = (px: number) => {
-        const spare = box.h / px - units;
+        const spare = editing ? 0 : box.h / px - units;
         const open = Math.max(0, Math.min(spare / Math.max(1, lines), LINE[reading] * 0.5));
         page.style.setProperty("--size", `${px}px`);
         page.style.setProperty("--line", String(LINE[reading] + open));
@@ -227,7 +262,7 @@ export function ChartView({ chart, reading, playhead, focus }: Props) {
     return () => {
       current = false;
     };
-  }, [sections, size, reading, box.h, units, lines]);
+  }, [sections, size, reading, box.h, units, lines, editing, edit?.wrong]);
 
   // The page follows the band: when the bar being played is on another line, that line comes
   // to the top of the screen (its section's name with it), so what is coming is always under
@@ -254,27 +289,50 @@ export function ChartView({ chart, reading, playhead, focus }: Props) {
   return (
     <div className={`chart-frame${scrolls ? " scrolls" : ""}`} ref={frame}>
       <div
-        className={`chart${focus ? " focus" : ""}`}
+        className={`chart${focus ? " focus" : ""}${editing ? " editing" : ""}`}
         style={{ "--size": `${size}px`, "--line": line, "--columns": columns } as CSSProperties}
       >
         {sections.map((section, i) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: in focus the same section can be shown twice
           <section key={i} className="section">
             {showLabels && (
-              <header className="label">
-                {section.label && <span className="mark">{section.label}</span>}
+              <header className={`label${edit?.section === section.index ? " chosen" : ""}`}>
+                {edit ? (
+                  <button
+                    type="button"
+                    className={`mark${section.label ? "" : " unnamed"}`}
+                    aria-expanded={edit.section === section.index}
+                    aria-label={`Section ${section.label || "with no name"}: rename, copy, add or delete`}
+                    onClick={() => edit.pressSection(section.index)}
+                  >
+                    {section.label || "no name"}
+                  </button>
+                ) : (
+                  section.label && <span className="mark">{section.label}</span>
+                )}
                 {section.key && <span className="aside">in {keyToString(section.key)}</span>}
                 {section.meter && (
                   <span className="aside">
                     {section.meter.beats}/{section.meter.unit}
                   </span>
                 )}
+                {edit?.section === section.index && edit.sectionSlot}
               </header>
             )}
-            {section.lines.map((line) => (
-              <div key={line[0]!.id} className="line">
-                {line.map((bar) => (
-                  <Bar key={bar.id} bar={bar} reading={reading} playhead={playhead} />
+            {section.lines.map((line, l) => (
+              // A bar's name is its place in the text, which every edit above it moves. While
+              // editing, a bar is known by its place on the page, so it is the same button
+              // before and after the change that a press on it brings about.
+              <div key={edit ? l : line[0]!.id} className="line">
+                {line.map((bar, b) => (
+                  <Bar
+                    key={edit ? b : bar.id}
+                    bar={bar}
+                    reading={reading}
+                    playhead={playhead}
+                    edit={edit}
+                    late={b >= line.length / 2 && b > 0}
+                  />
                 ))}
               </div>
             ))}
@@ -289,24 +347,37 @@ function Bar({
   bar,
   reading,
   playhead,
+  edit,
+  late,
 }: {
   bar: PageBar;
   reading: Reading;
   playhead: Playhead | undefined;
+  edit: Editing | undefined;
+  /** In the right half of its line: what opens from it opens leftward. */
+  late: boolean;
 }) {
   const now = playhead?.bar === bar.id;
   const next = playhead?.next?.bar === bar.id ? playhead.next.at : undefined;
   const landing = playhead?.landing?.bar === bar.id ? playhead.landing.chords : undefined;
   const chords = landing ?? bar.chords;
   const lead = chords[0]?.at ?? 0;
+  const open = edit?.open === bar.id;
+  const wrong = edit?.wrong.get(bar.id);
   return (
     <div
-      className={`bar${now ? " now" : ""}${bar.repeatOpens ? " opens" : ""}${bar.repeatCloses ? " closes" : ""}`}
+      className={`bar${now ? " now" : ""}${bar.repeatOpens ? " opens" : ""}${bar.repeatCloses ? " closes" : ""}${open ? " open" : ""}${wrong !== undefined ? " wrong" : ""}${edit && late ? " late" : ""}`}
       aria-current={now ? "true" : undefined}
+      data-bar={edit ? bar.id : undefined}
     >
       {bar.ending !== null && <span className="ending">{bar.ending}.</span>}
       {bar.repeatOpens && <RepeatSign side="opens" />}
-      {bar.simile && !landing ? (
+      {wrong !== undefined ? (
+        // What cannot be read is shown as it was typed, in the pencil that marks what is wrong.
+        <span className="slot typed" style={{ flexGrow: 1 }}>
+          <span>{wrong}</span>
+        </span>
+      ) : bar.simile && !landing ? (
         <span className={`slot again${next !== undefined ? " next" : ""}`} style={{ flexGrow: 1 }}>
           <Simile />
         </span>
@@ -326,6 +397,17 @@ function Bar({
       )}
       {bar.repeatCloses && <RepeatSign side="closes" />}
       {bar.repeatCloses?.times && <span className="times">×{bar.repeatCloses.times}</span>}
+      {edit && !(open && edit.barSlot) && (
+        <button
+          type="button"
+          className="bar-press"
+          aria-label={edit.said(bar.id)}
+          // Pressing another bar does not take the keyboard away from the one being typed: the press moves it.
+          onPointerDown={(event) => event.preventDefault()}
+          onClick={() => edit.pressBar(bar.id)}
+        />
+      )}
+      {open && edit?.barSlot}
     </div>
   );
 }

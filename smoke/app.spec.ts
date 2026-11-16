@@ -43,7 +43,16 @@ test("a chart typed in the editor renders, and an error shows a diagnostic in pl
 }) => {
   await page.goto("./");
   await page.getByRole("button", { name: "New chart" }).click();
+  // The editor opens on the chart itself. A bar pressed and typed is drawn, and is the text:
+  // a bar line in what is typed spreads it over the bar after.
+  await page.getByRole("button", { name: /^Bar 1 of A/ }).click();
+  await page.keyboard.type("F7 | Bb7");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("button", { name: "Bar 2 of A: Bb7" })).toBeVisible();
+  // The text is the other way in, a press away, and it has what was typed on the chart.
+  await page.getByRole("button", { name: "Text", exact: true }).click();
   const text = page.getByRole("textbox", { name: "The chart's text" });
+  await expect(text).toHaveValue(/\| F7 \| Bb7 \| NC \| NC \|/);
   await text.fill("title: Typed\nkey: F\n\n| F7 | Bb7 | F7 | C7 |\n| Bb7 | Bb7 | F7 | F7 |\n");
   await expect(page.getByRole("heading", { name: "Typed" })).toBeVisible();
   await expect(page.locator(".bar")).toHaveCount(8);
