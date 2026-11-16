@@ -1381,3 +1381,14 @@ Brandon, 2026-11-16: "i opened a genre, then opened a chart, and when leaving th
 - **Home comes back where it was left**, not at its top: the list he opened the chart from is the list he returns to.
 - The back arrow's word is hidden on a phone only in a screen's top bar, where the title needs the room; the credits page shows "Charts" beside its arrow now.
 - A stopgap: the study of the app's structure (`prompts/app-look-study.md`) makes a style its own page.
+
+## the poster wall is chosen; one library, a style is a mark (stage 6)
+
+Brandon, 2026-11-16, of the study's direction A: "the poster wall looks really cool, i haven't seen anything like that in a while. reminds me of metro ui in the best way". And: "the band is very adaptable and can play any chart in any genre we support. does it make sense to organize things this way? what if we have a unified library and tag things based on their idiomatic genre, with the idea that everything is easily customizable anyway?"
+
+- **Direction A is the app's look.** B (the band room) is set aside; its players as shapes may yet be drawn into A's dock.
+- **One library; a chart's style is a mark on it, not a place it lives.** He is right about what the thing is: a chart is its chords, and the suite holds every style to every chart. The library is one page that says what it is showing (everything, his own, or one style) and is in the address; the wall on home stays, as eight ways into it. His own charts are in it with the built-in ones.
+- **The way back from a chart does not depend on how he arrived**: `Home / <its style>`, the second going to the library showing that style; `Home / Charts` for a chart with no style.
+- **A style's ink is the app's to know** (a table in `packages/app`, with an ink for a style it has not been told about): a look is not music, and a ninth style must not need the engine changed for it.
+- **Built in three briefs, one builder at a time**: the look, home, the library and the way back (`prompts/app-poster-wall-1.md`); then the chart's screen (the setup as a sentence, More, the dock in the style's ink, the players alive); then Edit as a mode of it.
+- **For the second brief to settle**: the ink on a chart's screen follows the style being played, not the one written; and what the tempo does when the style is changed (each style has its own range, and rhythm changes is written at 176 where blues stops at 150).
