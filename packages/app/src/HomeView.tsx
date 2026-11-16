@@ -24,7 +24,7 @@ const FIRST = ["blues-12-bar-a", "rock-four-chord-g", "funk-vamp-a"];
 /** The last thing played is a poster; this many before it are smaller bills under it. */
 const LATELY = 2;
 
-/** Open a chart of the player's in the editor. */
+/** Open a chart of the player's on its screen, with the pencil down. */
 const edit = (id: string) => go(`#/edit/${id}`);
 
 /** A new chart, or one brought in as a file: wherever the player's own charts are listed. */

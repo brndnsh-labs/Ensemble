@@ -1,24 +1,27 @@
-// The editor: one of the player's charts, edited on the chart itself. A bar is
+// The editor: one of the player's charts, edited on the chart itself, as a
+// mode of the chart's own screen (the same page, with a pencil). A bar is
 // pressed and its chords typed; a section's name is pressed for what can be
 // done with the section. The chart's text is still the chart: every change
 // made by tapping is a rewrite of it (`rewrite.ts`), the text can be typed in
 // directly on the Text side, and the arrangement grid writes its block. A
 // change made any of those ways shows at once in the others.
+//
+// It is a hook of the chart's screen, not a screen of its own, so that a bar
+// pressed is drawn open inside the press: the field takes the focus there,
+// which is what brings a phone's keyboard up. The screen places what it hands
+// back: the chart to press, the text or the grid, the dock's words and
+// controls, and the dock that sits on a phone's keyboard.
 
-import type { Chart, Diagnostic } from "@ensemble/engine";
+import type { Chart, Diagnostic, StylePack } from "@ensemble/engine";
 import { parse, print } from "@ensemble/engine";
-import { STYLES, styleById } from "@ensemble/styles";
-import type { CSSProperties } from "react";
+import type { ReactNode } from "react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { deleteChart, keptOnDevice, retitled, saveChart } from "../charts.ts";
+import { keptOnDevice, retitled, saveChart } from "../charts.ts";
 import { download, fileName } from "../download.ts";
 import type { LibraryChart } from "../library.ts";
 import type { Editing } from "../play/ChartView.tsx";
-import { ChartView } from "../play/ChartView.tsx";
-import type { Reading } from "../play/ChordSymbol.tsx";
 import { barId } from "../play/page.ts";
-import { placeOf, Trail } from "../Trail.tsx";
 import { ArrangementGrid } from "./ArrangementGrid.tsx";
 import type { BarAction } from "./BarEditor.tsx";
 import { BarEditor } from "./BarEditor.tsx";
@@ -42,27 +45,68 @@ import {
 } from "./rewrite.ts";
 import { SectionSheet } from "./SectionSheet.tsx";
 import { Source } from "./Source.tsx";
+import type { Area } from "./viewport.ts";
 import { useTouchScreen, useVisibleArea } from "./viewport.ts";
 
-interface Props {
-  /** One of the player's own charts. */
-  readonly entry: LibraryChart;
-  readonly reading: Reading;
-  /** The style chosen for this chart on the play screen, if one was. */
-  readonly style: string | undefined;
-}
-
-type Side = "chart" | "text" | "arrangement";
+export type Side = "chart" | "text" | "arrangement";
 const SIDES: readonly [Side, string][] = [
   ["chart", "Chart"],
   ["text", "Text"],
   ["arrangement", "Arrangement"],
 ];
 
-/** How long typing must pause before the text is written to storage. Leaving the screen writes it at once. */
+/** How long typing must pause before the text is written to storage. Leaving the mode writes it at once. */
 const SAVE_AFTER_MS = 400;
 /** How many changes can be taken back. */
 const STEPS = 200;
+
+interface Options {
+  /** One of the player's own charts. */
+  readonly entry: LibraryChart;
+  /** The pencil is down: the screen is in the mode. Off, the hook holds nothing anyone sees. */
+  readonly on: boolean;
+  /** The style the chart will be played in: the grid draws a section left to it at the level it will be played. */
+  readonly style: StylePack;
+  /** The chart is a copy of a built-in, just made: the dock says so, once. */
+  readonly copied: boolean;
+  /** Delete the chart (asked first) and leave its screen. */
+  readonly remove: () => void;
+}
+
+/** The editor, in parts, for the chart's screen to place. */
+export interface Editor {
+  /** The text as it stands. */
+  readonly text: string;
+  /** The chart as the page draws it: with the bar being typed applied. */
+  readonly chart: Chart;
+  /** Its title, as the text says it. */
+  readonly title: string;
+  /** What the page is pressed for. */
+  readonly edit: Editing;
+  readonly side: Side;
+  /** The text box has the focus. */
+  readonly typing: boolean;
+  /** On a touch screen, a bar or a section is open in the dock at the foot of the screen. */
+  readonly docked: boolean;
+  /** On a touch screen, a bar or the text is being typed: the keyboard is up. */
+  readonly keyboard: boolean;
+  /** The part of the screen a phone's keyboard leaves, while it is up. */
+  readonly area: Area | undefined;
+  /** Over the chart: the way to a first line, where it has no bars. */
+  readonly over: ReactNode;
+  /** The text or the grid, when one of them is open. */
+  readonly pane: ReactNode;
+  /** The dock's words and controls, in the band's place. */
+  readonly dock: ReactNode;
+  /** On a touch screen, the bar or the section being changed, on top of the keyboard. */
+  readonly keyDock: ReactNode;
+  /** Write the bar being typed and everything else to storage, now: the mode is being left. */
+  readonly finish: () => void;
+  /** Give the chart another title: a step that can be taken back. */
+  readonly rename: (title: string) => void;
+  /** Drop what is waiting to be written: the chart is being deleted. */
+  readonly forget: () => void;
+}
 
 /** A bar on the page, as the editor knows it. */
 interface Known extends BarPlace {
@@ -99,7 +143,7 @@ function knownBars(chart: Chart, diagnostics: readonly Diagnostic[]): Map<string
   return known;
 }
 
-export function EditView({ entry, reading, style: chosen }: Props) {
+export function useEditor({ entry, on, style, copied, remove }: Options): Editor {
   const [text, setText] = useState(entry.text);
   const [side, setSide] = useState<Side>("chart");
   const [typing, setTyping] = useState(false);
@@ -108,10 +152,38 @@ export function EditView({ entry, reading, style: chosen }: Props) {
   const [draft, setDraft] = useState<string>();
   /** The section whose actions are showing. */
   const [section, setSection] = useState<number>();
-  /** The title while it is being typed. */
-  const [titling, setTitling] = useState<string>();
+  /** The dock still says that this is a copy: until the first press on the chart. */
+  const [fresh, setFresh] = useState(copied);
   const touch = useTouchScreen();
-  const area = useVisibleArea(typing || open !== undefined || section !== undefined);
+  const area = useVisibleArea(on && (typing || open !== undefined || section !== undefined));
+
+  const latest = useRef(text);
+  /**
+   * What can be taken back, and what was. Kept beside the text, not in the screen's state:
+   * every change to it comes with a change to the text, which draws the screen again.
+   */
+  const history = useRef<{ past: string[]; future: string[] }>({ past: [], future: [] });
+  /** A stretch of typing in the text box is under way: it is one step to take back. */
+  const run = useRef(false);
+
+  // The pencil put down and taken up again starts from the chart as it was saved, on the
+  // chart's own side, with nothing to take back: the steps last as long as the mode is open.
+  const [was, setWas] = useState(on);
+  if (was !== on) {
+    setWas(on);
+    if (on) {
+      setText(entry.text);
+      setSide("chart");
+      setTyping(false);
+      setOpen(undefined);
+      setDraft(undefined);
+      setSection(undefined);
+      setFresh(copied);
+      latest.current = entry.text;
+      history.current = { past: [], future: [] };
+      run.current = false;
+    }
+  }
 
   // The chart as it stands, and as it would stand with the open bar applied: the page shows
   // the second, so a bar is drawn as it is typed, and leaving it as it was is forgetting the draft.
@@ -149,12 +221,9 @@ export function EditView({ entry, reading, style: chosen }: Props) {
 
   // ── the text, kept and taken back ─────────────────────────────────────────
 
-  const latest = useRef(text);
-  /** The text with the open bar applied, while it differs: what is kept if the screen is left mid-bar. */
+  /** The text with the open bar applied, while it differs: what is kept if the mode is left mid-bar. */
   const pending = useRef<string>(undefined);
   pending.current = preview && preview.text !== text ? preview.text : undefined;
-  /** A stretch of typing in the text box is under way: it is one step to take back. */
-  const run = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const save = useCallback(() => {
     clearTimeout(timer.current);
@@ -167,11 +236,6 @@ export function EditView({ entry, reading, style: chosen }: Props) {
     clearTimeout(timer.current);
     timer.current = setTimeout(save, SAVE_AFTER_MS);
   };
-  /**
-   * What can be taken back, and what was. Kept beside the text, not in the screen's state:
-   * every change to it comes with a change to the text, which draws the screen again.
-   */
-  const history = useRef<{ past: string[]; future: string[] }>({ past: [], future: [] });
   const remember = () => {
     const steps = history.current;
     steps.past.push(latest.current);
@@ -220,8 +284,9 @@ export function EditView({ entry, reading, style: chosen }: Props) {
     step(history.current.future, history.current.past);
   };
 
-  // Nothing typed is lost to leaving the screen, closing the tab, or the phone putting the app away.
+  // Nothing typed is lost to leaving the mode or the screen, closing the tab, or the phone putting the app away.
   useEffect(() => {
+    if (!on) return;
     const hidden = () => document.visibilityState === "hidden" && save();
     addEventListener("pagehide", save);
     document.addEventListener("visibilitychange", hidden);
@@ -230,7 +295,7 @@ export function EditView({ entry, reading, style: chosen }: Props) {
       document.removeEventListener("visibilitychange", hidden);
       save();
     };
-  }, [save]);
+  }, [on, save]);
 
   // ── a bar ─────────────────────────────────────────────────────────────────
 
@@ -266,7 +331,8 @@ export function EditView({ entry, reading, style: chosen }: Props) {
     const bar = known.get(id);
     if (!bar) return;
     apply();
-    // On a narrow screen the chart shares the screen with the text: a bar pressed there is edited on the chart's own side.
+    setFresh(false);
+    // On a narrow screen the chart has the place the text would take: a bar pressed is edited on the chart's own side.
     if (!matchMedia("(min-width: 700px)").matches) setSide("chart");
     // Drawn at once: the field takes the focus inside this press, which is what brings a phone's keyboard up.
     flushSync(() => go({ section: bar.section, bar: bar.bar }));
@@ -298,7 +364,8 @@ export function EditView({ entry, reading, style: chosen }: Props) {
   // its actions under it where it is typed in place. So does a section whose actions are showing.
   // biome-ignore lint/correctness/useExhaustiveDependencies: whenever the bar, the section or the room changes
   useEffect(() => {
-    const frame = document.querySelector<HTMLElement>(".edit .chart-frame");
+    if (!on) return;
+    const frame = document.querySelector<HTMLElement>(".play .chart-frame");
     const at =
       frame?.querySelector<HTMLElement>(".bar.open") ??
       frame?.querySelector<HTMLElement>(".label.chosen")?.closest<HTMLElement>(".section");
@@ -316,7 +383,7 @@ export function EditView({ entry, reading, style: chosen }: Props) {
     if (top < 0) frame.scrollTop += top;
     else if (bottom > frame.clientHeight)
       frame.scrollTop += Math.min(top, bottom - frame.clientHeight);
-  }, [openId, section, area?.height, touch, side]);
+  }, [on, openId, section, area?.height, touch, side]);
 
   // Leaving a bar with Escape or Enter leaves the keyboard's focus on that bar, to go on from.
   // biome-ignore lint/correctness/useExhaustiveDependencies: once the bar has closed
@@ -325,7 +392,7 @@ export function EditView({ entry, reading, style: chosen }: Props) {
     if (open || to === undefined) return;
     refocus.current = undefined;
     document
-      .querySelector<HTMLElement>(`.edit [data-bar="${to}"] .bar-press`)
+      .querySelector<HTMLElement>(`.play [data-bar="${to}"] .bar-press`)
       ?.focus({ preventScroll: true });
   }, [open]);
 
@@ -333,6 +400,7 @@ export function EditView({ entry, reading, style: chosen }: Props) {
   const steps = useRef({ undo, redo });
   steps.current = { undo, redo };
   useEffect(() => {
+    if (!on) return;
     const keyed = (event: KeyboardEvent) => {
       if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
       if ((event.target as Element).closest?.("input, textarea")) return;
@@ -344,13 +412,14 @@ export function EditView({ entry, reading, style: chosen }: Props) {
     };
     addEventListener("keydown", keyed);
     return () => removeEventListener("keydown", keyed);
-  }, []);
+  }, [on]);
 
   // ── a section ─────────────────────────────────────────────────────────────
 
   const picked = section === undefined ? undefined : chart.sections[section];
   const pressSection = (index: number) => {
     apply();
+    setFresh(false);
     setOpen(undefined);
     setSection(section === index ? undefined : index);
   };
@@ -371,24 +440,9 @@ export function EditView({ entry, reading, style: chosen }: Props) {
 
   // ── the chart's own ───────────────────────────────────────────────────────
 
-  const titled = chart.header.some((item) => item.kind === "field" && item.name === "title");
-  const retitle = () => {
-    const title = titling?.replace(/\s+/g, " ").trim();
-    setTitling(undefined);
-    if (title && title !== chart.title) commit(retitled(latest.current, title));
-  };
-
   const format = () => {
     commit(print(chart));
     save();
-  };
-
-  const remove = () => {
-    if (!confirm(`Delete “${chart.title}”? This cannot be undone.`)) return;
-    clearTimeout(timer.current);
-    pending.current = undefined;
-    deleteChart(entry.id);
-    location.replace("#/");
   };
 
   const wrong = useMemo(
@@ -463,6 +517,8 @@ export function EditView({ entry, reading, style: chosen }: Props) {
     />
   );
 
+  const docked = on && touch && (open !== undefined || section !== undefined);
+
   const edit: Editing = {
     open: openId,
     section,
@@ -475,49 +531,33 @@ export function EditView({ entry, reading, style: chosen }: Props) {
     pressSection,
     barSlot: touch ? undefined : barEditor,
     sectionSlot: touch ? undefined : sectionSheet,
+    // While a phone's keyboard or the dock on it has the room, the page keeps the size it was set at and scrolls.
+    held: touch && (docked || typing),
   };
 
-  const docked = touch && (open !== undefined || section !== undefined);
-  const fitted = area && ({ top: area.top, height: area.height } as CSSProperties);
-  return (
-    <main
-      className={`edit side-${side}${typing ? " typing" : ""}${docked ? " docked" : ""}`}
-      // The ink of the style the chart will be played in: the editor's Play is printed in it.
-      data-style={(styleById(chosen ?? chart.styleId ?? "") ?? STYLES[0]!).id}
-      style={fitted}
-    >
-      <header className="bar-top">
-        <Trail place={placeOf(chart)} />
-        <h1 className="title" aria-label={chart.title}>
-          <input
-            aria-label="Title"
-            value={titling ?? (titled ? chart.title : "")}
-            placeholder="Untitled"
-            enterKeyHint="done"
-            spellCheck={false}
-            autoComplete="off"
-            onFocus={(event) => {
-              setTitling(event.target.value);
-              event.target.select();
-            }}
-            onChange={(event) => setTitling(event.target.value)}
-            onBlur={retitle}
-            onKeyDown={(event) => {
-              if (event.key === "Escape") setTitling(undefined);
-              if (event.key === "Enter" || event.key === "Escape") event.currentTarget.blur();
-            }}
-          />
-        </h1>
+  const canUndo = history.current.past.length > 0 || pending.current !== undefined;
+  const canRedo = history.current.future.length > 0;
+
+  const dock = (
+    <>
+      <p className="edit-says" aria-live="polite">
+        <span>
+          {fresh
+            ? "This is your copy. The built-in chart is unchanged."
+            : where || "Press a bar to change it."}
+        </span>
+        {toFix > 0 && side !== "text" && (
+          <button type="button" className="to-fix" onClick={() => setSide("text")}>
+            {toFix} to fix
+          </button>
+        )}
+      </p>
+      <div className="edit-row">
         <div className="steps">
           {(
             [
-              [
-                "Undo",
-                undo,
-                history.current.past.length > 0 || pending.current !== undefined,
-                "M9 5L4.5 9.5 9 14",
-              ],
-              ["Redo", redo, history.current.future.length > 0, "M13 5l4.5 4.5L13 14"],
+              ["Undo", undo, canUndo, "M9 5L4.5 9.5 9 14"],
+              ["Redo", redo, canRedo, "M13 5l4.5 4.5L13 14"],
             ] as const
           ).map(([name, press, can, arrow]) => (
             <button
@@ -543,113 +583,111 @@ export function EditView({ entry, reading, style: chosen }: Props) {
             </button>
           ))}
         </div>
-        {/* Written first, so the play screen opens on what was just typed. */}
-        <a className="to-play" href={`#/chart/${entry.id}`} onClick={save}>
-          Play
-        </a>
-      </header>
-
-      <fieldset className="sides" aria-label="Edit">
-        {SIDES.map(([way, name]) => (
-          <button
-            key={way}
-            type="button"
-            className="side"
-            aria-pressed={side === way}
-            onClick={() => setSide(way)}
-          >
-            {name}
-          </button>
-        ))}
-      </fieldset>
-
-      <div className="panes">
-        <div className="pane-chart">
-          <ChartView
-            chart={page.chart}
-            reading={reading}
-            playhead={undefined}
-            focus={false}
-            edit={edit}
-          />
-          {known.size === 0 ? (
-            <p className="empty-page">
-              <span>No bars yet.</span>
-              <button type="button" onClick={() => commit(withFirstSection(latest.current))}>
-                Add a line of bars
-              </button>
-            </p>
-          ) : (
-            <p className="chart-foot">
-              <span>
-                Press a bar to type its chords, or a section’s name to change the section.
-              </span>
-              {toFix > 0 && side === "chart" && (
-                <button type="button" onClick={() => setSide("text")}>
-                  {toFix} to fix in the text
-                </button>
-              )}
-            </p>
-          )}
-        </div>
-        {side !== "chart" && (
-          <div className="pane-text">
-            {!keptOnDevice() && (
-              <p className="problem" role="alert">
-                This browser is not keeping charts, so this one lasts until the page is closed.
-                Export it to keep it.
-              </p>
-            )}
-            {side === "text" ? (
-              <>
-                <div className="tools">
-                  <button type="button" onClick={format}>
-                    Format
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      download(
-                        text,
-                        "text/plain;charset=utf-8",
-                        fileName(chart.title, "chart", ".chart"),
-                      )
-                    }
-                  >
-                    Export
-                  </button>
-                  <button type="button" className="danger" onClick={remove}>
-                    Delete
-                  </button>
-                </div>
-                <Source
-                  text={text}
-                  diagnostics={diagnostics}
-                  change={typed}
-                  typing={(on) => {
-                    setTyping(on);
-                    // Leaving the box ends the stretch of typing that is one step to take back.
-                    if (!on) run.current = false;
-                  }}
-                  area={area}
-                />
-              </>
-            ) : (
-              <ArrangementGrid
-                text={text}
-                chart={chart}
-                diagnostics={diagnostics}
-                change={commit}
-                // The style play would use, so a section left to it is drawn at the level it will be played.
-                style={styleById(chosen ?? chart.styleId ?? "") ?? STYLES[0]!}
-                showText={() => setSide("text")}
-              />
-            )}
-          </div>
-        )}
+        <fieldset className="sides" aria-label="Edit the chart as">
+          {SIDES.map(([way, name]) => (
+            <button
+              key={way}
+              type="button"
+              className="side"
+              aria-pressed={side === way}
+              onClick={() => setSide(way)}
+            >
+              {name}
+            </button>
+          ))}
+        </fieldset>
       </div>
-      {touch && barEditor}
-      {touch && sectionSheet}
-    </main>
+    </>
   );
+
+  const over =
+    known.size === 0 ? (
+      <p className="empty-page">
+        <span>No bars yet.</span>
+        <button type="button" onClick={() => commit(withFirstSection(latest.current))}>
+          Add a line of bars
+        </button>
+      </p>
+    ) : undefined;
+
+  const pane = side !== "chart" && (
+    <div className="pane-text">
+      {!keptOnDevice() && (
+        <p className="problem" role="alert">
+          This browser is not keeping charts, so this one lasts until the page is closed. Export it
+          to keep it.
+        </p>
+      )}
+      {side === "text" ? (
+        <>
+          <div className="tools">
+            <button type="button" onClick={format}>
+              Format
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                download(text, "text/plain;charset=utf-8", fileName(chart.title, "chart", ".chart"))
+              }
+            >
+              Export
+            </button>
+            <button type="button" className="danger" onClick={remove}>
+              Delete
+            </button>
+          </div>
+          <Source
+            text={text}
+            diagnostics={diagnostics}
+            change={typed}
+            typing={(typingNow) => {
+              setTyping(typingNow);
+              // Leaving the box ends the stretch of typing that is one step to take back.
+              if (!typingNow) run.current = false;
+            }}
+            area={area}
+          />
+        </>
+      ) : (
+        <ArrangementGrid
+          text={text}
+          chart={chart}
+          diagnostics={diagnostics}
+          change={commit}
+          style={style}
+          showText={() => setSide("text")}
+        />
+      )}
+    </div>
+  );
+
+  return {
+    text,
+    chart: page.chart,
+    title: chart.title,
+    edit,
+    side,
+    typing,
+    docked,
+    keyboard: on && touch && (open !== undefined || typing),
+    area,
+    over,
+    pane,
+    dock,
+    keyDock: touch && (barEditor || sectionSheet),
+    finish: () => {
+      apply();
+      save();
+    },
+    rename: (title) => {
+      const clean = title.replace(/\s+/g, " ").trim();
+      if (clean && clean !== chart.title) commit(retitled(latest.current, clean));
+    },
+    forget: () => {
+      clearTimeout(timer.current);
+      timer.current = undefined;
+      pending.current = undefined;
+      latest.current = entry.text;
+    },
+  };
 }

@@ -1,5 +1,5 @@
-// The app: home, the library, one chart on the play screen, one of the
-// player's own in the editor, or a take they kept. The address says which
+// The app: home, the library, one chart on its screen (to play, or with the
+// pencil down to change one of the player's own), or a take they kept. The address says which
 // (`address.ts`), so the browser's back button works and a chart can be
 // bookmarked.
 
@@ -8,7 +8,6 @@ import { address, go, routeOf, subscribeAddress } from "./address.ts";
 import { Browse } from "./Browse.tsx";
 import { CreditsView } from "./CreditsView.tsx";
 import { findChart, ownCharts, subscribeCharts } from "./charts.ts";
-import { EditView } from "./edit/EditView.tsx";
 import type { Saving } from "./offline.ts";
 import { saveInstruments } from "./offline.ts";
 import { PlayView } from "./play/PlayView.tsx";
@@ -30,6 +29,8 @@ export function App() {
   const [settings, setSettings] = useState(loadSettings);
   /** The address of the chart or take whose play button was tapped on home or in the library: it starts as its screen opens. */
   const [autoplay, setAutoplay] = useState<string>();
+  /** The id of a copy of a built-in chart just made to edit: its screen says so, once. */
+  const [copied, setCopied] = useState<string>();
 
   const [saving, setSaving] = useState<Saving>();
 
@@ -65,20 +66,14 @@ export function App() {
   }
   const entry =
     route.screen === "chart" || route.screen === "edit" ? findChart(route.id) : undefined;
-  // A built-in is not edited in place: its play screen offers a copy.
-  if (route.screen === "edit" && entry?.own)
-    return (
-      <EditView
-        key={entry.id}
-        entry={entry}
-        reading={settings.reading}
-        style={settings.charts[entry.id]?.style}
-      />
-    );
-  if (route.screen === "chart" && entry)
+  // Playing a chart and editing it are one screen: going from one to the other redraws nothing.
+  if (entry)
     return (
       <PlayView
         key={entry.id}
+        mode={route.screen === "edit" ? "edit" : "play"}
+        copied={copied === entry.id}
+        madeCopy={setCopied}
         entry={entry}
         takes={takes.filter((kept) => chartFor(kept)?.id === entry.id)}
         rig={rig}
@@ -90,7 +85,7 @@ export function App() {
     );
   return (
     <Browse
-      // A chart, a take or an editor that is not there to open: home.
+      // A chart or a take that is not there to open: home.
       route={
         route.screen === "home" || route.screen === "library"
           ? route

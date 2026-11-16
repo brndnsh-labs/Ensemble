@@ -237,7 +237,7 @@ export function Source({ text, diagnostics, change, typing, area }: Props) {
           </ol>
         )}
         {others > 0 && (
-          <button type="button" className="more" onClick={() => setOpen(!open)}>
+          <button type="button" className="problems-more" onClick={() => setOpen(!open)}>
             {open ? "Fewer" : `${others} more`}
           </button>
         )}

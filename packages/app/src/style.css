@@ -175,8 +175,7 @@ fieldset {
 .shows-style,
 .crumb.style,
 .trail .here,
-.go,
-.to-play {
+.go {
   font-stretch: 62%;
   font-weight: 900;
   line-height: 0.86;
@@ -225,6 +224,7 @@ fieldset {
 .grid-remove,
 .choice,
 .empty-page button,
+.steps button,
 :is(.bar-panel, .section-panel) :is(.dock-acts button, .dock-step) {
   display: inline-flex;
   align-items: center;
@@ -293,7 +293,14 @@ button:active:not(:disabled),
     .row-more,
     .tab,
     .shows-all
-  ):not(:disabled, [aria-disabled="true"], [aria-pressed="true"], [aria-current], .first):hover {
+  ):not(
+    :disabled,
+    [aria-disabled="true"],
+    [aria-pressed="true"],
+    [aria-current],
+    .first,
+    .done
+  ):hover {
     background: var(--wash);
   }
 
@@ -1303,7 +1310,7 @@ button:active:not(:disabled),
   overflow: hidden;
 }
 
-/* The row of places, and at its end the way to the editor. */
+/* The row of places, and at its end Edit and More. */
 .bar-top {
   display: flex;
   align-items: center;
@@ -1332,21 +1339,7 @@ button:active:not(:disabled),
   white-space: nowrap;
 }
 
-/* In the editor the name is typed where it stands, in the row itself. */
-.bar-top h1 {
-  flex: 1;
-  min-width: 0;
-  margin: 0;
-  overflow: hidden;
-  font-family: var(--chart-face);
-  font-size: 1.25rem;
-  font-stretch: 62%;
-  font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* The way to the editor, and More: words at the end of the row, not boxes. */
+/* Edit and More: words at the end of the row, not boxes. */
 .edit-link {
   display: inline-flex;
   flex: none;
@@ -2041,99 +2034,161 @@ button:active:not(:disabled),
   }
 }
 
-/* ── The editor ──────────────────────────────────────────────────────────── */
+/* ── The chart with a pencil ─────────────────────────────────────────────── */
 
-/* Pinned to the screen, so that while a phone's keyboard is up it can be fitted to what is left. */
-.edit {
+/* Edit is a word at the end of the row; with the pencil down it reads Done, filled, the one
+   thing in the row that is switched on. The fill is a fingertip's width of ink inside a
+   fingertip-tall button, so the row does not change height. */
+.edit-toggle.done {
+  padding: 0 10px;
+  background: linear-gradient(var(--ink), var(--ink)) center / 100% 34px no-repeat;
+  color: var(--paper);
+}
+
+/* Pinned to the screen, so that while a phone's keyboard is up it can be fitted to what the
+   keyboard leaves (`edit/viewport.ts`). With no keyboard it is exactly where it was. */
+.play.editing {
   position: fixed;
   top: 0;
   left: 0;
+  width: 100%;
+}
+
+/* The chart's place. Playing, the chart has it alone; with the text or the arrangement open
+   they share it: on a phone one takes the chart's place, on a wide screen they are side by side. */
+.panes {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.pane-chart {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* The page with a pencil scrolls, whatever its size: a keyboard can take half the screen, and
+   what hangs from a bar typed in place hangs past the last line. */
+.chart-frame.editing {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.chart-frame.editing::-webkit-scrollbar {
+  display: none;
+}
+
+.empty-page {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
-  width: 100%;
-  height: 100dvh;
-  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
-    env(safe-area-inset-left);
-  overflow: hidden;
-}
-
-/* The editor's row of places is as wide as its words: the chart's name has the rest. */
-.edit .trail {
-  flex: none;
-}
-
-.edit .bar-top {
-  padding: 6px var(--gutter) 4px;
-}
-
-/* The editor's way to the band: Play, in the ink of the style it will be played in. */
-.to-play {
-  display: inline-flex;
-  flex: none;
+  gap: 12px;
   align-items: center;
-  height: var(--control);
-  padding: 0 12px;
-  background: var(--spot);
-  color: var(--press);
-  font-size: 1.35rem;
-  line-height: 1;
-  text-decoration: none;
-  white-space: nowrap;
-  --focus: var(--ink);
-}
-
-.to-play:active {
-  background: var(--marker);
-  color: var(--on-marker);
-}
-
-/* The chart's name is typed where it stands. */
-.bar-top h1.title {
-  display: flex;
-  overflow: visible;
-}
-
-.title input {
-  width: 100%;
-  min-width: 0;
-  height: var(--control);
-  padding: 0 6px;
-  border: 2px solid transparent;
-  background: none;
-  font-stretch: inherit;
-  text-overflow: ellipsis;
-}
-
-.title input::placeholder {
+  justify-content: center;
+  margin: 0;
   color: var(--faint);
-  opacity: 1;
 }
 
-.title input:focus-visible {
-  border-color: var(--ink);
-  outline: none;
+/* The dock with the pencil down: the editor's things in the band's place, over the strip and
+   the players. They keep their room under it, unseen, so the dock is the height it was, the
+   chart above it does not move, and Play is where it was. */
+.play.editing :is(.strip, .players) {
+  visibility: hidden;
 }
 
-@media (hover: hover) {
-  .title input:hover {
-    border-color: var(--rule);
+.edit-dock {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+  grid-row: strip-start / players-end;
+  grid-column: strip-start / players-end;
+  min-width: 0;
+}
+
+@media (max-width: 819px) {
+  .play.editing .band-dock {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "strip"
+      "players"
+      "transport";
+  }
+
+  .play.editing .strip {
+    grid-area: strip;
+  }
+
+  .play.editing .players {
+    grid-area: players;
+  }
+
+  .play.editing .transport {
+    grid-area: transport;
   }
 }
 
-/* Taking a change back, and doing it again: there for as long as the editor is open. */
-.steps {
+/* What a press will do, which bar is open, or that this is a copy; and what there is to fix. */
+.edit-says {
   display: flex;
-  flex: none;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 14px;
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.3;
 }
 
-.steps button {
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: var(--control);
+.edit-says span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.to-fix {
+  position: relative;
+  flex: none;
   padding: 0;
   border: 0;
   background: none;
+  color: var(--pencil);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* A fingertip tall, however short the words. */
+.to-fix::after {
+  content: "";
+  position: absolute;
+  inset: -12px -8px;
+}
+
+.edit-row {
+  display: flex;
+  gap: 8px;
+}
+
+/* Taking a change back, and doing it again: there for as long as the pencil is down. */
+.steps {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+
+.steps button {
+  width: var(--control);
+  padding: 0;
 }
 
 .steps svg {
@@ -2147,74 +2202,60 @@ button:active:not(:disabled),
 }
 
 .steps button[aria-disabled="true"] {
+  border-color: var(--rule);
   color: var(--rule);
   cursor: default;
 }
 
-/* A phone held upright: the chart has the screen. With the text or the arrangement open it
-   is the page above, about two fifths of the height, and they are under it. */
-.panes {
+/* Which way the chart is being changed: on the chart itself, as its text, or who plays where. */
+.sides {
   display: flex;
   flex: 1;
-  flex-direction: column;
-  min-height: 0;
+  min-width: 0;
 }
 
-.pane-chart {
-  position: relative;
-  display: flex;
-  flex: 0 0 40%;
-  flex-direction: column;
-  min-height: 0;
-  padding: 4px 0 8px;
-}
-
-.side-chart .pane-chart {
-  flex: 1;
-}
-
-/* With a wide screen to itself the chart keeps to the width of a page: a bar is not a hand's width of white. */
-.side-chart .chart-frame {
-  width: min(100% - 2 * var(--gutter), 64rem);
-}
-
-/* What the chart is for here, said once under it. */
-.chart-foot {
-  display: flex;
-  flex: none;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px 16px;
-  margin: 0;
-  padding: 6px var(--gutter) 0;
-  color: var(--faint);
-  font-size: 0.8125rem;
-  line-height: 1.3;
-}
-
-.chart-foot button {
-  flex: none;
-  height: var(--control);
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--pencil);
-  font-size: inherit;
+.side {
+  flex: 1 1 auto;
+  padding: 0 8px;
   font-weight: 650;
-  text-decoration: underline;
-  text-underline-offset: 3px;
 }
 
-.empty-page {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  align-items: center;
-  justify-content: center;
-  margin: 0;
-  color: var(--faint);
+.side + .side {
+  border-left: 0;
+}
+
+/* A laptop: the words beside the controls, in the strip's and the players' one row. */
+@media (min-width: 1100px) {
+  .edit-dock {
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .edit-says {
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .edit-says span {
+    white-space: normal;
+  }
+
+  .sides {
+    flex: none;
+  }
+}
+
+/* On a touch screen, while a bar or a section is open in the dock at the foot of the screen, or
+   the text is being typed, that has the foot: the band's dock waits. While the keyboard is up
+   the name and the line give the chart their room too; the row of places stays. */
+@media (pointer: coarse) {
+  .play.docked .band-dock,
+  .play.typing .band-dock,
+  .play.keyboard :is(.chart-title, .sentence) {
+    display: none;
+  }
 }
 
 .pane-text {
@@ -2382,7 +2423,7 @@ button:active:not(:disabled),
   color: var(--faint);
 }
 
-.more {
+.problems-more {
   position: sticky;
   top: 0;
   display: none;
@@ -2412,7 +2453,7 @@ button:active:not(:disabled),
     -webkit-line-clamp: 2;
   }
 
-  .more {
+  .problems-more {
     display: block;
     min-width: var(--control);
     min-height: var(--control);
@@ -2434,7 +2475,7 @@ button:active:not(:disabled),
 }
 
 @media (pointer: coarse) {
-  .edit.typing .keys {
+  .play.typing .keys {
     position: absolute;
     right: 0;
     bottom: 0;
@@ -2445,7 +2486,7 @@ button:active:not(:disabled),
     background: var(--rule);
   }
 
-  .edit.typing .panes {
+  .play.typing .panes {
     padding-bottom: 52px;
   }
 
@@ -2470,46 +2511,32 @@ button:active:not(:disabled),
   }
 
   /* While typing on a phone the tools wait; the keyboard has taken their room. */
-  .edit.typing .tools,
-  .edit.typing .sides,
-  .edit.docked .sides,
-  .edit.docked .chart-foot {
+  .play.typing .tools {
     display: none;
   }
 }
 
-/* Beside or over the text, the chart is the smaller thing: it says what it is for on its own side. */
+/* A phone held upright: the text or the grid takes the chart's place, and Chart in the dock brings it back. */
 @media (max-width: 699px) {
-  .edit:not(.side-chart) .chart-foot {
+  .play.editing:not(.side-chart) .pane-chart {
     display: none;
-  }
-
-  /* The grid takes the height it needs, so its choices are not under the fold, and the chart has the rest. */
-  .side-arrangement .pane-chart {
-    flex: 1 1 0;
-  }
-
-  .side-arrangement .pane-text {
-    flex: 0 1 auto;
-    max-height: 75%;
   }
 }
 
-/* A wide screen: the text on the left, the page beside it. */
+/* A wide screen: the text on the left, the page beside it, the two in the chart's column. */
 @media (min-width: 700px) {
   .panes {
     flex-direction: row;
+  }
+
+  .play.editing:not(.side-chart) .panes {
+    padding-inline: max(0px, calc((100% - 64rem) / 2 - var(--gutter)));
   }
 
   .pane-text {
     flex: 0 0 min(46%, 38rem);
     order: -1;
     padding: 4px 0 12px var(--gutter);
-  }
-
-  .pane-chart {
-    flex: 1;
-    padding: 4px 0 12px;
   }
 }
 
@@ -2535,10 +2562,10 @@ button:active:not(:disabled),
   height: max(calc(var(--line) * 1em), var(--control));
 }
 
-/* A section's name is a button too, with a fingertip's room round it. */
+/* A section's name is a button too, with a fingertip's room round it (its own, below), and
+   the height it has on the play screen, so the bars under it stay where they were. */
 .chart.editing .label {
   position: relative;
-  height: max(0.95em, 38px);
 }
 
 .chart.editing .label.chosen {
@@ -2636,7 +2663,7 @@ button.mark[aria-expanded="true"] {
 
 /* Room under the last line for what hangs from a bar typed in place. */
 @media not (pointer: coarse) {
-  .chart-frame.scrolls .chart.editing {
+  .chart.editing {
     padding-bottom: 13rem;
   }
 }
@@ -2772,7 +2799,7 @@ button.mark[aria-expanded="true"] {
 /* On a touch screen: a dock on top of the keyboard. What is being typed and where, the way
    to the bars on either side, and under them the keys a phone's keyboard hides or lacks. */
 @media (pointer: coarse) {
-  .dock {
+  .key-dock {
     display: flex;
     flex: none;
     flex-direction: column;
@@ -2782,7 +2809,7 @@ button.mark[aria-expanded="true"] {
     font-size: 0.875rem;
   }
 
-  .dock .dock-says {
+  .key-dock .dock-says {
     margin: 0 calc(-1 * max(5px, env(safe-area-inset-right))) 0
       calc(-1 * max(5px, env(safe-area-inset-left)));
     padding: 6px var(--gutter) 5px;
@@ -2792,14 +2819,14 @@ button.mark[aria-expanded="true"] {
     line-height: 1.3;
   }
 
-  .dock .dock-acts,
-  .dock .dock-type,
+  .key-dock .dock-acts,
+  .key-dock .dock-type,
   .dock-keys {
     display: flex;
     gap: 4px;
   }
 
-  .dock button {
+  .key-dock button {
     flex: 1 1 0;
     min-width: 0;
     height: 44px;
@@ -2814,23 +2841,23 @@ button.mark[aria-expanded="true"] {
     -webkit-user-select: none;
   }
 
-  .dock button:active:not([aria-disabled="true"], :disabled) {
+  .key-dock button:active:not([aria-disabled="true"], :disabled) {
     background: var(--marker);
     color: var(--on-marker);
   }
 
-  .dock .bar-field {
+  .key-dock .bar-field {
     flex: 1 1 0;
     height: 44px;
   }
 
-  .dock .dock-step {
+  .key-dock .dock-step {
     display: grid;
     flex: 0 0 44px;
     place-items: center;
   }
 
-  .dock .dock-step.wide {
+  .key-dock .dock-step.wide {
     flex: none;
     padding: 0 12px;
   }
@@ -2845,13 +2872,13 @@ button.mark[aria-expanded="true"] {
     stroke-width: 2.4;
   }
 
-  .dock .dock-done,
-  .dock .dock-more[aria-pressed="true"] {
+  .key-dock .dock-done,
+  .key-dock .dock-more[aria-pressed="true"] {
     background: var(--ink);
     color: var(--paper);
   }
 
-  .dock .dock-done {
+  .key-dock .dock-done {
     flex: none;
     padding: 0 14px;
   }
@@ -2884,13 +2911,13 @@ button.mark[aria-expanded="true"] {
     font-size: 1rem;
   }
 
-  .dock .dock-acts .danger,
-  .dock .dock-acts .danger[aria-disabled="true"] {
+  .key-dock .dock-acts .danger,
+  .key-dock .dock-acts .danger[aria-disabled="true"] {
     color: var(--pencil);
   }
 
-  .dock [aria-disabled="true"],
-  .dock :disabled {
+  .key-dock [aria-disabled="true"],
+  .key-dock :disabled {
     opacity: 0.45;
   }
 }
@@ -2902,30 +2929,6 @@ button.mark[aria-expanded="true"] {
 }
 
 /* ── The arrangement ─────────────────────────────────────────────────────── */
-
-/* Which way the chart is being edited: on the chart itself, as its text, or who plays where. */
-.sides {
-  display: flex;
-  flex: none;
-  margin: 2px var(--gutter) 8px;
-}
-
-.side {
-  flex: 1 1 auto;
-  padding: 0 8px;
-  font-weight: 650;
-}
-
-.side + .side {
-  border-left: 0;
-}
-
-@media (min-width: 700px) {
-  .sides {
-    align-self: flex-start;
-    width: 24rem;
-  }
-}
 
 .arrangement {
   display: flex;
@@ -3108,25 +3111,6 @@ button.mark[aria-expanded="true"] {
   margin-top: auto;
   border-color: var(--pencil);
   color: var(--pencil);
-}
-
-/* ── A phone held upright ────────────────────────────────────────────────── */
-
-/* The editor's top row also holds the chart's name, Undo, Redo and Play. On a phone the
-   place after Home is left out of it: Play is the way to the chart, and Home is home. */
-@media (max-width: 699px) {
-  .edit .crumb-sep,
-  .edit .crumb.place {
-    display: none;
-  }
-
-  .edit .bar-top {
-    gap: 4px;
-  }
-
-  .edit .bar-top h1 {
-    font-size: 1.15rem;
-  }
 }
 
 /* ── Sheets ──────────────────────────────────────────────────────────────── */

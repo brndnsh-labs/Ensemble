@@ -68,7 +68,7 @@ export function SectionSheet(props: Props) {
   return (
     <fieldset
       ref={sheet}
-      className={docked ? "dock" : "section-panel"}
+      className={docked ? "key-dock" : "section-panel"}
       aria-label={`Section ${label || "with no name"}`}
     >
       <p className={`dock-says${refused ? " wrong" : ""}`} aria-live="polite">

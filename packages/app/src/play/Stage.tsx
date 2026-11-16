@@ -3,11 +3,17 @@
 // playhead on it, and the dock: where the band is, the four players, and the
 // transport. Behind More, what is rarely wanted. Each screen brings its own
 // line, its own players' states and its own part of More.
+//
+// A chart's screen can also be in the editing mode (`edit/useEditor.tsx`):
+// the same screen with a pencil. The top, the chart and Play stay where they
+// are; the chart is pressed to change it, and the dock holds the editor's
+// things in the band's place.
 
 import type { Chart, Plan, Seat, StylePack } from "@ensemble/engine";
 import { keyToString, planBar, SOLO_INSTRUMENTS, seatChoice } from "@ensemble/engine";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
+import type { Editor } from "../edit/useEditor.tsx";
 import { instrument } from "../posters.ts";
 import type { Place } from "../Trail.tsx";
 import { Trail } from "../Trail.tsx";
@@ -51,7 +57,7 @@ interface Props {
   readonly place: Place;
   readonly reading: Reading;
   readonly read: (reading: Reading) => void;
-  /** At the end of the top row, before More: the way to the editor, or to a take's chart. */
+  /** At the end of the top row, before More: Edit (Done with the pencil down), or the way to a take's chart. */
   readonly side?: ReactNode;
   /** Under the name: what is played, in a line. */
   readonly sentence: ReactNode;
@@ -63,6 +69,8 @@ interface Props {
   readonly more: (close: () => void) => ReactNode;
   /** Something of the screen's own that went wrong, said where the band's own troubles are. */
   readonly problem?: string | undefined;
+  /** The chart's screen in the editing mode: the editor's parts, for this screen to place. */
+  readonly editor?: Editor | undefined;
 }
 
 /** Somewhere a space is typed or chooses, or a sheet is open over the screen: the space is not the transport's there. */
@@ -79,7 +87,7 @@ const takesSpaces = (target: EventTarget | null): boolean =>
  * when the player reaches for the space bar to stop the band. A button under
  * the focus is still pressed with Enter.
  */
-function useSpaceBar(press: () => void): void {
+function useSpaceBar(press: (() => void) | undefined): void {
   const latest = useRef(press);
   latest.current = press;
   useEffect(() => {
@@ -87,12 +95,12 @@ function useSpaceBar(press: () => void): void {
     let ours = false;
     const down = (event: KeyboardEvent) => {
       if (event.key !== " " || event.ctrlKey || event.metaKey || event.altKey) return;
-      if (takesSpaces(event.target)) return;
+      if (!latest.current || takesSpaces(event.target)) return;
       event.preventDefault();
       // A held key repeats; the band is started or stopped once.
       if (event.repeat) return;
       ours = true;
-      latest.current();
+      latest.current?.();
     };
     const up = (event: KeyboardEvent) => {
       if (event.key !== " " || !ours) return;
@@ -148,14 +156,15 @@ const SAYS: Readonly<Record<Seated["state"], string | undefined>> = {
 
 export function Stage(props: Props) {
   const { jam, call, chart, preview, reading, read } = props;
-  const { title, place, side, sentence, players, keep, more } = props;
+  const { title, place, side, sentence, players, keep, more, editor } = props;
   const problem = jam.problem ?? props.problem;
   const [focus, setFocus] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
 
   const idle = jam.phase === "idle";
   const playing = jam.phase === "playing";
-  useSpaceBar(idle ? jam.play : jam.stop);
+  // With the pencil down the space bar is the keyboard's: it presses the bar or the name it is on.
+  useSpaceBar(editor ? undefined : idle ? jam.play : jam.stop);
   const plan = playing && jam.playing ? jam.playing.plan : preview;
   const shown = playing && jam.playing ? jam.playing.chart : chart;
 
@@ -211,25 +220,44 @@ export function Stage(props: Props) {
 
   return (
     // The screen takes the ink of the style the band plays in: the line, the dock and Play.
-    <main className="play" data-style={style.id} data-state={jam.phase}>
+    <main
+      className={`play${editor ? ` editing side-${editor.side}${editor.typing ? " typing" : ""}${editor.docked ? " docked" : ""}${editor.keyboard ? " keyboard" : ""}` : ""}`}
+      data-style={style.id}
+      data-state={jam.phase}
+      // While a phone's keyboard is up, the screen is fitted to what it leaves.
+      style={editor?.area && { top: editor.area.top, height: editor.area.height }}
+    >
       <div className="top">
         <header className="bar-top">
           <Trail place={place} />
           {side}
           <button
             type="button"
-            className="edit-link more-link"
+            className="edit-link more"
             aria-haspopup="dialog"
             onClick={() => setMoreOpen(true)}
           >
             More
           </button>
         </header>
-        <h1 className="chart-title">{title ?? shown.title}</h1>
+        <h1 className="chart-title">{title ?? editor?.title ?? shown.title}</h1>
         {sentence}
       </div>
 
-      <ChartView chart={shown} reading={reading} playhead={playhead} focus={focus} />
+      {/* The same frame in both modes, so the page is not set again when the pencil is picked up. */}
+      <div className="panes">
+        <div className="pane-chart">
+          <ChartView
+            chart={editor ? editor.chart : shown}
+            reading={reading}
+            playhead={editor ? undefined : playhead}
+            focus={focus && !editor}
+            edit={editor?.edit}
+          />
+          {editor?.over}
+        </div>
+        {editor?.pane}
+      </div>
 
       {problem && (
         <p className="problem" role="alert">
@@ -280,6 +308,8 @@ export function Stage(props: Props) {
             );
           })}
         </fieldset>
+        {/* In the mode, laid over the strip and the players, which keep their room: the dock does not change height. */}
+        {editor && <div className="edit-dock">{editor.dock}</div>}
         <div className="transport">
           {keep}
           {/* The second choice, and only a jam's: a song ends by itself. It comes in beside Stop, moving nothing. */}
@@ -298,8 +328,14 @@ export function Stage(props: Props) {
           </button>
         </div>
       </footer>
+      {editor?.keyDock}
 
-      <Sheet open={moreOpen} close={close} title={title ?? shown.title} kind="more-sheet">
+      <Sheet
+        open={moreOpen}
+        close={close}
+        title={title ?? editor?.title ?? shown.title}
+        kind="more-sheet"
+      >
         <p className="sheet-label" id="reading-label">
           Show the chords as
         </p>
@@ -330,24 +366,26 @@ export function Stage(props: Props) {
           </button>
         </fieldset>
         <ul className="menu">
-          <li>
-            <button
-              className="menu-line"
-              type="button"
-              aria-pressed={focus}
-              onClick={() => {
-                setFocus(!focus);
-                close();
-              }}
-            >
-              <span>{focus ? "Focus is on" : "Focus"}</span>
-              <small>
-                {focus
-                  ? "Press to show the whole chart again"
-                  : "Only the line being played and the next, large"}
-              </small>
-            </button>
-          </li>
+          {!editor && (
+            <li>
+              <button
+                className="menu-line"
+                type="button"
+                aria-pressed={focus}
+                onClick={() => {
+                  setFocus(!focus);
+                  close();
+                }}
+              >
+                <span>{focus ? "Focus is on" : "Focus"}</span>
+                <small>
+                  {focus
+                    ? "Press to show the whole chart again"
+                    : "Only the line being played and the next, large"}
+                </small>
+              </button>
+            </li>
+          )}
           {more(close)}
         </ul>
       </Sheet>
