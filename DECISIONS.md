@@ -1448,3 +1448,58 @@ Read on the main thread: the diff (2,408 lines in, 864 out, all in `packages/app
 - The builder's decisions stand as logged above, among them: search is the library showing what was found (the box moves from home into the library's top bar on the first letter); a take's row goes to Takes, with "Open its chart" beside it; lists are by title.
 - **Known and left for the next parts or his eye**: on a phone a style's list starts about 435 px down (the bar, two rows of the strip, the poster head); a long chart title is cut to one line; `theme-color` is still the paper; nothing has been seen on an iPhone (safe areas, the pinned bar under Safari's toolbars, how a press shows).
 - **Builds from here go to Opus where the design is drawn** (Brandon, 2026-11-16: "should we lean more on opus for most of the building?"; agreed): parts 2 and 3 are built from the study's pages. Fable keeps the briefs, the checking, and anything that turns out to need design.
+
+## the poster wall, part 2: the chart's screen (stage 6)
+
+Built to `prompts/app-poster-wall-2.md`, from the study's direction A (`out/look-study/a/chart-*.html`, `take-1.html`). Nothing in the engine, the styles or the audio package changed. What that brief did not settle:
+
+**The line and its sheets**
+
+- **A sheet is the browser's own modal dialog** (`play/Sheet.tsx`): the screen behind it is inert, Escape is its `cancel`, a press on the dimmed screen closes it, the sheet itself takes the focus as it opens (so nothing is ringed by a touch, and the next Tab is its first control) and the focus goes back to what opened it. It rises 28 px in 140 ms on a phone, closes at once, and does not move under reduced motion; from 720 px wide it is a 440 px card at the foot of the middle, as the study draws it. It is the only animation in the stylesheet.
+- **Its way out is a filled "Done", the study's word**, in every sheet. The brief says "its own Close"; Done is what the study draws, and every change in a sheet is made at the press, so there is nothing to confirm or cancel.
+- **A choice of one closes its sheet** (style, key, length), as the study's do. Tempo and how the chords are written leave it open: each press there is a step, and the figure or the page behind has to stay in view.
+- **The tempo sheet keeps the study's slider** under the figure, over the style's whole range, a beat at a time; minus and plus step by 4 as before, and are not pressed past the style's limits.
+- **The way back on the tempo sheet**: with a tempo he set, "Back to 100, as written" (or "Back to 76, reggae's usual" where the chart is played in another style); with none set and the chart played in another style at that style's usual tempo, "Play at 176, as written" sets the chart's own, held to the style's limits.
+- **"The song, once through" is offered for every chart**, as the Length picker offered it. The brief says "where the chart has an arrangement"; keeping it to those would take away playing a 12-bar blues once through, which the screen does now.
+- **The key sheet is the twelve keys of the written mode from C, as the picker spelled them** (G flat, not the study's F sharp), the written one marked "written".
+- **While the band plays the line is a statement**: the same bold words with the ink taken from under them, plain text and not buttons, and "(changed when the band is stopped)" for a screen reader. A take's line is the study's plain sentence: "A take kept 16 Nov: Jazz in Bb, 176 bpm, 2:57".
+- **The space bar is not the transport inside a sheet**: there it presses the button under the focus, as anywhere a choice is being made.
+
+**More**
+
+- **More is a word at the end of the top row**, after Edit (or "Edit a copy", which part 1 put there and which stays: the next brief makes Edit a mode). A built-in chart's More also has "Make a copy to edit", as the brief lists.
+- **The sheet's heading is the screen's name.** How the chords are written is a joined row of three, each with an example in the key it is played in ("Names A7", "Numerals I7", "Both A7 over I7"). Focus is a line that says what it does, switches, and closes the sheet so the page can be seen; it is still forgotten when the screen is left.
+- **An instrument is chosen in More only before Play**, as the pickers under the Band row were, and the line is the browser's own list laid unseen over it (a phone's wheel). "Soloist plays" is there while the soloist sits out too, and says so: choosing the instrument first is reasonable.
+- **A kept take is a line named for itself** ("Kept take, 14:05" for one kept today, else the day; its own name if it was given one) with its style, key, tempo and length under it.
+- **Export MIDI and Export the chart's text close the sheet**, so the download is seen. **Duplicate opens the copy; Delete, asked first, goes to the chart's place in the library**; Rename is typed in the sheet.
+
+**The dock**
+
+- **The ink floods the dock from the press of Play**, through the band loading, not from the first note: the press is answered in its frame, as Stop already was.
+- **Keep is there from the press of Play** (dashed, until the take is made) and stays beside Play after the band stops, until the next Play: Stop never moves when the take arrives, and the take just played can still be kept, as before. A song has Keep and Stop, no Finish.
+- **Stop covers the middle of where Play was.** On a 390 px phone Keep (about 60 px) and Finish (84 px) leave Stop from 176 px; Play's middle is 195. On a laptop the transport is 360 px wide for the same reason (at 320 the middle of Play was Finish).
+- **The last pass is not red on the flood**: red on a spot colour is the palette's no. It says "Last pass", and the way home is shaded in the arc.
+- **A player in the band is an outline; out of it, a dashed block that says "sits out"; switched on while the band plays a take it is not in, hatched and dashed, "in next time".** On a take, a seat that is not in the take is dashed, says "not in this take", and cannot be pressed.
+- **Phone: the strip, the players, the transport, three rows. From 820 px: the strip over the players, the transport beside them. From 1100 px: one row** (strip, players 400 px, transport 360 px) in the chart's 64 rem column.
+
+**The players alive**
+
+- **`play/lamps.ts`**: each seat's onsets are the take's sounds by the chair they sit in (the seat before the colon of the sampler's name), one per moment (a chord lights once); nothing before the first bar of music (the count-in). When the take is replaced under the band, the onsets are replaced from the same second the player's sounds are. `useJam` keeps them beside the player and hands out one function, `follow`, that reads the player's position less the output's latency; it never sets state.
+- **A lamp is a copy of the block's words in the paper's colour on the ink, laid over the block**, and the frame loop writes only its opacity: full for 37.5 ms, then out by 150 ms on a squared ease (the study's keyframes). The loop runs only while the band plays, not at all under reduced motion, and a seat out or silenced does not light.
+
+**The tempo when the style is changed**
+
+- **`tempoFor` in `play/jam.ts`**, used by the chart's screen and by home's poster and bills (so home says what Play will play). A tempo he set is kept and held to the style's limits when it is used, not when it is stored, so going back to the first style gives back what he set. A chart that names no style, or one this version does not have, keeps its written tempo in every style.
+
+**A kept take's screen**
+
+- **Its mutes are the screen's own**, not the chart's switches: everyone is heard when it opens, a seat silenced stays silenced from one Play to the next on that screen, and nothing is stored. Rename, Export MIDI, Export take and Delete are its More. "This browser is not keeping takes" is said where the screen's problems are, over the dock.
+
+**Left as it is**
+
+- **At 1280 px the chart is set eight bars to a line**, where the study drew four: that is `ChartView.tsx`'s rule given a 64 rem column, which this brief did not open.
+
+**Tests**
+
+- **Smoke journey 5** opens More before each export (the play screen's while the band plays, the take's two), presses the export inside the sheet, and reaches the kept take through More's "Kept take" line where it pressed the link under the chart. What it proves is unchanged: both MIDI files equal the CLI's. Journeys 1 to 4 are as they were.
+- **`out/wall-2/`** (the pictures of this part) is ignored by git.

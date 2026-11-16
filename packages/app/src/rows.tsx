@@ -9,6 +9,7 @@ import { useState } from "react";
 import { deleteChart, duplicateChart, renameChart } from "./charts.ts";
 import { download, fileName } from "./download.ts";
 import type { LibraryChart } from "./library.ts";
+import { tempoFor } from "./play/jam.ts";
 import { clock } from "./play/StatusStrip.tsx";
 import { count, writtenFor } from "./posters.ts";
 import type { ChartChoices } from "./settings.ts";
@@ -55,7 +56,9 @@ export function chartRow(entry: LibraryChart, withStyle: boolean): Row {
  */
 export function playedRow(entry: LibraryChart, choices: ChartChoices | undefined): Row {
   const style = styleById(choices?.style ?? entry.chart.styleId ?? "") ?? STYLES[0]!;
-  const tempo = choices?.tempo ?? entry.chart.tempo ?? style.tempo.default;
+  // The tempo the chart's own screen shows, and its Play starts.
+  const tempo =
+    tempoFor(entry.chart, style, choices?.tempo) ?? entry.chart.tempo ?? style.tempo.default;
   const key = choices?.key ?? keyToString(entry.chart.key);
   return {
     address: `#/chart/${entry.id}`,

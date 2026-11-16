@@ -1,22 +1,41 @@
-// What the play screen and a kept take's screen share: the chart with the
-// playhead on it, how it is read, the status strip and the transport. Each
-// screen brings what there is to do before the band starts: set it up, or
-// name and export the take.
+// What a chart's screen and a kept take's screen share: the way back, the
+// screen's name and what is being played in a line, the chart with the
+// playhead on it, and the dock: where the band is, the four players, and the
+// transport. Behind More, what is rarely wanted. Each screen brings its own
+// line, its own players' states and its own part of More.
 
-import type { Chart, Plan } from "@ensemble/engine";
-import { keyToString, planBar, SOLO_INSTRUMENTS } from "@ensemble/engine";
+import type { Chart, Plan, Seat, StylePack } from "@ensemble/engine";
+import { keyToString, planBar, SOLO_INSTRUMENTS, seatChoice } from "@ensemble/engine";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
+import { instrument } from "../posters.ts";
 import type { Place } from "../Trail.tsx";
 import { Trail } from "../Trail.tsx";
 import type { Playhead } from "./ChartView.tsx";
 import { ChartView } from "./ChartView.tsx";
 import type { Reading } from "./ChordSymbol.tsx";
-import type { Call } from "./jam.ts";
+import type { Call, HowPlayed } from "./jam.ts";
 import { homeStretch, nextChange } from "./jam.ts";
+import { useLamps } from "./lamps.ts";
 import { pageBarOf } from "./page.ts";
+import { Sheet } from "./Sheet.tsx";
 import { StatusStrip } from "./StatusStrip.tsx";
 import type { Jam } from "./useJam.ts";
+
+/** A player in the dock: the seat, what it is played on, and whether it plays. */
+export interface Seated {
+  readonly seat: Seat;
+  /** The instrument, as its pack names it: "Upright bass". */
+  readonly on: string;
+  /**
+   * In the band and heard; out of it (sitting out, or silenced); switched on
+   * while the band plays a take it is not in, so heard from the next one; or
+   * not in a kept take at all, which nothing can change.
+   */
+  readonly state: "in" | "out" | "next" | "absent";
+  /** What a press does. None: the block cannot be pressed. */
+  readonly press?: () => void;
+}
 
 interface Props {
   readonly jam: Jam;
@@ -28,36 +47,37 @@ interface Props {
   readonly preview: Plan;
   /** The screen's name, when it is not the chart's title. */
   readonly title?: string;
-  /** What kind of thing the screen shows, when it is not a chart: said before the style, key and tempo. */
-  readonly about?: string;
   /** The place above this screen: the part of the library it belongs under, or the takes. */
   readonly place: Place;
   readonly reading: Reading;
   readonly read: (reading: Reading) => void;
-  /** At the end of the header: the way to the editor. */
+  /** At the end of the top row, before More: the way to the editor, or to a take's chart. */
   readonly side?: ReactNode;
-  /** Over the chart while the band is not playing. */
-  readonly before: ReactNode;
-  /** Who is in the band: under the chart, and there while the band plays too. */
-  readonly band?: ReactNode;
-  /** Beside the transport, and quieter than it. */
-  readonly aside?: ReactNode;
+  /** Under the name: what is played, in a line. */
+  readonly sentence: ReactNode;
+  /** The four players. */
+  readonly players: readonly Seated[];
+  /** Beside the transport: Keep. */
+  readonly keep?: ReactNode;
+  /** The screen's own part of More, under how the page is read. */
+  readonly more: (close: () => void) => ReactNode;
   /** Something of the screen's own that went wrong, said where the band's own troubles are. */
   readonly problem?: string | undefined;
 }
 
-/** Somewhere a space is typed or chooses, so it is not the transport's there. */
+/** Somewhere a space is typed or chooses, or a sheet is open over the screen: the space is not the transport's there. */
 const takesSpaces = (target: EventTarget | null): boolean =>
   target instanceof HTMLInputElement ||
   target instanceof HTMLTextAreaElement ||
-  target instanceof HTMLSelectElement;
+  target instanceof HTMLSelectElement ||
+  (target instanceof Element && target.closest("dialog") !== null);
 
 /**
  * The space bar is the transport, as on every recorder: it does what the big
- * button would. That holds wherever the focus is but in a text box or a list
- * of choices, so a seat silenced with the mouse does not come back when the
- * player reaches for the space bar to stop the band. A button under the focus
- * is still pressed with Enter.
+ * button would. That holds wherever the focus is but in a text box, a list of
+ * choices or a sheet, so a seat silenced with the mouse does not come back
+ * when the player reaches for the space bar to stop the band. A button under
+ * the focus is still pressed with Enter.
  */
 function useSpaceBar(press: () => void): void {
   const latest = useRef(press);
@@ -101,25 +121,48 @@ function useSpaceBar(press: () => void): void {
 
 /** How many bars ahead the play screen tells the chart about: enough to find the next line from anywhere. */
 const COMING = 16;
-const READINGS: readonly Reading[] = ["names", "numerals", "both"];
-/** Each way of reading shown by example, and said in full for a screen reader. */
-const READING_NAMES: Readonly<Record<Reading, readonly [shown: string, said: string]>> = {
-  names: ["C7", "Chord names"],
-  numerals: ["V7", "Numerals"],
-  both: ["Both", "Names with numerals under them"],
+
+const SEAT_NAMES: Readonly<Record<Seat, string>> = {
+  drums: "Drums",
+  bass: "Bass",
+  chords: "Chords",
+  solo: "Soloist",
+};
+
+/** What a seat is played on in a take, as its pack names it. */
+export function playedOn(style: StylePack, options: HowPlayed, seat: Seat): string {
+  if (seat === "solo") {
+    const solo = options.soloInstrument ?? style.solo.instrument;
+    return SOLO_INSTRUMENTS[solo]?.name ?? instrument(solo);
+  }
+  return instrument(seatChoice(style, seat, options.instruments).pack);
+}
+
+/** What a player's block says under its name, when it is not what it is played on. */
+const SAYS: Readonly<Record<Seated["state"], string | undefined>> = {
+  in: undefined,
+  out: "sits out",
+  next: "in next time",
+  absent: "not in this take",
 };
 
 export function Stage(props: Props) {
   const { jam, call, chart, preview, reading, read } = props;
-  const { title, about, place, side, before, band, aside } = props;
+  const { title, place, side, sentence, players, keep, more } = props;
   const problem = jam.problem ?? props.problem;
   const [focus, setFocus] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   const idle = jam.phase === "idle";
   const playing = jam.phase === "playing";
   useSpaceBar(idle ? jam.play : jam.stop);
   const plan = playing && jam.playing ? jam.playing.plan : preview;
   const shown = playing && jam.playing ? jam.playing.chart : chart;
+
+  // Each player's lamp, lit by its notes while the band plays: written to directly, never through React.
+  const lamps = useRef(new Map<Seat, HTMLElement>());
+  const states = new Map(players.map((player) => [player.seat, player.state]));
+  useLamps(playing, jam.follow, lamps, (seat) => states.get(seat) === "in");
 
   let playhead: Playhead | undefined;
   if (playing && jam.place) {
@@ -162,50 +205,29 @@ export function Stage(props: Props) {
   const soloist = options.solo
     ? SOLO_INSTRUMENTS[options.soloInstrument ?? style.solo.instrument]?.name
     : undefined;
+  const close = () => setMoreOpen(false);
+  // An example of each way of reading, in the key the chart is played in.
+  const tonic = keyToString({ tonic: shown.key.tonic, mode: "major" });
 
   return (
-    // The screen takes the ink of the style the band plays in: Play is printed in it.
-    <main className={`play${playing ? " playing" : ""}`} data-style={style.id}>
-      {/* The way back, the screen's name and how the page is read: three lines, or one where a phone on its side has no height to spare. */}
+    // The screen takes the ink of the style the band plays in: the line, the dock and Play.
+    <main className="play" data-style={style.id} data-state={jam.phase}>
       <div className="top">
         <header className="bar-top">
           <Trail place={place} />
           {side}
-        </header>
-        <h1 className="chart-title">{title ?? shown.title}</h1>
-
-        {/* What is being played, and how the page is read. */}
-        <div className="view">
-          <p className="summary">
-            {about && `${about}: `}
-            {style.name} in {keyToString(shown.key)}, {Math.round(plan.tempo)} bpm
-          </p>
-          <fieldset className="reading" aria-label="Show chords as">
-            {READINGS.map((way) => (
-              <button
-                key={way}
-                type="button"
-                aria-pressed={reading === way}
-                aria-label={READING_NAMES[way][1]}
-                onClick={() => read(way)}
-              >
-                {READING_NAMES[way][0]}
-              </button>
-            ))}
-          </fieldset>
           <button
             type="button"
-            className="focus-toggle"
-            aria-pressed={focus}
-            onClick={() => setFocus(!focus)}
+            className="edit-link more-link"
+            aria-haspopup="dialog"
+            onClick={() => setMoreOpen(true)}
           >
-            Focus
+            More
           </button>
-        </div>
+        </header>
+        <h1 className="chart-title">{title ?? shown.title}</h1>
+        {sentence}
       </div>
-
-      {/* Gone from the press of play, not from the first note: the press is answered at once. */}
-      {idle && before}
 
       <ChartView chart={shown} reading={reading} playhead={playhead} focus={focus} />
 
@@ -215,7 +237,7 @@ export function Stage(props: Props) {
         </p>
       )}
 
-      <footer className="bar-bottom">
+      <footer className="band-dock">
         <StatusStrip
           plan={plan}
           place={playing ? jam.place : undefined}
@@ -224,9 +246,42 @@ export function Stage(props: Props) {
           loading={jam.phase === "loading"}
           soloist={soloist}
         />
-        {band}
-        <div className="take-tools">{aside}</div>
+        <fieldset className="players" aria-label="Band">
+          {players.map(({ seat, on, state, press }) => {
+            const says = SAYS[state];
+            const words = (
+              <>
+                <span className="who">{SEAT_NAMES[seat]}</span>
+                {/* The space is for whoever hears the block read out. */}
+                <span className="what"> {says ?? on}</span>
+              </>
+            );
+            return (
+              <button
+                key={seat}
+                type="button"
+                className={`player ${state}`}
+                aria-pressed={state === "in" || state === "next"}
+                disabled={press === undefined}
+                onClick={press}
+              >
+                <span
+                  className="lamp"
+                  aria-hidden="true"
+                  ref={(element) => {
+                    if (element) lamps.current.set(seat, element);
+                    else lamps.current.delete(seat);
+                  }}
+                >
+                  {words}
+                </span>
+                {words}
+              </button>
+            );
+          })}
+        </fieldset>
         <div className="transport">
+          {keep}
           {/* The second choice, and only a jam's: a song ends by itself. It comes in beside Stop, moving nothing. */}
           {!idle && plan.mode === "jam" && (
             <button type="button" className="finish" disabled={!jam.canFinish} onClick={jam.finish}>
@@ -243,6 +298,59 @@ export function Stage(props: Props) {
           </button>
         </div>
       </footer>
+
+      <Sheet open={moreOpen} close={close} title={title ?? shown.title} kind="more-sheet">
+        <p className="sheet-label" id="reading-label">
+          Show the chords as
+        </p>
+        <fieldset className="opts seg" aria-labelledby="reading-label">
+          <button
+            type="button"
+            className="opt"
+            aria-pressed={reading === "names"}
+            onClick={() => read("names")}
+          >
+            Names<small>{tonic}7</small>
+          </button>
+          <button
+            type="button"
+            className="opt"
+            aria-pressed={reading === "numerals"}
+            onClick={() => read("numerals")}
+          >
+            Numerals<small>I7</small>
+          </button>
+          <button
+            type="button"
+            className="opt"
+            aria-pressed={reading === "both"}
+            onClick={() => read("both")}
+          >
+            Both<small>{tonic}7 over I7</small>
+          </button>
+        </fieldset>
+        <ul className="menu">
+          <li>
+            <button
+              className="menu-line"
+              type="button"
+              aria-pressed={focus}
+              onClick={() => {
+                setFocus(!focus);
+                close();
+              }}
+            >
+              <span>{focus ? "Focus is on" : "Focus"}</span>
+              <small>
+                {focus
+                  ? "Press to show the whole chart again"
+                  : "Only the line being played and the next, large"}
+              </small>
+            </button>
+          </li>
+          {more(close)}
+        </ul>
+      </Sheet>
     </main>
   );
 }

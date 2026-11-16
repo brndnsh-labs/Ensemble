@@ -25,6 +25,7 @@ import {
   timedNotes,
   transpose,
 } from "@ensemble/engine";
+import { styleById } from "@ensemble/styles";
 import type { Chair } from "./rig.ts";
 import { chairName } from "./rig.ts";
 
@@ -83,6 +84,28 @@ export function takeOptions(setup: JamSetup): HowPlayed {
       : {}),
     without: SEAT_ORDER.filter((seat) => seat !== "solo" && !setup.band[seat]),
   };
+}
+
+/**
+ * The tempo a chart is played at in a style, or null for the engine's own
+ * choice (the chart's written tempo, or the style's where it names none).
+ * Each style has its usual tempo and its limits. A tempo the player set is
+ * kept, held to the style's limits. Without one, a chart played in a style it
+ * was not written for goes at that style's usual tempo, since a rhythm
+ * changes at 176 is no reggae; in its own style, or naming none this version
+ * has, as written.
+ */
+export function tempoFor(
+  chart: Chart,
+  style: StylePack,
+  chosen: number | undefined,
+): number | null {
+  const { min, max } = style.tempo;
+  if (chosen !== undefined) return Math.min(max, Math.max(min, chosen));
+  // A style this version does not have is no style: the chart is played as written.
+  const written = styleById(chart.styleId ?? "");
+  if (!written || written.id === style.id) return null;
+  return style.tempo.default;
 }
 
 /** The take a call becomes when play is pressed: everything that decides what is heard. */

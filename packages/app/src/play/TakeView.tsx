@@ -3,7 +3,8 @@
 // `ensemble replay` reads. Nothing done here changes how the take goes: it is
 // a recording, not a setup.
 
-import { recipeText } from "@ensemble/engine";
+import type { Seat } from "@ensemble/engine";
+import { keyToString, recipeText, seconds } from "@ensemble/engine";
 import { styleById } from "@ensemble/styles";
 import { useEffect, useMemo, useState } from "react";
 import { swap, TAKES } from "../address.ts";
@@ -17,8 +18,11 @@ import { dayOf, deleteTake, heardAs, renameTake, takesKeptOnDevice } from "../ta
 import { midiOf } from "./band.ts";
 import type { Reading } from "./ChordSymbol.tsx";
 import type { Call } from "./jam.ts";
+import { SEAT_ORDER, seatsOf } from "./jam.ts";
 import type { Rig } from "./rig.ts";
-import { Stage } from "./Stage.tsx";
+import type { Seated } from "./Stage.tsx";
+import { playedOn, Stage } from "./Stage.tsx";
+import { clock } from "./StatusStrip.tsx";
 import { useJam } from "./useJam.ts";
 
 interface Props {
@@ -69,12 +73,10 @@ export function TakeView(props: Props) {
         This take does not play in this version of Ensemble
         {missing ? `: it was played in a style called “${missing}”, which is no longer here.` : "."}
       </p>
-      <div className="setup">
-        <div className="tools">
-          <button type="button" className="danger" onClick={() => remove(take)}>
-            Delete
-          </button>
-        </div>
+      <div className="tools take-gone">
+        <button type="button" className="danger" onClick={() => remove(take)}>
+          Delete
+        </button>
       </div>
     </main>
   );
@@ -116,7 +118,30 @@ function TakeStage({
     started();
   }, []);
 
+  // The seats silenced here. A take is what it is: who plays in it is settled, and a press
+  // only takes a seat's channel down or brings it back, now or at the next Play.
+  const [silenced, setSilenced] = useState<ReadonlySet<Seat>>(new Set());
+  useEffect(() => {
+    for (const seat of jam.seats ?? []) rig.hush(seat, silenced.has(seat));
+  }, [rig, jam.seats, silenced]);
+  const inTake = seatsOf(recipe.options);
+  const players: Seated[] = SEAT_ORDER.map((seat) =>
+    inTake.includes(seat)
+      ? {
+          seat,
+          on: playedOn(heard.style, recipe.options, seat),
+          state: silenced.has(seat) ? "out" : "in",
+          press: () => {
+            const next = new Set(silenced);
+            if (!next.delete(seat)) next.add(seat);
+            setSilenced(next);
+          },
+        }
+      : { seat, on: playedOn(heard.style, recipe.options, seat), state: "absent" },
+  );
+
   const [problem, setProblem] = useState<string>();
+  const [naming, setNaming] = useState(false);
   const named = take.name.trim() || recipe.chartName;
   const exportMidi = () => {
     setProblem(undefined);
@@ -126,58 +151,99 @@ function TakeStage({
     );
   };
 
+  const { plan } = heard;
   return (
     <Stage
       jam={jam}
       call={call}
       chart={heard.chart}
-      preview={heard.plan}
+      preview={plan}
       title={named}
-      about={`Take kept ${dayOf(take.kept)}`}
       place={KEPT}
       side={chartLink(chart)}
       reading={reading}
       read={read}
-      before={
-        <div className="setup take-setup">
-          <label className="field take-name">
-            <span>Name</span>
-            <input
-              type="text"
-              value={take.name}
-              enterKeyHint="done"
-              onChange={(e) => renameTake(take.id, e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-            />
-          </label>
-          <div className="tools">
-            <button type="button" onClick={exportMidi}>
-              Export MIDI
-            </button>
+      // What was played, said and not offered: a take is a recording, not a setup.
+      sentence={
+        <p className="sentence told take-told">
+          A take kept {dayOf(take.kept)}: {heard.style.name} in {keyToString(heard.chart.key)},{" "}
+          {Math.round(plan.tempo)} bpm, {clock(seconds(plan))}
+        </p>
+      }
+      players={players}
+      problem={
+        problem ??
+        (takesKeptOnDevice()
+          ? undefined
+          : "This browser is not keeping takes, so this one lasts until the page is closed. Export it to keep it.")
+      }
+      more={(close) => (
+        <>
+          <li>
+            {naming ? (
+              <label className="field menu-name">
+                <span>Name</span>
+                <input
+                  type="text"
+                  value={take.name}
+                  enterKeyHint="done"
+                  // biome-ignore lint/a11y/noAutofocus: the box appears because Rename was pressed, to be typed in
+                  autoFocus
+                  onChange={(e) => renameTake(take.id, e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter") return;
+                    e.preventDefault();
+                    setNaming(false);
+                  }}
+                  onBlur={() => setNaming(false)}
+                />
+              </label>
+            ) : (
+              <button type="button" className="menu-line" onClick={() => setNaming(true)}>
+                <span>Rename</span>
+                <small>
+                  {take.name.trim() ? `Called “${take.name.trim()}”` : "It has its chart's name"}
+                </small>
+              </button>
+            )}
+          </li>
+          <li>
             <button
+              className="menu-line"
               type="button"
-              onClick={() =>
+              onClick={() => {
+                exportMidi();
+                close();
+              }}
+            >
+              <span>Export MIDI</span>
+              <small>This take, the whole band</small>
+            </button>
+          </li>
+          <li>
+            <button
+              className="menu-line"
+              type="button"
+              onClick={() => {
                 download(
                   recipeText(recipe),
                   "application/json",
                   fileName(named, "take", ".take.json"),
-                )
-              }
+                );
+                close();
+              }}
             >
-              Export take
+              <span>Export take</span>
+              <small>Its recipe, the file the command line's replay reads</small>
             </button>
-            <button type="button" className="danger" onClick={() => remove(take)}>
-              Delete
+          </li>
+          <li>
+            <button type="button" className="menu-line danger" onClick={() => remove(take)}>
+              <span>Delete this take</span>
             </button>
-          </div>
-          {(problem || !takesKeptOnDevice()) && (
-            <p className="problem" role="alert">
-              {problem ??
-                "This browser is not keeping takes, so this one lasts until the page is closed. Export it to keep it."}
-            </p>
-          )}
-        </div>
-      }
+          </li>
+        </>
+      )}
     />
   );
 }

@@ -15,7 +15,7 @@ const PACK_NAMES = import.meta.glob<string>("../../../assets/packs/*/pack.json",
 });
 
 /** What an instrument is called: its pack's name, or its id read as words when the pack is not here. */
-function instrument(pack: string): string {
+export function instrument(pack: string): string {
   const named = PACK_NAMES[`../../../assets/packs/${pack}/pack.json`];
   if (named) return named;
   const words = pack.replaceAll("-", " ");
