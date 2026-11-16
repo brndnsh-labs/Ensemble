@@ -1440,3 +1440,11 @@ Built to `prompts/app-poster-wall-1.md`: the look of the study's direction A, ho
 **Tests**
 
 - **Smoke journey 1** looks for the wall's Jazz as a link (it was a button that filtered home), fills the search box by its new name ("Find a chart"), and also sees the way home at the top of what was found, which is the library. **Journey 5** leaves the chart by the row of places (`Home`, in the navigation "Where you are") where it pressed "Back to the charts", and comes back through the poster at the top of home where it came through Recent. Journeys 2, 3 and 4 are as they were. Nothing was added.
+
+## the poster wall, part 1: checked and merged (stage 6)
+
+Read on the main thread: the diff (2,408 lines in, 864 out, all in `packages/app` and the smoke journeys; nothing in the engine, the styles or the audio), `pnpm check` (16.0 s of 20), the five smoke journeys against the built app (9.2 s), and its screens photographed again from the merged tree at phone and laptop size (home, the wall, the library showing jazz and showing everything, a chart). The walk Brandon got lost on (home, a style, a chart, back) was walked: a jazz chart's row reads `Home -> #/` and `Jazz -> #/charts/jazz`.
+
+- The builder's decisions stand as logged above, among them: search is the library showing what was found (the box moves from home into the library's top bar on the first letter); a take's row goes to Takes, with "Open its chart" beside it; lists are by title.
+- **Known and left for the next parts or his eye**: on a phone a style's list starts about 435 px down (the bar, two rows of the strip, the poster head); a long chart title is cut to one line; `theme-color` is still the paper; nothing has been seen on an iPhone (safe areas, the pinned bar under Safari's toolbars, how a press shows).
+- **Builds from here go to Opus where the design is drawn** (Brandon, 2026-11-16: "should we lean more on opus for most of the building?"; agreed): parts 2 and 3 are built from the study's pages. Fable keeps the briefs, the checking, and anything that turns out to need design.
