@@ -84,10 +84,10 @@ const mark = (): void => {
   }
 };
 
-function arrive(byHistory: boolean): void {
-  if (location.hash === current) return;
+function arrive(at: string, byHistory: boolean): void {
+  if (at === current) return;
   before = current;
-  current = location.hash;
+  current = at;
   returned = byHistory;
   for (const listener of listeners) listener();
 }
@@ -99,7 +99,7 @@ addEventListener("hashchange", () => {
   // A link pressed makes a new entry with no mark; the back gesture lands on one that has it.
   const known = marked();
   if (!known) mark();
-  arrive(known);
+  arrive(location.hash, known);
 });
 
 /** For `useSyncExternalStore`: told at once when the address changes, however it was changed. */
@@ -122,22 +122,26 @@ export const cameFrom = (): string => before;
  * the same breath, or the caret jumps.
  */
 export function go(to: string): void {
-  if (to === location.hash) return;
-  history.pushState({ ensemble: ++entries }, "", to);
-  arrive(false);
+  if (to === current) return;
+  try {
+    history.pushState({ ensemble: ++entries }, "", to);
+  } catch {
+    // Safari allows a hundred changes to the history in thirty seconds. Past that the screen
+    // still changes, and the address bar catches up at the next change it allows.
+  }
+  arrive(to, false);
 }
 
 /** Put another address in this one's place: the back gesture will not stop at the one replaced. */
 export function swap(to: string): void {
-  if (to === location.hash) return;
+  if (to === current) return;
   try {
     history.replaceState({ ensemble: ++entries }, "", to);
   } catch {
-    // Safari allows a hundred of these in thirty seconds. Past that the address is a new entry instead.
-    history.pushState({ ensemble: ++entries }, "", to);
+    // As in `go`.
   }
   const from = before;
-  arrive(false);
+  arrive(to, false);
   // Replaced, not left: where the player came from is where they were before the one replaced.
   before = from;
 }
