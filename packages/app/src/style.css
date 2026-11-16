@@ -109,7 +109,9 @@ fieldset {
 .side,
 .fix,
 .grid-remove,
-.choice {
+.choice,
+.empty-page button,
+:is(.bar-panel, .section-panel) :is(.dock-acts button, .dock-step) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -168,12 +170,15 @@ button:active:not(:disabled),
     .fix,
     .grid-remove,
     .choice,
+    .empty-page button,
+    :is(.bar-panel, .section-panel) :is(.dock-acts button, .dock-step),
+    .steps button,
     .finish,
     .tune-more,
     .stepper button,
     .kept a,
     .back
-  ):not(:disabled, [aria-pressed="true"], .first):hover {
+  ):not(:disabled, [aria-disabled="true"], [aria-pressed="true"], .first):hover {
     background: var(--wash);
   }
 
@@ -914,11 +919,13 @@ button:active:not(:disabled),
 }
 
 /* The highlighter: a stroke of marker, not a tidy box. */
-.bar.now {
+.bar.now,
+.bar.open {
   color: var(--on-marker);
 }
 
-.bar.now::before {
+.bar.now::before,
+.bar.open::before {
   content: "";
   position: absolute;
   inset: 7% 1.5%;
@@ -980,7 +987,8 @@ button:active:not(:disabled),
 }
 
 /* On the highlighter everything is the ink that reads on yellow, in either theme. */
-.bar.now .chord.rest {
+.bar.now .chord.rest,
+.bar.open .chord.rest {
   color: inherit;
 }
 
@@ -1400,7 +1408,74 @@ button:active:not(:disabled),
   white-space: nowrap;
 }
 
-/* A phone held upright: the page above, about two fifths of the height, and the text under it. */
+/* The chart's name is typed where it stands. */
+.bar-top h1.title {
+  display: flex;
+  overflow: visible;
+}
+
+.title input {
+  width: 100%;
+  min-width: 0;
+  height: var(--control);
+  padding: 0 6px;
+  border: 1.5px solid transparent;
+  border-radius: var(--round);
+  background: none;
+  font-stretch: inherit;
+  text-overflow: ellipsis;
+}
+
+.title input::placeholder {
+  color: var(--faint);
+  opacity: 1;
+}
+
+.title input:focus-visible {
+  border-color: var(--ink);
+  outline: none;
+}
+
+@media (hover: hover) {
+  .title input:hover {
+    border-color: var(--rule);
+  }
+}
+
+/* Taking a change back, and doing it again: there for as long as the editor is open. */
+.steps {
+  display: flex;
+  flex: none;
+}
+
+.steps button {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: var(--control);
+  padding: 0;
+  border: 0;
+  border-radius: var(--round);
+  background: none;
+}
+
+.steps svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.2;
+}
+
+.steps button[aria-disabled="true"] {
+  color: var(--rule);
+  cursor: default;
+}
+
+/* A phone held upright: the chart has the screen. With the text or the arrangement open it
+   is the page above, about two fifths of the height, and they are under it. */
 .panes {
   display: flex;
   flex: 1;
@@ -1417,11 +1492,50 @@ button:active:not(:disabled),
   padding: 4px 0 8px;
 }
 
+.side-chart .pane-chart {
+  flex: 1;
+}
+
+/* With a wide screen to itself the chart keeps to the width of a page: a bar is not a hand's width of white. */
+.side-chart .chart-frame {
+  width: min(100% - 2 * var(--gutter), 64rem);
+}
+
+/* What the chart is for here, said once under it. */
+.chart-foot {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 16px;
+  margin: 0;
+  padding: 6px var(--gutter) 0;
+  color: var(--faint);
+  font-size: 0.8125rem;
+  line-height: 1.3;
+}
+
+.chart-foot button {
+  flex: none;
+  height: var(--control);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--pencil);
+  font-size: inherit;
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .empty-page {
   position: absolute;
   inset: 0;
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
   margin: 0;
   color: var(--faint);
 }
@@ -1683,8 +1797,27 @@ button:active:not(:disabled),
 
   /* While typing on a phone the tools wait; the keyboard has taken their room. */
   .edit.typing .tools,
-  .edit.typing .sides {
+  .edit.typing .sides,
+  .edit.docked .sides,
+  .edit.docked .chart-foot {
     display: none;
+  }
+}
+
+/* Beside or over the text, the chart is the smaller thing: it says what it is for on its own side. */
+@media (max-width: 699px) {
+  .edit:not(.side-chart) .chart-foot {
+    display: none;
+  }
+
+  /* The grid takes the height it needs, so its choices are not under the fold, and the chart has the rest. */
+  .side-arrangement .pane-chart {
+    flex: 1 1 0;
+  }
+
+  .side-arrangement .pane-text {
+    flex: 0 1 auto;
+    max-height: 75%;
   }
 }
 
@@ -1706,19 +1839,420 @@ button:active:not(:disabled),
   }
 }
 
+/* ── The chart, pressed ──────────────────────────────────────────────────── */
+
+/* Every bar is a button the size of the bar. */
+.bar-press {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+}
+
+.bar-press:focus-visible {
+  outline-offset: -3px;
+}
+
+/* However full a line is, and however small that sets it, a bar is never shorter than a fingertip. */
+.chart.editing .line {
+  height: max(calc(var(--line) * 1em), var(--control));
+}
+
+/* A section's name is a button too, with a fingertip's room round it. */
+.chart.editing .label {
+  position: relative;
+  height: max(0.95em, 38px);
+}
+
+.chart.editing .label.chosen {
+  z-index: 4;
+}
+
+button.mark {
+  position: relative;
+  border-radius: 0;
+  background: none;
+  line-height: 1.15;
+}
+
+button.mark::after {
+  content: "";
+  position: absolute;
+  inset: -10px -12px;
+}
+
+button.mark.unnamed {
+  border-style: dashed;
+  color: var(--faint);
+  font-weight: 600;
+}
+
+button.mark[aria-expanded="true"] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+@media (hover: hover) {
+  .bar-press:hover,
+  button.mark:not([aria-expanded="true"]):hover {
+    background: var(--wash);
+  }
+}
+
+/* The bar being typed is over its neighbours, so that what opens from it is too. */
+.bar.open {
+  z-index: 3;
+}
+
+/* A bar that cannot be read: what was typed, in the red pencil. */
+.bar.wrong {
+  background: color-mix(in srgb, var(--pencil) 12%, transparent);
+}
+
+.slot.typed {
+  overflow: hidden;
+}
+
+.slot.typed span {
+  overflow: hidden;
+  color: var(--pencil);
+  font-family: var(--mono);
+  font-size: max(0.42em, 13px);
+  font-weight: 600;
+  line-height: 1.7;
+  text-decoration: underline wavy;
+  text-decoration-skip-ink: none;
+  text-decoration-thickness: 1.5px;
+  text-overflow: ellipsis;
+  text-underline-offset: 3px;
+}
+
+.bar.open.wrong {
+  background: none;
+}
+
+.bar.open .slot.typed span {
+  color: var(--on-marker);
+}
+
+/* Where a bar's chords are typed: the format's own letters, in the type the text is set in. */
+.bar-field {
+  min-width: 0;
+  height: var(--control);
+  padding: 0 10px;
+  border: 2px solid var(--ink);
+  border-radius: var(--round);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--mono);
+  /* Sixteen pixels or more, or a phone zooms the page in when the box is touched. */
+  font-size: 16px;
+  font-weight: 400;
+}
+
+.bar-field::placeholder {
+  color: var(--faint);
+  opacity: 1;
+}
+
+.bar-field:focus-visible {
+  outline: none;
+}
+
+/* Room under the last line for what hangs from a bar typed in place. */
+@media not (pointer: coarse) {
+  .chart-frame.scrolls .chart.editing {
+    padding-bottom: 13rem;
+  }
+}
+
+/* Under a mouse: the field lies over the bar, and the bar's own actions hang under it. */
+.bar-edit,
+.section-panel {
+  position: absolute;
+  left: 0;
+  z-index: 2;
+  max-width: calc(100vw - 2 * var(--gutter));
+  color: var(--ink);
+  font-family: var(--face);
+  font-size: 0.875rem;
+  font-stretch: 100%;
+  font-weight: 450;
+  line-height: 1.35;
+}
+
+/* The field is the bar's own width, so the bars beside it can still be pressed. */
+.bar-edit {
+  top: 0;
+  width: 100%;
+  min-width: 9.5rem;
+}
+
+.bar.late :is(.bar-edit, .bar-panel) {
+  right: 0;
+  left: auto;
+}
+
+.bar-edit .bar-field {
+  display: block;
+  width: 100%;
+  height: calc(var(--line) * var(--size));
+}
+
+.bar-panel,
+.section-panel {
+  padding: 8px 10px 10px;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--round);
+  background: var(--paper);
+  /* A slip of paper laid on the page: its edge, and the page it covers a shade darker beside it. */
+  box-shadow: 4px 5px 0 var(--wash);
+}
+
+.bar-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 26rem;
+  max-width: calc(100vw - 2 * var(--gutter));
+}
+
+.section-panel {
+  top: calc(100% + 2px);
+  width: max-content;
+}
+
+.bar-hint {
+  margin: 8px 0 0;
+  color: var(--faint);
+  font-size: 0.75rem;
+  line-height: 1.9;
+}
+
+.bar-hint kbd {
+  margin: 0 3px 0 8px;
+  padding: 1px 5px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  color: var(--ink);
+  font-family: var(--face);
+  font-weight: 650;
+}
+
+.bar-hint kbd:first-child {
+  margin-left: 0;
+}
+
+/* Which bar it is, or why it cannot be read. */
+.dock-says {
+  margin: 0;
+  font-weight: 600;
+}
+
+.dock-says.wrong {
+  color: var(--pencil);
+}
+
+.dock-says code {
+  font-family: var(--mono);
+  font-size: 0.95em;
+}
+
+.dock-acts,
+.dock-type {
+  display: flex;
+  gap: 6px;
+}
+
+:is(.bar-panel, .section-panel) :is(.dock-acts, .dock-type) {
+  margin-top: 8px;
+}
+
+.dock-acts [aria-disabled="true"],
+.dock-acts :disabled,
+.dock-step[aria-disabled="true"] {
+  border-color: var(--rule);
+  color: var(--faint);
+  cursor: default;
+}
+
+.section-panel .bar-field {
+  width: 13rem;
+}
+
+.dock-done {
+  flex: none;
+  height: var(--control);
+  padding: 0 14px;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--round);
+  background: var(--ink);
+  color: var(--paper);
+  font-weight: 700;
+}
+
+.dock-done[aria-disabled="true"] {
+  border-color: var(--rule);
+  background: var(--rule);
+  cursor: default;
+}
+
+/* On a touch screen: a dock on top of the keyboard. What is being typed and where, the way
+   to the bars on either side, and under them the keys a phone's keyboard hides or lacks. */
+@media (pointer: coarse) {
+  .dock {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    gap: 5px;
+    padding: 0 max(5px, env(safe-area-inset-right)) 5px max(5px, env(safe-area-inset-left));
+    background: var(--rule);
+    font-size: 0.875rem;
+  }
+
+  .dock .dock-says {
+    margin: 0 calc(-1 * max(5px, env(safe-area-inset-right))) 0
+      calc(-1 * max(5px, env(safe-area-inset-left)));
+    padding: 6px var(--gutter) 5px;
+    border-top: 1.5px solid var(--ink);
+    background: var(--paper);
+    font-size: 0.8125rem;
+    line-height: 1.3;
+  }
+
+  .dock .dock-acts,
+  .dock .dock-type,
+  .dock-keys {
+    display: flex;
+    gap: 4px;
+  }
+
+  .dock button {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 44px;
+    padding: 0 4px;
+    border: 0;
+    border-radius: 6px;
+    background: var(--paper);
+    color: var(--ink);
+    font-weight: 650;
+    white-space: nowrap;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .dock button:active:not([aria-disabled="true"], :disabled) {
+    background: var(--marker);
+    color: var(--on-marker);
+  }
+
+  .dock .bar-field {
+    flex: 1 1 0;
+    height: 44px;
+    border-radius: 6px;
+  }
+
+  .dock .dock-step {
+    display: grid;
+    flex: 0 0 44px;
+    place-items: center;
+  }
+
+  .dock .dock-step.wide {
+    flex: none;
+    padding: 0 12px;
+  }
+
+  .dock-step svg {
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2.4;
+  }
+
+  .dock .dock-done,
+  .dock .dock-more[aria-pressed="true"] {
+    background: var(--ink);
+    color: var(--paper);
+  }
+
+  .dock .dock-done {
+    flex: none;
+    padding: 0 14px;
+  }
+
+  .dock-keys button {
+    font-family: var(--mono);
+    font-size: 1.125rem;
+  }
+
+  .dock-keys .dock-more {
+    flex-grow: 1.4;
+    font-family: var(--face);
+    font-size: 0.875rem;
+  }
+
+  /* The chord endings: more than a phone is wide, most used first, the rest a swipe away. */
+  .dock-keys.endings {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .dock-keys.endings::-webkit-scrollbar {
+    display: none;
+  }
+
+  .dock-keys.endings button {
+    flex: none;
+    min-width: 46px;
+    padding: 0 11px;
+    font-size: 1rem;
+  }
+
+  .dock .dock-acts .danger,
+  .dock .dock-acts .danger[aria-disabled="true"] {
+    color: var(--pencil);
+  }
+
+  .dock [aria-disabled="true"],
+  .dock :disabled {
+    opacity: 0.45;
+  }
+}
+
+/* Under a mouse the same actions are a row of the page's own controls. */
+:is(.bar-panel, .section-panel) .dock-acts button {
+  flex: 1 1 auto;
+  padding: 0 10px;
+}
+
 /* ── The arrangement ─────────────────────────────────────────────────────── */
 
-/* Which side of the chart is being edited: its chords as text, or who plays where. */
+/* Which way the chart is being edited: on the chart itself, as its text, or who plays where. */
 .sides {
   display: flex;
   flex: none;
-  padding-bottom: 8px;
+  margin: 2px var(--gutter) 8px;
 }
 
 .side {
-  flex: 1;
+  flex: 1 1 auto;
+  padding: 0 8px;
   border-radius: 0;
   font-weight: 650;
+}
+
+.side + .side {
+  border-left: 0;
 }
 
 .side:first-child {
@@ -1726,8 +2260,14 @@ button:active:not(:disabled),
 }
 
 .side:last-child {
-  border-left: 0;
   border-radius: 0 var(--round) var(--round) 0;
+}
+
+@media (min-width: 700px) {
+  .sides {
+    align-self: flex-start;
+    width: 24rem;
+  }
 }
 
 .arrangement {

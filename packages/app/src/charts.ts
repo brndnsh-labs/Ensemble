@@ -16,12 +16,17 @@ interface Stored {
 
 const KEY = "ensemble.charts.1";
 
-/** What a new chart starts as: enough to see the format, and to type over. */
+/**
+ * What a new chart starts as: a title to type over, and a line of four bars to
+ * press and fill. The format has no empty bar (`| |` makes none), so each is a
+ * bar of no chord, which is what a bar with nothing in it plays. No key is
+ * stated: the parser takes it from the first chord typed, which is the tonic
+ * far more often than C is, and says so on the text side.
+ */
 export const STARTER = `title: New chart
-key: C
 
 [A]
-| C | Am | F | G |
+| NC | NC | NC | NC |
 `;
 
 /** A text file bigger than this is not a chart someone typed. */

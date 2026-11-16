@@ -73,7 +73,7 @@ function runsOf(text: string, diagnostics: readonly Diagnostic[]): Run[] {
 }
 
 /** A message with its `quoted` chart text set as typed. */
-function said(message: string): ReactNode[] {
+export function said(message: string): ReactNode[] {
   return (
     message
       .split("`")

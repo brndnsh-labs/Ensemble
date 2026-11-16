@@ -37,3 +37,19 @@ export function useVisibleArea(active: boolean): Area | undefined {
   }, [active]);
   return area;
 }
+
+/**
+ * Whether the screen is one that is touched, and so types on a keyboard that
+ * covers half of it: there a bar is typed in a dock on top of that keyboard,
+ * and under a mouse it is typed where it stands.
+ */
+export function useTouchScreen(): boolean {
+  const [touch, setTouch] = useState(() => matchMedia("(pointer: coarse)").matches);
+  useEffect(() => {
+    const query = matchMedia("(pointer: coarse)");
+    const changed = () => setTouch(query.matches);
+    query.addEventListener("change", changed);
+    return () => query.removeEventListener("change", changed);
+  }, []);
+  return touch;
+}
