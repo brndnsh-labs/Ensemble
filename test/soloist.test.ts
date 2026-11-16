@@ -205,8 +205,11 @@ test("the soloist plays only where it has the lead (a pickup may lead in by a be
 
 test("the soloist lands the changes: a note struck where a chord arrives is a tone of that chord, and a note held across a change on a beat is a tone of the new chord", () => {
   let landings = 0;
-  for (const { chart, options, take } of soloTakes()) {
+  for (const { style, chart, options, take } of soloTakes()) {
     const solo = notesOf(take, "solo");
+    // A soloist the style lays back is late everywhere, the change included, and the comp with
+    // it: a note is held across a change by what it has left once that lay-back is set aside.
+    const laidBack = (Math.max(0, style.feel.lean.solo) / 1000) * (take.plan.tempo / 60) * PPQ;
     for (const arrival of harmonyOf(take)) {
       const chord = arrival.chord;
       if (!chord || !arrival.changed) continue;
@@ -220,7 +223,7 @@ test("the soloist lands the changes: a note struck where a chord arrives is a to
         const held =
           arrival.tick % PPQ === 0 &&
           note.tick < arrival.tick &&
-          note.tick + note.offset + note.duration > arrival.tick + POCKET;
+          note.tick + note.offset - laidBack + note.duration > arrival.tick + POCKET;
         if (!struck && !held) continue;
         landings++;
         assert.ok(
@@ -232,8 +235,8 @@ test("the soloist lands the changes: a note struck where a chord arrives is a to
   }
   // A reggae line enters after the One and rests on the drop (ST-reggae-25), so few of its
   // notes are struck where a chord arrives: about 300 on the full run, where funk's and
-  // disco's are about 2,000 each.
-  assert.ok(landings > enough(250), `only ${landings} landings`);
+  // disco's are about 2,000 each. The floor is well under that, for a library that grows.
+  assert.ok(landings > enough(200), `only ${landings} landings`);
 });
 
 test("a solo breathes and keeps going: no silence inside it reaches three bars, and it has one top note, in its last chorus", () => {

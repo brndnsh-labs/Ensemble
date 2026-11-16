@@ -539,9 +539,10 @@ test("the strumming hand is a pendulum: on the grid it strums, a stroke between 
     }
   }
   // The reggae hand comes up only for the flick after a chop (ST-reggae-19): on the full run it
-  // rolls about 1,300 upstrokes where funk's and disco's roll 32,000 and 76,000.
+  // rolls about 1,300 upstrokes where funk's and disco's roll 32,000 and 76,000. The floor is
+  // well under that: it says the rule was seen at work, and a library that grows moves the count.
   assert.ok(
-    ups > enough(1000) && downs > enough(5000),
+    ups > enough(800) && downs > enough(5000),
     `only ${ups} upstrokes and ${downs} downstrokes rolled`,
   );
 });

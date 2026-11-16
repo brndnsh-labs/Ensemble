@@ -264,11 +264,14 @@ test(
       }
     }
     let heads = 0;
-    for (const { chart, options, take } of takes(in44("jazz"))) {
+    for (const { style, chart, options, take } of takes(in44("jazz"))) {
       if (options.mode !== "jam" || options.energy !== undefined || take.plan.passes < 2) continue;
       for (const { bar, kit, energy } of kitBars(take)) {
         if (bar.pass !== 0 || bar.section.role !== "body" || bar.ending) continue;
         if (tierOf(energy) !== "low") continue;
+        // A section the tune itself calls quieter than its choruses (a breakdown) is not the
+        // head: down there the drummer is on the soft ride of a ballad.
+        if (bar.level < style.arc.defaultLevel) continue;
         const where = `${chart.file} seed ${options.seed} bar ${bar.index}`;
         heads++;
         assert.ok(strikes(kit, "closedHat", 4), `${where}: the head is not on the hat`);
