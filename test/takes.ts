@@ -105,8 +105,12 @@ const KINDS: readonly Omit<TakeOptions, "seed">[] = [
   { mode: "jam", passes: 4, solo: true },
 ];
 
-/** How many charts written for other styles each style is handed. */
-const BORROWED = 12;
+/**
+ * How many charts written for other styles each style is handed: a dozen on a push, and twice
+ * that on the full run, which held the floors of the blues' properties when the library lost
+ * three blues charts that differed only by a setting (DECISIONS.md, the library's standards).
+ */
+const BORROWED = FULL ? Number.POSITIVE_INFINITY : 12;
 
 /**
  * A style's own charts: the ones written for it, named for it. Any band can be handed any
@@ -118,8 +122,25 @@ const BORROWED = 12;
  */
 export const ownCharts = (style: StylePack): LibraryChart[] =>
   LIBRARY.filter((chart) => chart.file.startsWith(`${style.id}-`));
+
+/**
+ * The standards (`standard-*.chart`): tunes as they are known, longer and harder than the
+ * library's own progressions, each written for a style (its `style:` line). The style they are
+ * written for plays each of them on every push twice: once soloist included, and once in one of
+ * the other kinds by turns. The full run plays each in every kind of take on half the seeds.
+ * Every other style is handed them in turn with the rest of the library.
+ */
+const STANDARDS: readonly LibraryChart[] = LIBRARY.filter((chart) =>
+  chart.file.startsWith("standard-"),
+);
+const standardsOf = (style: StylePack): LibraryChart[] =>
+  STANDARDS.filter((chart) => parse(chart.text).chart.styleId === style.id);
+const SOLO_KIND = KINDS.find((kind) => kind.solo)!;
+const BAND_KINDS = KINDS.filter((kind) => !kind.solo);
+
 const otherCharts = (style: StylePack): LibraryChart[] => {
-  const others = LIBRARY.filter((chart) => !chart.file.startsWith(`${style.id}-`));
+  const mine = new Set([...ownCharts(style), ...standardsOf(style)]);
+  const others = LIBRARY.filter((chart) => !mine.has(chart));
   const every = Math.max(1, Math.ceil(others.length / BORROWED));
   const from = SHIPPING.indexOf(style) % every;
   return others.filter((_, at) => at % every === from);
@@ -128,6 +149,24 @@ const otherCharts = (style: StylePack): LibraryChart[] => {
 const TAKE_SPECS: readonly JamSpec[] = STYLES.flatMap((style) => [
   ...ownCharts(style).flatMap((chart) =>
     SEEDS.flatMap((seed) => KINDS.map((kind) => ({ style, chart, options: { ...kind, seed } }))),
+  ),
+  ...standardsOf(style).flatMap((chart, c) =>
+    FULL
+      ? // Every kind on half the seeds, the odd or the even ones by turns.
+        SEEDS.filter((_, s) => s % 2 === c % 2).flatMap((seed) =>
+          KINDS.map((kind) => ({ style, chart, options: { ...kind, seed } })),
+        )
+      : [
+          { style, chart, options: { ...SOLO_KIND, seed: SEEDS[c % SEEDS.length]! } },
+          {
+            style,
+            chart,
+            options: {
+              ...BAND_KINDS[c % BAND_KINDS.length]!,
+              seed: SEEDS[(c + 1) % SEEDS.length]!,
+            },
+          },
+        ],
   ),
   ...otherCharts(style).map((chart, c) => ({
     style,
