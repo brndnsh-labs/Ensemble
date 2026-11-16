@@ -1511,3 +1511,11 @@ An Opus build from `prompts/app-poster-wall-2.md`. Read on the main thread: the 
 - The builder's decisions stand as logged above. Two go against the brief's letter and are right: "The song, once through" is offered for every chart, as the old picker offered it; sheets close with "Done".
 - **Known and left**: at laptop width the chart sets eight bars a line in the 64rem column where the study drew four (the chart's own layout rule, not opened here); a take's Rename shows its chart's name; a phone on its side is only compacted. Nothing has been seen on an iPhone: the sheet (the browser's own modal dialog) over Safari's toolbars, the flood in a dark room, whether the lamps sit on the notes by ear.
 - **Part 3 (Edit as a mode of this screen) waits for Brandon's hands on parts 1 and 2**: it is the largest piece, it moves the editor he passed on his phone the same day, and what he says of the chart's screen changes what it is built on.
+
+## playing in six and twelve is to be designed (stage 6)
+
+Brandon asked whether 6/8 and 12/8 need proper support. A study for his ear (`out/meter-study/`, not committed: a blues in six as jazz written 6/8, 6/4 and as 24 bars of 3/4; a slow blues in 12/8 beside 4/4; fifties changes in 12/8 beside 4/4; a folk tune in 6/8) with one bar of each printed as a grid. What the grids show: the engine builds a bar of any meter from its pulses and fits a style's 4/4 groove to them a beat for each pulse, so the drums come through, but the bass falls to a note a pulse and the chords to once a bar, and nothing in any style is written for compound time. His ear, 2026-11-16: "we definitely aren't capturing a 6/8 feel very well", and "i think we should have fable design this properly".
+
+- **A Fable design, after the two Opus builds now running** (a Fable subagent runs alone, and the work needs the pruned library and its tests in place): `prompts/meters-design.md`.
+- **All Blues and Footprints are left out of the library until then** (his suggestion; the library's builder was told): a stand-in in 3/4 would be a chart he knows to be wrong, written twice. The standards added now are twelve.
+- **Open, for the design to propose and him to answer**: whether the tempo figure counts quarter notes in every meter (his call in the previous version, so that one number is one speed everywhere) or the pulse.
