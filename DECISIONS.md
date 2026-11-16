@@ -1519,3 +1519,57 @@ Brandon asked whether 6/8 and 12/8 need proper support. A study for his ear (`ou
 - **A Fable design, after the two Opus builds now running** (a Fable subagent runs alone, and the work needs the pruned library and its tests in place): `prompts/meters-design.md`.
 - **All Blues and Footprints are left out of the library until then** (his suggestion; the library's builder was told): a stand-in in 3/4 would be a chart he knows to be wrong, written twice. The standards added now are twelve.
 - **Open, for the design to propose and him to answer**: whether the tempo figure counts quarter notes in every meter (his call in the previous version, so that one number is one speed everywhere) or the pulse.
+## the poster wall, part 3: Edit is a mode of the chart's screen (stage 6)
+
+Built to `prompts/app-poster-wall-3.md`, from the study's sketch (`out/look-study/a/chart-my-sunday-groove.html#edit`). Nothing in the engine, the styles or the audio package changed; `viewport.ts`, `rewrite.ts` and how `BarEditor` places itself did not change. What that brief did not settle:
+
+**How the editor is hosted**
+
+- **The editor is a hook of the chart's screen** (`edit/useEditor.tsx`, which was `EditView.tsx`), not a screen of its own nor a component inside it. Its state lives in the chart's screen, so a bar pressed is drawn open inside the press (`flushSync`, as before) and the field takes the focus there, which is what brings a phone's keyboard up. A child component handing its parts up would draw them a frame later, outside the press. The hook hands back parts and `Stage` places them: the chart to press, the text or the grid, the dock's words and controls, and the dock that sits on the keyboard.
+- **Playing and editing are one screen at the same place in the tree**, so going from one to the other redraws nothing: the chart's frame, its scroll and the focus on the button stay. Edit and Done are one button.
+- **The steps are kept while the pencil is down.** Putting it down writes everything (the bar being typed with it); picking it up again starts from the chart as saved, on the Chart side, with nothing to take back.
+
+**The address**
+
+- **`#/edit/<id>` is kept as the mode's address**, so every link to the old editor (home's New chart and Import, a row's Edit) opens the mode, and a reload stays in it. An `#/edit/` address of a built-in is put back to its `#/chart/` address.
+- **Edit is one step of history; Done goes back over it** when Edit made it, and otherwise (a reload, New chart, a copy just made) puts the chart's address in the mode's place. Either way Done adds no entry, and the phone's back gesture from the mode lands on the chart.
+
+**What stays where it is**
+
+- **The chart is set in the mode as it is for playing**: the same layout rule, the same frame, the same lines opened up by the height left over. The editor used to set every chart at the size it is wanted at and scroll it, so that a phone's keyboard would not re-set the page; that is now done by holding the height the page was set for (`Editing.held`) while a keyboard, or the dock on it, has the room. The page in the mode always scrolls.
+- **The dock keeps its height**: the editor's things are laid over the strip and the players, which keep their room under them unseen (a grid area over both, on every width). So the frame is the same height in both modes, the chart does not move, and Play is where it was.
+- **A section's name keeps its play-screen height** (it was at least 38 px in the editor); its fingertip of room is its own, outside it.
+- **The one exception: a chart of one section with no name.** The play screen shows no name over it; the mode shows "A", since the name is where the section's actions are (adding a second section, renaming). Its bars move down by the name's height, and the page is fitted with the name counted, so it still fits.
+- **In the mode the chart is drawn in the key it is written in**, since that is what is typed; the line above still says the key it will be played in.
+
+**The dock**
+
+- **Words, then a row: Undo and Redo, and Chart, Text, Arrangement as one joined switch** (the editor's own three sides, so the way back from the text is the switch itself). The words say "Press a bar to change it.", which bar is open (on a laptop), or once, for a copy just made, "This is your copy. The built-in chart is unchanged." What there is to fix is "1 to fix" beside the words, in the red pencil, and opens the text. On a laptop the words and the row are one line, in the strip's and the players' place.
+- **On a touch screen, a bar or a section open has the foot of the screen**: the band's dock waits and the editor's dock is the screen's last row, fitted to what the keyboard leaves, as before. While the keyboard is up (a bar, or the text, being typed) the title and the line are put away too and the row of places stays: with them the chart above a bar's dock was a line and a half.
+- **The space bar is not the transport in the mode**: there it presses what has the focus (a bar, a section's name), as in the editor.
+
+**The rest**
+
+- **Play from the mode** writes everything, puts the pencil down and starts the band from the chart as saved, once the screen is drawn from it (the browser is woken inside the press, as home's play buttons do).
+- **More's Rename in the mode is a step of the editor**, taken back with Undo, as the title typed in the editor's header was. The title is no longer typed where it stands: it does not move now, and More has Rename. Duplicate writes everything first; Export the chart's text exports the text as it stands.
+- **Focus is off in the mode and not in More there**: it shows two lines, and every bar must be there to press.
+- **"Edit a copy" makes the copy, gives it the choices the built-in was played with (style, key, tempo, instruments) if it has none of its own, and opens it in the mode.** Otherwise the line would change under the player's eyes.
+- **The editor's `.dock` is `.key-dock` and the text's `.more` is `.problems-more`**; the chart's More is `.more`. There are two docks on the screen now, so the band's keeps `.band-dock`.
+- **On a phone the text and the grid take the chart's place** between the top and the dock; on a laptop they sit beside it, the two in the chart's 64 rem column.
+
+**Tests**
+
+- No journey's steps changed: journey 3's New chart, bar, Text and diagnostic steps find the same names in the mode. Nothing added.
+- **`out/wall-3/`** (the pictures of this part) is ignored by git.
+
+## the poster wall, part 3: checked and merged (stage 6)
+
+An Opus build from `prompts/app-poster-wall-3.md`. Read on the main thread: the whole of `useEditor.tsx`, the changes to `App`, `PlayView`, `Stage` and `ChartView`, the builder's pictures. Then walked in headless Chrome at 390 by 844 (touch) and 1280 by 800:
+
+- **Edit, a bar typed, Play from the mode**: the address goes `#/chart/` to `#/edit/` and back, the bar as typed is what is saved, and the band is playing the saved chart (its first bar on the page is the new one).
+- **History**: Edit then Done then back lands on home, not on the chart twice. "Edit a copy" on a built-in opens the copy in the mode and says so once; Done then back lands on the built-in.
+- **Delete from the mode with a bar being typed**: the chart is gone and stays gone (a save for a chart that is not there writes nothing).
+- **A reload in the mode stays in it**; an `#/edit/` address of a built-in is put back to `#/chart/`.
+- The five smoke journeys pass with no step changed. Typecheck and lint pass. Nothing in the engine, the styles or the audio package is in the diff.
+- The builder's decisions stand as logged above.
+- **Known and left**: on a phone with a bar open there are two buttons that say Done (the top one leaves the mode, the dock's closes the bar); a chart of one unnamed section moves down by its name's height when the pencil is picked up; a copy has the same title as the built-in it was made from; between 820 and 1100 px the dock's words sit low. Not seen on an iPhone: that a tap on a bar raises the keyboard now that the editor is hosted in the chart's screen, and where the dock sits on it.

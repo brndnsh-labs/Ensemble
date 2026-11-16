@@ -237,7 +237,7 @@ export function BarEditor(props: Props) {
     );
 
   return (
-    <fieldset className="dock" aria-label={where} onPointerDown={pressed}>
+    <fieldset className="key-dock" aria-label={where} onPointerDown={pressed}>
       {says}
       <div className="dock-type">
         <button

@@ -1,6 +1,7 @@
 // A chart's screen: the chart, how it is to be played in a line whose every
 // part is pressed to change it, the band and the transport. What is rarely
-// wanted is behind More.
+// wanted is behind More. Edit puts the screen in the editing mode, at its own
+// address (`#/edit/<id>`): the same screen, the chart pressed to change it.
 
 import type { Key, Seat, StylePack, TakeRecipe } from "@ensemble/engine";
 import {
@@ -17,6 +18,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { go, swap } from "../address.ts";
 import { copyOf, deleteChart, duplicateChart, renameChart } from "../charts.ts";
 import { download, fileName } from "../download.ts";
+import { useEditor } from "../edit/useEditor.tsx";
 import type { LibraryChart } from "../library.ts";
 import { instrument } from "../posters.ts";
 import { notePlayed } from "../recent.ts";
@@ -45,6 +47,12 @@ interface Props {
   readonly autoplay: boolean;
   /** Called when that has been done, so it happens once. */
   readonly started: () => void;
+  /** What the address asks for: the chart to play, or the chart with the pencil down. */
+  readonly mode: "play" | "edit";
+  /** This chart is the player's copy of a built-in, made by the press that opened it. */
+  readonly copied: boolean;
+  /** A copy of a built-in has been made, to open in the mode; undefined once that has been said. */
+  readonly madeCopy: (id: string | undefined) => void;
 }
 
 const LENGTHS: readonly (number | null)[] = [2, 3, 5, 10, 15, 20, null];
@@ -80,7 +88,8 @@ const lengthWords = (song: boolean, minutes: number | null): string =>
 
 type Part = "style" | "key" | "tempo" | "length";
 
-export function PlayView({ entry, takes, rig, settings, change, autoplay, started }: Props) {
+export function PlayView(props: Props) {
+  const { entry, takes, rig, settings, change, autoplay, started, copied, madeCopy } = props;
   const choices: ChartChoices = settings.charts[entry.id] ?? {};
   const choose = (patch: ChartChoices) =>
     change({
@@ -94,6 +103,25 @@ export function PlayView({ entry, takes, rig, settings, change, autoplay, starte
   const chosen = choices.soloInstrument;
   const soloInstrument =
     chosen !== undefined && chosen in SOLO_INSTRUMENTS ? chosen : style.solo.instrument;
+  // The pencil: down where the address says so, for a chart of the player's own. Done takes it up
+  // in the press, before the address has caught up with the browser's history.
+  const [asked, setAsked] = useState(props.mode);
+  const [leaving, setLeaving] = useState(false);
+  if (asked !== props.mode) {
+    setAsked(props.mode);
+    setLeaving(false);
+  }
+  const editing = props.mode === "edit" && entry.own && !leaving;
+  /** The mode was entered from this screen with Edit: Done goes back to that entry of the history, rather than piling up another. */
+  const pushed = useRef(false);
+  const editor = useEditor({
+    entry,
+    on: editing,
+    style,
+    copied,
+    remove: () => remove(),
+  });
+
   // An arrangement that fits says the chart is meant to be played as written; anything else is a jam.
   const song = choices.song ?? entry.chart.arrangement?.fits === true;
   const setup: JamSetup = useMemo(
@@ -153,10 +181,61 @@ export function PlayView({ entry, takes, rig, settings, change, autoplay, starte
   };
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, as the screen opens
   useEffect(() => {
+    if (copied) madeCopy(undefined);
     if (!autoplay) return;
     jam.play();
     started();
   }, []);
+
+  // A built-in is not edited in place: an address that asks for that shows the chart to play.
+  useEffect(() => {
+    if (props.mode === "edit" && !entry.own) swap(`#/chart/${entry.id}`);
+  }, [props.mode, entry]);
+
+  // The band stops when the pencil is picked up, however the mode was reached.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: when the mode is entered
+  useEffect(() => {
+    if (editing && band.phase !== "idle") band.stop();
+  }, [editing]);
+
+  const enter = () => {
+    pushed.current = true;
+    go(`#/edit/${entry.id}`);
+  };
+  /** Put the pencil down: everything typed is written first. */
+  const leave = () => {
+    editor.finish();
+    setLeaving(true);
+    if (pushed.current) {
+      pushed.current = false;
+      history.back();
+    } else swap(`#/chart/${entry.id}`);
+  };
+  /** Play, from the mode: the band starts once the screen is drawn from the chart as it now stands. */
+  const [startSoon, setStartSoon] = useState(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: when the mode has been left to play
+  useEffect(() => {
+    if (!startSoon || editing) return;
+    setStartSoon(false);
+    jam.play();
+  }, [startSoon, editing]);
+
+  /** The player's copy of a built-in, opened in the mode and played as the built-in was set up to be. */
+  const editCopy = () => {
+    const id = copyOf(entry.text);
+    if (!settings.charts[id])
+      change({ ...settings, charts: { ...settings.charts, [id]: choices } });
+    madeCopy(id);
+    go(`#/edit/${id}`);
+  };
+
+  function remove() {
+    if (!confirm(`Delete “${entry.chart.title}”? This cannot be undone. Takes kept from it stay.`))
+      return;
+    editor.forget();
+    swap(placeOf(entry.chart).href);
+    deleteChart(entry.id);
+  }
 
   // What play would start: the tempo shown before it is pressed is the one it would play at.
   const preview = useMemo(() => planOf(chart, call.style, call.options), [chart, call]);
@@ -241,7 +320,20 @@ export function PlayView({ entry, takes, rig, settings, change, autoplay, starte
   return (
     <>
       <Stage
-        jam={jam}
+        jam={
+          editing
+            ? {
+                ...jam,
+                // Inside the press, so the browser lets the band start once the mode is left.
+                play: () => {
+                  leave();
+                  rig.wake();
+                  setStartSoon(true);
+                },
+              }
+            : jam
+        }
+        editor={editing ? editor : undefined}
         call={call}
         chart={chart}
         preview={preview}
@@ -251,18 +343,17 @@ export function PlayView({ entry, takes, rig, settings, change, autoplay, starte
         place={placeOf(entry.chart)}
         side={
           entry.own ? (
-            <a className="edit-link" href={`#/edit/${entry.id}`}>
-              Edit
-            </a>
-          ) : (
-            // A built-in stays as it ships; the player changes a copy of their own.
+            // One button, in one place: Edit, and Done while the pencil is down.
             <button
               type="button"
-              className="edit-link"
-              onClick={() => {
-                go(`#/edit/${copyOf(entry.text)}`);
-              }}
+              className={`edit-link edit-toggle${editing ? " done" : ""}`}
+              onClick={editing ? leave : enter}
             >
+              {editing ? "Done" : "Edit"}
+            </button>
+          ) : (
+            // A built-in stays as it ships; the player changes a copy of their own.
+            <button type="button" className="edit-link" onClick={editCopy}>
               Edit a copy
             </button>
           )
@@ -368,7 +459,7 @@ export function PlayView({ entry, takes, rig, settings, change, autoplay, starte
                 type="button"
                 onClick={() => {
                   download(
-                    entry.text,
+                    editing ? editor.text : entry.text,
                     "text/plain;charset=utf-8",
                     fileName(entry.chart.title, "chart", ".chart"),
                   );
@@ -386,7 +477,7 @@ export function PlayView({ entry, takes, rig, settings, change, autoplay, starte
                     <button
                       className="menu-line"
                       type="button"
-                      onClick={() => setRenaming(entry.chart.title)}
+                      onClick={() => setRenaming(editing ? editor.title : entry.chart.title)}
                     >
                       <span>Rename</span>
                     </button>
@@ -395,7 +486,8 @@ export function PlayView({ entry, takes, rig, settings, change, autoplay, starte
                       className="menu-rename"
                       onSubmit={(e) => {
                         e.preventDefault();
-                        renameChart(entry.id, renaming);
+                        if (editing) editor.rename(renaming);
+                        else renameChart(entry.id, renaming);
                         setRenaming(undefined);
                       }}
                     >
@@ -425,6 +517,7 @@ export function PlayView({ entry, takes, rig, settings, change, autoplay, starte
                     className="menu-line"
                     type="button"
                     onClick={() => {
+                      if (editing) editor.finish();
                       const copy = duplicateChart(entry.id);
                       if (copy) go(`#/chart/${copy}`);
                     }}
@@ -434,33 +527,14 @@ export function PlayView({ entry, takes, rig, settings, change, autoplay, starte
                   </button>
                 </li>
                 <li>
-                  <button
-                    type="button"
-                    className="menu-line danger"
-                    onClick={() => {
-                      if (
-                        !confirm(
-                          `Delete “${entry.chart.title}”? This cannot be undone. Takes kept from it stay.`,
-                        )
-                      )
-                        return;
-                      swap(placeOf(entry.chart).href);
-                      deleteChart(entry.id);
-                    }}
-                  >
+                  <button type="button" className="menu-line danger" onClick={remove}>
                     <span>Delete this chart</span>
                   </button>
                 </li>
               </>
             ) : (
               <li>
-                <button
-                  className="menu-line"
-                  type="button"
-                  onClick={() => {
-                    go(`#/edit/${copyOf(entry.text)}`);
-                  }}
-                >
+                <button className="menu-line" type="button" onClick={editCopy}>
                   <span>Make a copy to edit</span>
                   <small>This chart stays as it ships; the copy is yours</small>
                 </button>

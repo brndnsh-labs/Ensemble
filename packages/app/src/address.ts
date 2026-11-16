@@ -9,7 +9,7 @@
 //   #/charts/<style>      the library, the charts written for one style
 //   #/charts?find=<text>  the library, what a search found
 //   #/chart/<id>          a chart, to play
-//   #/edit/<id>           one of the player's charts, in the editor
+//   #/edit/<id>           one of the player's charts, on its screen with the pencil down
 //   #/take/<id>           a kept take
 //   #/credits
 

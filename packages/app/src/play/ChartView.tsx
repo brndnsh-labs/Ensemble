@@ -27,8 +27,10 @@ export interface Playhead {
 
 /**
  * The chart as something pressed: the editor's. Every bar is a button and so is every
- * section's name, the page is set at the size it is wanted at and scrolls (so nothing on it
- * changes size when a phone's keyboard takes half the screen), and every section shows its name.
+ * section's name, and every section shows its name. The page is set as it is for playing,
+ * so a bar is where it was before the pencil was picked up; it scrolls, and while `held` it
+ * keeps the size it was set at, so nothing on it changes size when a phone's keyboard takes
+ * half the screen.
  */
 export interface Editing {
   /** The bar open for typing. */
@@ -44,6 +46,8 @@ export interface Editing {
   /** Where the chart is typed in place: what is drawn in the open bar, and under the chosen section's name. */
   readonly barSlot?: ReactNode;
   readonly sectionSlot?: ReactNode;
+  /** The height the page was set for stands, whatever the room: a keyboard, or the dock on it, has the rest. */
+  readonly held?: boolean;
 }
 
 interface Props {
@@ -52,7 +56,7 @@ interface Props {
   readonly playhead: Playhead | undefined;
   /** Show only the line being played and the one after it, large. */
   readonly focus: boolean;
-  readonly edit?: Editing;
+  readonly edit?: Editing | undefined;
 }
 
 /** Heights in units of the root's type size. */
@@ -90,12 +94,12 @@ interface Layout {
 const labelled = (sections: readonly PageSection[]): boolean =>
   sections.length > 1 || (sections[0]?.label ?? "A") !== "A";
 
-/** The height of a page in units of its type size. */
-function unitsOf(sections: readonly PageSection[], reading: Reading): number {
+/** The height of a page in units of its type size. Every section is named on a page that is pressed. */
+function unitsOf(sections: readonly PageSection[], reading: Reading, named = false): number {
   const lines = sections.reduce((sum, section) => sum + section.lines.length, 0);
   return (
     lines * LINE[reading] +
-    (labelled(sections) ? sections.length * LABEL : 0) +
+    (named || labelled(sections) ? sections.length * LABEL : 0) +
     (sections.length - 1) * SECTION_GAP
   );
 }
@@ -133,10 +137,18 @@ export function ChartView({ chart, reading, playhead, focus, edit }: Props) {
   const editing = edit !== undefined;
   const frame = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ w: 0, h: 0 });
+  /** Read when the frame is measured: while held, a change of height is not a change of page. */
+  const held = useRef(false);
+  held.current = edit?.held === true;
 
   useLayoutEffect(() => {
     const element = frame.current!;
-    const measure = () => setBox({ w: element.clientWidth, h: element.clientHeight });
+    const measure = () =>
+      setBox((last) => {
+        const w = element.clientWidth;
+        const h = held.current && last.h > 0 ? last.h : element.clientHeight;
+        return last.w === w && last.h === h ? last : { w, h };
+      });
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(element);
@@ -146,19 +158,10 @@ export function ChartView({ chart, reading, playhead, focus, edit }: Props) {
   // Wider lines when that makes the type bigger: a long form on a laptop reads better eight bars across.
   const layout = useMemo((): Layout => {
     if (focus) return { sections: pageOf(chart, box.w < PHONE ? 0.5 : 1), size: 0, scrolls: false };
-    if (editing) {
-      // As written, at the size it is wanted at, whatever the height: the page scrolls.
-      const written = pageOf(chart, 1);
-      const wanted = Math.min(
-        box.w / columnsOf(written) / BAR_WIDTH,
-        box.w < PHONE ? WANTED.phone : WANTED.wide,
-      );
-      return { sections: written, size: Math.max(SMALLEST, wanted), scrolls: true };
-    }
     let best: Layout | undefined;
     for (const widen of [1, 2]) {
       const sections = pageOf(chart, widen);
-      const size = fit(unitsOf(sections, reading), columnsOf(sections), box.w, box.h);
+      const size = fit(unitsOf(sections, reading, editing), columnsOf(sections), box.w, box.h);
       // Compared before the floor is applied: of two layouts both too small to read as they
       // stand, the one that fits the screen is still the one to take.
       if (!best || size > best.size * 1.15) best = { sections, size, scrolls: false };
@@ -183,12 +186,11 @@ export function ChartView({ chart, reading, playhead, focus, edit }: Props) {
   // can be (two sections, each with its label), so it does not jump as the lines change.
   const units = focus
     ? 2 * LINE[reading] + (showLabels ? 2 * LABEL : 0) + SECTION_GAP
-    : unitsOf(sections, reading);
+    : unitsOf(sections, reading, editing);
   const size = focus ? Math.max(SMALLEST, fit(units, columns, box.w, box.h)) : layout.size;
   // When the width is what limits the type, the height left over opens the lines up, to a point.
   const lines = focus ? 2 : sections.reduce((sum, section) => sum + section.lines.length, 0);
-  // (Not in the editor, where the height is the keyboard's to take and the page must not move for it.)
-  const spare = editing ? 0 : box.h / size - units;
+  const spare = box.h / size - units;
   const line =
     LINE[reading] + Math.max(0, Math.min(spare / Math.max(1, lines), LINE[reading] * 0.5));
 
@@ -238,7 +240,7 @@ export function ChartView({ chart, reading, playhead, focus, edit }: Props) {
       };
       /** Set the page in a size, its lines opened up by whatever height that leaves over. */
       const set = (px: number) => {
-        const spare = editing ? 0 : box.h / px - units;
+        const spare = box.h / px - units;
         const open = Math.max(0, Math.min(spare / Math.max(1, lines), LINE[reading] * 0.5));
         page.style.setProperty("--size", `${px}px`);
         page.style.setProperty("--line", String(LINE[reading] + open));
@@ -262,7 +264,7 @@ export function ChartView({ chart, reading, playhead, focus, edit }: Props) {
     return () => {
       current = false;
     };
-  }, [sections, size, reading, box.h, units, lines, editing, edit?.wrong]);
+  }, [sections, size, reading, box.h, units, lines, edit?.wrong]);
 
   // The page follows the band: when the bar being played is on another line, that line comes
   // to the top of the screen (its section's name with it), so what is coming is always under
@@ -287,7 +289,10 @@ export function ChartView({ chart, reading, playhead, focus, edit }: Props) {
   }, [scrolls, playing, size]);
 
   return (
-    <div className={`chart-frame${scrolls ? " scrolls" : ""}`} ref={frame}>
+    <div
+      className={`chart-frame${scrolls ? " scrolls" : ""}${editing ? " editing" : ""}`}
+      ref={frame}
+    >
       <div
         className={`chart${focus ? " focus" : ""}${editing ? " editing" : ""}`}
         style={{ "--size": `${size}px`, "--line": line, "--columns": columns } as CSSProperties}
