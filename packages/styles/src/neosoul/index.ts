@@ -45,14 +45,13 @@ export const neosoul: StylePack = {
   instruments: { bass: 33, chords: 4 },
   sound: {
     packs: { drums: "drum-kit", bass: "electric-bass", chords: "electric-piano" },
-    // Measured (`pnpm levels`), no ear yet. At the default mix the band read -18.6 LUFS with the
-    // Rhodes 1.5 dB under the drums, and every soloist 2.2 to 2.7 dB under the band: the
-    // soloist comes up 1.5 to sit about a decibel under, and the band half a decibel, into the
-    // quiet styles' -17.5 to -18.5.
+    // Measured (`pnpm levels`), no ear yet. At the default mix the Rhodes read 1.4 dB under
+    // the drums and every soloist 2.2 to 2.7 dB under the band: the soloist comes up to sit
+    // about a decibel under. The master is left alone: everyone together reads -17.7 LUFS,
+    // between the loud styles' -17 and the blues' and jazz's -18.5.
     mix: {
       ...DEFAULT_MIX,
       seats: { ...DEFAULT_MIX.seats, solo: { ...DEFAULT_MIX.seats.solo, level: 3 } },
-      master: DEFAULT_MIX.master + 0.5,
     },
   },
 };
