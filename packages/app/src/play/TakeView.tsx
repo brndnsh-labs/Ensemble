@@ -6,6 +6,7 @@
 import { recipeText } from "@ensemble/engine";
 import { styleById } from "@ensemble/styles";
 import { useEffect, useMemo, useState } from "react";
+import { Back } from "../Back.tsx";
 import { download, fileName } from "../download.ts";
 import type { Heard, KeptTake } from "../takes.ts";
 import { deleteTake, heardAs, renameTake, takesKeptOnDevice } from "../takes.ts";
@@ -43,9 +44,7 @@ export function TakeView(props: Props) {
   return (
     <main className="play">
       <header className="bar-top">
-        <a className="back" href="#/" aria-label="Back to the charts">
-          ‹<span>Charts</span>
-        </a>
+        <Back />
         <h1>{take.name || take.recipe.chartName}</h1>
       </header>
       <p className="problem" role="alert">

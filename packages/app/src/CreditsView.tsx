@@ -3,6 +3,7 @@
 
 import type { Pack } from "@ensemble/audio";
 import { useEffect, useState } from "react";
+import { Back } from "./Back.tsx";
 import { PACK_IDS } from "./offline.ts";
 
 export function CreditsView({ packsUrl }: { packsUrl: string }) {
@@ -26,9 +27,7 @@ export function CreditsView({ packsUrl }: { packsUrl: string }) {
 
   return (
     <main className="library credits">
-      <a className="back" href="#/">
-        ‹<span>Charts</span>
-      </a>
+      <Back />
       <h1>Credits</h1>
       <p>
         The band plays recordings of real instruments, cut down from sample libraries their makers

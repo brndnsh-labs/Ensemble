@@ -7,6 +7,7 @@ import { parse, print } from "@ensemble/engine";
 import { STYLES, styleById } from "@ensemble/styles";
 import type { CSSProperties } from "react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { Back } from "../Back.tsx";
 import { deleteChart, keptOnDevice, saveChart } from "../charts.ts";
 import { download, fileName } from "../download.ts";
 import type { LibraryChart } from "../library.ts";
@@ -86,9 +87,7 @@ export function EditView({ entry, reading, style: chosen }: Props) {
   return (
     <main className={`edit${typing ? " typing" : ""}`} style={fitted}>
       <header className="bar-top">
-        <a className="back" href="#/" aria-label="Back to the charts">
-          ‹<span>Charts</span>
-        </a>
+        <Back />
         <h1>{chart.title}</h1>
         {/* Written first, so the play screen opens on what was just typed. */}
         <a className="to-play" href={`#/chart/${entry.id}`} onClick={save}>

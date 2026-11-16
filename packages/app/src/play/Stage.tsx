@@ -6,7 +6,8 @@
 import type { Chart, Plan } from "@ensemble/engine";
 import { keyToString, planBar, SOLO_INSTRUMENTS } from "@ensemble/engine";
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Back } from "../Back.tsx";
 import type { Playhead } from "./ChartView.tsx";
 import { ChartView } from "./ChartView.tsx";
 import type { Reading } from "./ChordSymbol.tsx";
@@ -32,8 +33,63 @@ interface Props {
   readonly side?: ReactNode;
   /** Over the chart while the band is not playing. */
   readonly before: ReactNode;
+  /** Who is in the band: under the chart, and there while the band plays too. */
+  readonly band?: ReactNode;
   /** Beside the transport, and quieter than it. */
   readonly aside?: ReactNode;
+}
+
+/** Somewhere a space is typed or chooses, so it is not the transport's there. */
+const takesSpaces = (target: EventTarget | null): boolean =>
+  target instanceof HTMLInputElement ||
+  target instanceof HTMLTextAreaElement ||
+  target instanceof HTMLSelectElement;
+
+/**
+ * The space bar is the transport, as on every recorder: it does what the big
+ * button would. That holds wherever the focus is but in a text box or a list
+ * of choices, so a seat silenced with the mouse does not come back when the
+ * player reaches for the space bar to stop the band. A button under the focus
+ * is still pressed with Enter.
+ */
+function useSpaceBar(press: () => void): void {
+  const latest = useRef(press);
+  latest.current = press;
+  useEffect(() => {
+    /** True from the space bar going down to its coming up: the press a focused button would make of it is dropped. */
+    let ours = false;
+    const down = (event: KeyboardEvent) => {
+      if (event.key !== " " || event.ctrlKey || event.metaKey || event.altKey) return;
+      if (takesSpaces(event.target)) return;
+      event.preventDefault();
+      // A held key repeats; the band is started or stopped once.
+      if (event.repeat) return;
+      ours = true;
+      latest.current();
+    };
+    const up = (event: KeyboardEvent) => {
+      if (event.key !== " " || !ours) return;
+      event.preventDefault();
+      // The button's own press, where a browser still makes one, comes with the key's release.
+      setTimeout(() => {
+        ours = false;
+      });
+    };
+    // A press made by a key, not a pointer, counts no clicks.
+    const click = (event: MouseEvent) => {
+      if (!ours || event.detail !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    document.addEventListener("keydown", down);
+    document.addEventListener("keyup", up);
+    document.addEventListener("click", click, true);
+    return () => {
+      document.removeEventListener("keydown", down);
+      document.removeEventListener("keyup", up);
+      document.removeEventListener("click", click, true);
+    };
+  }, []);
 }
 
 /** How many bars ahead the play screen tells the chart about: enough to find the next line from anywhere. */
@@ -47,10 +103,12 @@ const READING_NAMES: Readonly<Record<Reading, readonly [shown: string, said: str
 };
 
 export function Stage(props: Props) {
-  const { jam, call, chart, preview, title, reading, read, side, before, aside } = props;
+  const { jam, call, chart, preview, title, reading, read, side, before, band, aside } = props;
   const [focus, setFocus] = useState(false);
 
+  const idle = jam.phase === "idle";
   const playing = jam.phase === "playing";
+  useSpaceBar(idle ? jam.play : jam.stop);
   const plan = playing && jam.playing ? jam.playing.plan : preview;
   const shown = playing && jam.playing ? jam.playing.chart : chart;
 
@@ -88,7 +146,10 @@ export function Stage(props: Props) {
     };
   }
 
-  const { options, style } = call;
+  const { style } = call;
+  // While the band plays the strip follows the take, not the switches: a soloist silenced
+  // still has its solos marked, for the player to take.
+  const options = !idle && jam.take ? jam.take.options : call.options;
   const soloist = options.solo
     ? SOLO_INSTRUMENTS[options.soloInstrument ?? style.solo.instrument]?.name
     : undefined;
@@ -96,9 +157,7 @@ export function Stage(props: Props) {
   return (
     <main className={`play${playing ? " playing" : ""}`}>
       <header className="bar-top">
-        <a className="back" href="#/" aria-label="Back to the charts">
-          ‹<span>Charts</span>
-        </a>
+        <Back />
         <h1>{title ?? shown.title}</h1>
         {side}
       </header>
@@ -131,7 +190,8 @@ export function Stage(props: Props) {
         </button>
       </div>
 
-      {!playing && before}
+      {/* Gone from the press of play, not from the first note: the press is answered at once. */}
+      {idle && before}
 
       <ChartView chart={shown} reading={reading} playhead={playhead} focus={focus} />
 
@@ -147,23 +207,27 @@ export function Stage(props: Props) {
           place={playing ? jam.place : undefined}
           elapsed={jam.elapsed}
           playing={playing}
+          loading={jam.phase === "loading"}
           soloist={soloist}
         />
-        {aside}
-        {jam.phase === "idle" ? (
-          <button type="button" className="go" onClick={jam.play}>
-            Play
+        {band}
+        <div className="take-tools">{aside}</div>
+        <div className="transport">
+          {/* The second choice, and only a jam's: a song ends by itself. It comes in beside Stop, moving nothing. */}
+          {!idle && plan.mode === "jam" && (
+            <button type="button" className="finish" disabled={!jam.canFinish} onClick={jam.finish}>
+              {jam.finishing ? "Finishing" : "Finish"}
+            </button>
+          )}
+          {/* One button in one place: Play, and Stop while there is anything to stop. */}
+          <button
+            type="button"
+            className={`go${idle ? "" : " stop"}`}
+            onClick={idle ? jam.play : jam.stop}
+          >
+            {idle ? "Play" : "Stop"}
           </button>
-        ) : jam.canFinish ? (
-          // One press brings the band to an ending; the button then stops it dead.
-          <button type="button" className="go stop" onClick={jam.finish}>
-            Finish
-          </button>
-        ) : (
-          <button type="button" className="go stop" onClick={jam.stop}>
-            {jam.phase === "loading" ? "Loading" : "Stop"}
-          </button>
-        )}
+        </div>
       </footer>
     </main>
   );

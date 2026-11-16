@@ -124,12 +124,17 @@ export function chartOf(text: string, key: Key | null | undefined): Chart {
   return key ? transpose(chart, key) : chart;
 }
 
-/** The instruments a take needs. */
-export function chairsOf(style: StylePack, options: HowPlayed): Chair[] {
+/** Who is in a take: a seat left out has no part in it, and the others play differently for that. */
+export function seatsOf(options: HowPlayed): Seat[] {
   const out = options.without ?? [];
   return SEAT_ORDER.filter((seat) =>
     seat === "solo" ? options.solo === true : !out.includes(seat),
-  ).map((seat) => ({
+  );
+}
+
+/** The instruments a take needs. Each sounds in the mixer channel named for its seat. */
+export function chairsOf(style: StylePack, options: HowPlayed): Chair[] {
+  return seatsOf(options).map((seat) => ({
     pack:
       seat === "solo"
         ? (options.soloInstrument ?? style.solo.instrument)

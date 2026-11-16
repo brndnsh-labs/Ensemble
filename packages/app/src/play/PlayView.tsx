@@ -123,6 +123,13 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
   const shownTempo = Math.round(preview.tempo);
   const take = jam.phase === "loading" ? undefined : jam.take;
   const isKept = take !== undefined && kept?.seed === take.options.seed;
+  const idle = jam.phase === "idle";
+  // An instrument is chosen only where the style has more than one for the seat, and the seat is in.
+  const chosenFor = choices.instruments;
+  const offered = BAND_SEATS.flatMap((seat) => {
+    const all = style.sound.choices?.[seat];
+    return all && settings.band[seat] ? [[seat, all] as const] : [];
+  });
 
   return (
     <Stage
@@ -164,7 +171,7 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
       }
       before={
         <div className="setup">
-          <label>
+          <label className="field pick">
             <span>Style</span>
             <select
               value={style.id}
@@ -184,7 +191,7 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
               ))}
             </select>
           </label>
-          <label>
+          <label className="field pick">
             <span>Key</span>
             <select
               value={setup.key ? keyToString(setup.key) : ""}
@@ -209,7 +216,7 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
                 ))}
             </select>
           </label>
-          <div className="field">
+          <div className="field tempo">
             <span id="tempo-label">Tempo</span>
             <fieldset className="stepper" aria-labelledby="tempo-label">
               <button
@@ -229,7 +236,7 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
               </button>
             </fieldset>
           </div>
-          <label>
+          <label className="field pick">
             <span>Length</span>
             <select
               value={song ? "song" : (settings.minutes ?? "open")}
@@ -255,10 +262,51 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
               ))}
             </select>
           </label>
-          <div className="field band">
-            <span id="band-label">Band</span>
-            <fieldset className="seats" aria-labelledby="band-label">
-              {SEAT_ORDER.map((seat) => (
+        </div>
+      }
+      band={
+        <div className="band">
+          {/* What a seat is played on is settled before play, so it is offered only then: each
+              choice over the row of seats, named for its own. */}
+          {idle && (offered.length > 0 || settings.band.solo) && (
+            <div className="band-picks">
+              {offered.map(([seat, choices]) => (
+                <label key={seat} className="field pick">
+                  <span>{SEAT_NAMES[seat]} played on</span>
+                  <select
+                    value={seatChoice(style, seat, chosenFor).pack}
+                    onChange={(e) =>
+                      choose({ instruments: { ...chosenFor, [seat]: e.target.value } })
+                    }
+                  >
+                    {choices.map((choice) => (
+                      <option key={choice.pack} value={choice.pack}>
+                        {choice.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+              {settings.band.solo && (
+                <label className="field pick">
+                  <span>Soloist plays</span>
+                  <select
+                    value={soloInstrument}
+                    onChange={(e) => choose({ soloInstrument: e.target.value })}
+                  >
+                    {Object.entries(SOLO_INSTRUMENTS).map(([id, instrument]) => (
+                      <option key={id} value={id}>
+                        {instrument.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+            </div>
+          )}
+          <fieldset className="seats" aria-label="Band">
+            {SEAT_ORDER.map((seat) => {
+              return (
                 <button
                   key={seat}
                   type="button"
@@ -272,43 +320,9 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
                 >
                   {SEAT_NAMES[seat]}
                 </button>
-              ))}
-              {BAND_SEATS.map((seat) => {
-                // An instrument is chosen only where the style has more than one for the seat.
-                const offered = style.sound.choices?.[seat];
-                if (!offered || !settings.band[seat]) return null;
-                return (
-                  <select
-                    key={seat}
-                    aria-label={`${SEAT_NAMES[seat]}: the instrument`}
-                    value={seatChoice(style, seat, choices.instruments).pack}
-                    onChange={(e) =>
-                      choose({ instruments: { ...choices.instruments, [seat]: e.target.value } })
-                    }
-                  >
-                    {offered.map((choice) => (
-                      <option key={choice.pack} value={choice.pack}>
-                        {SEAT_NAMES[seat]}: {choice.name}
-                      </option>
-                    ))}
-                  </select>
-                );
-              })}
-              {settings.band.solo && (
-                <select
-                  aria-label="The soloist's instrument"
-                  value={soloInstrument}
-                  onChange={(e) => choose({ soloInstrument: e.target.value })}
-                >
-                  {Object.entries(SOLO_INSTRUMENTS).map(([id, instrument]) => (
-                    <option key={id} value={id}>
-                      {SEAT_NAMES.solo}: {instrument.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </fieldset>
-          </div>
+              );
+            })}
+          </fieldset>
         </div>
       }
     />
