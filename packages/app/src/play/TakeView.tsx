@@ -6,9 +6,12 @@
 import { recipeText } from "@ensemble/engine";
 import { styleById } from "@ensemble/styles";
 import { useEffect, useMemo, useState } from "react";
+import { Back } from "../Back.tsx";
 import { download, fileName } from "../download.ts";
+import type { LibraryChart } from "../library.ts";
+import { notePlayed } from "../recent.ts";
 import type { Heard, KeptTake } from "../takes.ts";
-import { deleteTake, heardAs, renameTake, takesKeptOnDevice } from "../takes.ts";
+import { dayOf, deleteTake, heardAs, renameTake, takesKeptOnDevice } from "../takes.ts";
 import { midiOf } from "./band.ts";
 import type { Reading } from "./ChordSymbol.tsx";
 import type { Call } from "./jam.ts";
@@ -18,6 +21,8 @@ import { useJam } from "./useJam.ts";
 
 interface Props {
   readonly take: KeptTake;
+  /** The chart it is a take of, if that is still here: the way back goes to it. */
+  readonly chart: LibraryChart | undefined;
   readonly rig: Rig;
   readonly reading: Reading;
   readonly read: (reading: Reading) => void;
@@ -27,15 +32,21 @@ interface Props {
   readonly started: () => void;
 }
 
-/** Ask first, then forget the take and go back to the library. */
-function remove(take: KeptTake): void {
+/** Where a take's screen goes back to: its chart, or the charts when that is gone. */
+const backOf = (chart: LibraryChart | undefined) =>
+  chart
+    ? { href: `#/chart/${chart.id}`, label: "Chart", said: `Back to ${chart.chart.title}` }
+    : {};
+
+/** Ask first, then forget the take and go back to where it was found. */
+function remove(take: KeptTake, chart: LibraryChart | undefined): void {
   if (!confirm(`Delete “${take.name || take.recipe.chartName}”? This cannot be undone.`)) return;
   deleteTake(take.id);
-  location.replace("#/");
+  location.replace(chart ? `#/chart/${chart.id}` : "#/");
 }
 
 export function TakeView(props: Props) {
-  const { take } = props;
+  const { take, chart } = props;
   const heard = heardAs(take.recipe);
   if (heard) return <TakeStage {...props} heard={heard} />;
   // Kept by another build of the app: a style since removed, or options this engine cannot plan.
@@ -43,9 +54,7 @@ export function TakeView(props: Props) {
   return (
     <main className="play">
       <header className="bar-top">
-        <a className="back" href="#/" aria-label="Back to the charts">
-          ‹<span>Charts</span>
-        </a>
+        <Back {...backOf(chart)} />
         <h1>{take.name || take.recipe.chartName}</h1>
       </header>
       <p className="problem" role="alert">
@@ -54,7 +63,7 @@ export function TakeView(props: Props) {
       </p>
       <div className="setup">
         <div className="tools">
-          <button type="button" onClick={() => remove(take)}>
+          <button type="button" className="danger" onClick={() => remove(take, chart)}>
             Delete
           </button>
         </div>
@@ -65,6 +74,7 @@ export function TakeView(props: Props) {
 
 function TakeStage({
   take,
+  chart,
   rig,
   reading,
   read,
@@ -82,7 +92,15 @@ function TakeStage({
     }),
     [recipe, heard],
   );
-  const jam = useJam(rig, call);
+  const band = useJam(rig, call);
+  // A press of play here is what puts the take at the top of the home screen.
+  const jam = {
+    ...band,
+    play: () => {
+      notePlayed(`#/take/${take.id}`);
+      band.play();
+    },
+  };
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, as the screen opens
   useEffect(() => {
     if (!autoplay) return;
@@ -107,11 +125,13 @@ function TakeStage({
       chart={heard.chart}
       preview={heard.plan}
       title={named}
+      about={`Take kept ${dayOf(take.kept)}`}
+      back={backOf(chart)}
       reading={reading}
       read={read}
       before={
         <div className="setup take-setup">
-          <label className="take-name">
+          <label className="field take-name">
             <span>Name</span>
             <input
               type="text"
@@ -137,7 +157,7 @@ function TakeStage({
             >
               Export take
             </button>
-            <button type="button" onClick={() => remove(take)}>
+            <button type="button" className="danger" onClick={() => remove(take, chart)}>
               Delete
             </button>
           </div>

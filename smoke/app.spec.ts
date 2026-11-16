@@ -9,11 +9,13 @@ import { expect, test } from "@playwright/test";
 test("the app loads and shows the library", async ({ page }) => {
   await page.goto("./");
   await expect(page.getByRole("heading", { name: "Ensemble" })).toBeVisible();
-  // A chart from each of the styles that ship.
-  for (const title of ["12-Bar Blues in A", "Rhythm Changes in Bb"]) {
-    await expect(page.getByRole("link", { name: title })).toBeVisible();
-  }
+  // Somewhere to start, a tap from playing, before anything has been played.
+  await expect(page.getByRole("link", { name: "12-Bar Blues in A" })).toBeVisible();
   await expect(page.getByRole("button", { name: /^Play / })).not.toHaveCount(0);
+  // The built-in charts wait behind their styles and a search box: one of another style is a few letters away.
+  await expect(page.getByRole("button", { name: /^Jazz/ })).toBeVisible();
+  await page.getByRole("searchbox", { name: "Search" }).fill("rhythm");
+  await expect(page.getByRole("link", { name: "Rhythm Changes in Bb" })).toBeVisible();
 });
 
 test("after install, the app loads offline", async ({ page, context }) => {
@@ -96,14 +98,6 @@ test("pressing play starts audio and advances the playhead", async ({ page }) =>
 test("export downloads a MIDI file that matches the CLI's output for the same take", async ({
   page,
 }, info) => {
-  await page.goto("./#/chart/jazz-rhythm-changes-bb");
-  await page.getByRole("button", { name: "Play", exact: true }).click();
-  await page.getByRole("button", { name: "Keep" }).click();
-  await expect(page.getByRole("button", { name: "Kept" })).toBeDisabled();
-  // Leaving the screen stops the band: the transport's own Stop waits behind Finish, which would change the take.
-  await page.getByRole("link", { name: "Back to the charts" }).click();
-  await page.getByRole("link", { name: /^Rhythm Changes in Bb.*kept/ }).click();
-
   const exported = async (button: string, path: string) => {
     const [download] = await Promise.all([
       page.waitForEvent("download"),
@@ -114,13 +108,32 @@ test("export downloads a MIDI file that matches the CLI's output for the same ta
   };
   const take = info.outputPath("take.json");
   const app = info.outputPath("app.mid");
+  const again = info.outputPath("again.mid");
   const cli = info.outputPath("cli.mid");
-  expect(await exported("Export take", take)).toBe("Rhythm Changes in Bb.take.json");
+
+  // The take is to be had as a file where it is played, while it plays, without keeping it first.
+  await page.goto("./#/chart/jazz-rhythm-changes-bb");
+  await page.getByRole("button", { name: "Play", exact: true }).click();
   expect(await exported("Export MIDI", app)).toBe("Rhythm Changes in Bb.mid");
+
+  // The CLI plays a take from its recipe, which a kept take's own screen exports. Leaving the
+  // screen stops the band; the chart is then first under Recent, and its kept take is on its screen.
+  await page.getByRole("button", { name: "Keep" }).click();
+  await expect(page.getByRole("button", { name: "Kept" })).toBeDisabled();
+  await page.getByRole("link", { name: "Back to the charts" }).click();
+  await page.getByRole("link", { name: "Rhythm Changes in Bb" }).click();
+  await page
+    .getByRole("navigation", { name: "Kept takes of this chart" })
+    .getByRole("link")
+    .click();
+  expect(await exported("Export take", take)).toBe("Rhythm Changes in Bb.take.json");
+  expect(await exported("Export MIDI", again)).toBe("Rhythm Changes in Bb.mid");
 
   const root = resolve(import.meta.dirname, "..");
   execFileSync("node", ["packages/cli/src/main.ts", "replay", take, "--out", cli], { cwd: root });
   const ours = readFileSync(app);
   expect(ours.length).toBeGreaterThan(100);
   expect(ours.equals(readFileSync(cli))).toBe(true);
+  // The kept take's screen hands over the same file.
+  expect(readFileSync(again).equals(readFileSync(cli))).toBe(true);
 });

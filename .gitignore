@@ -14,3 +14,4 @@ dist-types/
 test-results/
 out/bass-study/*.mp3
 out/face-study/
+out/ui-pass/

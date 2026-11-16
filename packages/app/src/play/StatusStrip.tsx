@@ -13,6 +13,8 @@ interface Props {
   readonly place: Place | undefined;
   readonly elapsed: number;
   readonly playing: boolean;
+  /** Play has been pressed and the band is not ready yet. */
+  readonly loading: boolean;
   /** The soloist's instrument, when one is in the band. */
   readonly soloist: string | undefined;
 }
@@ -41,14 +43,14 @@ function where(plan: Plan, place: Place | undefined, playing: boolean, elapsed: 
   return plan.open ? `Pass ${bar.pass + 1}` : `Pass ${bar.pass + 1} of ${plan.passes}`;
 }
 
-export function StatusStrip({ plan, place, elapsed, playing, soloist }: Props) {
+export function StatusStrip({ plan, place, elapsed, playing, loading, soloist }: Props) {
   const bar = place?.bar;
   const length = seconds(plan);
   const last = bar !== undefined && homeStretch(plan, bar);
   return (
-    <div className={`strip${last ? " last" : ""}`}>
+    <div className={`strip${last ? " last" : ""}${loading ? " loading" : ""}`}>
       <span className="strip-where" aria-live="polite">
-        {where(plan, place, playing, elapsed)}
+        {loading ? "Loading the band" : where(plan, place, playing, elapsed)}
       </span>
       <Arc plan={plan} at={bar} />
       {soloist !== undefined && playing && (

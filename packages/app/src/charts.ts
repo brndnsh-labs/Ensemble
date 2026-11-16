@@ -2,6 +2,7 @@
 // (`stored.ts`). A browser that refuses to keep them still works: the charts
 // then last as long as the visit, and the editor says so.
 
+import { parse } from "@ensemble/engine";
 import type { LibraryChart } from "./library.ts";
 import { entryOf, LIBRARY } from "./library.ts";
 import { askToKeep, storedList } from "./stored.ts";
@@ -85,6 +86,34 @@ export function saveChart(id: string, text: string): void {
   charts.write(
     charts.items().map((chart) => (chart === item ? { id, text, modified: Date.now() } : chart)),
   );
+}
+
+/**
+ * A chart's text under another title. The title is a line of the text like any
+ * other, so only that line is rewritten (or one is put at the top, where the
+ * chart had none): everything else stays as it was typed.
+ */
+export function retitled(text: string, title: string): string {
+  const line = `title: ${title.replace(/\s+/g, " ").trim()}`;
+  const field = parse(text).chart.header.find(
+    (item) => item.kind === "field" && item.name === "title",
+  );
+  if (!field) return `${line}\n${text}`;
+  const lines = text.split("\n");
+  lines[field.range.line - 1] = line;
+  return lines.join("\n");
+}
+
+/** Give one of the player's charts another title. An empty one changes nothing. */
+export function renameChart(id: string, title: string): void {
+  const item = charts.items().find((chart) => chart.id === id);
+  if (item && title.trim() !== "") saveChart(id, retitled(item.text, title));
+}
+
+/** A second copy of one of the player's charts, named as a copy, and its id. */
+export function duplicateChart(id: string): string | undefined {
+  const entry = shelf.find((chart) => chart.id === id);
+  return entry && addChart(retitled(entry.text, `${entry.chart.title} copy`));
 }
 
 export function deleteChart(id: string): void {

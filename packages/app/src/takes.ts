@@ -6,6 +6,9 @@
 import type { Chart, Plan, StylePack, TakeRecipe } from "@ensemble/engine";
 import { plan, RECIPE_VERSION } from "@ensemble/engine";
 import { styleById } from "@ensemble/styles";
+import { findChart, ownCharts } from "./charts.ts";
+import type { LibraryChart } from "./library.ts";
+import { LIBRARY } from "./library.ts";
 import { chartOf } from "./play/jam.ts";
 import { askToKeep, storedList } from "./stored.ts";
 
@@ -16,6 +19,11 @@ export interface KeptTake {
   /** The chart's name to begin with; the player may change it. */
   readonly name: string;
   readonly recipe: TakeRecipe;
+  /**
+   * The id of the chart it was played from, so it can be shown on that
+   * chart's screen. Takes kept before this was written down have none.
+   */
+  readonly chart?: string;
 }
 
 const KEY = "ensemble.takes.1";
@@ -31,6 +39,7 @@ const isKept = (item: unknown): item is KeptTake => {
     typeof item.id === "string" &&
     typeof item.kept === "number" &&
     typeof item.name === "string" &&
+    (item.chart === undefined || typeof item.chart === "string") &&
     recipe.version === RECIPE_VERSION &&
     typeof recipe.chartName === "string" &&
     typeof recipe.chartText === "string" &&
@@ -56,10 +65,10 @@ export const takesKeptOnDevice = takes.kept;
 
 export const findTake = (id: string): KeptTake | undefined => shelf.find((take) => take.id === id);
 
-/** Keep a take, named for its chart, and say its id. */
-export function keepTake(recipe: TakeRecipe): string {
+/** Keep a take of a chart, named for it, and say its id. */
+export function keepTake(recipe: TakeRecipe, chart: string): string {
   const id = takes.newId("take-");
-  takes.write([...takes.items(), { id, kept: Date.now(), name: recipe.chartName, recipe }]);
+  takes.write([...takes.items(), { id, kept: Date.now(), name: recipe.chartName, recipe, chart }]);
   askToKeep();
   return id;
 }
@@ -77,6 +86,33 @@ export function renameTake(id: string, name: string): void {
 export function deleteTake(id: string): void {
   takes.write(takes.items().filter((take) => take.id !== id));
 }
+
+/**
+ * The chart a take is a performance of, if it is still here. A take says
+ * which chart it came from; one kept before takes did is matched by the
+ * chart's text, and failing that its title, among the player's charts first.
+ * Undefined when the chart has been deleted: the take still plays, since it
+ * carries the text it was played from.
+ */
+export function chartFor(take: KeptTake): LibraryChart | undefined {
+  if (take.chart !== undefined) return findChart(take.chart);
+  const { chartText, chartName } = take.recipe;
+  const all = [...ownCharts(), ...LIBRARY];
+  return (
+    all.find((entry) => entry.text === chartText) ??
+    all.find((entry) => entry.chart.title === chartName)
+  );
+}
+
+/** The day a take was kept: the year only when it was not this one. */
+export const dayOf = (time: number): string => {
+  const date = new Date(time);
+  return date.toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    ...(date.getFullYear() === new Date().getFullYear() ? {} : { year: "numeric" }),
+  });
+};
 
 /** A take as it was heard: its style, its chart in the key it was played in, and its roadmap. */
 export interface Heard {

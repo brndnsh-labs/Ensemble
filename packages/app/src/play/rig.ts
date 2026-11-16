@@ -31,6 +31,10 @@ export class Rig {
   readonly #packsUrl: string;
   readonly #packs = new Map<string, Promise<LoadedPack>>();
   #mixer: { readonly fixed: string; readonly mixer: Mixer } | undefined;
+  /** The mix of the band last seated, as its style has it: what a silenced channel comes back to. */
+  #mix: Mix | undefined;
+  /** The channels taken down while their parts go on being played. */
+  #hushed = new Set<string>();
   #sampler: Sampler | undefined;
   #seated = new Set<string>();
   #player: Player | undefined;
@@ -100,7 +104,8 @@ export class Rig {
       this.#seated = new Set();
     }
     const { mixer } = this.#mixer;
-    mixer.adjust(mix);
+    this.#mix = mix;
+    mixer.adjust(this.#heard(mix));
     chairs.forEach((chair, i) => {
       const name = chairName(chair);
       if (this.#seated.has(name)) return;
@@ -108,6 +113,37 @@ export class Rig {
       this.#sampler!.add({ ...loaded[i]!, pack }, mixer.input(chair.channel));
       this.#seated.add(name);
     });
+  }
+
+  /**
+   * Silence a channel, or bring it back, at once and without stopping what is
+   * played in it: the part goes on underneath, so it comes back in time. The
+   * mixer glides the level, so neither way clicks.
+   */
+  hush(channel: string, silent: boolean): void {
+    if (this.#hushed.has(channel) === silent) return;
+    if (silent) this.#hushed.add(channel);
+    else this.#hushed.delete(channel);
+    if (this.#mix) this.#mixer?.mixer.adjust(this.#heard(this.#mix));
+  }
+
+  /** Everyone is heard again: a new take starts with nobody silenced. */
+  unhush(): void {
+    if (this.#hushed.size === 0) return;
+    this.#hushed.clear();
+    if (this.#mix) this.#mixer?.mixer.adjust(this.#heard(this.#mix));
+  }
+
+  /** A mix with the silenced channels all the way down. The reverb is fed after the level, so it goes quiet with them. */
+  #heard(mix: Mix): Mix {
+    if (this.#hushed.size === 0) return mix;
+    const channels = Object.fromEntries(
+      Object.entries(mix.channels).map(([name, channel]) => [
+        name,
+        this.#hushed.has(name) ? { ...channel, level: Number.NEGATIVE_INFINITY } : channel,
+      ]),
+    );
+    return { ...mix, channels };
   }
 
   /** Play sounds from the top. `seat` must have finished for the band that plays them. */

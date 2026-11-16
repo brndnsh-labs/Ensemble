@@ -2,13 +2,13 @@
 // band is until the tune ends or someone stops it.
 
 import type { Player } from "@ensemble/audio";
-import type { StylePack, TakeRecipe } from "@ensemble/engine";
+import type { Seat, StylePack, TakeRecipe } from "@ensemble/engine";
 import { seconds } from "@ensemble/engine";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Made } from "./band.ts";
 import { perform, Unplayable, warmUp } from "./band.ts";
 import type { Call, Performance, Place } from "./jam.ts";
-import { chairsOf, mixOf, OPEN_PASSES, placeAt, recipeOf, turnForHome } from "./jam.ts";
+import { chairsOf, mixOf, OPEN_PASSES, placeAt, recipeOf, seatsOf, turnForHome } from "./jam.ts";
 import type { Rig } from "./rig.ts";
 
 export type Phase = "idle" | "loading" | "playing";
@@ -25,6 +25,11 @@ export interface Jam {
    * keep to hear it again. An open jam stopped dead is the passes it got to.
    */
   readonly take: TakeRecipe | undefined;
+  /**
+   * Who is in the take being loaded or played; undefined while the band is
+   * idle. A seat outside it has no part to be heard, whatever is pressed.
+   */
+  readonly seats: readonly Seat[] | undefined;
   /** Why the band could not start, in words for the player. */
   readonly problem: string | undefined;
   /** Call from a tap. */
@@ -33,6 +38,8 @@ export interface Jam {
   finish(): void;
   /** True while the band plays a jam and has not been told to finish, or reached its last pass by itself. Never in a song. */
   readonly canFinish: boolean;
+  /** True while a jam is on its way home: told to finish, or in its last pass by itself. Never in a song. */
+  readonly finishing: boolean;
   /** Silence, now. */
   stop(): void;
 }
@@ -47,8 +54,11 @@ const REPLACE_AHEAD = 3;
 const ENDING_COST = 2;
 /** How long the last chord and the room are left to ring before the jam counts as over. */
 const RING = 2.5;
-/** A press of Stop this soon after Finish is the same tap twice, not a change of mind. */
-const SAME_TAP_MS = 600;
+/**
+ * Stop is where Play was, so a press of it this soon after Play is the same
+ * tap twice, not a change of mind.
+ */
+const SAME_TAP_MS = 400;
 
 interface Running {
   readonly player: Player;
@@ -87,9 +97,12 @@ export function useJam(rig: Rig, call: Call, changed?: (take: TakeRecipe) => voi
   }, []);
   const [problem, setProblem] = useState<string>();
   const [told, setTold] = useState(false);
+  const [seats, setSeats] = useState<readonly Seat[]>();
   const running = useRef<Running>(undefined);
   /** Counts presses of play and stop, so a slow load that has been overtaken does nothing. */
   const presses = useRef(0);
+  /** When play was last pressed, on the page's clock. */
+  const pressedAt = useRef(Number.NEGATIVE_INFINITY);
 
   // Fetch the band's instruments as soon as it is known who is playing, not when play is
   // pressed. Only fetched: seating them changes the mix, which a band already playing owns.
@@ -118,6 +131,7 @@ export function useJam(rig: Rig, call: Call, changed?: (take: TakeRecipe) => voi
     running.current = undefined;
     rig.stop();
     setPhase("idle");
+    setSeats(undefined);
     setTold(false);
     setNow({ place: undefined, elapsed: 0 });
   }, [rig, setTake]);
@@ -125,11 +139,15 @@ export function useJam(rig: Rig, call: Call, changed?: (take: TakeRecipe) => voi
   const play = () => {
     rig.wake();
     stop();
+    pressedAt.current = performance.now();
     const mine = ++presses.current;
     const { style } = call;
     const recipe = recipeOf(call, call.options.seed ?? newSeed());
     setProblem(undefined);
     setPhase("loading");
+    // Whoever was silenced in the last take is heard in this one, if they are in it.
+    rig.unhush();
+    setSeats(seatsOf(recipe.options));
     Promise.all([
       perform(recipe),
       rig.seat(chairsOf(style, recipe.options), mixOf(style, recipe.options)),
@@ -151,6 +169,7 @@ export function useJam(rig: Rig, call: Call, changed?: (take: TakeRecipe) => voi
       (error: unknown) => {
         if (presses.current !== mine) return;
         setPhase("idle");
+        setSeats(undefined);
         setProblem(
           error instanceof Unplayable
             ? "The band could not play this."
@@ -276,19 +295,25 @@ export function useJam(rig: Rig, call: Call, changed?: (take: TakeRecipe) => voi
     !bar.lastPass &&
     !bar.ending &&
     bar.kind !== "tail";
+  // With no bar under it the band is either about to count in or letting its last chord ring.
+  const finishing =
+    phase === "playing" &&
+    playing?.plan.mode === "jam" &&
+    (told || (bar ? bar.lastPass || Boolean(bar.ending) || bar.kind === "tail" : now.elapsed > 0));
   return {
     phase,
     playing,
     place: now.place,
     elapsed: now.elapsed,
     take,
+    seats,
     problem,
     play,
     finish,
     canFinish,
+    finishing,
     stop: () => {
-      const toldAt = running.current?.toldAt;
-      if (toldAt !== undefined && performance.now() - toldAt < SAME_TAP_MS) return;
+      if (performance.now() - pressedAt.current < SAME_TAP_MS) return;
       stop();
     },
   };
