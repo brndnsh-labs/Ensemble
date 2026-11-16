@@ -1,20 +1,22 @@
-// The app: the library, one chart on the play screen, one of the player's own
-// in the editor, or a take they kept. The address says which, so the
+// The app: the home screen, one chart on the play screen, one of the player's
+// own in the editor, or a take they kept. The address says which, so the
 // browser's back button works and a chart can be bookmarked.
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { CreditsView } from "./CreditsView.tsx";
 import { findChart, ownCharts, subscribeCharts } from "./charts.ts";
 import { EditView } from "./edit/EditView.tsx";
+import type { Finding } from "./LibraryView.tsx";
 import { LibraryView } from "./LibraryView.tsx";
 import type { Saving } from "./offline.ts";
 import { saveInstruments } from "./offline.ts";
 import { PlayView } from "./play/PlayView.tsx";
 import { Rig } from "./play/rig.ts";
 import { TakeView } from "./play/TakeView.tsx";
+import { recentlyPlayed, subscribeRecent } from "./recent.ts";
 import type { Settings } from "./settings.ts";
 import { loadSettings, saveSettings } from "./settings.ts";
-import { findTake, keptTakes, subscribeTakes } from "./takes.ts";
+import { chartFor, findTake, keptTakes, subscribeTakes } from "./takes.ts";
 
 const subscribe = (listener: () => void) => {
   addEventListener("hashchange", listener);
@@ -28,7 +30,10 @@ export function App() {
   const hash = useSyncExternalStore(subscribe, () => location.hash);
   const own = useSyncExternalStore(subscribeCharts, ownCharts);
   const takes = useSyncExternalStore(subscribeTakes, keptTakes);
+  const recent = useSyncExternalStore(subscribeRecent, recentlyPlayed);
   const [settings, setSettings] = useState(loadSettings);
+  /** What is being looked for among the built-in charts: kept here so it is still set on coming back from one. */
+  const [finding, find] = useState<Finding>({ query: "", style: "" });
   /** The address of the chart or take whose play button was tapped in the library: it starts as its screen opens. */
   const [autoplay, setAutoplay] = useState<string>();
 
@@ -55,6 +60,7 @@ export function App() {
       <TakeView
         key={take.id}
         take={take}
+        chart={chartFor(take)}
         rig={rig}
         reading={settings.reading}
         read={(reading) => change({ ...settings, reading })}
@@ -78,6 +84,9 @@ export function App() {
       <LibraryView
         own={own}
         takes={takes}
+        recent={recent}
+        finding={finding}
+        find={find}
         saving={saving}
         play={(address) => {
           // Inside the tap, so the browser lets the band start without another one.
@@ -91,6 +100,7 @@ export function App() {
     <PlayView
       key={entry.id}
       entry={entry}
+      takes={takes.filter((kept) => chartFor(kept)?.id === entry.id)}
       rig={rig}
       settings={settings}
       change={change}

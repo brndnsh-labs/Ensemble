@@ -9,21 +9,27 @@ import {
   plan as planOf,
   SOLO_INSTRUMENTS,
   seatChoice,
+  seconds,
 } from "@ensemble/engine";
 import { STYLES, styleById } from "@ensemble/styles";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { copyOf } from "../charts.ts";
 import type { LibraryChart } from "../library.ts";
+import { notePlayed } from "../recent.ts";
 import type { ChartChoices, Settings } from "../settings.ts";
-import { followTake, keepTake } from "../takes.ts";
+import type { KeptTake } from "../takes.ts";
+import { dayOf, followTake, heardAs, keepTake } from "../takes.ts";
 import type { Call, JamSetup } from "./jam.ts";
 import { chartOf, SEAT_ORDER, takeOptions } from "./jam.ts";
 import type { Rig } from "./rig.ts";
 import { Stage } from "./Stage.tsx";
+import { clock } from "./StatusStrip.tsx";
 import { useJam } from "./useJam.ts";
 
 interface Props {
   readonly entry: LibraryChart;
+  /** The takes kept of this chart, the latest first. */
+  readonly takes: readonly KeptTake[];
   readonly rig: Rig;
   readonly settings: Settings;
   readonly change: (settings: Settings) => void;
@@ -44,11 +50,28 @@ const SEAT_NAMES: Readonly<Record<Seat, string>> = {
 /** The seats whose instrument a style may offer a choice of. The soloist's has its own list. */
 const BAND_SEATS = ["drums", "bass", "chords"] as const;
 
+/**
+ * A kept take in a few words: its own name if it was given one, else when it
+ * was kept (the time of day for one kept today, since several may have been),
+ * and how long it runs.
+ */
+function takeLabel(take: KeptTake): string {
+  const named = take.name.trim();
+  const heard = heardAs(take.recipe);
+  const kept = new Date(take.kept);
+  const today = kept.toDateString() === new Date().toDateString();
+  const when = today
+    ? kept.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+    : dayOf(take.kept);
+  const what = named && named !== take.recipe.chartName ? named : when;
+  return heard ? `${what}, ${clock(seconds(heard.plan))}` : what;
+}
+
 /** The twelve keys of a mode, as they are conventionally written. */
 const keysOf = (mode: Key["mode"]): Key[] =>
   Array.from({ length: 12 }, (_, pc) => conventionalKey(pc, mode, true));
 
-export function PlayView({ entry, rig, settings, change, autoplay, started }: Props) {
+export function PlayView({ entry, takes, rig, settings, change, autoplay, started }: Props) {
   const choices: ChartChoices = settings.charts[entry.id] ?? {};
   const choose = (patch: ChartChoices) =>
     change({
@@ -107,10 +130,18 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
   }>();
   const following = useRef(kept);
   following.current = kept;
-  const jam = useJam(rig, call, (take) => {
+  const band = useJam(rig, call, (take) => {
     const to = following.current;
     if (to && take.options.seed === to.seed) followTake(to.id, take);
   });
+  // A press of play here is what puts the chart at the top of the home screen.
+  const jam = {
+    ...band,
+    play: () => {
+      notePlayed(`#/chart/${entry.id}`);
+      band.play();
+    },
+  };
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, as the screen opens
   useEffect(() => {
     if (!autoplay) return;
@@ -171,106 +202,121 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
             type="button"
             className="keep"
             disabled={isKept}
-            onClick={() => setKept({ id: keepTake(take), seed: take.options.seed })}
+            onClick={() => setKept({ id: keepTake(take, entry.id), seed: take.options.seed })}
           >
             {isKept ? "Kept" : "Keep"}
           </button>
         )
       }
       before={
-        <div className="setup">
-          <label className="field pick">
-            <span>Style</span>
-            <select
-              value={style.id}
-              onChange={(e) => {
-                // Another style brings its own band: instruments chosen for the last one go.
-                const { soloInstrument: _, instruments: __, ...rest } = choices;
-                change({
-                  ...settings,
-                  charts: { ...settings.charts, [entry.id]: { ...rest, style: e.target.value } },
-                });
-              }}
-            >
-              {STYLES.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field pick">
-            <span>Key</span>
-            <select
-              value={setup.key ? keyToString(setup.key) : ""}
-              onChange={(e) => {
-                const { key: _, ...rest } = choices;
-                change({
-                  ...settings,
-                  charts: {
-                    ...settings.charts,
-                    [entry.id]: e.target.value ? { ...rest, key: e.target.value } : rest,
-                  },
-                });
-              }}
-            >
-              <option value="">{keyToString(entry.chart.key)} (written)</option>
-              {keysOf(entry.chart.key.mode)
-                .filter((k) => pitchClass(k.tonic) !== pitchClass(entry.chart.key.tonic))
-                .map((k) => (
-                  <option key={keyToString(k)} value={keyToString(k)}>
-                    {keyToString(k)}
+        <>
+          <div className="setup">
+            <label className="field pick">
+              <span>Style</span>
+              <select
+                value={style.id}
+                onChange={(e) => {
+                  // Another style brings its own band: instruments chosen for the last one go.
+                  const { soloInstrument: _, instruments: __, ...rest } = choices;
+                  change({
+                    ...settings,
+                    charts: { ...settings.charts, [entry.id]: { ...rest, style: e.target.value } },
+                  });
+                }}
+              >
+                {STYLES.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
                   </option>
                 ))}
-            </select>
-          </label>
-          <div className="field tempo">
-            <span id="tempo-label">Tempo</span>
-            <fieldset className="stepper" aria-labelledby="tempo-label">
-              <button
-                type="button"
-                aria-label="Slower"
-                onClick={() => choose({ tempo: Math.max(style.tempo.min, shownTempo - 4) })}
+              </select>
+            </label>
+            <label className="field pick">
+              <span>Key</span>
+              <select
+                value={setup.key ? keyToString(setup.key) : ""}
+                onChange={(e) => {
+                  const { key: _, ...rest } = choices;
+                  change({
+                    ...settings,
+                    charts: {
+                      ...settings.charts,
+                      [entry.id]: e.target.value ? { ...rest, key: e.target.value } : rest,
+                    },
+                  });
+                }}
               >
-                −
-              </button>
-              <output>{shownTempo}</output>
-              <button
-                type="button"
-                aria-label="Faster"
-                onClick={() => choose({ tempo: Math.min(style.tempo.max, shownTempo + 4) })}
+                <option value="">{keyToString(entry.chart.key)} (written)</option>
+                {keysOf(entry.chart.key.mode)
+                  .filter((k) => pitchClass(k.tonic) !== pitchClass(entry.chart.key.tonic))
+                  .map((k) => (
+                    <option key={keyToString(k)} value={keyToString(k)}>
+                      {keyToString(k)}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <div className="field tempo">
+              <span id="tempo-label">Tempo</span>
+              <fieldset className="stepper" aria-labelledby="tempo-label">
+                <button
+                  type="button"
+                  aria-label="Slower"
+                  onClick={() => choose({ tempo: Math.max(style.tempo.min, shownTempo - 4) })}
+                >
+                  −
+                </button>
+                <output>{shownTempo}</output>
+                <button
+                  type="button"
+                  aria-label="Faster"
+                  onClick={() => choose({ tempo: Math.min(style.tempo.max, shownTempo + 4) })}
+                >
+                  +
+                </button>
+              </fieldset>
+            </div>
+            <label className="field pick">
+              <span>Length</span>
+              <select
+                value={song ? "song" : (settings.minutes ?? "open")}
+                onChange={(e) => {
+                  const { value } = e.target;
+                  // The song is this chart's choice; a length is every chart's, and undoes it here.
+                  const charts = {
+                    ...settings.charts,
+                    [entry.id]: { ...choices, song: value === "song" },
+                  };
+                  change(
+                    value === "song"
+                      ? { ...settings, charts }
+                      : { ...settings, charts, minutes: value === "open" ? null : Number(value) },
+                  );
+                }}
               >
-                +
-              </button>
-            </fieldset>
+                <option value="song">The song, once through</option>
+                {LENGTHS.map((minutes) => (
+                  <option key={minutes ?? "open"} value={minutes ?? "open"}>
+                    {minutes === null ? "Until I stop it" : `About ${minutes} min`}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
-          <label className="field pick">
-            <span>Length</span>
-            <select
-              value={song ? "song" : (settings.minutes ?? "open")}
-              onChange={(e) => {
-                const { value } = e.target;
-                // The song is this chart's choice; a length is every chart's, and undoes it here.
-                const charts = {
-                  ...settings.charts,
-                  [entry.id]: { ...choices, song: value === "song" },
-                };
-                change(
-                  value === "song"
-                    ? { ...settings, charts }
-                    : { ...settings, charts, minutes: value === "open" ? null : Number(value) },
-                );
-              }}
-            >
-              <option value="song">The song, once through</option>
-              {LENGTHS.map((minutes) => (
-                <option key={minutes ?? "open"} value={minutes ?? "open"}>
-                  {minutes === null ? "Until I stop it" : `About ${minutes} min`}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+          {/* The takes kept of this chart: performances of it, so this is where they are found. */}
+          {takes.length > 0 && (
+            <nav className="kept" aria-label="Kept takes of this chart">
+              <span>Kept takes</span>
+              <ul>
+                {takes.map((kept) => (
+                  <li key={kept.id}>
+                    <a href={`#/take/${kept.id}`}>{takeLabel(kept)}</a>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          )}
+        </>
       }
       band={
         <div className="band">

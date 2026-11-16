@@ -27,6 +27,8 @@ interface Props {
   readonly preview: Plan;
   /** The screen's name, when it is not the chart's title. */
   readonly title?: string;
+  /** Where the way back goes, when it is not to the charts. */
+  readonly back?: { readonly href?: string; readonly label?: string; readonly said?: string };
   readonly reading: Reading;
   readonly read: (reading: Reading) => void;
   /** At the end of the header: the way to the editor. */
@@ -103,7 +105,8 @@ const READING_NAMES: Readonly<Record<Reading, readonly [shown: string, said: str
 };
 
 export function Stage(props: Props) {
-  const { jam, call, chart, preview, title, reading, read, side, before, band, aside } = props;
+  const { jam, call, chart, preview, title, back, reading, read, side, before, band, aside } =
+    props;
   const [focus, setFocus] = useState(false);
 
   const idle = jam.phase === "idle";
@@ -157,7 +160,7 @@ export function Stage(props: Props) {
   return (
     <main className={`play${playing ? " playing" : ""}`}>
       <header className="bar-top">
-        <Back />
+        <Back {...back} />
         <h1>{title ?? shown.title}</h1>
         {side}
       </header>

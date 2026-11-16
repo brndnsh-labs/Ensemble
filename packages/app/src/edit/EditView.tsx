@@ -126,7 +126,7 @@ export function EditView({ entry, reading, style: chosen }: Props) {
             >
               Export
             </button>
-            <button type="button" onClick={remove}>
+            <button type="button" className="danger" onClick={remove}>
               Delete
             </button>
           </div>

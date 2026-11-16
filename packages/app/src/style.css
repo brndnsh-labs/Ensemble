@@ -89,14 +89,119 @@ fieldset {
   outline-offset: 2px;
 }
 
-/* ── The library ─────────────────────────────────────────────────────────── */
+/* ── A choice in a box ───────────────────────────────────────────────────── */
+
+/* A choice with its name written inside its own box, small, over what is chosen: the box
+   says what it is without a line of labels over the row. */
+.field {
+  position: relative;
+  display: block;
+  min-width: 0;
+  height: 48px;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--round);
+}
+
+.field > span:first-child {
+  position: absolute;
+  top: 6px;
+  right: 11px;
+  left: 11px;
+  overflow: hidden;
+  color: var(--faint);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.field select,
+.field input {
+  width: 100%;
+  height: 100%;
+  padding: 17px 11px 0;
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  /* Sixteen pixels or more, or a phone zooms the page in when the box is touched. */
+  font-size: 1rem;
+  font-stretch: 90%;
+  font-weight: 650;
+  text-overflow: ellipsis;
+}
+
+.field select {
+  padding-right: 30px;
+  appearance: none;
+  cursor: pointer;
+}
+
+/* The browser's own arrow is different on every device; this one is the page's. */
+.field.pick::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 13px;
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-70%) rotate(45deg);
+  pointer-events: none;
+}
+
+.field :focus-visible {
+  outline: none;
+}
+
+.field:has(select:focus-visible, input:focus-visible) {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.field.tempo > span:first-child {
+  text-align: center;
+}
+
+.stepper {
+  display: flex;
+  align-items: stretch;
+  height: 100%;
+}
+
+.stepper button {
+  flex: none;
+  width: 46px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--round);
+  background: none;
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+
+.stepper output {
+  flex: 1;
+  min-width: 2.6em;
+  padding-top: 21px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-align: center;
+}
+
+/* ── The home screen ─────────────────────────────────────────────────────── */
 
 .library {
   max-width: 44rem;
   margin: 0 auto;
-  padding: calc(28px + env(safe-area-inset-top)) var(--gutter) 64px;
+  padding: calc(28px + env(safe-area-inset-top)) max(var(--gutter), env(safe-area-inset-right)) 64px
+    max(var(--gutter), env(safe-area-inset-left));
 }
 
+/* The one loud thing on the screen: the name, as tall and narrow as a poster's. */
 .masthead h1 {
   margin: 0;
   font-size: clamp(3.6rem, 17vw, 6.5rem);
@@ -111,47 +216,12 @@ fieldset {
   color: var(--faint);
 }
 
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 18px;
-}
-
-.actions button,
-.actions label {
-  display: inline-flex;
-  align-items: center;
-  height: 40px;
-  padding: 0 14px;
-  border: 1.5px solid var(--ink);
-  border-radius: 6px;
-  background: none;
-  font-size: 0.95rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.actions button {
-  background: var(--ink);
-  color: var(--paper);
-}
-
-/* The file picker is the label; the browser's own control stays out of sight. */
-.actions input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-}
-
-.actions label:focus-within {
-  outline: 2px solid var(--ink);
-  outline-offset: 2px;
+.shelf {
+  margin-top: 36px;
 }
 
 .shelf h2 {
-  margin: 34px 0 0;
+  margin: 0;
   padding-bottom: 6px;
   border-bottom: 2px solid var(--ink);
   font-size: 1rem;
@@ -165,10 +235,23 @@ fieldset {
 }
 
 .shelf li {
+  border-bottom: 1px solid var(--rule);
+}
+
+.shelf-note {
+  margin: 12px 0 0;
+  color: var(--faint);
+}
+
+.shelf-note p {
+  margin: 0 0 10px;
+}
+
+/* A line of a shelf: the name opens it, the round button plays it. */
+.tune-line {
   display: flex;
   align-items: center;
-  gap: 12px;
-  border-bottom: 1px solid var(--rule);
+  gap: 10px;
 }
 
 .tune {
@@ -188,12 +271,17 @@ fieldset {
 }
 
 .tune-facts {
+  display: block;
+  margin-top: 2px;
   color: var(--faint);
   font-size: 0.875rem;
+  line-height: 1.3;
 }
 
 .tune-play {
+  display: grid;
   flex: none;
+  place-items: center;
   width: 46px;
   height: 46px;
   padding: 0;
@@ -206,14 +294,153 @@ fieldset {
   width: 20px;
   height: 20px;
   fill: currentColor;
-  vertical-align: middle;
 }
 
-.tune-play:hover,
 .tune-play:active {
   background: var(--marker);
   color: var(--on-marker);
   border-color: var(--on-marker);
+}
+
+/* What can be done to a chart of the player's own waits behind this word. */
+.tune-more {
+  flex: none;
+  height: var(--control);
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--round);
+  background: none;
+  color: var(--faint);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.tune-more[aria-expanded="true"] {
+  background: var(--wash);
+  color: var(--ink);
+}
+
+/* The plain controls of the home screen: outlines, as everywhere. */
+.actions button,
+.actions label,
+.tune-tools a,
+.tune-tools button,
+.shelf-note button {
+  display: inline-flex;
+  align-items: center;
+  height: var(--control);
+  padding: 0 14px;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--round);
+  background: none;
+  color: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+/* The file picker is the label; the browser's own control stays out of sight. */
+.actions input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.actions label:focus-within {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.tune-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 12px;
+}
+
+.tune-tools .field {
+  flex: 1 1 100%;
+}
+
+/* The one filled button of a few: what Enter does. */
+.tune-tools .first {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.tune-tools .first:disabled {
+  border-color: var(--rule);
+  background: var(--rule);
+  cursor: default;
+}
+
+/* What cannot be undone is the red pencil's. */
+.danger,
+.tune-tools .danger {
+  border-color: var(--pencil);
+  color: var(--pencil);
+}
+
+.tune-tools .danger {
+  margin-left: auto;
+}
+
+/* Finding a built-in chart: what to type, and which style. */
+.finder {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0 4px;
+}
+
+.finder .field {
+  flex: 1 1 auto;
+}
+
+.finder .field.pick {
+  flex: 0 0 9.5rem;
+}
+
+.finder input::placeholder {
+  color: var(--faint);
+  font-weight: 450;
+  opacity: 1;
+}
+
+/* A style and what is in it, before anything has been asked for: a tap opens it. */
+.style-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 12px;
+  align-items: baseline;
+  width: 100%;
+  padding: 11px 0;
+  border: 0;
+  background: none;
+  text-align: left;
+}
+
+.style-line .tune-facts {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.style-count {
+  color: var(--faint);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .colophon {
@@ -399,113 +626,54 @@ button[aria-pressed="true"] {
   padding: 0 var(--gutter) 10px;
 }
 
-/* A choice with its name written inside its own box, small, over what is chosen: the box
-   says what it is without a line of labels over the row. */
-.field {
-  position: relative;
-  display: block;
-  min-width: 0;
-  height: 48px;
-  border: 1.5px solid var(--ink);
-  border-radius: var(--round);
-}
-
-.field > span:first-child {
-  position: absolute;
-  top: 6px;
-  right: 11px;
-  left: 11px;
-  overflow: hidden;
-  color: var(--faint);
-  font-size: 0.6875rem;
-  font-weight: 600;
-  line-height: 1;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  pointer-events: none;
-}
-
-.field select,
-.field input {
-  width: 100%;
-  height: 100%;
-  padding: 17px 11px 0;
-  border: 0;
-  border-radius: inherit;
-  background: none;
-  /* Sixteen pixels or more, or a phone zooms the page in when the box is touched. */
-  font-size: 1rem;
-  font-stretch: 90%;
-  font-weight: 650;
-  text-overflow: ellipsis;
-}
-
-.field select {
-  padding-right: 30px;
-  appearance: none;
-  cursor: pointer;
-}
-
-/* The browser's own arrow is different on every device; this one is the page's. */
-.field.pick::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  right: 13px;
-  width: 7px;
-  height: 7px;
-  border-right: 2px solid currentColor;
-  border-bottom: 2px solid currentColor;
-  transform: translateY(-70%) rotate(45deg);
-  pointer-events: none;
-}
-
-.field :focus-visible {
-  outline: none;
-}
-
-.field:has(select:focus-visible, input:focus-visible) {
-  outline: 2px solid var(--ink);
-  outline-offset: 2px;
-}
-
-.field.tempo > span:first-child {
-  text-align: center;
-}
-
-.stepper {
-  display: flex;
-  align-items: stretch;
-  height: 100%;
-}
-
-.stepper button {
-  flex: none;
-  width: 46px;
-  padding: 0;
-  border: 0;
-  border-radius: var(--round);
-  background: none;
-  font-size: 1.3rem;
-  font-weight: 600;
-}
-
-.stepper output {
-  flex: 1;
-  min-width: 2.6em;
-  padding-top: 21px;
-  font-weight: 650;
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-  text-align: center;
-}
-
 .setup .field {
   flex: 1 1 calc(50% - 4px);
 }
 
 .setup .field.tempo {
   flex: 0 0 136px;
+}
+
+/* The takes kept of this chart, in a line that scrolls sideways if there are many. */
+.kept {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 0 var(--gutter) 10px;
+}
+
+.kept > span {
+  flex: none;
+  color: var(--faint);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.kept ul {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 2px;
+  overflow-x: auto;
+  list-style: none;
+  scrollbar-width: none;
+}
+
+.kept a {
+  display: inline-flex;
+  align-items: center;
+  height: var(--control);
+  padding: 0 12px;
+  border: 1.5px solid var(--rule);
+  border-radius: var(--round);
+  color: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-decoration: none;
+  white-space: nowrap;
 }
 
 /* Who is in the band: under the chart, where it stays while the band plays. */
@@ -1108,10 +1276,8 @@ button[aria-pressed="true"] {
   border-radius: 6px;
 }
 
-.tools button:last-child {
+.tools .danger {
   margin-left: auto;
-  border-color: var(--pencil);
-  color: var(--pencil);
 }
 
 .pane-text .problem {
