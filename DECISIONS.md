@@ -1381,3 +1381,52 @@ Brandon, 2026-11-16: "i opened a genre, then opened a chart, and when leaving th
 - **Home comes back where it was left**, not at its top: the list he opened the chart from is the list he returns to.
 - The back arrow's word is hidden on a phone only in a screen's top bar, where the title needs the room; the credits page shows "Charts" beside its arrow now.
 - A stopgap: the study of the app's structure (`prompts/app-look-study.md`) makes a style its own page.
+
+## the poster wall, part 1 (stage 6)
+
+Built to `prompts/app-poster-wall-1.md`: the look of the study's direction A, home, one library, and the way back. Nothing in the engine, the styles or the audio package changed. What that brief did not settle:
+
+**The library**
+
+- **Every chart in one list is by title**, the way a person reads one ("8-Bar Blues" before "12-Bar Blues", capitals aside). Grouped by style would be the eight style pages end to end, which the strip already gives; by title is the one view that finds a tune by its name. One style's charts are by title too. The player's own (`#/charts/yours`) stay the one changed last first, as on home.
+- **A search is a fourth thing the library shows, across everything, and it is in the address** (`#/charts?find=minor`). It is not a filter on what was showing: typed while Jazz is showing, it still looks everywhere. So what was found is still there on coming back from a chart, and after a reload. The first letter is one step in the browser's history (the back gesture undoes the search) and the letters after it are the same step. Emptying the box shows every chart.
+- **The search box on home and the one in the library are one box** (`Browse.tsx`): the first letter typed on home turns the screen into the library showing what was found, and the caret and the phone's keyboard stay in it. The box does move, from under the name to the bar at the top.
+- **In the library the search box is in the pinned bar beside `‹ Home`**, not on a line of its own: it is there however far a list of fifty is scrolled, and a style's page spends no height on it. The style's name joins the bar once its poster is scrolled past, only from 600 px wide; on a phone the bar's ink says which style it is.
+- **The strip is a small wall: All, Yours, and a bill for each style, wrapped onto as many rows as it needs** (two on a phone), directly under the bar and above what is being shown. Wrapped, not a row that scrolls sideways: every place is in view and one tap away. Above the poster, not under it: the posters are different heights, and the strip stays under the finger from one style to the next. The style being shown has the press ink's frame; All and Yours are filled when shown.
+- **While a search is showing, the strip is not**: none of its places is the one being shown, and a phone's keyboard has half the screen. Clear (or "Show every chart" where nothing matched) is the way out to it.
+- **A chart's mark is its play button, printed in the ink of the style it was written for, and the style's name in its line.** One of the player's own says "Yours" in a small box wherever the list holds built-in charts too, and has its actions behind More in every list it is in, not only on home.
+- **A chart that names no style, or one this version does not have, has a grey-violet ink** (`--ink-other`), is in All, Yours and what a search finds, and is under no style. `#/charts/<a style that is not there>` shows every chart.
+- **The inks are in the stylesheet**, as tokens at its top (`--ink-blues` …) and one line each that gives the ink to anything marked `data-style`. That is the table by style id; a style with no line gets `--ink-other`. The line about how a style sounds (`posters.ts`, taken from the study) is by style id too, and a style without one has none. A style's band is read from its pack: each instrument is named by its own pack's `pack.json`, so the wall says "clean electric guitar" where the study's own table said "clean guitar".
+
+**Home**
+
+- **The poster is the last thing played as it was played**: in the style, key and tempo chosen for it on its own screen, since that is what its Play starts, and in that style's ink. A take played says it is a take, when it was kept and how long it runs. The two things played before it are the smaller bills (style, key and tempo); one alone is as wide as the poster.
+- **Home lists every chart of the player's own**, as before. The way to the whole library is a block of the app's own ink under them: "All 54 charts".
+- **Takes is an address** (`#/takes`), so the row of places over a take has somewhere to go and the back gesture returns to it. Every kept take is listed there, with or without its chart; home's shelf of "takes of charts no longer here" is gone with the need for it. A chart's own screen still lists its takes.
+- **The wall's heading counts the styles in words** ("Eight styles"), and each bill counts the charts written for its style, the player's own included.
+
+**The way back**
+
+- **The row is `‹ Home`, then the place the screen belongs under.** A chart: the style its text names (not the style it is being played in), as that style's bill; with no style, "Charts". A take: "Takes". Credits: `‹ Home` alone.
+- **The editor's row is its chart's row**, `‹ Home / <STYLE>` or `‹ Home / Charts`: the editor is beside its chart, not under it. On a phone held upright the second place is left out, because the same row holds the chart's name, Undo, Redo and Play, and Play is the way to the chart.
+- **A take's screen no longer goes back to its chart**; it goes to Takes. The chart is a word at the end of the take's top row, "Open its chart", where a chart's screen has Edit. A take deleted leaves for Takes.
+- **Coming back is to where the page was** (`Browse.tsx`): home from anywhere; a part of the library when it is come up to from a chart, a take, the editor or credits, or reached by the browser's back or forward. A part of the library gone to afresh, from the wall, the strip or a search, starts at its top. The browser's own scroll restoring is switched off, since each address is a different page in one document.
+- **How an address was reached is told by a mark on the history entry** (`address.ts`): the app marks every entry it has shown, so an entry already marked was come back to.
+
+**The chart's screen, the take's, the editor: the look only**
+
+- **The chart's name is on a line of its own under the row of places.** The row, with "Edit a copy" at its end, leaves no room for it on a phone. It costs the chart about 30 px there until the next brief rebuilds the screen.
+- **Play is a block of the ink of the style the band will play in**, as wide as its row has room for, and Stop is the same block in the app's ink. The study's Stop is the press ink on a dock flooded with the style's ink; with no flooded dock that would be the style's colour as type on dark paper, which the palette rules out. The editor's Play is in the ink of the style the chart will be played in.
+- **Edit, Edit a copy and Open its chart are words at the end of the row, not boxes**, as the study has Edit and More.
+- **Corners are square throughout** (the editor's dock, its keys and panels, the arrangement's cells), outlines are 2 px, and the one round thing is a line's play button. The highlighter's stroke keeps its own shape.
+
+**The look**
+
+- **A style's name is fitted by the stylesheet from one number**, its width in ems, measured once for each name after the type's own letters are in (`PosterName.tsx`); until they are, the width is a guess of 0.49 em a letter, so a name is not set at a size worked out for other letters.
+- **A press on a block of colour is the colour a shade darker (mixed with the press ink), with no transition and no filter.** The stylesheet has no transition and no animation; the only movement in the app is the chart's page following the band, which was there and is off under reduced motion.
+- **The page listens for touches and does nothing with them** (`main.tsx`), so that Safari on a phone shows `:active`. Not seen on a phone.
+- **`out/wall-1/`** (the pictures of this part) is ignored by git.
+
+**Tests**
+
+- **Smoke journey 1** looks for the wall's Jazz as a link (it was a button that filtered home), fills the search box by its new name ("Find a chart"), and also sees the way home at the top of what was found, which is the library. **Journey 5** leaves the chart by the row of places (`Home`, in the navigation "Where you are") where it pressed "Back to the charts", and comes back through the poster at the top of home where it came through Recent. Journeys 2, 3 and 4 are as they were. Nothing was added.
