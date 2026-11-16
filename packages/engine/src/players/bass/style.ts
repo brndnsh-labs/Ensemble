@@ -418,6 +418,18 @@ export interface LeadInPolicy {
    * decided from there. Without this such a leap is bridged by a lead-in.
    */
   readonly throughOctave?: boolean;
+  /**
+   * A held note that is already the next chord's bass note is played as
+   * written, and the root arrives on the note the line has just left: a
+   * root-and-fifth line's fifth on beat 3 is its fifth whatever follows
+   * (ST-acoustic-12: energy adds notes, never harmony). A lead-in still splits
+   * it when the coin says so, and a note in the lead-in's own place always
+   * gives way to one, by the weights below: the arrival is never sounded a beat
+   * early. Left out, it is not heard early at all (BA-34): a held note is split
+   * by a lead-in or traded for the chord's third, and a note in the lead-in's
+   * place becomes the half step below.
+   */
+  readonly playsNextRoot?: boolean;
   /** The weight of each kind by how the bass note moves. All zero: never lead into that move (BA-11). */
   readonly kinds: Readonly<Record<RootMotion, Readonly<Record<LeadInKind, number>>>>;
 }

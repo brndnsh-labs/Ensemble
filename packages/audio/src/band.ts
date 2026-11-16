@@ -11,7 +11,11 @@ import { Scheduler, type SchedulerCount } from "./schedule.ts";
 
 /** Which packs a band plays, and the mixer channel each one sounds in. */
 export interface BandSetup {
-  /** Pack id to mixer channel. */
+  /**
+   * Pack to mixer channel. A key is a pack's id, or `name:id` for a pack that
+   * sits in a second channel too (a guitar comping and the same guitar
+   * soloing): the whole key is then the name its sounds are sent to.
+   */
   readonly packs: Readonly<Record<string, string>>;
   /** The folder the packs' folders are in. */
   readonly packsUrl: string;
@@ -35,12 +39,15 @@ export async function assemble(context: BaseAudioContext, setup: BandSetup): Pro
   const base = setup.packsUrl.endsWith("/") ? setup.packsUrl : `${setup.packsUrl}/`;
   let decodedBytes = 0;
   await Promise.all(
-    Object.entries(setup.packs).map(async ([id, channel]) => {
+    Object.entries(setup.packs).map(async ([name, channel]) => {
+      // The pack's folder is its id, whatever name it plays under.
+      const id = name.slice(name.indexOf(":") + 1);
       const loaded = await loadPack(context, base + id, setup.load);
       for (const { buffer } of loaded.recordings.values()) {
         decodedBytes += buffer.length * buffer.numberOfChannels * 4;
       }
-      sampler.add(loaded, mixer.input(channel));
+      const seated = name === id ? loaded : { ...loaded, pack: { ...loaded.pack, id: name } };
+      sampler.add(seated, mixer.input(channel));
     }),
   );
   return { sampler, mixer, decodedBytes };

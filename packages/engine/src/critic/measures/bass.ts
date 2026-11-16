@@ -182,6 +182,19 @@ function onTheChord(take: Take, note: NoteEvent): boolean | null {
   return chordTones(chord.quality).some((tone) => mod12(root + tone.interval) === pc);
 }
 
+/** Whether a note is its chord's bass note (the root, or a slash bass) or its fifth. Null under no chord. */
+function rootOrFifth(take: Take, note: NoteEvent): boolean | null {
+  const chord = chordAt(take, note.tick);
+  if (!chord) return null;
+  const pc = mod12(note.pitch);
+  const fifth = chordTones(chord.quality).find((tone) => tone.role === "fifth")?.interval ?? 7;
+  return (
+    pc === pitchClass(chord.bass ?? chord.root) ||
+    pc === pitchClass(chord.root) ||
+    pc === mod12(pitchClass(chord.root) + fifth)
+  );
+}
+
 /**
  * The bass's moves, stretch by stretch: each run of bars past the quiet level
  * played one after another is a stretch, and a move is one pitched note
@@ -501,6 +514,68 @@ const idiomMeasures: readonly Measure[] = [
       const lengths: number[] = [];
       for (const bar of musicBars(take)) {
         if (bar.ending) continue;
+        for (const note of notesIn(bass, bar)) lengths.push(note.duration / STEP);
+      }
+      return mean(lengths);
+    },
+  },
+  {
+    id: "bass.roots-and-fifths",
+    seat: "bass",
+    idiom: true,
+    says: "On beats 1 and 3 the bass plays the chord's root or its fifth: a line that adds notes as the band comes up, never harmony.",
+    unit: "share",
+    of(take) {
+      const bass = notesOf(take, "bass");
+      let strong = 0;
+      let plain = 0;
+      for (const bar of musicBars(take)) {
+        if (bar.ending || bar.meter.beats !== 4 || bar.meter.unit !== 4) continue;
+        for (const note of notesIn(bass, bar)) {
+          const at = note.tick - bar.start;
+          if (at !== 0 && at !== 2 * PPQ) continue;
+          const tone = rootOrFifth(take, note);
+          if (tone === null) continue;
+          strong++;
+          if (tone) plain++;
+        }
+      }
+      return share(plain, strong);
+    },
+  },
+  {
+    id: "bass.passing-tones",
+    seat: "bass",
+    idiom: true,
+    says: "A few notes are neither the root nor the fifth: a step on the last beat into a new root, and nothing else.",
+    unit: "share",
+    of(take) {
+      const bass = notesOf(take, "bass");
+      let notes = 0;
+      let passing = 0;
+      for (const bar of musicBars(take)) {
+        if (bar.ending) continue;
+        for (const note of notesIn(bass, bar)) {
+          const tone = rootOrFifth(take, note);
+          if (tone === null) continue;
+          notes++;
+          if (!tone) passing++;
+        }
+      }
+      return share(passing, notes);
+    },
+  },
+  {
+    id: "bass.note-length-quiet",
+    seat: "bass",
+    idiom: true,
+    says: "When the band is quiet the bass lets its notes ring into the next: a half note or longer on average, in sixteenths.",
+    unit: "ratio",
+    of(take) {
+      const bass = notesOf(take, "bass");
+      const lengths: number[] = [];
+      for (const bar of musicBars(take)) {
+        if (bar.ending || bassTier(bar) !== "low") continue;
         for (const note of notesIn(bass, bar)) lengths.push(note.duration / STEP);
       }
       return mean(lengths);

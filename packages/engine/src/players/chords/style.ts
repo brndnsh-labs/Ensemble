@@ -217,8 +217,9 @@ export interface PlainRhythm {
  * - `bass`: the grip's lowest string
  * - `alternate`: the chord's fifth as an alternating thumb plays it: a string
  *   under the bass at the same fret (a fourth below: C3 with G2 under it, A2
- *   with the open E) where the hand can hold that with the grip, or else the
- *   lowest fifth in the grip above the bass
+ *   with the open E) where the hand can hold that with the grip; or else the
+ *   fifth on one of the two strings over the bass (E2 with B2); and with no
+ *   fifth there, the bass again
  * - `upper`: the next string of the grip above those two
  *
  * and each finger one: `1`, `2`, `3` are the grip's strings counted from the

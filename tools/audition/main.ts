@@ -71,14 +71,19 @@ async function perform(): Promise<Performance> {
   const packOf = (seat: Seat, voice: string | undefined): string =>
     swapped.get(seat) ?? (seat === "solo" ? (voice ?? "") : style.sound.packs[seat]);
   const sounds: Sound[] = [];
+  // Each instrument by the name its sounds are sent to, and the seat whose channel it sounds
+  // in. A pack two seats play (a guitar comping and the same guitar soloing) is two
+  // instruments: the second seat to ask for it names its own `seat:pack`.
   const wanted = new Map<string, Seat>();
+  const nameOf = (seat: Seat, pack: string): string =>
+    (wanted.get(pack) ?? seat) === seat ? pack : `${seat}:${pack}`;
   // Notes written by hand, to be heard over the take (or alone, with `only=`): a file of
   // timed notes, each with its seat. For studying one sound, not for playing a tune.
   const written = params.get("notes");
   const extra: TimedNote[] = written ? await (await fetch(written)).json() : [];
   for (const note of [...timedNotes(take.plan, take.events), ...extra]) {
     if (only && !only.includes(note.seat)) continue;
-    const pack = packOf(note.seat, note.voice);
+    const pack = nameOf(note.seat, packOf(note.seat, note.voice));
     wanted.set(pack, note.seat);
     sounds.push({
       at: note.at,
@@ -94,8 +99,9 @@ async function perform(): Promise<Performance> {
   sounds.sort((a, b) => a.at - b.at);
   const packs: Record<string, string> = {};
   const missing: string[] = [];
-  for (const [pack, seat] of wanted) {
-    if (available.includes(pack)) packs[pack] = seat;
+  for (const [name, seat] of wanted) {
+    const pack = name.slice(name.indexOf(":") + 1);
+    if (available.includes(pack)) packs[name] = seat;
     else missing.push(`${seat}: no pack "${pack}"`);
   }
   const layers = $<HTMLSelectElement>("layers").value;

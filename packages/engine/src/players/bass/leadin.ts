@@ -192,7 +192,11 @@ function leadInTo(request: LeadInRequest): LeadIn | null {
       // heard early (BA-34). A box note becomes the half step below. A held note (the
       // two-feel's fifth, going from the IV home) is split by a lead-in if the bassist was
       // going to play one anyway, and otherwise traded for the chord's third.
-      if (replaces) kind = "below";
+      // A line that plays its note whatever follows (a root and fifth, ST-acoustic-12) keeps
+      // a held one unless the bassist was going to lead in, and leads in as it usually does
+      // from one in the lead-in's own place: the arrival is still never sounded a beat early.
+      if (replaces) kind = policy.playsNextRoot ? (draw() ?? "below") : "below";
+      else if (policy.playsNextRoot) kind = coin() ? (draw() ?? "below") : null;
       else if (request.third === null || coin()) kind = draw() ?? "below";
       else return { how: "replace", index, pitch: request.third, chosen: false };
     } else if (apart <= 2) {

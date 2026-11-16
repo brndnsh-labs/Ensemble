@@ -7,7 +7,7 @@ import { arrivals } from "../../perform/harmony.ts";
 import type { NoteEvent } from "../../perform/notes.ts";
 import type { PlanBar } from "../../plan/types.ts";
 import { fingerings, positionOf } from "../../players/chords/guitar.ts";
-import { MUTED } from "../../players/chords/strike.ts";
+import { MUTED, PICKED } from "../../players/chords/strike.ts";
 import { LOW_LIMITS, RUB_FLOOR } from "../../players/chords/voicing.ts";
 import type { StylePack } from "../../style/types.ts";
 import type { Take } from "../../take.ts";
@@ -30,12 +30,13 @@ interface Struck {
  * chord a strike plays is the one written under it, unless it is struck in
  * the eighth before a change and is still sounding there: then it is the
  * chord coming, played early (X-B-07). A scratch is a stroke of the rhythm and
- * states no chord, so it is not a strike.
+ * states no chord, so it is not a strike; nor is a plucked string, which is one
+ * note of a grip: a voicing is read where the hand strums it.
  */
 function strikes(take: Take): Struck[] {
   const byTick = new Map<number, { pitches: number[]; ends: number }>();
   for (const note of notesOf(take, "chords")) {
-    if (note.voice === MUTED) continue;
+    if (note.voice === MUTED || note.voice === PICKED) continue;
     const hit = byTick.get(note.tick) ?? { pitches: [], ends: 0 };
     hit.pitches.push(note.pitch);
     hit.ends = Math.max(hit.ends, note.tick + note.offset + note.duration);

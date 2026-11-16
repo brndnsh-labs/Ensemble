@@ -11,9 +11,10 @@ import { PPQ } from "../../chart/types.ts";
 import { energyGain } from "../../perform/feel.ts";
 import { arrivals, sameChord } from "../../perform/harmony.ts";
 import type { PlanBar } from "../../plan/types.ts";
+import { fingering, fretsOf } from "../../players/chords/guitar.ts";
 import type { BarRhythm } from "../../players/chords/rhythm.ts";
 import { alike, barRhythm, samePhrase } from "../../players/chords/rhythm.ts";
-import { MUTED } from "../../players/chords/strike.ts";
+import { MUTED, PICKED } from "../../players/chords/strike.ts";
 import { GHOST_BELOW } from "../../players/drums/kit.ts";
 import type { StylePack, Tier } from "../../style/types.ts";
 import { tierOf } from "../../style/types.ts";
@@ -48,6 +49,10 @@ interface Hit {
   readonly pitches: readonly number[];
   /** A scratch: the stroke with the notes deadened. It keeps the time and states no chord. */
   readonly muted: boolean;
+  /** A plucked string (or two): one note of the grip, not a chord struck. */
+  readonly picked: boolean;
+  /** Strummed upward: the highest string sounds first. */
+  readonly up: boolean;
   /** How hard, as played: the loudest of its notes. */
   readonly level: number;
 }
@@ -61,7 +66,7 @@ interface Phrase {
 interface Reading {
   /** The bars the piano comps in: 4/4, playing, short of the ending bar. */
   readonly bars: readonly PlanBar[];
-  /** The chords struck in each bar. A scratch is not one of them. */
+  /** The chords struck in each bar. A scratch is not one of them, nor a plucked string. */
   readonly hits: ReadonlyMap<number, readonly Hit[]>;
   /** Every stroke of the hand in each bar, scratches too. On a keyboard these are the hits. */
   readonly strokes: ReadonlyMap<number, readonly Hit[]>;
@@ -87,15 +92,29 @@ function read(take: Take): Reading {
       bar.meter.unit === 4,
   );
   const byTick = new Map<number, Hit>();
+  // Where the lowest and the highest note of each stroke sound, to read which way it rolled.
+  const rolled = new Map<number, { low: number; lowAt: number; high: number; highAt: number }>();
   for (const note of notesOf(take, "chords")) {
     const ends = note.tick + note.offset + note.duration;
     const hit = byTick.get(note.tick);
+    const roll = rolled.get(note.tick);
+    const low = !roll || note.pitch < roll.low;
+    const high = !roll || note.pitch > roll.high;
+    const across = {
+      low: low ? note.pitch : roll.low,
+      lowAt: low ? note.offset : roll.lowAt,
+      high: high ? note.pitch : roll.high,
+      highAt: high ? note.offset : roll.highAt,
+    };
+    rolled.set(note.tick, across);
     byTick.set(note.tick, {
       tick: note.tick,
       ends: Math.max(hit?.ends ?? 0, ends),
       length: Math.max(hit?.length ?? 0, note.duration),
       pitches: [...(hit?.pitches ?? []), note.pitch],
       muted: note.voice === MUTED,
+      picked: note.voice === PICKED,
+      up: across.highAt < across.lowAt,
       level: Math.max(hit?.level ?? 0, note.velocity),
     });
   }
@@ -112,7 +131,7 @@ function read(take: Take): Reading {
   const rhythm = new Map<number, BarRhythm>();
   for (const bar of bars) {
     const own = struck.filter((hit) => hit.tick >= bar.start && hit.tick < bar.start + bar.ticks);
-    const sounded = own.filter((hit) => !hit.muted);
+    const sounded = own.filter((hit) => !hit.muted && !hit.picked);
     strokes.set(bar.index, own);
     hits.set(bar.index, sounded);
     rhythm.set(
@@ -485,6 +504,72 @@ export const compingMeasures: readonly Measure[] = [
       return share(all.filter((stroke) => stroke.muted).length, all.length);
     },
   },
+  // ── a hand that picks ──
+  // A guitar that fingerpicks when the band is quiet and strums when it is not: the level
+  // chooses the right hand, and a section keeps its choice (CH-32, ST-acoustic-17).
+  {
+    id: "chords.picked-quiet",
+    seat: "chords",
+    idiom: true,
+    says: "When the band is quiet the guitar fingerpicks: the share of its bars in which every stroke is a plucked string.",
+    unit: "share",
+    of: (take) => pickedBars(take, (tier) => tier === "low"),
+  },
+  {
+    id: "chords.picked-working",
+    seat: "chords",
+    idiom: true,
+    says: "At the working level some sections are picked and more are strummed: the share of the guitar's bars in which every stroke is a plucked string.",
+    unit: "share",
+    of: (take) => pickedBars(take, (tier) => tier === "mid"),
+  },
+  {
+    id: "chords.picked-hot",
+    seat: "chords",
+    idiom: true,
+    says: "When the band is hot the guitar strums: hardly a bar is picked.",
+    unit: "share",
+    of: (take) => pickedBars(take, (tier) => tier === "high"),
+  },
+  {
+    id: "chords.upstrokes",
+    seat: "chords",
+    idiom: true,
+    says: "A strummed part breathes down and up: between a third and a half of its strums come up, catching the top of the chord.",
+    unit: "share",
+    of(take) {
+      const strums = strokesAt(take, () => true).filter(
+        (stroke) => !stroke.picked && !stroke.muted && stroke.pitches.length > 1,
+      );
+      return share(strums.filter((stroke) => stroke.up).length, strums.length);
+    },
+  },
+  {
+    id: "chords.open-strings",
+    seat: "chords",
+    idiom: true,
+    says: "An open-position guitar rings: a downstroke sounds an open string or two with the fretted ones, on average.",
+    unit: "ratio",
+    of(take, style) {
+      const guitar = style.chords.idiom;
+      if (guitar === "keys") return null;
+      const open = new Map<string, number>();
+      const counts: number[] = [];
+      for (const stroke of strokesAt(take, () => true)) {
+        if (stroke.picked || stroke.muted || stroke.up || stroke.pitches.length < 2) continue;
+        const pitches = [...stroke.pitches].sort((a, b) => a - b);
+        const key = pitches.join(" ");
+        let count = open.get(key);
+        if (count === undefined) {
+          const strings = fingering(guitar, pitches);
+          count = strings ? fretsOf(strings, pitches).filter((fret) => fret === 0).length : 0;
+          open.set(key, count);
+        }
+        counts.push(count);
+      }
+      return mean(counts);
+    },
+  },
   {
     id: "chords.short-stabs",
     seat: "chords",
@@ -639,6 +724,16 @@ function sameLine(a: Line, b: Line): boolean {
       .map((stroke) => `${stroke.at}${stroke.muted ? "~" : "x"}`)
       .join(" ");
   return body(a) === body(b);
+}
+
+/** Of the bars at the levels asked for that the hand plays in, the share where it only plucks. */
+function pickedBars(take: Take, at: (tier: Tier) => boolean): Measurement | null {
+  const { bars, strokes } = read(take);
+  const played = bars
+    .filter((bar) => at(tierAt(bar)))
+    .map((bar) => strokes.get(bar.index)!)
+    .filter((own) => own.length > 0);
+  return share(played.filter((own) => own.every((stroke) => stroke.picked)).length, played.length);
 }
 
 /** Every stroke of the hand in the bars at the levels asked for. */
