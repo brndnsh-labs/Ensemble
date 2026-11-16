@@ -22,6 +22,7 @@ import { drumKit } from "./recipes/drum-kit.ts";
 import { electricBass } from "./recipes/electric-bass.ts";
 import { electricPiano } from "./recipes/electric-piano.ts";
 import { grandPiano } from "./recipes/grand-piano.ts";
+import { nylonGuitar } from "./recipes/nylon-guitar.ts";
 import { uprightBass } from "./recipes/upright-bass.ts";
 import { vibraphone } from "./recipes/vibraphone.ts";
 import {
@@ -55,6 +56,7 @@ const RECIPES: readonly Recipe[] = [
   cleanGuitar,
   drivenGuitar,
   electricPiano,
+  nylonGuitar,
 ];
 
 const ROOT = join(import.meta.dirname, "..", "..");
