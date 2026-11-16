@@ -1077,3 +1077,13 @@ Read on the main thread: the planner and player diff (five optional fields and t
   Nothing in an engine was changed for either.
 - Not built, as the build said: the fast count (the planner would read written bars two for one at half the tempo), ST-reggae-04's drums in other meters (in 3/4 there is no drop), the keyboard double and the organ bubble, a horn's scoop. One of the notes' four solo endings is left out (it broke the breath in a short bar at a fast tempo).
 
+## the acoustic guitar is a steel-string archtop; the nylon stays (stage 6, part 5)
+
+Brandon heard the same picked and strummed part on three guitars (`scripts/steel-study.ts`, served from `out/steel-study/`): the nylon already cut, FreePats' FSS steel-string (a Seagull flat-top, GPL 3 with the FreePats exception for music made with it), and Karoryfer's Shinyguitar (an archtop through a microphone, CC0). 2026-11-15: "let's go with the archtop, it sounds pretty good and the license is nice", and "we should keep nylon as an option as well".
+
+- **`shinyguitar` is pinned** (`scripts/packs/sources.ts`, the microphone recordings only) and the cut is briefed in `prompts/cut-steel-guitar.md`: 16 notes at four dynamics, two alternates each. It waits for the acoustic build to report (one subagent at a time).
+- **The flat-top was not chosen**: the genre's own instrument, but shipping its samples in the app is distributing them under the GPL (the pack under the same terms, its licence text, the means to rebuild it to anyone who asks), and it has one dynamic for most notes.
+- **The acoustic style is being built on the nylon** and moves to the steel in one line when the pack is in (`sound.packs.chords`, and its soloist).
+- **Nylon as an option** needs something the app does not have: a seat's instrument chosen by the player where a style has more than one that plays the same part. The soloist already works this way (`SOLO_INSTRUMENTS`). Put to Brandon as a small piece of work for after acoustic is heard: a style lists the instruments its chord seat may be played on (the first is its own), and the band setup offers them where there is more than one.
+- **No manager for packs**: ten packs are 24 MB to download in all and a band loads only its own three or four. What a growing shelf does need is listed in `PLAN.md`.
+

@@ -159,6 +159,17 @@ export const SOURCES: readonly Source[] = [
     licenceFile: "SpanishClassicalGuitar-SFZ+FLAC-20190618/cc0.txt",
   },
   {
+    id: "shinyguitar",
+    title: "Shinyguitar",
+    author: "Karoryfer Samples",
+    repo: "https://github.com/sfzinstruments/karoryfer.shinyguitar",
+    commit: "57243cca85277dbcc120ce17c6178032f93c80f3",
+    licence: "CC0-1.0",
+    licenceFile: "LICENSE",
+    // The archtop through its microphone. The pickup's recordings (`Samples/electric`) are not used.
+    paths: ["Programs", "Samples/acoustic"],
+  },
+  {
     id: "emilyguitar",
     title: "Emilyguitar",
     author: "Karoryfer Samples",
