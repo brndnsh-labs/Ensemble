@@ -1,0 +1,8 @@
+title: Minor Reggae, One to Flat Seven, in E minor
+key: Em
+tempo: 80
+style: reggae
+
+// The minor one and the major chord a whole step under it, a bar each.
+[A]
+| Em | D |

@@ -1,0 +1,71 @@
+// Reggae: roots reggae in the slow count. The one drop, kick and cross-stick
+// together on beat 3 with nothing on the One; the guitar's skank chopping 2 and
+// 4; a deep bass with holes in it; and a horn laying back over the top. When
+// the band is hot the drummer plays one riddim for the whole performance,
+// steppers or rockers, and puts the kick back on the One (ST-reggae-01 to
+// ST-reggae-37).
+
+import { DEFAULT_ARC, DEFAULT_MIX, type StylePack } from "@ensemble/engine";
+import { reggaeBass } from "./bass.ts";
+import { reggaeChords } from "./chords.ts";
+import { reggaeCritic } from "./critic.ts";
+import { reggaeDrums } from "./drums.ts";
+import { reggaeSolo } from "./solo.ts";
+
+export const reggae: StylePack = {
+  id: "reggae",
+  name: "Reggae",
+  // ST-reggae-01: the slow count, about 60 to 90, 76 for the import and the loudness reference.
+  // A chart written in the fast count (the skank on every "and") is not read as such: it would
+  // play at twice the tempo it is written at.
+  tempo: { default: 76, min: 60, max: 90 },
+  feel: {
+    // Swing 20 on the sixteenths: the off-sixteenth at 53.3% of its pair (ST-reggae-02). The bass
+    // drags most, the chop a touch less so it stays crisp against the hat, the horn furthest
+    // back (ST-reggae-03).
+    swing: { unit: "sixteenth", amount: 20 },
+    lean: { bass: 8, chords: 5, solo: 12 },
+    humanize: 30,
+  },
+  arc: {
+    ...DEFAULT_ARC,
+    // The song-length arc at half depth: a plain chart's climax reaches about 0.65, so the build
+    // and the breath are heard in dynamics only (ST-reggae-34).
+    depth: 0.5,
+    // No build, arc or lift carries a section from the one drop into steppers or rockers, or
+    // back (ST-reggae-33).
+    liftsCrossHigh: false,
+  },
+  ending: {
+    // The plain triad, I or i (ST-reggae-31).
+    finalChord: { major: "", minor: "m", dominant: "" },
+    // The stop: a set-up fill, then bass and chord hit the One together for an eighth and the
+    // band drops out (ST-reggae-32).
+    gesture: { kind: "stop" },
+    setupFill: true,
+    tailBars: 0,
+  },
+  critic: reggaeCritic,
+  drums: reggaeDrums,
+  bass: reggaeBass,
+  chords: reggaeChords,
+  solo: reggaeSolo,
+  // Fingered electric bass and a clean electric guitar on the skank (ST-reggae-35).
+  instruments: { bass: 33, chords: 27 },
+  sound: {
+    packs: { drums: "drum-kit", bass: "electric-bass", chords: "clean-guitar" },
+    // Measured (`pnpm levels`), no ear yet. At the default mix the skank read 2 dB under the
+    // drums (short chops measure quiet, as funk's and disco's do), the band -19.9 LUFS and the
+    // alto 1.4 dB under it: the guitar comes up 3 dB as theirs does, the soloist a decibel, the
+    // master a decibel.
+    mix: {
+      ...DEFAULT_MIX,
+      seats: {
+        ...DEFAULT_MIX.seats,
+        chords: { ...DEFAULT_MIX.seats.chords, level: -3 },
+        solo: { ...DEFAULT_MIX.seats.solo, level: 2.5 },
+      },
+      master: DEFAULT_MIX.master + 1,
+    },
+  },
+};

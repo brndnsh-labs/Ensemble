@@ -128,6 +128,38 @@ test(
   },
 );
 
+// ── reggae ──────────────────────────────────────────────────────────────────
+
+test(
+  "reggae: the one drop: in every bar the kick lands on beat 3 with the cross-stick, or with the snare when the band is hot; below the hot level nothing kicks the One but an arrival crash, and hot the kick is back on it",
+  only("reggae"),
+  () => {
+    let bars = 0;
+    let hot = 0;
+    for (const { chart, options, take } of takes(in44("reggae"))) {
+      for (const { bar, kit, energy } of kitBars(take)) {
+        // The last bar is the stop: the drop's own pair moved onto the One.
+        if (bar.ending) continue;
+        const where = `${chart.file} seed ${options.seed} bar ${bar.index}`;
+        bars++;
+        const high = tierOf(energy) === "high";
+        assert.ok(strikes(kit, "kick", 8), `${where}: no kick on 3`);
+        assert.ok(
+          strikes(kit, high ? "snare" : "crossStick", 8),
+          `${where}: no ${high ? "snare" : "cross-stick"} on 3`,
+        );
+        if (high) {
+          hot++;
+          assert.ok(strikes(kit, "kick", 0), `${where}: hot, and no kick on the One`);
+        } else {
+          assert.ok(!strikes(kit, "kick", 0) || bar.crash, `${where}: a kick on the empty One`);
+        }
+      }
+    }
+    assert.ok(bars > enough(2000) && hot > enough(200), `only ${bars} bars, ${hot} of them hot`);
+  },
+);
+
 // ── jazz ────────────────────────────────────────────────────────────────────
 
 test(

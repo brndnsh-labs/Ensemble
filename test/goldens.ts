@@ -108,6 +108,21 @@ export const GOLDENS: readonly Golden[] = [
     style: "neosoul",
     options: { mode: "song", seed: 2 },
   },
+  // Reggae: three chords with a solo over them (the one drop, the riff's hole on the One kept
+  // across the barline, the skank, a change inside the bar).
+  {
+    file: "reggae-three-chord-d-solo.mid",
+    chart: "reggae-three-chord-d.chart",
+    style: "reggae",
+    options: { mode: "jam", passes: 4, seed: 1, solo: true },
+  },
+  // Reggae: the arranged song, in song mode (a breakdown for drums and bass alone, the stop).
+  {
+    file: "reggae-song-f.mid",
+    chart: "reggae-song-f.chart",
+    style: "reggae",
+    options: { mode: "song", seed: 2 },
+  },
 ];
 
 export const goldenUrl = (golden: Golden): URL =>

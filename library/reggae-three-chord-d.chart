@@ -1,0 +1,10 @@
+title: Three-Chord Reggae in D
+key: D
+tempo: 84
+style: reggae
+
+// The one, the four and the five over eight bars, the five and the four
+// sharing a bar on the way home.
+[A]
+| D | G | D   | A |
+| D | G | A G | D |

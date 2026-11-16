@@ -1,0 +1,9 @@
+title: Two-Chord Reggae Vamp in A minor
+key: Am
+tempo: 76
+style: reggae
+
+// The minor one and the major four, a bar each: the dorian vamp a roots band
+// can sit on all night.
+[A]
+| Am | D |

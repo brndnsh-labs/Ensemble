@@ -1,0 +1,42 @@
+title: Reggae Song in F
+key: F
+tempo: 76
+style: reggae
+
+// An intro on the four and the five, a verse on the one and the four, a
+// chorus that opens on the four, a breakdown on the minor six where the drums
+// and the bass play alone, and an outro that comes home.
+[Intro]
+| Bb | C | F | % |
+
+[Verse]
+| F | Bb | F | C |
+| F | Bb | C | F |
+
+[Chorus]
+| Bb | C | F | Dm |
+| Bb | C | F | %  |
+
+[Verse]
+
+[Chorus]
+
+[Breakdown]
+| Dm | C | Bb | C |
+| Dm | C | Bb | C |
+
+[Chorus]
+
+[Outro]
+| Bb | C | F | % |
+
+--- arrangement
+//         energy  drums  bass  chords  solo
+Intro      1       -      -     -       .
+Verse      2       -      -     -       .
+Chorus     3       -      -     -       .
+Verse      2       -      -     -       .
+Chorus     3       -      -     -       .
+Breakdown  2       -      -     .       .
+Chorus     3       -      -     -       -
+Outro      2       -      -     -       .
