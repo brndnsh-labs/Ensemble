@@ -137,6 +137,19 @@ export function compStrikes(
     return [first, held.fork("second").weighted(rest, (figure) => figure.weight)];
   });
 
+  // A figure written a second way for a bar with no bassist is played that way there: the
+  // plan says who is playing (CH-26).
+  const unaccompanied = new Map<CompFigure, CompFigure>();
+  const asPlayed = (bar: PlanBar, figure: CompFigure): CompFigure => {
+    if (figure.alone === undefined || bar.seats.bass !== null) return figure;
+    let known = unaccompanied.get(figure);
+    if (!known) {
+      known = { ...figure, name: `${figure.name}, alone`, grid: figure.alone };
+      unaccompanied.set(figure, known);
+    }
+    return known;
+  };
+
   // The chord the next bar opens on, where that is a change the piano plays into.
   const changeAfter = once((bar): Stretch | null => {
     const next = planBar(plan, bar.index + 1);
@@ -152,15 +165,18 @@ export function compStrikes(
   const pushAfter = once((bar): boolean => {
     if (!changeAfter(bar) || !comps(planBar(plan, bar.index + 1), chords)) return false;
     const last = own(bar).at(-1)!;
-    const figure = home(bar);
+    const figure = asPlayed(bar, home(bar));
     const tier = tierAt(bar);
     const reach = bar.ticks - EIGHTH;
     // A chord written for an eighth or less is played where it is written, never leaned past.
-    // A groove is played as written: it leans in only on a stroke it already has.
+    // A groove is played as written: it leans in only on a stroke it already has, and never on
+    // a scratch or a plucked string.
     const able =
       last.end - last.start > EIGHTH &&
       (!figure.groove ||
-        strokes(figure, tier).some((stroke) => stroke.at >= reach && !stroke.muted));
+        strokes(figure, tier).some(
+          (stroke) => stroke.at >= reach && !stroke.muted && !stroke.pluck,
+        ));
     return able && heldRng(rng, "push", "bar", bar).chance(chords.anticipation.barline[tier]);
   });
   const pushedInto = (bar: PlanBar) => {
@@ -193,7 +209,7 @@ export function compStrikes(
     figures: readonly CompFigure[],
   ): Strike[] =>
     bars.flatMap((bar) => {
-      const figure = figures[bar.phrase.bar]!;
+      const figure = asPlayed(bar, figures[bar.phrase.bar]!);
       const next = planBar(plan, bar.index + 1);
       const to = changeAfter(bar);
       let carry = 0;
@@ -201,7 +217,7 @@ export function compStrikes(
         // The next phrase always opens on its section's figure, so what a push lands on is
         // known before that phrase is chosen.
         const top = next.phrase.bar === 0;
-        const into = top ? home(next) : figures[next.phrase.bar]!;
+        const into = asPlayed(next, top ? home(next) : figures[next.phrase.bar]!);
         carry = landing(book, into, strokes(into, top ? tierAt(next) : tier), to);
       }
       const key = `${bar.index} ${figure.name} ${carry}`;

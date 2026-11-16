@@ -179,6 +179,10 @@ const ALTERATION_TONE: Readonly<Record<Alteration, FittedTone>> = {
   b13: { tone: "13", interval: 8 },
 };
 
+/** The alterations a chord's symbol writes, as semitones above its root: each is always heard. */
+export const alterationsOf = (chord: Chord): number[] =>
+  chord.quality.alterations.map((alteration) => ALTERATION_TONE[alteration].interval);
+
 /**
  * The voice to give up for a tone the chord needs: the root (the bass has it),
  * then a natural fifth, then colour the chart did not write, then a written

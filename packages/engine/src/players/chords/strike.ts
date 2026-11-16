@@ -3,6 +3,7 @@
 // strikes into notes. Each side knows only this file of the others.
 
 import type { Arrival } from "../../perform/harmony.ts";
+import type { PickPlace } from "./style.ts";
 import type { FittedTone } from "./tones.ts";
 
 /** One time the hand comes down: where, how long, how hard, and on what chord. */
@@ -35,6 +36,12 @@ export interface Strike {
    * a plain bar, the final chord (CH-74). A keyboard has no other way to play.
    */
   readonly down?: true;
+  /**
+   * The stroke is plucked: only these places of the grip sound, a string
+   * each, written with the voice `PICKED`. It is voiced like any strike, so
+   * the grip under it is the one a strum would sound.
+   */
+  readonly pluck?: readonly PickPlace[];
 }
 
 /**
@@ -44,6 +51,13 @@ export interface Strike {
  * patch gets a clipped, quiet stroke of the right chord and never a wrong note.
  */
 export const MUTED = "muted";
+
+/**
+ * The voice a plucked string is written with: one string of the grip sounded
+ * by a finger or the thumb, where a strum crosses them all. A sampler with a
+ * plucked sound plays it; any other plays the note plainly.
+ */
+export const PICKED = "picked";
 
 /**
  * Pitches for a strike, low to high, each with the tone of the chord it plays.
@@ -60,3 +74,21 @@ export interface VoicedStrike {
   readonly strike: Strike;
   readonly voicing: Voicing;
 }
+
+/**
+ * The lowest pitch each interval between neighbouring voices may stand on
+ * before it turns to mud (X-B-04), by its size in semitones.
+ */
+export const LOW_LIMITS: Readonly<Record<number, number>> = {
+  1: 52,
+  2: 51,
+  3: 48,
+  4: 46,
+  5: 46,
+  6: 47,
+  7: 34,
+  8: 43,
+  9: 41,
+  10: 41,
+  11: 41,
+};

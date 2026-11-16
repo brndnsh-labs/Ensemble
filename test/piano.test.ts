@@ -13,7 +13,15 @@ import {
   scaleHas,
   tierOf,
 } from "@ensemble/engine";
-import { blues, chordsUnder, harmonyOf, POCKET, type Strike, strikesOf } from "./reading.ts";
+import {
+  blues,
+  chordsUnder,
+  harmonyOf,
+  POCKET,
+  pluckedOf,
+  type Strike,
+  strikesOf,
+} from "./reading.ts";
 import {
   enough,
   FULL,
@@ -29,7 +37,8 @@ import {
 test("the piano stays in its register: nothing under the style's floor, nothing above E6, in every take", () => {
   let strikes = 0;
   for (const { style, chart, options, take } of [...takes(), ...stressTakes()]) {
-    for (const strike of strikesOf(take)) {
+    // A plucked string is held to the register as a chord is.
+    for (const strike of [...strikesOf(take), ...pluckedOf(take)]) {
       strikes++;
       const where = `${chart.file} seed ${options.seed} at tick ${strike.tick}`;
       assert.ok(strike.pitches[0]! >= style.chords.register.floor, `${where}: under the floor`);
@@ -68,7 +77,8 @@ test("a chord keeps its identity: every strike of two or more notes has the chor
 
 test("the piano plays nothing the harmony rules out: every note is a tone of its chord or of that chord's scale", () => {
   for (const { chart, options, take } of [...takes(), ...stressTakes()]) {
-    for (const strike of strikesOf(take)) {
+    // A plucked string is held to the harmony as a chord is.
+    for (const strike of [...strikesOf(take), ...pluckedOf(take)]) {
       const fits = chordsUnder(take, strike).some(({ chord, scale }) =>
         strike.pitches.every((pitch) => {
           const interval = (pitch - pitchClass(chord.root) + 120) % 12;
@@ -86,9 +96,10 @@ test("the piano plays nothing the harmony rules out: every note is a tone of its
   }
 });
 
-test("every chord the chart writes is struck: the piano plays each one within an eighth before it arrives, or while it sounds", () => {
+test("every chord the chart writes is struck: the piano plays each one within an eighth before it arrives, or while it sounds; a hand that is picking plucks a string of it while it sounds", () => {
   for (const { chart, options, take } of [...takes(), ...stressTakes()]) {
     const strikes = strikesOf(take);
+    const plucked = pluckedOf(take);
     const harmony = harmonyOf(take);
     harmony.forEach((arrival, i) => {
       const bar = take.plan.bars.find((candidate) => candidate.index === arrival.bar);
@@ -105,12 +116,15 @@ test("every chord the chart writes is struck: the piano plays each one within an
         .map((tone) => (pitchClass(chord.root) + tone.interval) % 12);
       // Struck by a chord that is this chord: any strike at all in the window would let the
       // chord before it, or a cluster of two chords, pass.
-      const struck = strikes.some(
-        (strike) =>
-          strike.tick >= arrival.tick - PPQ / 2 &&
-          strike.tick < until &&
-          guides.every((guide) => strike.pitches.some((pitch) => pitch % 12 === guide)),
-      );
+      // A picked chord is said a string at a time, never early, and no one string is the
+      // chord: that every one of them is a string of the chord's shape is its own property.
+      const struck =
+        strikes.some(
+          (strike) =>
+            strike.tick >= arrival.tick - PPQ / 2 &&
+            strike.tick < until &&
+            guides.every((guide) => strike.pitches.some((pitch) => pitch % 12 === guide)),
+        ) || plucked.some((note) => note.tick >= arrival.tick && note.tick < until);
       assert.ok(
         struck,
         `${chart.file} seed ${options.seed}: ${arrival.chord.text} in bar ${bar.index} never struck`,
@@ -120,13 +134,15 @@ test("every chord the chart writes is struck: the piano plays each one within an
 });
 
 test("one hand, one chord: a strike has stopped sounding before the next one starts", () => {
-  for (const { chart, options, take } of [...takes(), ...stressTakes()]) {
+  for (const { style, chart, options, take } of [...takes(), ...stressTakes()]) {
     const strikes = strikesOf(take);
+    // Two chords struck on the same tick would read as one strike: a hand has five fingers
+    // and plays no key twice; a guitar strums no more strings than its style holds.
+    const idiom = style.chords.idiom;
+    const most = idiom === "keys" ? 5 : Math.max(5, idiom.strings);
     for (const strike of strikes) {
-      // Two chords struck on the same tick would read as one strike: a hand has five fingers
-      // and plays no key twice.
       assert.ok(
-        strike.pitches.length <= 5 && new Set(strike.pitches).size === strike.pitches.length,
+        strike.pitches.length <= most && new Set(strike.pitches).size === strike.pitches.length,
         `${chart.file} seed ${options.seed} at tick ${strike.tick}: ${strike.pitches}`,
       );
     }
@@ -163,7 +179,7 @@ test("the piano's last chord is the final chord, struck once where it lands and 
       .map((note) => note.pitch);
     const sounding = new Set([...final[0]!.pitches, ...soloist]);
     assert.ok(sounding.size >= 3, `${where}: a thin final chord`);
-    const early = strikes.filter(
+    const early = [...strikes, ...pluckedOf(take)].filter(
       (strike) => strike.tick < landing && strike.ends > landing + POCKET,
     );
     assert.equal(early.length, 0, `${where}: a chord ringing into the final hit`);
@@ -409,26 +425,51 @@ const strummed = (jam: { style: (typeof STYLES)[number] }) => guitars.includes(j
 /** Standard tuning, low string first. */
 const OPEN = [40, 45, 50, 55, 59, 64];
 
-/** Whether a hand can hold these notes: a string each, neighbours, fretted 1 to 15, inside four frets. */
-function holdable(pitches: readonly number[]): boolean {
-  for (let low = 0; low + pitches.length <= OPEN.length; low++) {
-    const frets = pitches.map((pitch, i) => pitch - OPEN[low + i]!);
-    if (frets.some((fret) => fret < 1 || fret > 15)) continue;
-    if (Math.max(...frets) - Math.min(...frets) <= 3) return true;
-  }
-  return false;
+/**
+ * Whether a hand can hold these notes (low to high) on a guitar: a string each, pitch rising
+ * string to string, on neighbouring strings or with one muted inside the grip where the
+ * guitar allows that, nothing over the 15th fret, every fretted note inside four frets, and an
+ * open string only where the guitar plays them. `apart`: the notes are strings picked out of
+ * a shape, so any number of its strings may lie unplucked between them.
+ */
+function holdable(
+  pitches: readonly number[],
+  guitar: { readonly open: boolean; readonly skip: boolean },
+  apart = false,
+): boolean {
+  const place = (at: number, from: number, low: number, high: number, muted: boolean): boolean => {
+    if (at === pitches.length) return true;
+    for (let string = from; string < OPEN.length; string++) {
+      // A string passed over inside the grip is muted: one at most, where the guitar may.
+      const passed = at > 0 ? string - from : 0;
+      if (passed > 0 && !apart && (passed > 1 || muted || !guitar.skip)) break;
+      const fret = pitches[at]! - OPEN[string]!;
+      if (fret < (guitar.open ? 0 : 1) || fret > 15) continue;
+      const [lowest, highest] =
+        fret === 0 ? [low, high] : [Math.min(low, fret), Math.max(high, fret)];
+      if (highest - lowest > 3) continue;
+      if (place(at + 1, string + 1, lowest, highest, muted || passed > 0)) return true;
+    }
+    return false;
+  };
+  return place(0, 0, Infinity, -Infinity, false);
 }
 
-test("a guitar's chords can be held: every stroke is three or four notes, one to a string on neighbouring strings, inside a four-fret hand, none open and none over the 15th fret", {
+test("a guitar's chords can be held: every stroke is three notes or more and no more than the guitar has strings (four, where it grips three), one to a string, inside a four-fret hand, none over the 15th fret; on neighbouring strings and none open, unless the style's guitar may mute a string inside its grip or plays open strings", {
   skip: guitars.length === 0,
 }, () => {
   let strokes = 0;
-  for (const { chart, options, take } of [...takes(strummed), ...stressTakes(strummed)]) {
+  for (const { style, chart, options, take } of [...takes(strummed), ...stressTakes(strummed)]) {
+    const idiom = style.chords.idiom;
+    if (idiom === "keys") continue;
     for (const stroke of [...strikesOf(take), ...strikesOf(take, true)]) {
       strokes++;
       const where = `${chart.file} seed ${options.seed} at tick ${stroke.tick}: ${stroke.pitches}`;
-      assert.ok(stroke.pitches.length >= 3 && stroke.pitches.length <= 4, `${where}: the strings`);
-      assert.ok(holdable(stroke.pitches), `${where}: no hand holds this`);
+      assert.ok(
+        stroke.pitches.length >= 3 && stroke.pitches.length <= Math.max(4, idiom.strings),
+        `${where}: the strings`,
+      );
+      assert.ok(holdable(stroke.pitches, idiom), `${where}: no hand holds this`);
     }
   }
   assert.ok(strokes > enough(20000), `only ${strokes} strokes`);
@@ -440,7 +481,12 @@ test("a guitarist holds a grip: the notes under the hand change only where the c
   let moves = 0;
   let scratches = 0;
   let leant = 0;
-  for (const { chart, options, take } of [...takes(strummed), ...stressTakes(strummed)]) {
+  for (const { style, chart, options, take } of [...takes(strummed), ...stressTakes(strummed)]) {
+    const idiom = style.chords.idiom;
+    if (idiom === "keys") continue;
+    // A guitar whose upstroke catches only the top strings of its grip shows part of the
+    // shape there and the rest on the downstroke: that is one grip, not a move.
+    const partial = idiom.strum.up < idiom.strings;
     const harmony = harmonyOf(take);
     const strokes = [
       ...strikesOf(take).map((stroke) => ({ ...stroke, scratch: false })),
@@ -452,7 +498,8 @@ test("a guitarist holds a grip: the notes under the hand change only where the c
     for (const stroke of strokes) {
       const where = `${chart.file} seed ${options.seed} at tick ${stroke.tick}`;
       assert.ok(stroke.tick >= ringing, `${where}: stroked over a chord that was leant into`);
-      const held = stroke.pitches.every((pitch) => grip.includes(pitch));
+      const more = partial && grip.every((pitch) => stroke.pitches.includes(pitch));
+      const held = stroke.pitches.every((pitch) => grip.includes(pitch)) || more;
       if (stroke.scratch) scratches++;
       // A chord leant into: struck in the eighth before its change and ringing across it.
       const coming = harmony.find(
@@ -467,7 +514,10 @@ test("a guitarist holds a grip: the notes under the hand change only where the c
         leant++;
         ringing = coming.tick + PPQ / 2;
       }
-      if (held) continue;
+      if (held) {
+        if (more) grip = stroke.pitches;
+        continue;
+      }
       // The hand moved: a chord has arrived since it last did, or this is a chord leant
       // into. A scratch never leads the way: it deadens the old grip until the new chord
       // has sounded or arrived.
@@ -544,5 +594,144 @@ test("the strumming hand is a pendulum: on the grid it strums, a stroke between 
   assert.ok(
     ups > enough(800) && downs > enough(5000),
     `only ${ups} upstrokes and ${downs} downstrokes rolled`,
+  );
+});
+
+// ── a guitar that picks ─────────────────────────────────────────────────────
+
+/** The guitars whose rhythm book plucks: a tier's attacks, or a figure's own. */
+const pickers = guitars.filter((style) => {
+  const book = style.chords.rhythm;
+  if (!book) return false;
+  return [book.tiers.low, book.tiers.mid, book.tiers.high].some((tier) =>
+    [tier.articulation, ...tier.figures.map((figure) => figure.articulation ?? {})].some(
+      (articulation) => Object.values(articulation).some((attack) => attack.pluck !== undefined),
+    ),
+  );
+});
+const picked = (jam: { style: (typeof STYLES)[number] }) => pickers.includes(jam.style);
+
+test("a picked note is a string of the shape the hand is holding: everything the guitar plucks under one chord, with whatever it strums there, is no more notes than it has strings and one shape a hand can hold; and a plucked string rings on under the hand until it is plucked again, never past its chord and never into a strum", {
+  skip: pickers.length === 0,
+}, () => {
+  let chords = 0;
+  let plucks = 0;
+  let rang = 0;
+  for (const { style, chart, options, take } of [...takes(picked), ...stressTakes(picked)]) {
+    const idiom = style.chords.idiom;
+    if (idiom === "keys") continue;
+    const harmony = harmonyOf(take);
+    const plucked = pluckedOf(take);
+    const strums = strikesOf(take);
+    let from = 0;
+    let strummed = 0;
+    harmony.forEach((arrival, i) => {
+      if (!arrival.changed) return;
+      // The chord sounds until the next one that is not the same chord written again.
+      const until = harmony.slice(i + 1).find((next) => next.changed)?.tick ?? Infinity;
+      while (from < plucked.length && plucked[from]!.tick < arrival.tick) from++;
+      let to = from;
+      while (to < plucked.length && plucked[to]!.tick < until) to++;
+      const own = plucked.slice(from, to);
+      from = to;
+      if (own.length === 0) return;
+      chords++;
+      const where = `${chart.file} seed ${options.seed}: ${arrival.chord?.text} at tick ${arrival.tick}`;
+      // What it strums under the same chord is the same shape. A strum in the eighth before
+      // the next chord may be that chord, played early, and is left out.
+      while (strummed < strums.length && strums[strummed]!.tick < arrival.tick) strummed++;
+      const alongside: Strike[] = [];
+      for (let at = strummed; strums[at] && strums[at]!.tick < until - PPQ / 2; at++) {
+        alongside.push(strums[at]!);
+      }
+      const shape = [...new Set([...own, ...alongside].flatMap((stroke) => stroke.pitches))].sort(
+        (a, b) => a - b,
+      );
+      assert.ok(shape.length <= idiom.strings, `${where}: ${shape}: more notes than strings`);
+      assert.ok(holdable(shape, idiom, true), `${where}: ${shape}: not one shape a hand holds`);
+      const nextStrum = (tick: number) => {
+        let at = strummed;
+        while (strums[at] && strums[at]!.tick <= tick) at++;
+        return strums[at];
+      };
+      own.forEach((note, at) => {
+        plucks++;
+        const [pitch] = note.pitches;
+        assert.ok(note.ends <= until + POCKET, `${where}: ${pitch} rings into the next chord`);
+        const again = own.slice(at + 1).find((later) => later.pitches[0] === pitch);
+        if (again) {
+          assert.ok(
+            note.ends <= again.sounds + POCKET,
+            `${where}: ${pitch} still ringing when its string is plucked again`,
+          );
+        }
+        const strum = nextStrum(note.tick);
+        if (strum) {
+          assert.ok(note.ends <= strum.sounds + POCKET, `${where}: ${pitch} rings into a strum`);
+        }
+        // It rings on: past the next string plucked, where its own is not plucked first.
+        const next = own[at + 1];
+        if (next && next.tick > note.tick && note.ends > next.sounds + POCKET) rang++;
+      });
+    });
+  }
+  assert.ok(
+    chords > enough(1200) && plucks > enough(9000) && rang > enough(7000),
+    `only ${chords} picked chords, ${plucks} plucked notes, ${rang} that rang on`,
+  );
+});
+
+test("with no bassist the picking thumb is the bass: in a bar of four the guitar picks while the bass is out, a string is plucked on every beat a chord sounds on, and the first one plucked on a beat under a chord is that chord's root, with nothing in the bar under it but the fifth below", {
+  skip: pickers.length === 0,
+}, () => {
+  let bars = 0;
+  let stated = 0;
+  for (const { chart, options, take } of takes(picked)) {
+    const harmony = harmonyOf(take);
+    const plucked = pluckedOf(take);
+    const strums = strikesOf(take);
+    for (const bar of take.plan.bars) {
+      if (bar.kind !== "music" || bar.ending || bar.seats.chords === null) continue;
+      if (bar.seats.bass !== null || bar.meter.beats !== 4 || bar.meter.unit !== 4) continue;
+      const end = bar.start + bar.ticks;
+      const own = plucked.filter((note) => note.tick >= bar.start && note.tick < end);
+      if (own.length === 0 || strums.some((s) => s.tick >= bar.start && s.tick < end)) continue;
+      bars++;
+      const where = `${chart.file} seed ${options.seed} bar ${bar.index}`;
+      // The chords of the bar, each from where it arrives (or the barline) to the next.
+      const at = harmony.findLastIndex((arrival) => arrival.tick <= bar.start);
+      for (let i = Math.max(0, at); harmony[i] && harmony[i]!.tick < end; i++) {
+        const arrival = harmony[i]!;
+        if (!arrival.chord || (i > at && !arrival.changed)) continue;
+        const chord = arrival.chord;
+        const starts = Math.max(arrival.tick, bar.start);
+        const next = harmony.slice(i + 1).find((later) => later.changed);
+        const stops = Math.min(next?.tick ?? Infinity, end);
+        const root = pitchClass(chord.root);
+        let first = true;
+        for (let beat = bar.start; beat < end; beat += PPQ) {
+          if (beat < starts || beat >= stops) continue;
+          const thumb = own.filter((note) => note.tick === beat).map((note) => note.pitches[0]!);
+          assert.ok(thumb.length > 0, `${where}: no string plucked on the beat at ${beat}`);
+          if (!first) continue;
+          first = false;
+          stated++;
+          const bass = Math.min(...thumb);
+          assert.equal(bass % 12, root, `${where}: ${chord.text} is first given ${bass}`);
+          // Nothing under the bass but the alternate bass, a fourth below it.
+          const under = own.filter(
+            (note) => note.tick >= starts && note.tick < stops && note.pitches[0]! < bass,
+          );
+          assert.ok(
+            under.every((note) => note.pitches[0] === bass - 5),
+            `${where}: ${chord.text} has ${under.map((note) => note.pitches[0])} under its bass ${bass}`,
+          );
+        }
+      }
+    }
+  }
+  assert.ok(
+    bars > enough(60) && stated > enough(60),
+    `only ${bars} bars picked with no bassist, ${stated} chords stated`,
   );
 });

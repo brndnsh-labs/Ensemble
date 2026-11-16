@@ -53,6 +53,21 @@ export const SOLO_INSTRUMENTS: Readonly<Record<string, SoloInstrument>> = {
     bend: { takes: 0.1 },
     shake: { depth: 60, rate: 5.5, after: 0.35, grows: 0.3, upward: true },
   },
+  // The nylon-string guitar as a lead: E3 to A5, at home on F#4 (SO-01), the verse melody's
+  // cousin (ST-acoustic-37). Its hand does not bend: a nylon string is not pushed up a whole
+  // step (ST-acoustic-28), and the half-step slur into a note is not in the model. A held note
+  // is shaken as a classical hand shakes it, along the string and so either side of the pitch,
+  // and narrowly: a fifth of a half step, where the electric guitar's pushed string goes 60
+  // cents sharp. The numbers are a hand's, not an ear's: nobody has listened to them.
+  "nylon-guitar": {
+    name: "Nylon-string guitar",
+    program: 24,
+    range: [52, 81],
+    home: 66,
+    breath: null,
+    bend: null,
+    shake: { depth: 20, rate: 5, after: 0.35, grows: 0.3, upward: false },
+  },
 };
 
 /** The name an instrument is listed under, for a note's `voice`. */

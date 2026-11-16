@@ -2,7 +2,7 @@
 // and how long each chord would ring if nothing cut it short.
 
 import { cells, STEP } from "../../perform/grid.ts";
-import type { CompFigure, RhythmBook, RhythmTier } from "./style.ts";
+import type { CompFigure, PickPlace, RhythmBook, RhythmTier } from "./style.ts";
 
 /** Sixteenths in a figure's grid: one bar of 4/4. */
 export const FIGURE_STEPS = 16;
@@ -20,6 +20,8 @@ export interface FigureStroke {
   readonly length: number;
   /** A deadened stroke: a scratch. */
   readonly muted?: true;
+  /** A plucked stroke: the places of the grip that sound. */
+  readonly pluck?: readonly PickPlace[];
 }
 
 export function strokesOf(figure: CompFigure, tier: RhythmTier, book: RhythmBook): FigureStroke[] {
@@ -37,6 +39,7 @@ export function strokesOf(figure: CompFigure, tier: RhythmTier, book: RhythmBook
       level: stroke.level,
       length: Math.round(steps * STEP),
       ...(stroke.muted ? { muted: true as const } : {}),
+      ...(stroke.pluck ? { pluck: stroke.pluck } : {}),
     });
   });
   return strokes;

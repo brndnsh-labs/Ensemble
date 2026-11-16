@@ -6,8 +6,8 @@ import type { Tier } from "../../style/types.ts";
 import type { ChordFamily } from "../../theory/chord.ts";
 import { FIGURE_STEPS, HELD } from "./figure.ts";
 import { OPEN_STRINGS, TOP_FRET } from "./guitar.ts";
-import type { Articulation, ChordStyle, Voice } from "./style.ts";
-import { INSTRUMENTS, VOICE_TONES } from "./style.ts";
+import type { Articulation, Attack, ChordStyle, Voice } from "./style.ts";
+import { INSTRUMENTS, PICK_PLACES, VOICE_TONES } from "./style.ts";
 
 const TIERS: readonly Tier[] = ["low", "mid", "high"];
 const FAMILIES: readonly ChordFamily[] = [
@@ -56,6 +56,19 @@ export function validateChordStyle(chords: ChordStyle): string[] {
       Object.values(articulation ?? {}).some((attack) => attack.muted),
     );
   });
+  /** A plucked attack is a guitar's, names one or two places of the grip, and is not a scratch. */
+  const plucks = (attack: Attack, where: string) => {
+    if (attack.pluck === undefined) return;
+    say(guitar !== null, `${where}: a plucked stroke needs a guitar in the seat.`);
+    say(!attack.muted, `${where}: a stroke is plucked or deadened, not both.`);
+    say(
+      attack.pluck.length >= 1 && attack.pluck.length <= 2,
+      `${where}: plucks ${attack.pluck.length} places; the hand picks one string, or two pinched together.`,
+    );
+    for (const place of attack.pluck) {
+      say(PICK_PLACES.includes(place), `${where}: "${place}" is not a place of the picking hand.`);
+    }
+  };
   if (guitar) {
     const { strings, position, strum } = guitar;
     const most = OPEN_STRINGS.length;
@@ -82,6 +95,17 @@ export function validateChordStyle(chords: ChordStyle): string[] {
     say(
       strum.roll >= 0 && strum.roll <= 20,
       `guitar: ${strum.roll} ms a string is not a strum; a roll is between 0 and 20.`,
+    );
+    say(
+      guitar.openPosition === undefined ||
+        (Number.isInteger(guitar.openPosition) &&
+          guitar.openPosition >= 1 &&
+          guitar.openPosition <= TOP_FRET),
+      `guitar: open position up to fret ${guitar.openPosition}; write a whole number from 1 to ${TOP_FRET}.`,
+    );
+    say(
+      guitar.openPosition === undefined || guitar.open,
+      "guitar: open position with no open strings; a chord at the nut is its open strings (CH-24).",
     );
     say(
       !(guitar.open && scratches),
@@ -239,6 +263,7 @@ export function validateChordStyle(chords: ChordStyle): string[] {
       const where = `rhythm (${tier})`;
       for (const [symbol, attack] of Object.entries(vocabulary.articulation)) {
         level(attack.level, `${where}, "${symbol}"`);
+        plucks(attack, `${where}, "${symbol}"`);
         say(
           symbol !== HELD && symbol !== ".",
           `${where}: "${symbol}" already means held or silent.`,
@@ -253,9 +278,14 @@ export function validateChordStyle(chords: ChordStyle): string[] {
         `${where}: a push is played as "${stroke}", a scratch; a chord is never played early as one (CH-36).`,
       );
       say(
+        !vocabulary.articulation[stroke]?.pluck,
+        `${where}: a push is played as "${stroke}", a plucked string; one string cannot state a chord early.`,
+      );
+      say(
         !vocabulary.arrival.muted,
         `${where}: a chord struck where it arrives cannot be a scratch (CH-34).`,
       );
+      plucks(vocabulary.arrival, `${where}, a chord struck where it arrives`);
       level(vocabulary.arrival.level, `${where}, a chord struck where it arrives`);
       if (vocabulary.restrike !== undefined) {
         level(vocabulary.restrike, `${where}, a held chord struck again at the barline`);
@@ -280,12 +310,15 @@ export function validateChordStyle(chords: ChordStyle): string[] {
         const articulation = figure.articulation ?? vocabulary.articulation;
         readGrid(figure.grid, articulation, at);
         if (figure.turn !== undefined) readGrid(figure.turn, articulation, `${at}, its turn`);
+        if (figure.alone !== undefined)
+          readGrid(figure.alone, articulation, `${at}, with no bassist`);
         say(
           !figure.ties || figure.groove === true,
           `${at}: only a groove need say it ties a pushed chord; any other figure does.`,
         );
         for (const [symbol, attack] of Object.entries(figure.articulation ?? {})) {
           level(attack.level, `${at}, "${symbol}"`);
+          plucks(attack, `${at}, "${symbol}"`);
         }
         say(figure.weight >= 0, `${at}: a weight cannot be negative.`);
         say(
@@ -320,6 +353,10 @@ export function validateChordStyle(chords: ChordStyle): string[] {
       `listening: a breath of ${listening.breath} sixteenths is not a silence the hand could answer; write a whole number from 2.`,
     );
     level(listening.answer.level, "listening, the answer");
+    say(
+      listening.answer.pluck === undefined,
+      "listening: the answer is a stab of the chord, not a plucked string.",
+    );
     say(!listening.answer.muted, "listening: the answer cannot be a scratch.");
     say(
       listening.answer.steps > 0 && listening.answer.steps <= 2,

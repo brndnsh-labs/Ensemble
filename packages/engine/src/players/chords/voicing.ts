@@ -12,11 +12,15 @@ import type { ChordFamily } from "../../theory/chord.ts";
 import { chordFamily } from "../../theory/chord.ts";
 import { mod12, pitchClass } from "../../theory/pitch.ts";
 import { chordScale } from "../../theory/scale.ts";
+import { fretsOf, OPEN_STRINGS } from "./guitar.ts";
 import type { InstrumentIdiom } from "./idiom.ts";
 import type { StrikeLine } from "./line.ts";
 import type { Strike, VoicedStrike, Voicing } from "./strike.ts";
+import { LOW_LIMITS } from "./strike.ts";
 import type { ChordRegister, ChordStyle } from "./style.ts";
 import { fitRecipe, identity, recipeFor } from "./tones.ts";
+
+export { LOW_LIMITS };
 
 /** A voicing as the critic judges it: where it sits, and what it follows. */
 export interface VoicingCandidate {
@@ -33,24 +37,6 @@ export interface VoicingCandidate {
    */
   readonly away: boolean;
 }
-
-/**
- * The lowest pitch each interval between neighbouring voices may stand on
- * before it turns to mud (X-B-04), by its size in semitones.
- */
-export const LOW_LIMITS: Readonly<Record<number, number>> = {
-  1: 52,
-  2: 51,
-  3: 48,
-  4: 46,
-  5: 46,
-  6: 47,
-  7: 34,
-  8: 43,
-  9: 41,
-  10: 41,
-  11: 41,
-};
 
 /** E4: below it a dominant's half-step rub on the bottom of the hand is a growl, not a colour (Q-03). */
 export const RUB_FLOOR = 64;
@@ -202,6 +188,27 @@ export const VOICING_FEATURES: readonly Feature<VoicingCandidate>[] = [
       const from = Math.max(lowest - 1, register.target - register.reach);
       return voicing.pitches.filter((pitch) => pitch >= from).length;
     },
+  },
+  {
+    id: "silent-strings",
+    says: "On a guitar, strings the grip leaves silent: an open-position chord wants them all ringing (CH-24).",
+    of: ({ voicing }) => (voicing.strings ? OPEN_STRINGS.length - voicing.strings.length : 0),
+  },
+  {
+    id: "stopped-strings",
+    says: "On a guitar, strings a finger stops: an open string rings longer than a fretted one, and is the sound of a chord at the nut (CH-24).",
+    of: ({ voicing }) =>
+      voicing.strings
+        ? fretsOf(voicing.strings, voicing.pitches).filter((fret) => fret > 0).length
+        : 0,
+  },
+  {
+    id: "muted-inside",
+    says: "On a guitar, a string muted inside the grip: the hand has to damp it, so a shape on neighbouring strings is the one taken where there is one.",
+    of: ({ voicing }) =>
+      voicing.strings
+        ? voicing.strings.at(-1)! - voicing.strings[0]! + 1 - voicing.strings.length
+        : 0,
   },
   {
     id: "low-intervals",

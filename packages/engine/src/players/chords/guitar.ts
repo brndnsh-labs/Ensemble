@@ -7,12 +7,16 @@
 
 import { PPQ } from "../../chart/types.ts";
 import type { WrittenNote } from "../../perform/notes.ts";
-import { mod12 } from "../../theory/pitch.ts";
+import type { Plan } from "../../plan/types.ts";
+import type { Chord } from "../../theory/chord.ts";
+import { toneInterval } from "../../theory/chord.ts";
+import { mod12, pitchClass } from "../../theory/pitch.ts";
 import type { InstrumentIdiom } from "./idiom.ts";
-import type { Voicing } from "./strike.ts";
-import { MUTED } from "./strike.ts";
-import type { Guitar } from "./style.ts";
+import type { VoicedStrike, Voicing } from "./strike.ts";
+import { LOW_LIMITS, MUTED, PICKED } from "./strike.ts";
+import type { Guitar, PickPlace } from "./style.ts";
 import type { FittedTone } from "./tones.ts";
+import { alterationsOf } from "./tones.ts";
 
 /** Standard tuning, low string first: E2 A2 D3 G3 B3 E4. */
 export const OPEN_STRINGS: readonly number[] = [40, 45, 50, 55, 59, 64];
@@ -201,18 +205,34 @@ function grips(
   count: number,
 ): Voicing[] {
   const toneAt = new Map(tones.map((tone) => [mod12(root + tone.interval), tone.tone]));
-  // With more strings than tones only the root or the fifth is doubled (CH-21).
-  const doubles = (tone: Tone) => tone === "R" || tone === "5";
+  // With more strings than tones only the root or the fifth is doubled (CH-21). In open
+  // position the third may be doubled too, once, with the copy on the top two strings (CH-24).
+  const doubles = (tone: Tone, held: readonly Tone[]) =>
+    tone === "R" ||
+    tone === "5" ||
+    (guitar.openPosition !== undefined &&
+      tone === "3" &&
+      held.length >= count - 2 &&
+      held.filter((other) => other === "3").length === 1);
   const spare = count - tones.length;
+  // A chord so dense that its root has given way to an alteration stands on what it has.
+  const stands = guitar.rootOnBottom && tones.some((tone) => tone.tone === "R");
   const byPitches = new Map<string, number[][]>();
   for (const strings of stringSets(count, guitar.skip)) {
     const found = fretted(guitar, strings, (pitch, below) => {
       const tone = toneAt.get(mod12(pitch));
       if (pitch < floor || tone === undefined) return false;
-      if (guitar.rootOnBottom && below.length === 0 && tone !== "R") return false;
+      if (stands && below.length === 0 && tone !== "R") return false;
+      // A grip that stands on its root is the bottom of its chord: its two lowest notes keep
+      // the low-interval limits (X-B-04). On the two low strings only a fifth passes them, so
+      // nothing sits under C3 but the root and the fifth over it (X-B-03): G is 3x0003.
+      if (stands && below.length === 1) {
+        const gap = (pitch - below[0]!) % 12;
+        if (gap > 0 && below[0]! < (LOW_LIMITS[gap] ?? 0)) return false;
+      }
       const held = below.map((other) => toneAt.get(mod12(other))!);
       const doubled = held.length - new Set(held).size;
-      return !held.includes(tone) || (doubles(tone) && doubled < spare);
+      return !held.includes(tone) || (doubles(tone, held) && doubled < spare);
     });
     for (const pitches of found) {
       if (new Set(pitches.map((pitch) => mod12(pitch))).size < tones.length) continue;
@@ -249,6 +269,133 @@ function tighter(a: Voicing, b: Voicing): number {
   return 0;
 }
 
+/** The grip's notes the chord is heard by: its third (or suspension), seventh (or sixth), and written alterations. */
+function heardBy(voicing: Voicing, chord: Chord | null): number[] {
+  const altered = chord
+    ? alterationsOf(chord).map((interval) => mod12(pitchClass(chord.root) + interval))
+    : [];
+  return voicing.pitches.filter(
+    (pitch, k) =>
+      voicing.tones[k] === "3" || voicing.tones[k] === "7" || altered.includes(mod12(pitch)),
+  );
+}
+
+/** One string sounding one note. */
+interface Plucked {
+  readonly string: number;
+  readonly pitch: number;
+}
+
+const sameGrip = (a: Voicing, b: Voicing) =>
+  a === b ||
+  (a.pitches.length === b.pitches.length &&
+    a.pitches.every((pitch, k) => pitch === b.pitches[k] && a.strings?.[k] === b.strings?.[k]));
+
+/**
+ * The thumb's alternate bass (CH-32): the chord's fifth a string under the
+ * grip's bass at the same fret, which in standard tuning is the fourth below
+ * (C3 on the fifth string with G2 beside it on the sixth; A2 with the open E),
+ * where there is such a string and a hand holding the grip can hold that too.
+ * Otherwise the fifth on one of the two strings over the bass (E2 with B2,
+ * G2 with the open D), and with none there the bass again.
+ */
+function alternate(voicing: Voicing, chord: Chord | null): Plucked {
+  const strings = voicing.strings ?? voicing.pitches.map((_, k) => k);
+  const [string, bass] = [strings[0]!, voicing.pitches[0]!];
+  const below = string - 1;
+  const fifth = chord
+    ? mod12(pitchClass(chord.root) + (toneInterval(chord.quality, "fifth") ?? 7))
+    : -1;
+  if (
+    below >= 0 &&
+    OPEN_STRINGS[string]! - OPEN_STRINGS[below]! === 5 &&
+    mod12(bass - 5) === fifth &&
+    fingered([bass - OPEN_STRINGS[string]!, ...fretsOf(strings, voicing.pitches)])
+  ) {
+    return { string: below, pitch: bass - 5 };
+  }
+  const over = [1, 2].find((k) => voicing.tones[k] === "5");
+  const k = over ?? 0;
+  return { string: strings[k]!, pitch: voicing.pitches[k]! };
+}
+
+/** The string a place of the picking hand is, in the grip the hand is holding. */
+function placeIn(voicing: Voicing, chord: Chord | null, place: PickPlace): Plucked {
+  const strings = voicing.strings ?? voicing.pitches.map((_, k) => k);
+  const at = (k: number): Plucked => ({ string: strings[k]!, pitch: voicing.pitches[k]! });
+  // A finger's string is counted from the top of the grip, as a guitarist numbers them.
+  if (typeof place === "number") return at(Math.max(0, strings.length - place));
+  if (place === "bass") return at(0);
+  const other = alternate(voicing, chord);
+  if (place === "alternate") return other;
+  // The upper string: the next one of the grip over the bass and its alternate.
+  const above = strings.findIndex((string) => string > Math.max(strings[0]!, other.string));
+  return at(above < 0 ? strings.length - 1 : above);
+}
+
+/**
+ * What each stroke of a part plucks, or null for a stroke that is strummed.
+ * Under a new grip the thumb's first note is its bass, whichever of its
+ * places the pattern writes there: a chord that arrives where the thumb would
+ * alternate is still stated by its bass (CH-32).
+ */
+function plucked(part: readonly VoicedStrike[]): (readonly Plucked[] | null)[] {
+  let holding: Voicing | null = null;
+  let stated = false;
+  return part.map(({ strike, voicing }) => {
+    if (!holding || !sameGrip(holding, voicing)) stated = false;
+    holding = voicing;
+    if (!strike.pluck || strike.muted) {
+      // A strum sounds the bass with everything else; a scratch sounds nothing.
+      if (!strike.muted) stated = true;
+      return null;
+    }
+    const thumbs = (place: PickPlace) => typeof place !== "number";
+    const places = strike.pluck.map((place) => (!stated && thumbs(place) ? "bass" : place));
+    if (places.includes("bass")) stated = true;
+    const sounded: Plucked[] = [];
+    for (const place of places) {
+      const at = placeIn(voicing, strike.arrival.chord, place);
+      if (!sounded.some((other) => other.string === at.string)) sounded.push(at);
+    }
+    return sounded;
+  });
+}
+
+/**
+ * How long a plucked string rings, in ticks: until it is plucked again, or
+ * the hand strums or moves to another grip, and no longer than the hand goes
+ * on holding the grip. Each stroke says how long its chord is written for from
+ * where it falls, so while strokes on the same grip follow with no gap between
+ * them the hand is still holding it: a string plucked late in a bar rings on
+ * into the next bar of the same chord, and stops where the chord does.
+ *
+ * Nothing rings over the top of the form. A pass of an open jam is played
+ * before the next is planned, and must come out the same when it is; what the
+ * hand will pluck in a pass that does not exist yet cannot shorten a note.
+ */
+function rings(
+  part: readonly VoicedStrike[],
+  plucks: readonly (readonly Plucked[] | null)[],
+  i: number,
+  string: number,
+  plan: Plan,
+): number {
+  const { strike, voicing } = part[i]!;
+  const pass = plan.bars[strike.bar]?.pass;
+  let held = strike.tick + strike.duration;
+  for (let j = i + 1; j < part.length; j++) {
+    const later = part[j]!;
+    if (later.strike.tick <= strike.tick) continue;
+    if (later.strike.tick > held || plan.bars[later.strike.bar]?.pass !== pass) break;
+    const again = plucks[j];
+    if (!again || !sameGrip(later.voicing, voicing)) return later.strike.tick - strike.tick;
+    if (again.some((other) => other.string === string)) return later.strike.tick - strike.tick;
+    held = Math.max(held, later.strike.tick + later.strike.duration);
+  }
+  return held - strike.tick;
+}
+
 const idioms = new WeakMap<Guitar, InstrumentIdiom>();
 
 /** The guitar a style describes, as the chord seat plays it. */
@@ -267,15 +414,28 @@ export function guitar(style: Guitar): InstrumentIdiom {
      */
     candidates(tones, root, register) {
       let wanted = [...tones];
+      // A grip that stands on its root cannot give the root up.
+      const givenUp = GIVEN_UP.filter((tone) => !(style.rootOnBottom && tone === "R"));
+      const nut = style.openPosition;
       for (;;) {
         const most = Math.min(OPEN_STRINGS.length, Math.max(style.strings, wanted.length));
+        // In open position the chord is whichever shape it has at the nut, on however many
+        // strings that is (CH-24): every count is looked at, and a shape at the nut wins.
+        const all: Voicing[] = [];
         for (let count = most; count >= wanted.length && count > 0; count--) {
           const found = grips(style, wanted, root, register.floor, count);
-          if (found.length > 0) return found.sort(tighter);
+          if (nut === undefined && found.length > 0) return found.sort(tighter);
+          all.push(...found);
         }
-        const spare = GIVEN_UP.map((tone) => wanted.findIndex((w) => w.tone === tone)).find(
-          (index) => index >= 0,
-        );
+        if (nut !== undefined && all.length > 0) {
+          const atNut = all.filter((grip) =>
+            fretsOf(grip.strings ?? [], grip.pitches).every((fret) => fret <= nut),
+          );
+          return (atNut.length > 0 ? atNut : all).sort(tighter);
+        }
+        const spare = givenUp
+          .map((tone) => wanted.findIndex((w) => w.tone === tone))
+          .find((index) => index >= 0);
         if (spare === undefined) return [];
         wanted = wanted.filter((_, i) => i !== spare);
       }
@@ -299,7 +459,24 @@ export function guitar(style: Guitar): InstrumentIdiom {
       const pair = grid === "eighth" ? PPQ : PPQ / 2;
       // The roll is a time, not a share of the beat: the same at every tempo (CH-29).
       const ticksPerMs = (plan.tempo * PPQ) / 60_000;
+      const plucks = plucked(part);
       part.forEach(({ strike, voicing }, i) => {
+        // A plucked stroke: each string sounds by itself, and rings on under the hand.
+        const picked = plucks[i];
+        if (picked) {
+          for (const { string, pitch } of picked) {
+            notes.push({
+              seat: "chords",
+              bar: strike.bar,
+              tick: strike.tick,
+              duration: Math.max(SHORTEST, rings(part, plucks, i, string, plan)),
+              pitch,
+              velocity: strike.velocity,
+              voice: PICKED,
+            });
+          }
+          return;
+        }
         const next = part[i + 1]?.strike;
         const room = next && next.tick > strike.tick ? next.tick - strike.tick : Infinity;
         const duration = Math.max(SHORTEST, Math.min(strike.duration, room));
@@ -307,8 +484,15 @@ export function guitar(style: Guitar): InstrumentIdiom {
         const inBar = strike.tick - (plan.bars[strike.bar]?.start ?? 0);
         const upstroke = !strike.down && inBar % pair >= pair / 2;
         const strings = voicing.strings ?? voicing.pitches.map((_, string) => string);
-        // An upstroke catches only the top strings of the grip.
-        const from = upstroke ? Math.max(0, voicing.pitches.length - up) : 0;
+        // An upstroke catches only the top strings of the grip, and as many more under them
+        // as it takes to sound every tone the chord is heard by (X-B-13).
+        let from = upstroke ? Math.max(0, voicing.pitches.length - up) : 0;
+        if (from > 0) {
+          const needed = heardBy(voicing, strike.arrival.chord);
+          const caught = (pitch: number) =>
+            voicing.pitches.slice(from).some((other) => mod12(other - pitch) === 0);
+          while (from > 0 && needed.some((pitch) => !caught(pitch))) from--;
+        }
         const [lowest, highest] = [strings[from]!, strings.at(-1)!];
         const across = (highest - lowest) * roll;
         for (let k = from; k < voicing.pitches.length; k++) {
