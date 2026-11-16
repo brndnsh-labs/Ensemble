@@ -14,6 +14,17 @@ export const PACK_IDS: readonly string[] = [
   ]),
 ].sort();
 
+/**
+ * The order they are brought onto the device in: the instruments most bands share first (the
+ * kit is in every one), so whatever tune is opened next has the least left to fetch, and the
+ * soloists' own instruments last, since the soloist sits out until asked.
+ */
+const SAVE_ORDER: readonly string[] = [...PACK_IDS].sort((a, b) => {
+  const bands = (id: string) =>
+    STYLES.filter((style) => Object.values(style.sound.packs).includes(id)).length;
+  return bands(b) - bands(a) || a.localeCompare(b);
+});
+
 export interface Saving {
   /** Files on the device. */
   readonly done: number;
@@ -27,6 +38,9 @@ const TAKE_CHARGE_MS = 5000;
 
 /** How many files are fetched at once. */
 const AT_ONCE = 4;
+
+/** A moment for the page to draw and for a tune to be opened before the connection is used for later. */
+const SETTLE_MS = 1500;
 
 /** Register the service worker. In development there is none: it would serve yesterday's code. */
 export function keepOffline(): void {
@@ -42,6 +56,8 @@ export function keepOffline(): void {
 export async function saveInstruments(
   packsUrl: string,
   report: (saving: Saving) => void,
+  /** Resolves when nobody is waiting for a band: each file fetched for later waits on it first. */
+  idle: () => Promise<void> = () => Promise.resolve(),
 ): Promise<boolean> {
   if (!import.meta.env.PROD || !("serviceWorker" in navigator)) return false;
   await navigator.serviceWorker.ready;
@@ -55,8 +71,10 @@ export async function saveInstruments(
     });
     if (!navigator.serviceWorker.controller) return false;
   }
+  await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
   const urls: string[] = [];
-  for (const id of PACK_IDS) {
+  for (const id of SAVE_ORDER) {
+    await idle();
     const base = new URL(`${packsUrl}${id}/`, location.href).href;
     // The same addresses the band's loader asks for, or what is saved here would never be used.
     const source = await readPack(base);
@@ -72,6 +90,9 @@ export async function saveInstruments(
   await Promise.all(
     Array.from({ length: AT_ONCE }, async () => {
       while (next < missing.length) {
+        // The band someone is waiting to hear has the connection to itself.
+        await idle();
+        if (next >= missing.length) break;
         const url = missing[next++]!;
         try {
           // The worker keeps a good answer as it goes by; the page has no use for the bytes yet.

@@ -1087,3 +1087,17 @@ Brandon heard the same picked and strummed part on three guitars (`scripts/steel
 - **Nylon as an option** needs something the app does not have: a seat's instrument chosen by the player where a style has more than one that plays the same part. The soloist already works this way (`SOLO_INSTRUMENTS`). Put to Brandon as a small piece of work for after acoustic is heard: a style lists the instruments its chord seat may be played on (the first is its own), and the band setup offers them where there is more than one.
 - **No manager for packs**: ten packs are 24 MB to download in all and a band loads only its own three or four. What a growing shelf does need is listed in `PLAN.md`.
 
+## the first visit, timed (stage 6)
+
+Brandon, 2026-11-15: "i just want to make sure initial page load is snappy - don't want people waiting while packs download". Timed on a cold browser against the built app through one shared pipe (a throwaway server, every response uncompressed and rate-limited together):
+
+| | 10 Mbps | 30 Mbps |
+|---|---|---|
+| the library on the screen | 0.6 s | 0.3 s |
+| Play pressed on rhythm changes to its first bar | 9.4 s | 4.4 s |
+
+- **The page never waits for a pack.** The shell is 0.25 MB compressed (script, stylesheet, the worker that plays the band, one font file); packs are fetched after it has drawn.
+- **The wait is the first Play of a band on a device**: its three packs. The jazz and blues quartet is the heaviest, 9.4 MB (the grand is 6.0, the kit 1.9, the upright 1.5); funk, disco and reggae are 5.6. About 1.9 s of each figure is the count-in and the start, not the fetch. After that the packs are on the device and Play is immediate.
+- **Changed now: fetching for later never competes with a band someone is waiting for.** The app saves every pack for offline use in the background from the moment it opens, four files at a time. It now waits a moment for the page to settle, stops whenever a band's packs are on their way (`Rig.idle`), and fetches the instruments most bands share first (the kit, then the basses and the chord instruments, the soloists' own last) so the next tune opened has least left to fetch. On this test pipe the first Play measured the same before and after (HTTP/1.1's six connections had been giving the band its turn anyway); over the live site's HTTP/2 nothing rations the saver's requests but this.
+- **The lever that would move the number, not built: start a band on one dynamic layer of each pack and bring the rest in behind it.** One middle layer of the jazz quartet is 3.2 MB against 9.4 (`loadPack` can already load a pack that way), which is about 2.6 s of fetching at 10 Mbps in place of 7.5. The price is that the very first take of a band on a device is played with one recording for every dynamic, loud and soft differing only in level, until the full packs land and take over at the next Play. Gate 5 left "packs load every layer" standing until an ear said otherwise, so this is put to Brandon.
+

@@ -30,6 +30,9 @@ export class Rig {
   #seated = new Set<string>();
   #player: Player | undefined;
   #wake: WakeLockSentinel | undefined;
+  /** Packs being fetched for a band someone is about to hear, and who is waiting for them to land. */
+  #fetching = 0;
+  #landed: (() => void)[] = [];
 
   constructor(packsUrl: string) {
     this.#packsUrl = packsUrl;
@@ -60,8 +63,23 @@ export class Rig {
       loading = loadPack(this.context, this.#packsUrl + pack, progress ? { progress } : {});
       this.#packs.set(pack, loading);
       loading.catch(() => this.#packs.delete(pack));
+      this.#fetching++;
+      const land = () => {
+        if (--this.#fetching > 0) return;
+        for (const tell of this.#landed.splice(0)) tell();
+      };
+      loading.then(land, land);
     }
     return loading;
+  }
+
+  /**
+   * Resolves when no band's instruments are on their way. Anything fetched for later waits
+   * on this, so the connection is the band's while someone is waiting to hear it.
+   */
+  idle(): Promise<void> {
+    if (this.#fetching === 0) return Promise.resolve();
+    return new Promise((resolve) => this.#landed.push(resolve));
   }
 
   /** Seat a band and set its mix. Resolves when every instrument can play. */

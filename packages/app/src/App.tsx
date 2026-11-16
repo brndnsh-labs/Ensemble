@@ -36,7 +36,7 @@ export function App() {
 
   // Once the app is open, bring the instruments onto the device for next time.
   useEffect(() => {
-    saveInstruments(PACKS_URL, setSaving).catch(() => {
+    saveInstruments(PACKS_URL, setSaving, () => rig.idle()).catch(() => {
       // No connection, or no room: whatever was saved stays, and the next visit tries again.
     });
   }, []);
