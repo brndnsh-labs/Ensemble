@@ -1,0 +1,14 @@
+title: Two-Chord Verse in A
+key: A
+tempo: 108
+style: acoustic
+
+// A verse that rocks between the one and the four, and a chorus that lifts
+// from the minor six.
+[Verse]
+| A | D | A | D |
+| A | D | A | D |
+
+[Chorus]
+| F#m | D | A | E |
+| F#m | D | A | E |

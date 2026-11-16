@@ -1,0 +1,9 @@
+title: Canon Progression in D
+key: D
+tempo: 90
+style: acoustic
+
+// The eight chords of a canon, a bar each: down a fourth, up a step, and again.
+[A]
+| D | A | Bm | F#m |
+| G | D | G  | A   |

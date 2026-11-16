@@ -532,7 +532,8 @@ test(
     for (const { chart, options, take } of takes(blues)) {
       const drums = notesOf(take, "drums");
       for (const bar of take.plan.bars) {
-        if (bar.kind !== "music" || bar.ending) continue;
+        // A bar the arrangement lays the drummer out of is not a bar he plays time in.
+        if (bar.kind !== "music" || bar.ending || bar.seats.drums === null) continue;
         const at = (beat: number, ...voices: string[]) =>
           drums.some(
             (note) => note.tick === bar.start + beat * PPQ && voices.includes(note.voice ?? ""),
@@ -560,11 +561,13 @@ test(
   },
 );
 
-test("an arrival is one crash with a kick under it, and the cymbal that keeps time gives way to it", () => {
+test("an arrival is one crash with a kick under it, and the cymbal that keeps time gives way to it (in a bar the drummer plays)", () => {
   for (const { chart, options, take } of takes()) {
     const drums = notesOf(take, "drums");
     for (const bar of take.plan.bars) {
-      if (bar.kind !== "music" || bar.ending) continue;
+      // A section the arrangement lays the drummer out of arrives with no crash: nobody is
+      // there to play it.
+      if (bar.kind !== "music" || bar.ending || bar.seats.drums === null) continue;
       const onOne = drums.filter((note) => note.tick === bar.start);
       const voices = onOne.map((note) => note.voice);
       const where = `${chart.file} seed ${options.seed} bar ${bar.index}`;

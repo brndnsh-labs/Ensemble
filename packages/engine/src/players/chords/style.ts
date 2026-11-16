@@ -140,6 +140,17 @@ export interface Guitar {
   readonly open: boolean;
   /** Whether a grip stands on the chord's root (a guitar that is also the bottom of the band). */
   readonly rootOnBottom: boolean;
+  /**
+   * Open position (CH-24): the highest fret of a shape played at the nut (the
+   * 4th). Where a chord has a grip with every fretted note at or below it,
+   * only such grips are offered, and not wherever voice leading would drift.
+   * Grips are looked for on every count of strings from `strings` down to the
+   * chord's tones, because x32010 and xx0232 are the chords and no six-string
+   * shape is; and the third may be doubled once, one copy on the top two
+   * strings (C is C E G C E). Left out, a grip is `strings` strings wherever
+   * on the neck the register puts it.
+   */
+  readonly openPosition?: number;
   readonly strum: {
     /** The note value the pendulum swings on. */
     readonly grid: "eighth" | "sixteenth";
@@ -200,6 +211,26 @@ export interface PlainRhythm {
 }
 
 /**
+ * A place in the grip a guitarist is holding, as the picking hand finds it
+ * (CH-32). The thumb has three:
+ *
+ * - `bass`: the grip's lowest string
+ * - `alternate`: the chord's fifth as an alternating thumb plays it: a string
+ *   under the bass at the same fret (a fourth below: C3 with G2 under it, A2
+ *   with the open E) where the hand can hold that with the grip; or else the
+ *   fifth on one of the two strings over the bass (E2 with B2); and with no
+ *   fifth there, the bass again
+ * - `upper`: the next string of the grip above those two
+ *
+ * and each finger one: `1`, `2`, `3` are the grip's strings counted from the
+ * top, as a guitarist numbers them. On a grip with fewer strings than a place
+ * asks for, the place is the nearest string the grip has. Under a new chord
+ * the thumb's first note is its bass, whichever of its places is written.
+ */
+export type PickPlace = "bass" | "alternate" | "upper" | 1 | 2 | 3;
+export const PICK_PLACES: readonly PickPlace[] = ["bass", "alternate", "upper", 1, 2, 3];
+
+/**
  * How the hand plays one written symbol of a figure: how hard, and for how
  * long when the grid does not hold it on.
  */
@@ -217,6 +248,17 @@ export interface Attack {
    * struck in its place.
    */
   readonly muted?: boolean;
+  /**
+   * The stroke is plucked, not strummed: only these places of the grip the
+   * hand is holding sound, a string each (one, or two pinched together). On a
+   * guitar only. The grip is the one a strum would sound, so picking and
+   * strumming a chord are one left hand. A plucked string rings until it is
+   * plucked again, or the hand strums or moves to another grip, and no longer
+   * than its chord is written for; `steps` is the longest it may ring. It
+   * strikes its chord (CH-34), but a chord is never played early as one: a
+   * single string cannot state a chord (ST-acoustic-30).
+   */
+  readonly pluck?: readonly PickPlace[];
 }
 
 /** The symbols a figure may be written in, and how each is played. */
@@ -269,6 +311,14 @@ export interface CompFigure {
    * another figure. Left out, the last bar is the figure again.
    */
   readonly turn?: string;
+  /**
+   * The figure as it is played in a bar where no bassist plays (the seat is
+   * switched off, or the arrangement lays it out), written whole like any
+   * figure: the hand is the bottom of the band too (CH-26), so a broken chord
+   * becomes a thumb that alternates basses under the fingers (CH-32). Left
+   * out, the figure is the same with or without a bassist.
+   */
+  readonly alone?: string;
 }
 
 /** The comping vocabulary at one level of energy. */

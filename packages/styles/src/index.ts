@@ -1,6 +1,7 @@
 // Every style pack. A new style is a new folder and one line here.
 
 import type { StylePack } from "@ensemble/engine";
+import { acoustic } from "./acoustic/index.ts";
 import { blues } from "./blues/index.ts";
 import { disco } from "./disco/index.ts";
 import { funk } from "./funk/index.ts";
@@ -9,10 +10,19 @@ import { neosoul } from "./neosoul/index.ts";
 import { reggae } from "./reggae/index.ts";
 import { rock } from "./rock/index.ts";
 
-export { blues, disco, funk, jazz, neosoul, reggae, rock };
+export { acoustic, blues, disco, funk, jazz, neosoul, reggae, rock };
 
 /** The styles that ship: the suite holds every one of them to every property. */
-export const STYLES: readonly StylePack[] = [blues, funk, jazz, rock, disco, neosoul, reggae];
+export const STYLES: readonly StylePack[] = [
+  blues,
+  funk,
+  jazz,
+  rock,
+  disco,
+  neosoul,
+  reggae,
+  acoustic,
+];
 
 export function styleById(id: string): StylePack | undefined {
   return STYLES.find((style) => style.id === id);

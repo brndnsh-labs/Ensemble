@@ -1,0 +1,14 @@
+title: Minor Ballad in A Minor
+key: Am
+tempo: 80
+style: acoustic
+
+// A slow tune in two parts: the first falls from the one and comes home through
+// the five, the second opens on the six and climbs to the relative major.
+[A]
+| Am | Em | F  | C  |
+| Dm | Am | E7 | Am |
+
+[B]
+| F  | G  | C  | Am |
+| Dm | E7 | Am | %  |

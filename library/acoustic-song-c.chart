@@ -1,0 +1,42 @@
+title: Acoustic Song in C
+key: C
+tempo: 96
+style: acoustic
+
+// An intro and a first verse for the guitar alone, a chorus that opens on the
+// four, a bridge on the minor six that turns round on the five, and an outro
+// that comes home.
+[Intro]
+| C | G | Am | F |
+
+[Verse]
+| C | G | Am  | F |
+| C | G | F G | C |
+
+[Chorus]
+| F | G | C | Am |
+| F | G | C | %  |
+
+[Verse]
+
+[Chorus]
+
+[Bridge]
+| Am | Em | F | C  |
+| Dm | F  | G | G7 |
+
+[Chorus]
+
+[Outro]
+| F | G | C | % |
+
+--- arrangement
+//      energy  drums  bass  chords  solo
+Intro   1       .      .     -       .
+Verse   1       .      .     -       .
+Chorus  3       -      -     -       .
+Verse   2       -      -     -       .
+Chorus  3       -      -     -       .
+Bridge  2       -      -     -       .
+Chorus  4       -      -     -       -
+Outro   1       .      -     -       .

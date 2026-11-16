@@ -45,7 +45,7 @@ export { fingering, fingerings, fretsOf, positionOf, tab } from "./players/chord
 export type { Breath, LineNote, StrikeLine } from "./players/chords/line.ts";
 export { chordPart, chordStrikes } from "./players/chords/play.ts";
 export type { Strike, VoicedStrike, Voicing } from "./players/chords/strike.ts";
-export { MUTED } from "./players/chords/strike.ts";
+export { MUTED, PICKED } from "./players/chords/strike.ts";
 export type * from "./players/chords/style.ts";
 export { validateChordStyle } from "./players/chords/validate.ts";
 export type { VoicingCandidate } from "./players/chords/voicing.ts";

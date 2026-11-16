@@ -2,7 +2,7 @@
 // band.test.ts, soloist.test.ts, and piano.test.ts needs. Not a test file.
 
 import type { Take } from "@ensemble/engine";
-import { arrivals, chordScale, contextOf, MUTED, PPQ } from "@ensemble/engine";
+import { arrivals, chordScale, contextOf, MUTED, PICKED, PPQ } from "@ensemble/engine";
 import { type Jam, notesOf } from "./takes.ts";
 
 /** Ticks of slack for where a note sounds: the largest lean plus human placement. */
@@ -20,12 +20,14 @@ export interface Strike {
 
 /**
  * The comp's notes grouped into the times the hand sounds a chord. A deadened stroke (a
- * guitar's scratch) is rhythm, not a chord: `scratches` reads those instead.
+ * guitar's scratch) is rhythm, not a chord: `scratches` reads those instead. A plucked
+ * string is one note of the shape a picking hand holds, not a strike of it: `pluckedOf`
+ * reads those.
  */
 export function strikesOf(take: Take, scratches = false): Strike[] {
   const strikes: Strike[] = [];
   for (const note of notesOf(take, "chords")) {
-    if ((note.voice === MUTED) !== scratches) continue;
+    if (note.voice === PICKED || (note.voice === MUTED) !== scratches) continue;
     const last = strikes.at(-1);
     if (last && last.tick === note.tick) {
       last.pitches.push(note.pitch);
@@ -40,6 +42,21 @@ export function strikesOf(take: Take, scratches = false): Strike[] {
   }
   for (const strike of strikes) strike.pitches.sort((a, b) => a - b);
   return strikes;
+}
+
+/**
+ * The strings a picking hand plucks, each as a strike of one note: a string rings on by
+ * itself, so two plucked together are two of these.
+ */
+export function pluckedOf(take: Take): Strike[] {
+  return notesOf(take, "chords")
+    .filter((note) => note.voice === PICKED)
+    .map((note) => ({
+      tick: note.tick,
+      pitches: [note.pitch],
+      sounds: note.tick + note.offset,
+      ends: note.tick + note.offset + note.duration,
+    }));
 }
 
 const harmonies = new WeakMap<Take, ReturnType<typeof arrivals>>();

@@ -94,7 +94,7 @@ export function barStrikes(chords: ChordStyle, book: RhythmBook, setting: BarSet
     duration: number,
     velocity: number,
     arrival: Arrival,
-    how: Pick<Strike, "muted" | "down"> = {},
+    how: Pick<Strike, "muted" | "down" | "pluck"> = {},
   ) =>
     strikes.push({
       bar: bar.index,
@@ -105,6 +105,9 @@ export function barStrikes(chords: ChordStyle, book: RhythmBook, setting: BarSet
       kind,
       ...how,
     });
+  /** How a stroke of the figure touches the strings: deadened, plucked, or plainly. */
+  const touch = (stroke: FigureStroke): Pick<Strike, "muted" | "pluck"> =>
+    stroke.muted ? { muted: true } : stroke.pluck ? { pluck: stroke.pluck } : {};
   /** A chord rings no longer than it is written, and breathes before what follows it. */
   const ring = (stroke: FigureStroke, stretch: Stretch) =>
     Math.min(stroke.length, Math.round((stretch.end - stroke.at) * book.hold));
@@ -122,7 +125,7 @@ export function barStrikes(chords: ChordStyle, book: RhythmBook, setting: BarSet
         ? vocabulary.restrike
         : stroke.level,
       stretch.arrival,
-      stroke.muted ? { muted: true } : {},
+      touch(stroke),
     );
   // A pushed chord that rings over the change is left alone until it has rung.
   const tied = !figure.groove || figure.ties === true;
@@ -159,10 +162,12 @@ export function barStrikes(chords: ChordStyle, book: RhythmBook, setting: BarSet
     let body = mine.filter((stroke) => !early.includes(stroke));
     const asWritten =
       figure.groove || (change && !change.push && chords.anticipation.otherwise === "stay");
-    // A chord is never played early as a scratch (CH-36).
+    // A chord is never played early as a scratch (CH-36), nor as one plucked string, which
+    // cannot state it (ST-acoustic-30).
     const sounded = early.filter((stroke) => !stroke.muted);
-    const pushing = !asWritten && change?.push === true && (sounded.length > 0 || !next);
-    const pushAt = sounded.at(-1)?.at ?? stretch.end - EIGHTH;
+    const leans = sounded.filter((stroke) => !stroke.pluck);
+    const pushing = !asWritten && change?.push === true && (leans.length > 0 || !next);
+    const pushAt = leans.at(-1)?.at ?? stretch.end - EIGHTH;
     if (pushing) {
       // The last beat before the change is the new chord's alone: the old chord stabbed on
       // the beat and the new one on its "and" is "a quick C7 right before the F7" (KF-B-27).
@@ -185,10 +190,12 @@ export function barStrikes(chords: ChordStyle, book: RhythmBook, setting: BarSet
       // not. A scratch before the push deadens the old chord, which the hand still holds.
       let pushed = false;
       for (const stroke of early) {
-        if (!change.push || (stroke.muted && !pushed)) play(stroke, stretch);
+        // A scratch or a plucked string is never the push itself.
+        const plain = stroke.muted || stroke.pluck !== undefined;
+        if (!change.push || (plain && !pushed)) play(stroke, stretch);
         else if (pushed && tied) continue;
-        else if (stroke.muted)
-          strike(stroke.at, stroke.length, stroke.level, change.arrival, { muted: true });
+        else if (plain)
+          strike(stroke.at, stroke.length, stroke.level, change.arrival, touch(stroke));
         else {
           strike(stroke.at, stretch.end - stroke.at + change.carry, stroke.level, change.arrival);
           pushed = true;
@@ -199,7 +206,7 @@ export function barStrikes(chords: ChordStyle, book: RhythmBook, setting: BarSet
     } else if (change && pushing) {
       // The push: the figure's own strike there, or at a barline one put there for it,
       // since a figure that happens to pass the last eighth by would never lean in (KF-B-36).
-      const written = sounded.at(-1);
+      const written = leans.at(-1);
       const leaned = vocabulary.articulation[chords.anticipation.stroke] ?? vocabulary.arrival;
       // A strike the figure holds on past the change stays held: it is the new chord early,
       // and rings as it was written, as long as the new chord lasts (CH-40).
@@ -222,11 +229,17 @@ export function barStrikes(chords: ChordStyle, book: RhythmBook, setting: BarSet
     // it was struck there, and the bar is the bass's and the ride's (ST-jazz-28).
     const rests = setting.strokes.length === 0 && i === 0 && setting.heldOver;
     if (!struck && !rests) {
-      const { level, steps } = vocabulary.arrival;
+      const { level, steps, pluck } = vocabulary.arrival;
       const stroke = { at: stretch.start, level, length: steps * STEP };
       const sitting = strikes.findIndex((other) => other.muted && other.tick === stroke.at);
       if (sitting >= 0) strikes.splice(sitting, 1);
-      strike(stroke.at, ring(stroke, stretch), level, stretch.arrival, { down: true });
+      strike(
+        stroke.at,
+        ring(stroke, stretch),
+        level,
+        stretch.arrival,
+        pluck ? { pluck } : { down: true },
+      );
     }
   });
   return strikes;
