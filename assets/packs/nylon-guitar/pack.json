@@ -1,0 +1,471 @@
+{
+  "format": 1,
+  "id": "nylon-guitar",
+  "name": "Nylon-string guitar",
+  "credits": [
+    {
+      "title": "Spanish Classical Guitar",
+      "author": "FreePats (roberto@zenvoid.org)",
+      "url": "https://freepats.zenvoid.org/Guitar/acoustic-guitar.html",
+      "version": "2019-06-18",
+      "licence": "CC0-1.0",
+      "changes": "Every recorded note, G1 to C6 (48 notes, one recording of each at one dynamic), the mono recordings kept whole up to five seconds; trimmed to the onset, cut at a length cap or where the tail has gone, and faded; each levelled to one loudness; roots measured; encoded as Opus."
+    }
+  ],
+  "audio": {
+    "container": "webm",
+    "codec": "opus",
+    "sampleRate": 48000,
+    "channels": 1,
+    "bytes": 1796331,
+    "decodedBytes": 29027596
+  },
+  "level": {
+    "measure": "loudness",
+    "reference": -20
+  },
+  "voices": {
+    "": {
+      "layers": [
+        {
+          "top": 127,
+          "zones": [
+            {
+              "root": 31.108,
+              "takes": [
+                {
+                  "file": "n31-v1-1.webm",
+                  "seconds": 5
+                }
+              ]
+            },
+            {
+              "root": 32.038,
+              "takes": [
+                {
+                  "file": "n32-v1-1.webm",
+                  "seconds": 5
+                }
+              ]
+            },
+            {
+              "root": 33.039,
+              "takes": [
+                {
+                  "file": "n33-v1-1.webm",
+                  "seconds": 5
+                }
+              ]
+            },
+            {
+              "root": 34.015,
+              "takes": [
+                {
+                  "file": "n34-v1-1.webm",
+                  "seconds": 5
+                }
+              ]
+            },
+            {
+              "root": 34.992,
+              "takes": [
+                {
+                  "file": "n35-v1-1.webm",
+                  "seconds": 5
+                }
+              ]
+            },
+            {
+              "root": 35.997,
+              "takes": [
+                {
+                  "file": "n36-v1-1.webm",
+                  "seconds": 5
+                }
+              ]
+            },
+            {
+              "root": 36.952,
+              "takes": [
+                {
+                  "file": "n37-v1-1.webm",
+                  "seconds": 5
+                }
+              ]
+            },
+            {
+              "root": 37.954,
+              "takes": [
+                {
+                  "file": "n38-v1-1.webm",
+                  "seconds": 5
+                }
+              ]
+            },
+            {
+              "root": 39.004,
+              "takes": [
+                {
+                  "file": "n39-v1-1.webm",
+                  "seconds": 5
+                }
+              ]
+            },
+            {
+              "root": 39.995,
+              "takes": [
+                {
+                  "file": "n40-v1-1.webm",
+                  "seconds": 4.924729
+                }
+              ]
+            },
+            {
+              "root": 41.1,
+              "takes": [
+                {
+                  "file": "n41-v1-1.webm",
+                  "seconds": 5
+                }
+              ]
+            },
+            {
+              "root": 43.11,
+              "takes": [
+                {
+                  "file": "n43-v1-1.webm",
+                  "seconds": 5
+                }
+              ]
+            },
+            {
+              "root": 45.132,
+              "takes": [
+                {
+                  "file": "n45-v1-1.webm",
+                  "seconds": 5
+                }
+              ]
+            },
+            {
+              "root": 47.095,
+              "takes": [
+                {
+                  "file": "n47-v1-1.webm",
+                  "seconds": 3.747417
+                }
+              ]
+            },
+            {
+              "root": 48.156,
+              "takes": [
+                {
+                  "file": "n48-v1-1.webm",
+                  "seconds": 4.202187
+                }
+              ]
+            },
+            {
+              "root": 50.038,
+              "takes": [
+                {
+                  "file": "n50-v1-1.webm",
+                  "seconds": 4.847
+                }
+              ]
+            },
+            {
+              "root": 52.053,
+              "takes": [
+                {
+                  "file": "n52-v1-1.webm",
+                  "seconds": 4.414646
+                }
+              ]
+            },
+            {
+              "root": 53.028,
+              "takes": [
+                {
+                  "file": "n53-v1-1.webm",
+                  "seconds": 3.939313
+                }
+              ]
+            },
+            {
+              "root": 54.006,
+              "takes": [
+                {
+                  "file": "n54-v1-1.webm",
+                  "seconds": 3.802333
+                }
+              ]
+            },
+            {
+              "root": 54.938,
+              "takes": [
+                {
+                  "file": "n55-v1-1.webm",
+                  "seconds": 4.517396
+                }
+              ]
+            },
+            {
+              "root": 56.028,
+              "takes": [
+                {
+                  "file": "n56-v1-1.webm",
+                  "seconds": 3.060771
+                }
+              ]
+            },
+            {
+              "root": 57.097,
+              "takes": [
+                {
+                  "file": "n57-v1-1.webm",
+                  "seconds": 2.378167
+                }
+              ]
+            },
+            {
+              "root": 58.127,
+              "takes": [
+                {
+                  "file": "n58-v1-1.webm",
+                  "seconds": 2.294021
+                }
+              ]
+            },
+            {
+              "root": 59.16,
+              "takes": [
+                {
+                  "file": "n59-v1-1.webm",
+                  "seconds": 2.195333
+                }
+              ]
+            },
+            {
+              "root": 60.046,
+              "takes": [
+                {
+                  "file": "n60-v1-1.webm",
+                  "seconds": 2.221292
+                }
+              ]
+            },
+            {
+              "root": 61.177,
+              "takes": [
+                {
+                  "file": "n61-v1-1.webm",
+                  "seconds": 2.726708
+                }
+              ]
+            },
+            {
+              "root": 62.081,
+              "takes": [
+                {
+                  "file": "n62-v1-1.webm",
+                  "seconds": 2.922167
+                }
+              ]
+            },
+            {
+              "root": 63.089,
+              "takes": [
+                {
+                  "file": "n63-v1-1.webm",
+                  "seconds": 2.990375
+                }
+              ]
+            },
+            {
+              "root": 64.004,
+              "takes": [
+                {
+                  "file": "n64-v1-1.webm",
+                  "seconds": 3.622396
+                }
+              ]
+            },
+            {
+              "root": 65.034,
+              "takes": [
+                {
+                  "file": "n65-v1-1.webm",
+                  "seconds": 2.996167
+                }
+              ]
+            },
+            {
+              "root": 66.032,
+              "takes": [
+                {
+                  "file": "n66-v1-1.webm",
+                  "seconds": 2.958667
+                }
+              ]
+            },
+            {
+              "root": 67.032,
+              "takes": [
+                {
+                  "file": "n67-v1-1.webm",
+                  "seconds": 2.319417
+                }
+              ]
+            },
+            {
+              "root": 69.038,
+              "takes": [
+                {
+                  "file": "n69-v1-1.webm",
+                  "seconds": 3.783167
+                }
+              ]
+            },
+            {
+              "root": 69.993,
+              "takes": [
+                {
+                  "file": "n70-v1-1.webm",
+                  "seconds": 2.218625
+                }
+              ]
+            },
+            {
+              "root": 71.13,
+              "takes": [
+                {
+                  "file": "n71-v1-1.webm",
+                  "seconds": 1.807187
+                }
+              ]
+            },
+            {
+              "root": 72.095,
+              "takes": [
+                {
+                  "file": "n72-v1-1.webm",
+                  "seconds": 1.506646
+                }
+              ]
+            },
+            {
+              "root": 73.093,
+              "takes": [
+                {
+                  "file": "n73-v1-1.webm",
+                  "seconds": 1.681771
+                }
+              ]
+            },
+            {
+              "root": 74.102,
+              "takes": [
+                {
+                  "file": "n74-v1-1.webm",
+                  "seconds": 1.229729
+                }
+              ]
+            },
+            {
+              "root": 75.022,
+              "takes": [
+                {
+                  "file": "n75-v1-1.webm",
+                  "seconds": 1.162792
+                }
+              ]
+            },
+            {
+              "root": 76.044,
+              "takes": [
+                {
+                  "file": "n76-v1-1.webm",
+                  "seconds": 1.256333
+                }
+              ]
+            },
+            {
+              "root": 76.982,
+              "takes": [
+                {
+                  "file": "n77-v1-1.webm",
+                  "seconds": 1.426958
+                }
+              ]
+            },
+            {
+              "root": 78.006,
+              "takes": [
+                {
+                  "file": "n78-v1-1.webm",
+                  "seconds": 1.305583
+                }
+              ]
+            },
+            {
+              "root": 78.982,
+              "takes": [
+                {
+                  "file": "n79-v1-1.webm",
+                  "seconds": 1.358771
+                }
+              ]
+            },
+            {
+              "root": 79.978,
+              "takes": [
+                {
+                  "file": "n80-v1-1.webm",
+                  "seconds": 0.909917
+                }
+              ]
+            },
+            {
+              "root": 81.086,
+              "takes": [
+                {
+                  "file": "n81-v1-1.webm",
+                  "seconds": 1.492354
+                }
+              ]
+            },
+            {
+              "root": 82.045,
+              "takes": [
+                {
+                  "file": "n82-v1-1.webm",
+                  "seconds": 1.197729
+                }
+              ]
+            },
+            {
+              "root": 83.019,
+              "takes": [
+                {
+                  "file": "n83-v1-1.webm",
+                  "seconds": 0.925604
+                }
+              ]
+            },
+            {
+              "root": 84.052,
+              "takes": [
+                {
+                  "file": "n84-v1-1.webm",
+                  "seconds": 0.841729
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "release": 0.1
+    }
+  }
+}
