@@ -1,0 +1,938 @@
+{
+  "format": 1,
+  "id": "steel-guitar",
+  "name": "Steel-string guitar",
+  "credits": [
+    {
+      "title": "Shinyguitar",
+      "author": "Karoryfer Samples",
+      "url": "https://github.com/sfzinstruments/karoryfer.shinyguitar",
+      "version": "57243cca85277dbcc120ce17c6178032f93c80f3",
+      "licence": "CC0-1.0",
+      "changes": "The microphone recordings only (not the magnetic pickup's): every recorded note, Db2 to C6 (seventeen notes), at all four dynamics at the source's velocity tops, the first two of its four alternates each; mono recordings, trimmed to the onset, cut at a length cap or where the tail has gone, and faded; each levelled to one loudness; roots measured; encoded as Opus."
+    }
+  ],
+  "audio": {
+    "container": "webm",
+    "codec": "opus",
+    "sampleRate": 48000,
+    "channels": 1,
+    "bytes": 4642878,
+    "decodedBytes": 78313024
+  },
+  "level": {
+    "measure": "loudness",
+    "reference": -20
+  },
+  "voices": {
+    "": {
+      "layers": [
+        {
+          "top": 32,
+          "zones": [
+            {
+              "root": 36.918,
+              "takes": [
+                {
+                  "file": "n37-v1-1.webm",
+                  "seconds": 4
+                },
+                {
+                  "file": "n37-v1-2.webm",
+                  "seconds": 4
+                }
+              ]
+            },
+            {
+              "root": 39.933,
+              "takes": [
+                {
+                  "file": "n40-v1-1.webm",
+                  "seconds": 3.872333
+                },
+                {
+                  "file": "n40-v1-2.webm",
+                  "seconds": 3.872333
+                }
+              ]
+            },
+            {
+              "root": 41.859,
+              "takes": [
+                {
+                  "file": "n42-v1-1.webm",
+                  "seconds": 3.787229
+                },
+                {
+                  "file": "n42-v1-2.webm",
+                  "seconds": 3.787229
+                }
+              ]
+            },
+            {
+              "root": 44.921,
+              "takes": [
+                {
+                  "file": "n45-v1-1.webm",
+                  "seconds": 3.659583
+                },
+                {
+                  "file": "n45-v1-2.webm",
+                  "seconds": 3.659583
+                }
+              ]
+            },
+            {
+              "root": 47.893,
+              "takes": [
+                {
+                  "file": "n48-v1-1.webm",
+                  "seconds": 3.531917
+                },
+                {
+                  "file": "n48-v1-2.webm",
+                  "seconds": 3.531917
+                }
+              ]
+            },
+            {
+              "root": 50.941,
+              "takes": [
+                {
+                  "file": "n51-v1-1.webm",
+                  "seconds": 3.40425
+                },
+                {
+                  "file": "n51-v1-2.webm",
+                  "seconds": 3.40425
+                }
+              ]
+            },
+            {
+              "root": 53.999,
+              "takes": [
+                {
+                  "file": "n54-v1-1.webm",
+                  "seconds": 3.276604
+                },
+                {
+                  "file": "n54-v1-2.webm",
+                  "seconds": 3.276604
+                }
+              ]
+            },
+            {
+              "root": 56.951,
+              "takes": [
+                {
+                  "file": "n57-v1-1.webm",
+                  "seconds": 3.148938
+                },
+                {
+                  "file": "n57-v1-2.webm",
+                  "seconds": 3.148938
+                }
+              ]
+            },
+            {
+              "root": 59.955,
+              "takes": [
+                {
+                  "file": "n60-v1-1.webm",
+                  "seconds": 3.021271
+                },
+                {
+                  "file": "n60-v1-2.webm",
+                  "seconds": 3.021271
+                }
+              ]
+            },
+            {
+              "root": 62.962,
+              "takes": [
+                {
+                  "file": "n63-v1-1.webm",
+                  "seconds": 2.893625
+                },
+                {
+                  "file": "n63-v1-2.webm",
+                  "seconds": 2.893625
+                }
+              ]
+            },
+            {
+              "root": 66.022,
+              "takes": [
+                {
+                  "file": "n66-v1-1.webm",
+                  "seconds": 2.765958
+                },
+                {
+                  "file": "n66-v1-2.webm",
+                  "seconds": 2.765958
+                }
+              ]
+            },
+            {
+              "root": 68.964,
+              "takes": [
+                {
+                  "file": "n69-v1-1.webm",
+                  "seconds": 2.638292
+                },
+                {
+                  "file": "n69-v1-2.webm",
+                  "seconds": 2.638292
+                }
+              ]
+            },
+            {
+              "root": 71.953,
+              "takes": [
+                {
+                  "file": "n72-v1-1.webm",
+                  "seconds": 2.510646
+                },
+                {
+                  "file": "n72-v1-2.webm",
+                  "seconds": 2.510646
+                }
+              ]
+            },
+            {
+              "root": 74.992,
+              "takes": [
+                {
+                  "file": "n75-v1-1.webm",
+                  "seconds": 2.382979
+                },
+                {
+                  "file": "n75-v1-2.webm",
+                  "seconds": 2.382979
+                }
+              ]
+            },
+            {
+              "root": 77.994,
+              "takes": [
+                {
+                  "file": "n78-v1-1.webm",
+                  "seconds": 2.255313
+                },
+                {
+                  "file": "n78-v1-2.webm",
+                  "seconds": 2.255313
+                }
+              ]
+            },
+            {
+              "root": 80.985,
+              "takes": [
+                {
+                  "file": "n81-v1-1.webm",
+                  "seconds": 2.127667
+                },
+                {
+                  "file": "n81-v1-2.webm",
+                  "seconds": 2.127667
+                }
+              ]
+            },
+            {
+              "root": 83.988,
+              "takes": [
+                {
+                  "file": "n84-v1-1.webm",
+                  "seconds": 1.799187
+                },
+                {
+                  "file": "n84-v1-2.webm",
+                  "seconds": 1.920021
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 64,
+          "zones": [
+            {
+              "root": 36.98,
+              "takes": [
+                {
+                  "file": "n37-v2-1.webm",
+                  "seconds": 4
+                },
+                {
+                  "file": "n37-v2-2.webm",
+                  "seconds": 4
+                }
+              ]
+            },
+            {
+              "root": 39.946,
+              "takes": [
+                {
+                  "file": "n40-v2-1.webm",
+                  "seconds": 3.872333
+                },
+                {
+                  "file": "n40-v2-2.webm",
+                  "seconds": 3.872333
+                }
+              ]
+            },
+            {
+              "root": 41.885,
+              "takes": [
+                {
+                  "file": "n42-v2-1.webm",
+                  "seconds": 3.787229
+                },
+                {
+                  "file": "n42-v2-2.webm",
+                  "seconds": 3.787229
+                }
+              ]
+            },
+            {
+              "root": 44.951,
+              "takes": [
+                {
+                  "file": "n45-v2-1.webm",
+                  "seconds": 3.659583
+                },
+                {
+                  "file": "n45-v2-2.webm",
+                  "seconds": 3.659583
+                }
+              ]
+            },
+            {
+              "root": 47.896,
+              "takes": [
+                {
+                  "file": "n48-v2-1.webm",
+                  "seconds": 3.531917
+                },
+                {
+                  "file": "n48-v2-2.webm",
+                  "seconds": 3.531917
+                }
+              ]
+            },
+            {
+              "root": 50.95,
+              "takes": [
+                {
+                  "file": "n51-v2-1.webm",
+                  "seconds": 3.40425
+                },
+                {
+                  "file": "n51-v2-2.webm",
+                  "seconds": 3.40425
+                }
+              ]
+            },
+            {
+              "root": 54.002,
+              "takes": [
+                {
+                  "file": "n54-v2-1.webm",
+                  "seconds": 3.276604
+                },
+                {
+                  "file": "n54-v2-2.webm",
+                  "seconds": 3.276604
+                }
+              ]
+            },
+            {
+              "root": 56.961,
+              "takes": [
+                {
+                  "file": "n57-v2-1.webm",
+                  "seconds": 3.148938
+                },
+                {
+                  "file": "n57-v2-2.webm",
+                  "seconds": 3.148938
+                }
+              ]
+            },
+            {
+              "root": 59.962,
+              "takes": [
+                {
+                  "file": "n60-v2-1.webm",
+                  "seconds": 3.021271
+                },
+                {
+                  "file": "n60-v2-2.webm",
+                  "seconds": 3.021271
+                }
+              ]
+            },
+            {
+              "root": 62.965,
+              "takes": [
+                {
+                  "file": "n63-v2-1.webm",
+                  "seconds": 2.893625
+                },
+                {
+                  "file": "n63-v2-2.webm",
+                  "seconds": 2.893625
+                }
+              ]
+            },
+            {
+              "root": 66.03,
+              "takes": [
+                {
+                  "file": "n66-v2-1.webm",
+                  "seconds": 2.765958
+                },
+                {
+                  "file": "n66-v2-2.webm",
+                  "seconds": 2.765958
+                }
+              ]
+            },
+            {
+              "root": 68.97,
+              "takes": [
+                {
+                  "file": "n69-v2-1.webm",
+                  "seconds": 2.638292
+                },
+                {
+                  "file": "n69-v2-2.webm",
+                  "seconds": 2.638292
+                }
+              ]
+            },
+            {
+              "root": 71.96,
+              "takes": [
+                {
+                  "file": "n72-v2-1.webm",
+                  "seconds": 2.510646
+                },
+                {
+                  "file": "n72-v2-2.webm",
+                  "seconds": 2.510646
+                }
+              ]
+            },
+            {
+              "root": 75.008,
+              "takes": [
+                {
+                  "file": "n75-v2-1.webm",
+                  "seconds": 2.382979
+                },
+                {
+                  "file": "n75-v2-2.webm",
+                  "seconds": 2.382979
+                }
+              ]
+            },
+            {
+              "root": 78.006,
+              "takes": [
+                {
+                  "file": "n78-v2-1.webm",
+                  "seconds": 2.255313
+                },
+                {
+                  "file": "n78-v2-2.webm",
+                  "seconds": 2.255313
+                }
+              ]
+            },
+            {
+              "root": 81,
+              "takes": [
+                {
+                  "file": "n81-v2-1.webm",
+                  "seconds": 2.127667
+                },
+                {
+                  "file": "n81-v2-2.webm",
+                  "seconds": 2.127667
+                }
+              ]
+            },
+            {
+              "root": 83.983,
+              "takes": [
+                {
+                  "file": "n84-v2-1.webm",
+                  "seconds": 1.728021
+                },
+                {
+                  "file": "n84-v2-2.webm",
+                  "seconds": 1.712792
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 96,
+          "zones": [
+            {
+              "root": 37.055,
+              "takes": [
+                {
+                  "file": "n37-v3-1.webm",
+                  "seconds": 4
+                },
+                {
+                  "file": "n37-v3-2.webm",
+                  "seconds": 4
+                }
+              ]
+            },
+            {
+              "root": 39.979,
+              "takes": [
+                {
+                  "file": "n40-v3-1.webm",
+                  "seconds": 3.872333
+                },
+                {
+                  "file": "n40-v3-2.webm",
+                  "seconds": 3.872333
+                }
+              ]
+            },
+            {
+              "root": 41.912,
+              "takes": [
+                {
+                  "file": "n42-v3-1.webm",
+                  "seconds": 3.787229
+                },
+                {
+                  "file": "n42-v3-2.webm",
+                  "seconds": 3.787229
+                }
+              ]
+            },
+            {
+              "root": 44.969,
+              "takes": [
+                {
+                  "file": "n45-v3-1.webm",
+                  "seconds": 3.659583
+                },
+                {
+                  "file": "n45-v3-2.webm",
+                  "seconds": 3.659583
+                }
+              ]
+            },
+            {
+              "root": 47.915,
+              "takes": [
+                {
+                  "file": "n48-v3-1.webm",
+                  "seconds": 3.531917
+                },
+                {
+                  "file": "n48-v3-2.webm",
+                  "seconds": 3.531917
+                }
+              ]
+            },
+            {
+              "root": 50.969,
+              "takes": [
+                {
+                  "file": "n51-v3-1.webm",
+                  "seconds": 3.40425
+                },
+                {
+                  "file": "n51-v3-2.webm",
+                  "seconds": 3.40425
+                }
+              ]
+            },
+            {
+              "root": 54.011,
+              "takes": [
+                {
+                  "file": "n54-v3-1.webm",
+                  "seconds": 3.276604
+                },
+                {
+                  "file": "n54-v3-2.webm",
+                  "seconds": 3.276604
+                }
+              ]
+            },
+            {
+              "root": 56.968,
+              "takes": [
+                {
+                  "file": "n57-v3-1.webm",
+                  "seconds": 3.148938
+                },
+                {
+                  "file": "n57-v3-2.webm",
+                  "seconds": 3.148938
+                }
+              ]
+            },
+            {
+              "root": 59.981,
+              "takes": [
+                {
+                  "file": "n60-v3-1.webm",
+                  "seconds": 3.021271
+                },
+                {
+                  "file": "n60-v3-2.webm",
+                  "seconds": 3.021271
+                }
+              ]
+            },
+            {
+              "root": 62.969,
+              "takes": [
+                {
+                  "file": "n63-v3-1.webm",
+                  "seconds": 2.893625
+                },
+                {
+                  "file": "n63-v3-2.webm",
+                  "seconds": 2.893625
+                }
+              ]
+            },
+            {
+              "root": 66.033,
+              "takes": [
+                {
+                  "file": "n66-v3-1.webm",
+                  "seconds": 2.765958
+                },
+                {
+                  "file": "n66-v3-2.webm",
+                  "seconds": 2.765958
+                }
+              ]
+            },
+            {
+              "root": 68.978,
+              "takes": [
+                {
+                  "file": "n69-v3-1.webm",
+                  "seconds": 2.638292
+                },
+                {
+                  "file": "n69-v3-2.webm",
+                  "seconds": 2.638292
+                }
+              ]
+            },
+            {
+              "root": 71.965,
+              "takes": [
+                {
+                  "file": "n72-v3-1.webm",
+                  "seconds": 2.510646
+                },
+                {
+                  "file": "n72-v3-2.webm",
+                  "seconds": 2.510646
+                }
+              ]
+            },
+            {
+              "root": 75.013,
+              "takes": [
+                {
+                  "file": "n75-v3-1.webm",
+                  "seconds": 2.382979
+                },
+                {
+                  "file": "n75-v3-2.webm",
+                  "seconds": 2.382979
+                }
+              ]
+            },
+            {
+              "root": 78.012,
+              "takes": [
+                {
+                  "file": "n78-v3-1.webm",
+                  "seconds": 2.255313
+                },
+                {
+                  "file": "n78-v3-2.webm",
+                  "seconds": 2.255313
+                }
+              ]
+            },
+            {
+              "root": 81.001,
+              "takes": [
+                {
+                  "file": "n81-v3-1.webm",
+                  "seconds": 2.127667
+                },
+                {
+                  "file": "n81-v3-2.webm",
+                  "seconds": 2.127667
+                }
+              ]
+            },
+            {
+              "root": 83.979,
+              "takes": [
+                {
+                  "file": "n84-v3-1.webm",
+                  "seconds": 1.657458
+                },
+                {
+                  "file": "n84-v3-2.webm",
+                  "seconds": 1.704521
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 127,
+          "zones": [
+            {
+              "root": 37.133,
+              "takes": [
+                {
+                  "file": "n37-v4-1.webm",
+                  "seconds": 4
+                },
+                {
+                  "file": "n37-v4-2.webm",
+                  "seconds": 4
+                }
+              ]
+            },
+            {
+              "root": 40.078,
+              "takes": [
+                {
+                  "file": "n40-v4-1.webm",
+                  "seconds": 3.872333
+                },
+                {
+                  "file": "n40-v4-2.webm",
+                  "seconds": 3.872333
+                }
+              ]
+            },
+            {
+              "root": 41.995,
+              "takes": [
+                {
+                  "file": "n42-v4-1.webm",
+                  "seconds": 3.787229
+                },
+                {
+                  "file": "n42-v4-2.webm",
+                  "seconds": 3.787229
+                }
+              ]
+            },
+            {
+              "root": 44.99,
+              "takes": [
+                {
+                  "file": "n45-v4-1.webm",
+                  "seconds": 3.659583
+                },
+                {
+                  "file": "n45-v4-2.webm",
+                  "seconds": 3.659583
+                }
+              ]
+            },
+            {
+              "root": 47.955,
+              "takes": [
+                {
+                  "file": "n48-v4-1.webm",
+                  "seconds": 3.531917
+                },
+                {
+                  "file": "n48-v4-2.webm",
+                  "seconds": 3.531917
+                }
+              ]
+            },
+            {
+              "root": 50.896,
+              "takes": [
+                {
+                  "file": "n51-v4-1.webm",
+                  "seconds": 3.40425
+                },
+                {
+                  "file": "n51-v4-2.webm",
+                  "seconds": 3.40425
+                }
+              ]
+            },
+            {
+              "root": 54.007,
+              "takes": [
+                {
+                  "file": "n54-v4-1.webm",
+                  "seconds": 3.276604
+                },
+                {
+                  "file": "n54-v4-2.webm",
+                  "seconds": 3.276604
+                }
+              ]
+            },
+            {
+              "root": 56.949,
+              "takes": [
+                {
+                  "file": "n57-v4-1.webm",
+                  "seconds": 3.148938
+                },
+                {
+                  "file": "n57-v4-2.webm",
+                  "seconds": 3.148938
+                }
+              ]
+            },
+            {
+              "root": 59.965,
+              "takes": [
+                {
+                  "file": "n60-v4-1.webm",
+                  "seconds": 3.021271
+                },
+                {
+                  "file": "n60-v4-2.webm",
+                  "seconds": 3.021271
+                }
+              ]
+            },
+            {
+              "root": 62.949,
+              "takes": [
+                {
+                  "file": "n63-v4-1.webm",
+                  "seconds": 2.893625
+                },
+                {
+                  "file": "n63-v4-2.webm",
+                  "seconds": 2.893625
+                }
+              ]
+            },
+            {
+              "root": 66.015,
+              "takes": [
+                {
+                  "file": "n66-v4-1.webm",
+                  "seconds": 2.765958
+                },
+                {
+                  "file": "n66-v4-2.webm",
+                  "seconds": 2.765958
+                }
+              ]
+            },
+            {
+              "root": 68.996,
+              "takes": [
+                {
+                  "file": "n69-v4-1.webm",
+                  "seconds": 2.638292
+                },
+                {
+                  "file": "n69-v4-2.webm",
+                  "seconds": 2.638292
+                }
+              ]
+            },
+            {
+              "root": 71.973,
+              "takes": [
+                {
+                  "file": "n72-v4-1.webm",
+                  "seconds": 2.510646
+                },
+                {
+                  "file": "n72-v4-2.webm",
+                  "seconds": 2.510646
+                }
+              ]
+            },
+            {
+              "root": 75.02,
+              "takes": [
+                {
+                  "file": "n75-v4-1.webm",
+                  "seconds": 2.382979
+                },
+                {
+                  "file": "n75-v4-2.webm",
+                  "seconds": 2.382979
+                }
+              ]
+            },
+            {
+              "root": 78.006,
+              "takes": [
+                {
+                  "file": "n78-v4-1.webm",
+                  "seconds": 2.255313
+                },
+                {
+                  "file": "n78-v4-2.webm",
+                  "seconds": 2.255313
+                }
+              ]
+            },
+            {
+              "root": 80.995,
+              "takes": [
+                {
+                  "file": "n81-v4-1.webm",
+                  "seconds": 2.127667
+                },
+                {
+                  "file": "n81-v4-2.webm",
+                  "seconds": 2.127667
+                }
+              ]
+            },
+            {
+              "root": 83.974,
+              "takes": [
+                {
+                  "file": "n84-v4-1.webm",
+                  "seconds": 1.555687
+                },
+                {
+                  "file": "n84-v4-2.webm",
+                  "seconds": 1.589813
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "release": 0.12
+    }
+  }
+}
