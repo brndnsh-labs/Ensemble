@@ -84,7 +84,17 @@ export function validateStyle(style: StylePack): string[] {
       `sound: the mix is set for ${seat}'s own instrument, which takes no level of its own`,
     );
   }
+  for (const [seat, touch] of Object.entries(style.sound.touch ?? {})) {
+    check(
+      Number.isInteger(touch) && Math.abs(touch) <= 60,
+      `sound: ${seat} is touched ${touch} from its level; a whole number within 60`,
+    );
+  }
   for (const [seat, mix] of Object.entries(style.sound.mix.seats)) {
+    check(
+      mix.lowpass === undefined || (mix.lowpass >= 100 && mix.lowpass <= 20000),
+      `sound: ${seat} tone rolls off at ${mix.lowpass} Hz; between 100 and 20000`,
+    );
     check(mix.level >= -40 && mix.level <= 12, `sound: ${seat} level is -40 to 12 dB`);
     check(mix.pan === undefined || Math.abs(mix.pan) <= 1, `sound: ${seat} pan is -1 to 1`);
     check(

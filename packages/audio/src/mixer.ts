@@ -13,6 +13,8 @@ export interface ChannelMix {
   readonly reverb?: number;
   /** Cut everything under this many Hz. The low end belongs to the bass and the kick. */
   readonly highpass?: number;
+  /** Roll off what is over this many Hz, 12 dB an octave: an instrument's tone control turned down. */
+  readonly lowpass?: number;
 }
 
 /** A mix: a channel for each name, the room, and the master level. */
@@ -88,6 +90,13 @@ export class Mixer {
       const filter = context.createBiquadFilter();
       filter.type = "highpass";
       filter.frequency.value = settings.highpass;
+      filter.Q.value = Math.SQRT1_2;
+      tail = tail.connect(filter);
+    }
+    if (settings.lowpass !== undefined) {
+      const filter = context.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.value = settings.lowpass;
       filter.Q.value = Math.SQRT1_2;
       tail = tail.connect(filter);
     }

@@ -81,10 +81,21 @@ async function perform(): Promise<Performance> {
   // timed notes, each with its seat. For studying one sound, not for playing a tune.
   const written = params.get("notes");
   const extra: TimedNote[] = written ? await (await fetch(written)).json() : [];
+  // `touch=bass:-12` plays a seat's softer (or harder) recordings at the level written, in
+  // place of the style's own touch: for hearing a touch before a style is given it.
+  const touched = new Map(
+    (params.get("touch") ?? "")
+      .split(",")
+      .filter(Boolean)
+      .map((pair) => pair.split(":"))
+      .map(([seat, by]) => [seat!, Number(by)] as const),
+  );
   for (const note of [...timedNotes(take.plan, take.events), ...extra]) {
     if (only && !only.includes(note.seat)) continue;
     const pack = nameOf(note.seat, packOf(note.seat, note.voice));
     wanted.set(pack, note.seat);
+    const touch =
+      touched.get(note.seat) ?? (note.seat === "solo" ? 0 : (style.sound.touch?.[note.seat] ?? 0));
     sounds.push({
       at: note.at,
       length: note.length,
@@ -93,6 +104,7 @@ async function perform(): Promise<Performance> {
       voice: note.seat === "solo" ? "" : (note.voice ?? ""),
       pitch: note.pitch,
       velocity: note.velocity,
+      ...(touch ? { touch: Math.max(1, Math.min(127, note.velocity + touch)) } : {}),
       ...(note.bend === undefined ? {} : { bend: note.bend }),
     });
   }

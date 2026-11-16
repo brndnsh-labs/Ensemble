@@ -182,6 +182,14 @@ export interface SoundStyle {
    * there is nothing to choose. The notes are the same whichever plays them.
    */
   readonly choices?: Readonly<Partial<Record<Exclude<Seat, "solo">, readonly SeatChoice[]>>>;
+  /**
+   * How a seat's instrument is touched, against how loud it is heard: a number
+   * added to each note's velocity to choose the recording that is played, while
+   * the note keeps its own level. Under zero the player strikes more gently
+   * than the band's dynamics say and is turned up: the softer recordings, which
+   * on a plucked string are the rounder ones. Absent for a seat: as written.
+   */
+  readonly touch?: Readonly<Partial<Record<Exclude<Seat, "solo">, number>>>;
   readonly mix: MixStyle;
 }
 
@@ -241,6 +249,11 @@ export interface SeatMix {
   readonly reverb?: number;
   /** Cut everything under this many Hz: the low end is the bass's and the kick's. */
   readonly highpass?: number;
+  /**
+   * Roll off what is over this many Hz: the instrument's tone control turned
+   * down, as a bassist turns it for a round, dark note. Absent: wide open.
+   */
+  readonly lowpass?: number;
 }
 
 /**

@@ -21,6 +21,13 @@ export interface Sound {
   /** 1 to 127. */
   readonly velocity: number;
   /**
+   * How hard the instrument was struck, 1 to 127, where that is not how loud
+   * it is heard: the recording played is the one made at this dynamic, at the
+   * level `velocity` gives. A string plucked gently and turned up. Left out,
+   * it is `velocity`.
+   */
+  readonly touch?: number;
+  /**
    * Where the pitch moves while it sounds: cents away from `pitch`, one value
    * every `step` seconds from its start. After the last, it stays there.
    */

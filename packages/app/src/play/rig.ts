@@ -18,7 +18,12 @@ const fixedParts = (mix: Mix): string =>
   JSON.stringify([
     mix.room.seconds,
     mix.room.predelay,
-    Object.entries(mix.channels).map(([name, channel]) => [name, channel.highpass, channel.pan]),
+    Object.entries(mix.channels).map(([name, channel]) => [
+      name,
+      channel.highpass,
+      channel.lowpass,
+      channel.pan,
+    ]),
   ]);
 
 export class Rig {

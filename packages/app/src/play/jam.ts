@@ -164,6 +164,7 @@ export function soundsOf(take: Take, style: StylePack, options: HowPlayed): Soun
   for (const note of timedNotes(take.plan, take.events)) {
     const pack = names.get(note.seat);
     if (pack === undefined) continue;
+    const touch = note.seat === "solo" ? undefined : style.sound.touch?.[note.seat];
     sounds.push({
       at: note.at,
       length: note.length,
@@ -172,6 +173,8 @@ export function soundsOf(take: Take, style: StylePack, options: HowPlayed): Soun
       voice: note.seat === "solo" ? "" : (note.voice ?? ""),
       pitch: note.pitch,
       velocity: note.velocity,
+      // A seat touched more gently than it is heard plays its softer recordings.
+      ...(touch ? { touch: Math.max(1, Math.min(127, note.velocity + touch)) } : {}),
       ...(note.bend === undefined ? {} : { bend: note.bend }),
     });
   }

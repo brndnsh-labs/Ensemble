@@ -60,7 +60,7 @@ export class Sampler {
     const name = sound.voice in pack.voices ? sound.voice : "";
     const voice = pack.voices[name];
     if (!voice) return;
-    const zone = nearestZone(layerFor(voice, sound.velocity), sound.pitch);
+    const zone = nearestZone(layerFor(voice, sound.touch ?? sound.velocity), sound.pitch);
     if (!zone) return;
     const turn = instrument.turns.get(zone) ?? 0;
     instrument.turns.set(zone, turn + 1);
