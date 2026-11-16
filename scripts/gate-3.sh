@@ -51,8 +51,8 @@ for seed in 1 2; do
 done
 
 echo "Other tunes and lengths:"
-take "timed-4min-quick-change-e" library/blues-quick-change-e.chart --minutes 4 --solo --seed 1
-take "slow-blues-g" library/blues-slow-g.chart --passes 4 --solo --seed 1
+take "timed-4min-quick-change-e" library/blues-intro-outro-d.chart --key E --tempo 108 --minutes 4 --solo --seed 1
+take "slow-blues-g" library/blues-12-bar-a.chart --key G --tempo 66 --passes 4 --solo --seed 1
 take "minor-blues-am" library/blues-minor-am.chart --passes "$passes" --solo --seed 1
 take "jazz-blues-f" library/blues-jazz-f.chart --passes "$passes" --solo --seed 1
 take "intro-and-tag-d-song" library/blues-intro-outro-d.chart --song --solo --seed 1

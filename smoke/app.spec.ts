@@ -10,13 +10,13 @@ test("the app loads and shows the library", async ({ page }) => {
   await page.goto("./");
   await expect(page.getByRole("heading", { name: "Ensemble" })).toBeVisible();
   // Somewhere to start, a tap from playing, before anything has been played.
-  await expect(page.getByRole("link", { name: "12-Bar Blues in A" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "12-Bar Blues" })).toBeVisible();
   await expect(page.getByRole("button", { name: /^Play / })).not.toHaveCount(0);
   // The wall: each style is a way into the one library. A chart of any style is a few letters
   // away, and what the search finds is the library showing it, with the way home at its top.
   await expect(page.getByRole("link", { name: /^Jazz/ })).toBeVisible();
   await page.getByRole("searchbox", { name: "Find a chart" }).fill("rhythm");
-  await expect(page.getByRole("link", { name: "Rhythm Changes in Bb" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Rhythm Changes" })).toBeVisible();
   await expect(
     page.getByRole("navigation", { name: "Where you are" }).getByRole("link", { name: "Home" }),
   ).toBeVisible();
@@ -37,7 +37,7 @@ test("after install, the app loads offline", async ({ page, context }) => {
   await page.reload();
   await expect(page.getByRole("heading", { name: "Ensemble" })).toBeVisible();
   // A chart opens too: the whole app is on the device, not just its front page.
-  await page.getByRole("link", { name: "12-Bar Blues in A" }).click();
+  await page.getByRole("link", { name: "12-Bar Blues" }).click();
   await expect(page.getByRole("button", { name: "Play", exact: true })).toBeVisible();
   await expect(page.locator(".bar")).toHaveCount(12);
 });
@@ -129,7 +129,7 @@ test("export downloads a MIDI file that matches the CLI's output for the same ta
   // The take is to be had as a file where it is played, while it plays, without keeping it first.
   await page.goto("./#/chart/jazz-rhythm-changes-bb");
   await page.getByRole("button", { name: "Play", exact: true }).click();
-  expect(await exported("Export MIDI", app)).toBe("Rhythm Changes in Bb.mid");
+  expect(await exported("Export MIDI", app)).toBe("Rhythm Changes.mid");
 
   // The CLI plays a take from its recipe, which a kept take's own screen exports. Leaving the
   // screen by its row of places stops the band; the chart is then the poster at the top of home,
@@ -140,14 +140,14 @@ test("export downloads a MIDI file that matches the CLI's output for the same ta
     .getByRole("navigation", { name: "Where you are" })
     .getByRole("link", { name: "Home" })
     .click();
-  await page.getByRole("link", { name: "Rhythm Changes in Bb" }).click();
+  await page.getByRole("link", { name: "Rhythm Changes" }).click();
   await page.getByRole("button", { name: "More", exact: true }).click();
   await page
     .getByRole("dialog")
     .getByRole("link", { name: /^Kept take/ })
     .click();
-  expect(await exported("Export take", take)).toBe("Rhythm Changes in Bb.take.json");
-  expect(await exported("Export MIDI", again)).toBe("Rhythm Changes in Bb.mid");
+  expect(await exported("Export take", take)).toBe("Rhythm Changes.take.json");
+  expect(await exported("Export MIDI", again)).toBe("Rhythm Changes.mid");
 
   const root = resolve(import.meta.dirname, "..");
   execFileSync("node", ["packages/cli/src/main.ts", "replay", take, "--out", cli], { cwd: root });
