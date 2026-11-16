@@ -1,4 +1,5 @@
 @import "@fontsource-variable/archivo/wdth.css";
+@import "@fontsource-variable/roboto-serif/wdth.css";
 
 /* Ink on paper, and a highlighter for the bar being played. The ink is the
    blue-violet of a duplicated band chart; the paper is cool, not cream. */
@@ -19,7 +20,8 @@
   --wash: color-mix(in srgb, var(--ink) 16%, transparent);
   --face: "Archivo Variable", system-ui, sans-serif;
   /* The face the chart is set in: its chords, its section marks, its title. The interface's own until another is chosen. */
-  --chart-face: var(--face);
+  /* The chart is set in a serif, so that it is the page and everything round it is the desk. */
+  --chart-face: "Roboto Serif Variable", Georgia, serif;
   /* The chart's text is set in the system's own monospace, so bars typed in columns stay in them. */
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
 }
@@ -624,9 +626,9 @@ button:active:not(:disabled),
   margin: 0;
   overflow: hidden;
   font-family: var(--chart-face);
-  font-size: 1.3rem;
-  font-stretch: 75%;
-  font-weight: 750;
+  font-size: 1.25rem;
+  font-stretch: 62%;
+  font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -842,11 +844,29 @@ button:active:not(:disabled),
   overflow: hidden;
 }
 
+/* A form too long to read at one screen's size is set larger and moves with the band. */
+.chart-frame.scrolls {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  /* The page runs on under the bottom edge: it fades there, so a line cut off reads as more to come. */
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+}
+
+.chart-frame.scrolls::-webkit-scrollbar {
+  display: none;
+}
+
 /* One em here is the size of a chord's root: everything on the page is cut from it. */
 .chart {
   font-family: var(--chart-face);
   font-size: var(--size);
   line-height: 1;
+}
+
+/* Room under the last line of a page that scrolls, so that it can come clear of the fade. */
+.chart-frame.scrolls .chart {
+  padding-bottom: 28px;
 }
 
 .section + .section {
@@ -908,9 +928,11 @@ button:active:not(:disabled),
   transform: rotate(-0.6deg);
 }
 
+/* A chord takes the room it needs before the bar's spare room is shared out by the beats:
+   a long symbol beside a short one borrows from it, and neither is squeezed. */
 .slot {
   display: flex;
-  flex: 0 1 0;
+  flex: 0 1 auto;
   align-items: center;
   min-width: 0;
   padding-right: 0.14em;
@@ -938,9 +960,9 @@ button:active:not(:disabled),
 
 .quality {
   position: relative;
-  top: -0.52em;
+  top: -0.42em;
   margin-left: 0.05em;
-  font-size: 0.56em;
+  font-size: 0.64em;
   font-weight: 620;
 }
 

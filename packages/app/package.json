@@ -13,6 +13,7 @@
     "@ensemble/engine": "workspace:*",
     "@ensemble/styles": "workspace:*",
     "@fontsource-variable/archivo": "5.3.0",
+    "@fontsource-variable/roboto-serif": "5.3.0",
     "react": "19.3.1",
     "react-dom": "19.3.1"
   },

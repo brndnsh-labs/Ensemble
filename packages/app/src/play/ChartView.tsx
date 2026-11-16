@@ -1,9 +1,11 @@
-// The chart on the page: the whole form on one screen, sized to fit it.
+// The chart on the page: the whole form on one screen where that leaves it large enough to
+// read from beside an instrument, and otherwise set large, four bars to a line, the page
+// moving up a line at a time with the band.
 
 import type { Chart } from "@ensemble/engine";
 import { keyToString } from "@ensemble/engine";
 import type { CSSProperties } from "react";
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Reading } from "./ChordSymbol.tsx";
 import { ChordSymbol, Simile } from "./ChordSymbol.tsx";
 import type { PageBar, PageChord, PageSection } from "./page.ts";
@@ -36,7 +38,20 @@ const LINE = { names: 2, numerals: 2, both: 2.9 } as const;
 const LABEL = 0.95;
 const SECTION_GAP = 0.35;
 /** The narrowest a bar may be, in the same units: room for a root and a short quality. */
-const BAR_WIDTH = 3.3;
+const BAR_WIDTH = 2.8;
+/**
+ * The size of a chord's root, in pixels, the chart is wanted at: on a phone, which sits on a
+ * music stand at arm's length, and on a wider screen, whose pixels are bigger and nearer.
+ * A form that fits one screen at four fifths of this or more is left whole and still; a form
+ * that does not is set at this size (or as large as the width allows), four bars to a line,
+ * and scrolls. Brandon's eye, from pictures of both: "larger looks better".
+ */
+const WANTED = { phone: 34, wide: 24 } as const;
+const NEAR_ENOUGH = 0.8;
+/** How far the whole page is set smaller for its fullest bar, as a share of its size. */
+const SMALLER = 0.72;
+/** Under this many pixels across the chart is on a phone held upright. */
+const PHONE = 560;
 /** The chords' width as set, and as far as a crowded bar may squeeze them (the typeface's range). */
 const WIDTH = 88;
 const NARROWEST = 62;
@@ -45,6 +60,8 @@ interface Layout {
   readonly sections: readonly PageSection[];
   /** The root's type size in pixels. */
   readonly size: number;
+  /** The form is longer than the screen at this size: the page moves with the band. */
+  readonly scrolls: boolean;
 }
 
 /** A section's label is shown unless the chart is one unnamed section. */
@@ -105,16 +122,25 @@ export function ChartView({ chart, reading, playhead, focus }: Props) {
 
   // Wider lines when that makes the type bigger: a long form on a laptop reads better eight bars across.
   const layout = useMemo((): Layout => {
-    if (focus) return { sections: pageOf(chart, box.w < 560 ? 0.5 : 1), size: 0 };
+    if (focus) return { sections: pageOf(chart, box.w < PHONE ? 0.5 : 1), size: 0, scrolls: false };
     let best: Layout | undefined;
     for (const widen of [1, 2]) {
       const sections = pageOf(chart, widen);
       const size = fit(unitsOf(sections, reading), columnsOf(sections), box.w, box.h);
       // Compared before the floor is applied: of two layouts both too small to read as they
       // stand, the one that fits the screen is still the one to take.
-      if (!best || size > best.size * 1.15) best = { sections, size };
+      if (!best || size > best.size * 1.15) best = { sections, size, scrolls: false };
     }
-    return { sections: best!.sections, size: Math.max(SMALLEST, best!.size) };
+    const whole = best as Layout;
+    // As written, four bars to a line, at the size it is wanted at or as near as the width allows.
+    const written = pageOf(chart, 1);
+    const wanted = Math.min(
+      box.w / columnsOf(written) / BAR_WIDTH,
+      box.w < PHONE ? WANTED.phone : WANTED.wide,
+    );
+    if (box.w === 0 || whole.size >= wanted * NEAR_ENOUGH)
+      return { sections: whole.sections, size: Math.max(SMALLEST, whole.size), scrolls: false };
+    return { sections: written, size: wanted, scrolls: true };
   }, [chart, reading, focus, box]);
 
   const showLabels = labelled(layout.sections);
@@ -132,35 +158,67 @@ export function ChartView({ chart, reading, playhead, focus }: Props) {
   const line =
     LINE[reading] + Math.max(0, Math.min(spare / Math.max(1, lines), LINE[reading] * 0.5));
 
-  // Squeeze a chord that is too wide for its share of the bar: narrower letters first, then smaller.
+  // Make room in the bars that are too full. Narrower letters first, bar by bar, and every
+  // chord of a bar by the same amount. Where that is not enough the whole page is set a
+  // little smaller, so that every chord on it is one size; only past a point (one very long
+  // symbol should not shrink a whole tune) is the bar itself set smaller than its neighbours.
+  // (A chord too wide for its own share of a bar that has room borrows it: see `.slot`.)
   // biome-ignore lint/correctness/useExhaustiveDependencies: measured again whenever what is drawn changes
   useLayoutEffect(() => {
     const squeeze = () => {
-      const slots = [...frame.current!.querySelectorAll<HTMLElement>(".slot")];
-      for (const slot of slots) {
-        const chord = slot.firstElementChild as HTMLElement | null;
-        if (chord) chord.style.cssText = "";
+      const page = frame.current!.querySelector<HTMLElement>(".chart")!;
+      const bars = [...page.querySelectorAll<HTMLElement>(".bar")].map((bar) => {
+        const slots = [...bar.querySelectorAll<HTMLElement>(".slot")];
+        const chords = slots
+          .map((slot) => slot.firstElementChild as HTMLElement | null)
+          .filter((chord): chord is HTMLElement => chord !== null);
+        // How much of what the chords need the bar has: the slots shrink to the bar, the chords do not.
+        const share = () => {
+          const room = slots.reduce(
+            (sum, slot) =>
+              sum + slot.clientWidth - Number.parseFloat(getComputedStyle(slot).paddingRight),
+            0,
+          );
+          const needed = chords.reduce(
+            (sum, chord) => sum + chord.getBoundingClientRect().width,
+            0,
+          );
+          return needed > 0 ? room / needed : 1;
+        };
+        return { chords, share };
+      });
+      /** Narrow each full bar's letters; say how much the fullest still lacks. */
+      const narrow = (): number => {
+        let least = 1;
+        for (const { chords, share } of bars) {
+          for (const chord of chords) chord.style.cssText = "";
+          const first = share();
+          if (first >= 1) continue;
+          for (const chord of chords) {
+            chord.style.fontStretch = `${Math.max(NARROWEST, WIDTH * first)}%`;
+          }
+          least = Math.min(least, share());
+        }
+        return least;
+      };
+      /** Set the page in a size, its lines opened up by whatever height that leaves over. */
+      const set = (px: number) => {
+        const spare = box.h / px - units;
+        const open = Math.max(0, Math.min(spare / Math.max(1, lines), LINE[reading] * 0.5));
+        page.style.setProperty("--size", `${px}px`);
+        page.style.setProperty("--line", String(LINE[reading] + open));
+      };
+      set(size);
+      const least = narrow();
+      if (least >= 1) return;
+      // A bar holds in proportion more of smaller type: the size at which the fullest bar fits.
+      set(size * Math.max(SMALLER, least * 0.98));
+      if (narrow() >= 1) return;
+      for (const { chords, share } of bars) {
+        const left = share();
+        if (left >= 1) continue;
+        for (const chord of chords) chord.style.fontSize = `${left * 0.98}em`;
       }
-      const room = (slot: HTMLElement) =>
-        slot.clientWidth - Number.parseFloat(getComputedStyle(slot).paddingRight);
-      const ratios = slots.map((slot) => {
-        const chord = slot.firstElementChild as HTMLElement | null;
-        return chord ? room(slot) / chord.getBoundingClientRect().width : 1;
-      });
-      slots.forEach((slot, i) => {
-        if (ratios[i]! >= 1) return;
-        const chord = slot.firstElementChild as HTMLElement;
-        chord.style.fontStretch = `${Math.max(NARROWEST, WIDTH * ratios[i]!)}%`;
-      });
-      // Narrower letters do not narrow a chord in exact proportion, and have a limit: what is left is made up in size.
-      const left = slots.map((slot, i) => {
-        const chord = slot.firstElementChild as HTMLElement | null;
-        return chord && ratios[i]! < 1 ? room(slot) / chord.getBoundingClientRect().width : 1;
-      });
-      slots.forEach((slot, i) => {
-        if (left[i]! >= 1) return;
-        (slot.firstElementChild as HTMLElement).style.fontSize = `${left[i]! * 0.98}em`;
-      });
     };
     squeeze();
     // The type's own letters arrive after the first drawing, and are a different width.
@@ -169,10 +227,32 @@ export function ChartView({ chart, reading, playhead, focus }: Props) {
     return () => {
       current = false;
     };
-  }, [sections, size, reading]);
+  }, [sections, size, reading, box.h, units, lines]);
+
+  // The page follows the band: when the bar being played is on another line, that line comes
+  // to the top of the screen (its section's name with it), so what is coming is always under
+  // it. It moves between lines and never inside one. Stopped, the page is the reader's to move.
+  const scrolls = !focus && layout.scrolls;
+  const playing = playhead?.bar;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the size changes where the lines are
+  useEffect(() => {
+    const element = frame.current!;
+    if (!scrolls || playing === undefined) return;
+    const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const to = (top: number) => {
+      if (Math.abs(top - element.scrollTop) < 2) return;
+      element.scrollTo({ top, behavior: calm ? "auto" : "smooth" });
+    };
+    const line = element.querySelector('.bar[aria-current="true"]')?.closest<HTMLElement>(".line");
+    // The count-in, before any bar is played: from the top.
+    if (!line) return to(0);
+    const label = line.previousElementSibling;
+    const first = label?.classList.contains("label") ? (label as HTMLElement) : line;
+    to(first.getBoundingClientRect().top - element.getBoundingClientRect().top + element.scrollTop);
+  }, [scrolls, playing, size]);
 
   return (
-    <div className="chart-frame" ref={frame}>
+    <div className={`chart-frame${scrolls ? " scrolls" : ""}`} ref={frame}>
       <div
         className={`chart${focus ? " focus" : ""}`}
         style={{ "--size": `${size}px`, "--line": line, "--columns": columns } as CSSProperties}
