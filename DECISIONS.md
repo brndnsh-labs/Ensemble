@@ -1356,3 +1356,11 @@ Built to `prompts/app-editor-tap-a-bar.md`. What that brief did not settle:
 
 - **Smoke journey 3** opens a new chart, presses the first bar, types `F7 | Bb7` and Enter, and reads the second bar as `Bb7` on the chart; then presses Text and reads `| F7 | Bb7 | NC | NC |` in the box. From there it is as it was: the text filled in, eight bars on the page, the heading, `Hq7` typed, its message, its mark inside the box. The other four are untouched.
 - **The rewrites are not tested** (`docs/TESTING.md`: UI glue). They were checked with a scratch script over all 51 library charts, kept out of the repo (`out/editor-pass/`, ignored): 23,367 checks, no faults. See the report.
+
+## the editor you tap: checked and merged (stage 6)
+
+Read on the main thread: the report against the pictures (a bar open over the phone's dock, a bar open on a laptop), and the build's own check of the rewrites run again here: 23,367 edits over every bar and section of the 51 library charts, no faults (each bar retyped gives the text back; each change parses with no new diagnostic and is left alone by `fmt`; add then delete, duplicate then delete, rename and back all restore the original). `pnpm check` and the five smoke journeys pass on the merged tree; nothing in the engine changed.
+
+- `docs/CHART_FORMAT.md` section 1 said the app never rewrites a user's text unless asked to format it. An edit made on the chart now does, for the section it touches and in the formatter's layout; the sentence says so.
+- Not seen on a real phone by anyone: whether a press on a bar raises the iPhone's keyboard, whether the dock sits on it, whether its keys keep it up. Brandon's to try.
+- Left as the build found them: by tapping there is no way to set key, tempo or meter, add repeats and endings, or play a section again by name (the Text side has them); a laptop's field overlaps the next bar on a six-bar line; duplicating a section that has its own key copies its bars untransposed.

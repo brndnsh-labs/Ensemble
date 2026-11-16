@@ -2,7 +2,7 @@
 
 Version 1. File extension `.chart`. UTF-8 plain text.
 
-A chart is the source of truth for a song. The app stores the text exactly as typed and renders every view from it. The app never rewrites a user's text unless asked to format it.
+A chart is the source of truth for a song. The app stores the text exactly as typed and renders every view from it. The app rewrites a user's text only when asked to: by Format, or by an edit made on the drawn chart (a bar typed there, a bar or a section added, duplicated, renamed or deleted), which rewrites the section it touches in the formatter's layout and leaves the rest of the text as it was.
 
 ## 1. Design goals
 
