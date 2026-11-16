@@ -218,12 +218,8 @@ fieldset {
 /* A plain control is an outline in ink, a fingertip tall. What is switched on is filled.
    Nothing here eases from one state to another: a press is answered in the frame it lands. */
 .act,
-.reading button,
-.focus-toggle,
 .tools button,
 .tools a,
-.seats button,
-.keep,
 .side,
 .fix,
 .grid-remove,
@@ -284,13 +280,9 @@ button:active:not(:disabled),
 @media (hover: hover) {
   :is(
     .act,
-    .reading button,
-    .focus-toggle,
     .edit-link,
     .tools button,
     .tools a,
-    .seats button,
-    .keep,
     .side,
     .fix,
     .grid-remove,
@@ -298,10 +290,7 @@ button:active:not(:disabled),
     .empty-page button,
     :is(.bar-panel, .section-panel) :is(.dock-acts button, .dock-step),
     .steps button,
-    .finish,
     .row-more,
-    .stepper button,
-    .kept a,
     .tab,
     .shows-all
   ):not(:disabled, [aria-disabled="true"], [aria-pressed="true"], [aria-current], .first):hover {
@@ -387,36 +376,6 @@ button:active:not(:disabled),
 .field:has(select:focus-visible, input:focus-visible) {
   outline: 2.5px solid var(--ink);
   outline-offset: 2px;
-}
-
-.field.tempo > span:first-child {
-  text-align: center;
-}
-
-.stepper {
-  display: flex;
-  align-items: stretch;
-  height: 100%;
-}
-
-.stepper button {
-  flex: none;
-  width: 46px;
-  padding: 0;
-  border: 0;
-  background: none;
-  font-size: 1.3rem;
-  font-weight: 600;
-}
-
-.stepper output {
-  flex: 1;
-  min-width: 2.6em;
-  padding-top: 20px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-  text-align: center;
 }
 
 /* ── The way back ────────────────────────────────────────────────────────── */
@@ -1331,14 +1290,16 @@ button:active:not(:disabled),
   font-size: 0.875rem;
 }
 
-/* ── The play screen ─────────────────────────────────────────────────────── */
+/* ── A chart's screen ────────────────────────────────────────────────────── */
 
+/* The screen is the height of the window: the chart takes what the top and the dock leave.
+   The dock runs to the bottom edge and the sides, so the style's ink fills under a phone's
+   home bar too; everything above it keeps clear of the notch by its own margins. */
 .play {
   display: flex;
   flex-direction: column;
   height: 100dvh;
-  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
-    env(safe-area-inset-left);
+  padding-top: env(safe-area-inset-top);
   overflow: hidden;
 }
 
@@ -1350,16 +1311,23 @@ button:active:not(:disabled),
   padding: 2px var(--gutter) 0;
 }
 
+/* The top of a chart's screen keeps to the chart's column on a wide screen. */
+.play .top {
+  flex: none;
+  padding-inline: max(env(safe-area-inset-left), calc((100% - 64rem) / 2 - var(--gutter)))
+    max(env(safe-area-inset-right), calc((100% - 64rem) / 2 - var(--gutter)));
+}
+
 /* A chart's name, in the chart's own face, on a line of its own under the way back. */
 .chart-title {
   margin: 0;
   padding: 0 var(--gutter);
   overflow: hidden;
   font-family: var(--chart-face);
-  font-size: 1.5rem;
+  font-size: 1.65rem;
   font-stretch: 62%;
   font-weight: 720;
-  line-height: 1.15;
+  line-height: 1.12;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1378,26 +1346,7 @@ button:active:not(:disabled),
   white-space: nowrap;
 }
 
-/* One of several ways to read the page: a row of joined buttons, since only one is ever on. */
-.reading {
-  display: flex;
-  flex: none;
-}
-
-.reading button {
-  min-width: var(--control);
-  padding: 0 10px;
-}
-
-.reading :where(button + button) {
-  border-left: 0;
-}
-
-.focus-toggle {
-  flex: none;
-}
-
-/* The way to the editor: a word at the end of the row, not a box. */
+/* The way to the editor, and More: words at the end of the row, not boxes. */
 .edit-link {
   display: inline-flex;
   flex: none;
@@ -1415,143 +1364,71 @@ button:active:not(:disabled),
   white-space: nowrap;
 }
 
-.view {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px var(--gutter) 8px;
+.edit-link + .edit-link {
+  margin-left: 6px;
 }
 
-/* What is being played, in a line: two short ones where a phone has no room for it. */
-.summary {
-  display: -webkit-box;
-  flex: 1;
-  min-width: 0;
-  margin: 0;
+/* For a screen reader only: what a sighted player reads from where a thing is. */
+.vh {
+  position: absolute;
+  width: 1px;
+  height: 1px;
   overflow: hidden;
-  color: var(--faint);
-  font-size: 0.875rem;
-  font-stretch: 90%;
-  line-height: 1.25;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-/* How the tune is called, before the band starts. On a phone two to a row: style and key,
-   then the tempo and, with the room that is left, how long. */
-.setup {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 0 var(--gutter) 10px;
-}
-
-.setup .field {
-  flex: 1 1 calc(50% - 4px);
-}
-
-.setup .field.tempo {
-  flex: 0 0 136px;
-}
-
-/* The takes kept of this chart, in a line that scrolls sideways if there are many. */
-.kept {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  padding: 0 var(--gutter) 10px;
-}
-
-.kept > span {
-  flex: none;
-  color: var(--faint);
-  font-size: 0.8125rem;
-  font-weight: 600;
-}
-
-.kept ul {
-  display: flex;
-  gap: 6px;
-  min-width: 0;
-  margin: 0;
-  padding: 2px;
-  overflow-x: auto;
-  list-style: none;
-  scrollbar-width: none;
-}
-
-.kept a {
-  display: inline-flex;
-  align-items: center;
-  height: var(--control);
-  padding: 0 12px;
-  border: 2px solid var(--rule);
-  color: inherit;
-  font-size: 0.875rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  text-decoration: none;
+  clip-path: inset(50%);
   white-space: nowrap;
 }
 
-/* Who is in the band: under the chart, where it stays while the band plays. */
-.band {
-  display: flex;
-  flex: 1 0 100%;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
-}
-
-/* What a seat is played on, over the seats: it grows upward, so the seats do not move. */
-.band-picks {
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
-}
-
-/* Half the row each, from the right: the soloist's choice stands over the soloist's seat. */
-.band-picks .field {
-  flex: 0 1 calc(50% - 3px);
-}
-
-/* Four switches, each its own button: any of them can be on. */
-.seats {
-  display: flex;
-  gap: 6px;
-}
-
-.seats button {
-  flex: 1 1 0;
-  flex-direction: column;
-  min-width: 0;
-  padding: 0 4px;
-  font-weight: 650;
-  line-height: 1.1;
-}
-
-/* In the band: a tint of ink, not the whole bottle, which is the transport's. Out of it, or
-   silenced: the outline of an empty chair. */
-.seats button[aria-pressed="true"] {
-  background: var(--wash);
-  color: var(--ink);
-}
-
-.seats button[aria-pressed="false"] {
-  border-color: var(--rule);
+/* What is played, in a line: the style, the key, the tempo and how long. Each part is
+   underlined with the style's ink and is pressed to change it, before Play; while the band
+   plays the line is a statement, and the ink comes off it. The rule under it is the top of
+   the chart's page, so a page scrolled up goes under it cleanly. */
+.sentence {
+  margin: 0 var(--gutter) 6px;
+  padding: 3px 0 10px;
+  border-bottom: 2px solid var(--ink);
   color: var(--faint);
+  font-size: 1.0625rem;
+  line-height: 2rem;
 }
 
-.seats small {
-  font-size: 0.6875rem;
-  font-weight: 600;
+.sentence .part {
+  position: relative;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-weight: 750;
+  line-height: 1.3;
+  white-space: nowrap;
+  box-shadow: inset 0 -0.42em 0 0 color-mix(in srgb, var(--spot) 62%, transparent);
 }
 
-/* Switched on for the next take: pencilled in, not inked. */
-.seats button.next {
-  border-style: dashed;
-  background: repeating-linear-gradient(-45deg, var(--wash) 0 3px, transparent 3px 7px);
+/* A fingertip tall and wide, whatever the line's height and however short the word. */
+.sentence button.part::after {
+  content: "";
+  position: absolute;
+  top: -11px;
+  bottom: -11px;
+  left: 50%;
+  width: max(100% + 6px, 44px);
+  transform: translateX(-50%);
+}
+
+.sentence button.part:active {
+  box-shadow: inset 0 -1.3em 0 0 var(--spot);
+  color: var(--press);
+}
+
+.sentence.told .part {
+  box-shadow: none;
+}
+
+/* A take's line says what was played, in plain type: there is nothing in it to press. */
+.sentence.take-told {
+  padding-top: 6px;
+  color: var(--ink);
+  font-weight: 550;
+  line-height: 1.35;
 }
 
 .problem {
@@ -1561,29 +1438,25 @@ button:active:not(:disabled),
   font-weight: 600;
 }
 
-@media (min-width: 820px) {
-  .setup {
-    flex-wrap: nowrap;
-    gap: 10px;
-    padding-bottom: 12px;
+.play .problem {
+  padding-inline: max(var(--gutter), calc((100% - 64rem) / 2));
+}
+
+/* A kept take that does not play here: what is left is to delete it. */
+.take-gone {
+  padding: 0 var(--gutter);
+}
+
+/* A phone on its side has width and no height: the name and the line are set smaller. */
+@media (max-height: 500px) and (min-width: 600px) {
+  .chart-title {
+    font-size: 1.25rem;
   }
 
-  .setup .field {
-    flex: 0 1 11rem;
-  }
-
-  .setup .field:last-child {
-    flex-basis: 14rem;
-  }
-
-  .band {
-    flex: none;
-    order: -1;
-  }
-
-  .seats button {
-    flex: none;
-    width: 84px;
+  .sentence {
+    padding-bottom: 4px;
+    font-size: 0.9375rem;
+    line-height: 1.6rem;
   }
 }
 
@@ -1607,6 +1480,12 @@ button:active:not(:disabled),
 
 .chart-frame.scrolls::-webkit-scrollbar {
   display: none;
+}
+
+/* The chart keeps to its column: a phone's width, or 64 rem in the middle of a laptop. */
+.play .chart-frame {
+  margin-inline: max(var(--gutter), env(safe-area-inset-left), calc((100% - 64rem) / 2))
+    max(var(--gutter), env(safe-area-inset-right), calc((100% - 64rem) / 2));
 }
 
 /* One em here is the size of a chord's root: everything on the page is cut from it. */
@@ -1861,22 +1740,35 @@ button:active:not(:disabled),
   font-weight: 650;
 }
 
-/* ── Under the chart ─────────────────────────────────────────────────────── */
+/* ── The dock ────────────────────────────────────────────────────────────── */
 
-/* A phone held upright: the strip, then who is playing, then what to press, each a row of
-   its own with the transport nearest the thumb. A wider screen has room for one row. */
-.bar-bottom {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  padding: 8px var(--gutter) 10px;
+/* Under the chart, one block: where the band is, the four players, and the transport, with
+   the transport nearest the thumb. Before Play it is paper with one block of the style's
+   ink on it, Play. From the press of Play the style's ink comes down over the whole dock at
+   once, with the press ink printed on it, and goes when the band stops. `--on` and `--under`
+   are what is printed and what it is printed on, so everything in the dock follows. */
+.band-dock {
+  flex: none;
+  padding: 8px max(var(--gutter), env(safe-area-inset-right))
+    calc(12px + env(safe-area-inset-bottom)) max(var(--gutter), env(safe-area-inset-left));
   border-top: 2px solid var(--ink);
+  background: var(--paper);
+  color: var(--on);
+  --on: var(--ink);
+  --under: var(--paper);
+  --wash: color-mix(in srgb, var(--on) 14%, transparent);
+}
+
+.play:not([data-state="idle"]) .band-dock {
+  border-top-color: var(--press);
+  background: var(--spot);
+  --on: var(--press);
+  --under: var(--spot);
+  --focus: var(--press);
 }
 
 .strip {
   display: grid;
-  flex: 1 0 100%;
   grid-template-columns: auto 1fr auto;
   gap: 3px 12px;
   align-items: baseline;
@@ -1890,27 +1782,25 @@ button:active:not(:disabled),
   font-weight: 850;
 }
 
-.strip.last .strip-where {
-  color: var(--pencil);
-}
-
 .strip-solo {
   grid-column: 2;
   overflow: hidden;
-  color: var(--faint);
   font-size: 0.875rem;
+  font-weight: 550;
+  opacity: 0.7;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .strip-solo.on {
-  color: inherit;
-  font-weight: 600;
+  font-weight: 750;
+  opacity: 1;
 }
 
 .strip-time {
   grid-column: 3;
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
 }
 
 .arc {
@@ -1926,23 +1816,24 @@ button:active:not(:disabled),
 }
 
 .arc-fill {
-  fill: var(--faint);
-  opacity: 0.45;
+  fill: var(--on);
+  opacity: 0.3;
 }
 
+/* The way home is shaded. */
 .arc-last {
-  fill: var(--pencil);
-  opacity: 0.16;
+  fill: var(--on);
+  opacity: 0.12;
 }
 
 .arc-top {
-  stroke: var(--paper);
+  stroke: var(--under);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
 
 .arc-solo {
-  stroke: var(--ink);
+  stroke: var(--on);
   stroke-width: 2.5;
   vector-effect: non-scaling-stroke;
 }
@@ -1954,48 +1845,112 @@ button:active:not(:disabled),
   vector-effect: non-scaling-stroke;
 }
 
-/* What can be done with the take: on the left, away from the transport, so neither moves
-   when the other's buttons come and go. */
-.take-tools {
-  display: flex;
-  flex: none;
+/* The four players: four switches, each a block of type naming its seat and what it is
+   played on. In the band it is printed in outline; out of it, only pencilled in. */
+.players {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
-  min-width: 0;
+  margin-top: 8px;
 }
 
-/* Nothing to keep yet: Play has the whole row. */
-.take-tools:empty {
-  display: none;
+.player,
+.player[aria-pressed] {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  height: 52px;
+  padding: 0 8px;
+  border: 2px solid var(--on);
+  background: none;
+  color: var(--on);
+  text-align: left;
+}
+
+.player .who {
+  display: block;
+  font-size: 1.1875rem;
+  font-stretch: 68%;
+  font-weight: 850;
+  line-height: 1.05;
+}
+
+.player .what {
+  display: block;
+  overflow: hidden;
+  font-size: 0.6875rem;
+  font-stretch: 88%;
+  font-weight: 600;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Out of the band (sitting out, or silenced while it plays), or not in a kept take at all. */
+.player.out,
+.player.absent {
+  padding: 0 8.5px;
+  border-style: dashed;
+  border-width: 1.5px;
+  color: color-mix(in srgb, var(--on) 62%, transparent);
+}
+
+/* Switched on for the next take: pencilled in, and hatched. */
+.player.next {
+  border-style: dashed;
+  background: repeating-linear-gradient(-45deg, var(--wash) 0 3px, transparent 3px 7px);
+}
+
+.player:active:not(:disabled) {
+  background: var(--wash);
+}
+
+/* The block inked solid, for the length of a note: the lamp is laid over it, holding the same
+   words in the paper's colour, and only its opacity is ever changed (by `lamps.ts`, from the
+   notes), so a note lays nothing out again. */
+.lamp {
+  position: absolute;
+  inset: -2px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 10px;
+  background: var(--on);
+  color: var(--under);
+  opacity: 0;
+  pointer-events: none;
 }
 
 .transport {
   display: flex;
-  flex: 1 1 0;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
+  gap: 8px;
+  margin-top: 8px;
 }
 
-/* Play: the one block of colour on the screen, in the ink of the style the band will play
-   in, and as wide as the row has room for. Then Stop, in the same place, in the ink
-   itself: whichever it says, it is the first choice. */
+/* Play: the one block of colour on the screen until it is pressed, as wide as its row. Then
+   Stop, in the same place, in the press ink on the flooded dock. */
 .go {
   flex: 1 1 0;
   min-width: 0;
-  height: 56px;
+  height: 64px;
   padding: 0;
   border: 0;
   background: var(--spot);
   color: var(--press);
-  font-size: 2.2rem;
+  font-size: 2.6rem;
   letter-spacing: 0.01em;
   line-height: 1;
+}
+
+.play[data-state="idle"] .go {
   --focus: var(--ink);
 }
 
 .go.stop {
-  background: var(--ink);
-  color: var(--paper);
+  background: var(--press);
+  color: var(--spot);
 }
 
 .go:active {
@@ -2003,146 +1958,86 @@ button:active:not(:disabled),
   color: var(--on-marker);
 }
 
-/* Finish, beside it and plainly the lesser: an outline, and as wide as its longest word so
-   that saying the band is on its way home moves nothing. */
+/* Keep and Finish, beside Stop and plainly the lesser: outlines. Finish is as wide as its
+   longest word, so that saying the band is on its way home moves nothing, and the two
+   together leave Stop over the middle of where Play was. */
+.keep,
 .finish {
   flex: none;
-  width: 84px;
-  height: 56px;
-  padding: 0;
-  border: 2px solid var(--ink);
+  height: 64px;
+  padding: 0 12px;
+  border: 2px solid var(--on);
   background: none;
-  font-size: 1.0625rem;
+  color: var(--on);
+  font-size: 1.125rem;
   font-stretch: 75%;
   font-weight: 800;
 }
 
+.finish {
+  width: 84px;
+  padding: 0;
+}
+
+.keep:disabled,
 .finish:disabled {
-  border-color: var(--rule);
-  color: var(--faint);
+  border-style: dashed;
+  border-width: 1.5px;
+  opacity: 0.6;
 }
 
-/* Keeping the take and taking it away: quieter still. */
-.keep {
-  flex: none;
-  height: 56px;
-  padding: 0 10px;
-  font-size: 1.0625rem;
-  font-stretch: 75%;
-  font-weight: 800;
+@media (hover: hover) {
+  :is(.player, .keep, .finish):not(:disabled):hover {
+    background: var(--wash);
+  }
 }
 
-.keep:disabled {
-  border-color: var(--rule);
-  color: var(--faint);
-}
-
-/* A tablet, or a phone on its side: the band beside the strip, and what to press under them. */
+/* A tablet, or a phone on its side: the strip over the players, and the transport beside
+   them. A laptop: all three in one row, in the chart's column. */
 @media (min-width: 820px) {
-  .bar-bottom {
+  .band-dock {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    gap: 8px 20px;
-    padding-bottom: 12px;
-  }
-
-  .band {
-    grid-column: 1;
-    grid-row: 1;
-    align-self: end;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    grid-template-areas:
+      "strip transport"
+      "players transport";
+    gap: 8px 28px;
+    align-items: end;
+    padding-inline: max(var(--gutter), calc((100% - 64rem) / 2));
   }
 
   .strip {
-    grid-column: 2 / -1;
-    grid-row: 1;
+    grid-area: strip;
   }
 
-  /* A take's screen has no band: its strip starts at the edge. */
-  .bar-bottom:not(:has(.band)) .strip {
-    grid-column: 1 / -1;
-  }
-
-  .take-tools {
-    grid-column: 1 / 3;
-    grid-row: 2;
-    gap: 8px;
+  .players {
+    grid-area: players;
+    margin-top: 0;
   }
 
   .transport {
-    grid-column: 3;
-    grid-row: 2;
-    gap: 10px;
-  }
-
-  .keep {
-    padding: 0 14px;
-  }
-
-  .finish {
-    width: 96px;
-  }
-
-  .transport {
-    flex: none;
-  }
-
-  .go {
-    flex: none;
-    width: 168px;
+    grid-area: transport;
+    margin-top: 0;
   }
 }
 
-/* A laptop: everything under the chart in one row. */
 @media (min-width: 1100px) {
-  .bar-bottom {
-    grid-template-columns: auto minmax(0, 1fr) auto auto;
-    padding-bottom: 14px;
-  }
-
-  .strip {
-    grid-column: 2;
-  }
-
-  .bar-bottom:not(:has(.band)) .strip {
-    grid-column: 1 / 3;
-  }
-
-  .take-tools {
-    grid-column: 3;
-    grid-row: 1;
-  }
-
-  .transport {
-    grid-column: 4;
-    grid-row: 1;
+  .band-dock {
+    grid-template-columns: minmax(0, 1fr) 400px 360px;
+    grid-template-areas: "strip players transport";
   }
 }
 
-/* A phone on its side has width and no height: the screen's name and how it is read share a line. */
-@media (max-height: 500px) and (min-width: 600px) {
-  .top {
-    display: flex;
-    align-items: center;
+@media (max-height: 500px) {
+  .player,
+  .player[aria-pressed] {
+    height: 44px;
   }
 
-  .top .bar-top {
-    flex: none;
-    padding: 4px 0 4px var(--gutter);
-  }
-
-  .top .chart-title {
-    flex: 0 1 auto;
-    padding: 0 0 0 12px;
-  }
-
-  .top .view {
-    flex: 1;
-    padding: 4px var(--gutter) 4px 12px;
-  }
-
-  .bar-bottom {
-    padding-top: 4px;
-    padding-bottom: 6px;
+  .go,
+  .keep,
+  .finish {
+    height: 52px;
   }
 }
 
@@ -3215,38 +3110,6 @@ button.mark[aria-expanded="true"] {
   color: var(--pencil);
 }
 
-/* ── A kept take ─────────────────────────────────────────────────────────── */
-
-/* In place of the setup: the take's name, and what can be done with it. */
-.take-setup {
-  align-items: center;
-}
-
-.setup .field.take-name {
-  flex: 1 1 100%;
-}
-
-.take-setup .tools {
-  flex: 1 1 100%;
-  padding-bottom: 0;
-}
-
-.take-setup .problem {
-  flex-basis: 100%;
-  padding: 0;
-  font-size: 0.875rem;
-}
-
-@media (min-width: 820px) {
-  .setup .field.take-name {
-    flex: 0 1 24rem;
-  }
-
-  .take-setup .tools {
-    flex: 1 1 auto;
-  }
-}
-
 /* ── A phone held upright ────────────────────────────────────────────────── */
 
 /* The editor's top row also holds the chart's name, Undo, Redo and Play. On a phone the
@@ -3263,5 +3126,376 @@ button.mark[aria-expanded="true"] {
 
   .edit .bar-top h1 {
     font-size: 1.15rem;
+  }
+}
+
+/* ── Sheets ──────────────────────────────────────────────────────────────── */
+
+/* A slip of paper laid over the screen: from the bottom edge on a phone, rising into place
+   in 140 ms, and away at once; a card at the foot of the middle on a laptop. It is the
+   browser's own dialog, so the screen behind it is dimmed and cannot be pressed. */
+.sheet {
+  position: fixed;
+  inset: auto 0 0;
+  width: 100%;
+  max-width: none;
+  max-height: 86dvh;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 0;
+  border-top: 2px solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.sheet[open] {
+  animation: sheet-up 140ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(28px);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet[open] {
+    animation: none;
+  }
+}
+
+.sheet::backdrop {
+  background: rgb(20 18 50 / 0.42);
+}
+
+/* The sheet takes the focus as it opens, for the next Tab: it is not ringed for that. */
+.sheet:focus {
+  outline: none;
+}
+
+.sheet-in {
+  padding: 6px max(var(--gutter), env(safe-area-inset-right))
+    calc(18px + env(safe-area-inset-bottom)) max(var(--gutter), env(safe-area-inset-left));
+}
+
+@media (min-width: 720px) {
+  .sheet {
+    inset: auto auto 24px 50%;
+    width: 440px;
+    margin-left: -220px;
+    border: 2px solid var(--ink);
+    box-shadow: 6px 7px 0 var(--wash);
+  }
+
+  .sheet-in {
+    padding: 6px 24px 20px;
+  }
+}
+
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  margin-bottom: 4px;
+}
+
+.sheet-head h2 {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.done {
+  flex: none;
+  height: var(--control);
+  padding: 0 16px;
+  border: 0;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 0.9375rem;
+  font-weight: 750;
+}
+
+.opts {
+  display: grid;
+  gap: 6px;
+}
+
+.opt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 8px;
+  border: 2px solid var(--ink);
+  background: none;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.opt small {
+  color: var(--faint);
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.keys-opts {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.list-opts .opt {
+  align-items: flex-start;
+  padding: 0 14px;
+}
+
+/* A style to choose is its bill, small, in its own ink; the one being played has the press
+   ink's frame round it. */
+.styles-opts {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+}
+
+.style-opt,
+.style-opt[aria-pressed] {
+  align-items: flex-start;
+  min-height: 56px;
+  padding: 0 12px;
+  border: 0;
+  background: var(--spot);
+  color: var(--press);
+  font-size: 1.8rem;
+  font-stretch: 62%;
+  font-weight: 900;
+  line-height: 0.86;
+  text-transform: uppercase;
+  --focus: var(--ink);
+}
+
+.style-opt[aria-pressed="true"] {
+  box-shadow: inset 0 0 0 4px var(--press);
+}
+
+.style-opt:active {
+  background: color-mix(in srgb, var(--spot) 84%, var(--press));
+}
+
+/* One of three, joined: how the chords are written. */
+.seg {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+}
+
+.seg .opt + .opt {
+  border-left: 0;
+}
+
+.sheet-label {
+  margin: 4px 0 8px;
+  color: var(--faint);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.sheet-note {
+  margin: 12px 0 0;
+  color: var(--faint);
+  font-size: 0.875rem;
+}
+
+/* The tempo: the figure large, a step either side, and the whole range under it. */
+.tempo-set {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.step {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border: 2px solid var(--ink);
+  background: none;
+  font-size: 2rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.step:disabled {
+  border-style: dashed;
+  border-width: 1.5px;
+  opacity: 0.5;
+}
+
+.tempo-now {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.tempo-now output {
+  font-size: 6rem;
+  font-stretch: 62%;
+  font-weight: 900;
+  line-height: 0.9;
+}
+
+.tempo-unit {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.tempo-range {
+  width: 100%;
+  height: var(--control);
+  margin: 10px 0 0;
+  accent-color: var(--ink);
+}
+
+.tempo-ends {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--control);
+  color: var(--faint);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.tempo-back {
+  height: var(--control);
+  padding: 0 8px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* More: a list of lines, each a thing to do or to go to, with a word under it on what it is. */
+.menu {
+  margin: 12px 0 0;
+  padding: 0;
+  border-top: 1px solid var(--rule);
+  list-style: none;
+}
+
+.menu li {
+  border-bottom: 1px solid var(--rule);
+}
+
+.menu-line,
+.menu-pick {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+  min-height: 52px;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-size: 1.0625rem;
+  font-weight: 650;
+  text-align: left;
+  text-decoration: none;
+}
+
+.menu-line[aria-pressed="true"] {
+  background: none;
+  color: var(--ink);
+}
+
+.menu small {
+  color: var(--faint);
+  font-size: 0.8125rem;
+  font-weight: 450;
+}
+
+.opt[aria-pressed="true"] small {
+  color: inherit;
+  opacity: 0.8;
+}
+
+.menu .danger {
+  color: var(--pencil);
+}
+
+/* A choice of instrument is the line itself: the browser's own list opens over it, which on a
+   phone is the wheel the thumb knows. The list is there, unseen, the size of the line. */
+.menu-pick {
+  position: relative;
+  padding-right: 24px;
+  cursor: pointer;
+}
+
+.menu-pick select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.menu-pick::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-70%) rotate(45deg);
+  pointer-events: none;
+}
+
+.menu-pick:has(select:focus-visible) {
+  outline: 2.5px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* A name being typed, in place of its line. */
+.menu-rename {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 0;
+}
+
+.menu-rename .field {
+  flex: 1 1 100%;
+}
+
+.menu .field.menu-name {
+  margin: 8px 0;
+}
+
+@media (hover: hover) {
+  :is(.opt, .step, .tempo-back, .menu-line, .menu-pick):not(
+    :disabled,
+    [aria-pressed="true"]
+  ):hover {
+    background: var(--wash);
+  }
+
+  .sentence button.part:hover {
+    box-shadow: inset 0 -1.3em 0 0 color-mix(in srgb, var(--spot) 62%, transparent);
   }
 }

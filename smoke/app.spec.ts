@@ -111,10 +111,12 @@ test("pressing play starts audio and advances the playhead", async ({ page }) =>
 test("export downloads a MIDI file that matches the CLI's output for the same take", async ({
   page,
 }, info) => {
+  // What is rarely wanted, the files among it, is behind More, in a sheet over the screen.
   const exported = async (button: string, path: string) => {
+    await page.getByRole("button", { name: "More", exact: true }).click();
     const [download] = await Promise.all([
       page.waitForEvent("download"),
-      page.getByRole("button", { name: button }).click(),
+      page.getByRole("dialog").getByRole("button", { name: button }).click(),
     ]);
     await download.saveAs(path);
     return download.suggestedFilename();
@@ -139,9 +141,10 @@ test("export downloads a MIDI file that matches the CLI's output for the same ta
     .getByRole("link", { name: "Home" })
     .click();
   await page.getByRole("link", { name: "Rhythm Changes in Bb" }).click();
+  await page.getByRole("button", { name: "More", exact: true }).click();
   await page
-    .getByRole("navigation", { name: "Kept takes of this chart" })
-    .getByRole("link")
+    .getByRole("dialog")
+    .getByRole("link", { name: /^Kept take/ })
     .click();
   expect(await exported("Export take", take)).toBe("Rhythm Changes in Bb.take.json");
   expect(await exported("Export MIDI", again)).toBe("Rhythm Changes in Bb.mid");
