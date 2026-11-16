@@ -15,6 +15,11 @@ export interface ChartChoices {
    * for every chart. Unset: a song when the chart's arrangement fits it.
    */
   readonly song?: boolean;
+  /**
+   * The soloist's instrument, where the player has chosen one for this chart.
+   * Unset: the style's own (a lead guitar in rock, an alto in the blues).
+   */
+  readonly soloInstrument?: string;
 }
 
 export interface Settings {
@@ -22,7 +27,6 @@ export interface Settings {
   /** Minutes, or null to go round until stopped. */
   readonly minutes: number | null;
   readonly band: Readonly<Record<Seat, boolean>>;
-  readonly soloInstrument: string;
   readonly charts: Readonly<Record<string, ChartChoices>>;
 }
 
@@ -33,7 +37,6 @@ const DEFAULTS: Settings = {
   minutes: 3,
   // The soloist sits out until asked: someone practising wants the band.
   band: { drums: true, bass: true, chords: true, solo: false },
-  soloInstrument: "vibraphone",
   charts: {},
 };
 

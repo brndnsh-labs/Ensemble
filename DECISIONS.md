@@ -993,3 +993,13 @@ Built from `prompts/style-neosoul.md` in its own clone: `packages/styles/src/neo
 **Suite:** `pnpm check` 13.3 to 13.6 s of 16 with six styles (11.1 s with five on this machine at the start of the session); `pnpm test:full` 33.5 s of 60, `pnpm score` 44 s of 120, `pnpm smoke` 9 s of 60. A sixth chart (the ballad) was needed for the full run's floors on solo takes (endings with the soloist 72 of 80, notes judged 4,942 of 5,000, takes compared 21 of 24 with five); none was lowered.
 
 **Found, not fixed:** the app's soloist control starts at the vibraphone in every style (`packages/app/src/settings.ts`), not at the style's own soloist, so the app plays neo-soul's (and rock's) solos on the vibraphone until the player picks the guitar; the CLI and the engine use the style's default.
+
+## neo-soul, checked and merged; the app takes each style's own soloist (stage 6, part 5)
+
+Read on the main thread: the whole engine diff (seven optional additions; no test was added, changed or loosened), the report's scorecard against the notes. `pnpm check` 13.4 s of 16 with six styles, `pnpm test:full` 33.6 s, `pnpm score` no movement in any of the six, the other five styles' goldens untouched.
+
+- **The master is left at the default** (the build raised it half a decibel): everyone together reads -17.7 LUFS, between funk, rock and disco at -17 and the blues and jazz at -18.5; the Rhodes 1.4 dB under the drums, the clean guitar 1.2 dB under the band.
+- **The soloist's instrument is the style's own unless the player chooses one for that chart** (`ChartChoices.soloInstrument`). The app had kept one instrument for every chart and started it at the vibraphone, so rock never opened on its lead guitar, nor would neo-soul on its clean one: found by the neo-soul build. The choice is now kept with the chart, like its key and tempo, and choosing another style for a chart lets that style bring its own soloist. The old setting is no longer read. Checked in a browser: rock opens on the overdriven guitar, neo-soul on the clean guitar, disco on the alto, the blues on the vibraphone; a choice survives leaving the chart and goes when its style is changed.
+- **Told to Brandon wrongly, 2026-11-15**: that rock's soloist was the guitar "by default". In the app it was not until this change; he heard the guitar by choosing it.
+- Not built, as the build said: slides, a head for the soloist, a lead-in decision made once for a section, the "within a fifth" lead-in rule, ST-neosoul-24's chances (laying out under the soloist is the critic's choice).
+

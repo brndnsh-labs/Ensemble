@@ -54,6 +54,10 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
 
   const style: StylePack = styleById(choices.style ?? entry.chart.styleId ?? "") ?? STYLES[0]!;
   const tempo = choices.tempo ?? null;
+  // The style's own soloist, unless the player chose another for this chart.
+  const chosen = choices.soloInstrument;
+  const soloInstrument =
+    chosen !== undefined && chosen in SOLO_INSTRUMENTS ? chosen : style.solo.instrument;
   // An arrangement that fits says the chart is meant to be played as written; anything else is a jam.
   const song = choices.song ?? entry.chart.arrangement?.fits === true;
   const setup: JamSetup = useMemo(
@@ -65,18 +69,9 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
       tempo,
       key: choices.key === undefined ? null : parseKey(choices.key),
       band: settings.band,
-      soloInstrument: settings.soloInstrument,
+      soloInstrument,
     }),
-    [
-      entry.text,
-      style,
-      song,
-      settings.minutes,
-      tempo,
-      choices.key,
-      settings.band,
-      settings.soloInstrument,
-    ],
+    [entry.text, style, song, settings.minutes, tempo, choices.key, settings.band, soloInstrument],
   );
 
   const chart = useMemo(() => chartOf(setup.text, setup.key), [setup.text, setup.key]);
@@ -156,7 +151,17 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
         <div className="setup">
           <label>
             <span>Style</span>
-            <select value={style.id} onChange={(e) => choose({ style: e.target.value })}>
+            <select
+              value={style.id}
+              onChange={(e) => {
+                // Another style brings its own soloist: an instrument chosen for the last one goes.
+                const { soloInstrument: _, ...rest } = choices;
+                change({
+                  ...settings,
+                  charts: { ...settings.charts, [entry.id]: { ...rest, style: e.target.value } },
+                });
+              }}
+            >
               {STYLES.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
@@ -256,8 +261,8 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
               {settings.band.solo && (
                 <select
                   aria-label="The soloist's instrument"
-                  value={settings.soloInstrument}
-                  onChange={(e) => change({ ...settings, soloInstrument: e.target.value })}
+                  value={soloInstrument}
+                  onChange={(e) => choose({ soloInstrument: e.target.value })}
                 >
                   {Object.entries(SOLO_INSTRUMENTS).map(([id, instrument]) => (
                     <option key={id} value={id}>
