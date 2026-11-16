@@ -1,4 +1,4 @@
-// The acoustic soloist: a second nylon-string guitar, the verse melody's
+// The acoustic soloist: a second steel-string guitar, the verse melody's
 // cousin. Pentatonic and sung: quarters and eighths in the rhythm of a vocal
 // line, landing on thirds, never a run of sixteenths and never a bend
 // (ST-acoustic-25 to ST-acoustic-28). The notes' hammer-on (`.xx-`, a grace
@@ -35,7 +35,7 @@ const ELSE = {
 } satisfies Way;
 
 export const acousticSolo: SoloStyle = {
-  instrument: "nylon-guitar",
+  instrument: "steel-guitar",
   // Home a fourth over the instrument's own, above the strummed guitar (ST-acoustic-28).
   lift: 5,
 
@@ -261,7 +261,7 @@ export const acousticSolo: SoloStyle = {
     chromatic: 0.05,
     enclosure: 0,
     pickup: { chance: 0, figures: [], rising: 0.6, approach: false },
-    // No whole-step bends and no scoops (ST-acoustic-28); the nylon guitar's hand cannot bend,
+    // No whole-step bends and no scoops (ST-acoustic-28); the acoustic guitars' hands do not bend,
     // and on an instrument that can the line is still sung, not bent.
     bend: { third: 0, rootOrFifth: 0, around: 0, elsewhere: 0 },
     // Vibrato on notes of eight sixteenths or longer (ST-acoustic-28).

@@ -288,7 +288,7 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
                   >
                     {offered.map((choice) => (
                       <option key={choice.pack} value={choice.pack}>
-                        {choice.name}
+                        {SEAT_NAMES[seat]}: {choice.name}
                       </option>
                     ))}
                   </select>
@@ -302,7 +302,7 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
                 >
                   {Object.entries(SOLO_INSTRUMENTS).map(([id, instrument]) => (
                     <option key={id} value={id}>
-                      {instrument.name}
+                      {SEAT_NAMES.solo}: {instrument.name}
                     </option>
                   ))}
                 </select>

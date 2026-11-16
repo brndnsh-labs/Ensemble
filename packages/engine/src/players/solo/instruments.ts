@@ -68,6 +68,19 @@ export const SOLO_INSTRUMENTS: Readonly<Record<string, SoloInstrument>> = {
     bend: null,
     shake: { depth: 20, rate: 5, after: 0.35, grows: 0.3, upward: false },
   },
+  // The steel-string acoustic guitar as a lead: the nylon guitar's register and its hand.
+  // Heavier strings at higher tension than an electric's are not pushed up a whole step, and
+  // the line is sung, not bent (ST-acoustic-28). The shake is the nylon's until an ear says
+  // otherwise.
+  "steel-guitar": {
+    name: "Steel-string guitar",
+    program: 25,
+    range: [52, 81],
+    home: 66,
+    breath: null,
+    bend: null,
+    shake: { depth: 20, rate: 5, after: 0.35, grows: 0.3, upward: false },
+  },
 };
 
 /** The name an instrument is listed under, for a note's `voice`. */

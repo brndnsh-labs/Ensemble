@@ -1,5 +1,5 @@
 // Acoustic: the singer-songwriter's band, restraint around a guitar. Quiet,
-// the nylon-string guitar fingerpicks and the drummer barely plays; louder, it
+// the steel-string guitar fingerpicks and the drummer barely plays; louder, it
 // strums open chords, the upright plays root and fifth, and the backbeat fills
 // out to a full snare. The arc is carried by texture more than by volume
 // (ST-acoustic-01 to ST-acoustic-39).
@@ -40,21 +40,31 @@ export const acoustic: StylePack = {
   bass: acousticBass,
   chords: acousticChords,
   solo: acousticSolo,
-  // Acoustic bass and nylon-string guitar (ST-acoustic-37).
-  instruments: { bass: 32, chords: 24 },
+  // Acoustic bass and steel-string guitar. The notes' default is a nylon-string guitar
+  // (ST-acoustic-37), which was the only one the old version had; the steel-string is the
+  // genre's instrument and was chosen by ear, and the nylon stays as a choice.
+  instruments: { bass: 32, chords: 25 },
   sound: {
-    packs: { drums: "drum-kit", bass: "upright-bass", chords: "nylon-guitar" },
-    // Measured (`pnpm levels`), no ear yet. At the default mix the nylon guitar read 4 dB over
-    // the drums and 3 over the bass (a strum is up to six strings, and this drummer plays
-    // softly) and its own soloist 3.4 dB under the band. The guitar comes down 2 dB and the
-    // soloist up a decibel and a half; the master comes down 0.6, which puts everyone
-    // together at -18.2 LUFS, with the blues and jazz the quietest of the eight.
+    packs: { drums: "drum-kit", bass: "upright-bass", chords: "steel-guitar" },
+    choices: {
+      chords: [
+        { pack: "steel-guitar", name: "Steel-string guitar" },
+        { pack: "nylon-guitar", name: "Nylon-string guitar", level: -1.1 },
+      ],
+    },
+    // Measured (`pnpm levels`), no ear yet. At the default mix a strummed guitar reads over
+    // the drums and the bass (a strum is up to six strings, and this drummer plays softly)
+    // and its own soloist well under the band. The steel-string guitar sits at -6.9, which
+    // puts it a decibel over the bass, and its soloist at 3.9, a decibel under the band; the
+    // master comes down 0.6, which puts everyone together near -18.2 LUFS, with the blues and
+    // jazz the quietest of the eight. The nylon-string guitar's recordings read 1.1 dB louder
+    // in the same part, so it is levelled down by that.
     mix: {
       ...DEFAULT_MIX,
       seats: {
         ...DEFAULT_MIX.seats,
-        chords: { ...DEFAULT_MIX.seats.chords, level: -8 },
-        solo: { ...DEFAULT_MIX.seats.solo, level: 3 },
+        chords: { ...DEFAULT_MIX.seats.chords, level: -6.9 },
+        solo: { ...DEFAULT_MIX.seats.solo, level: 3.9 },
       },
       master: DEFAULT_MIX.master - 0.6,
     },

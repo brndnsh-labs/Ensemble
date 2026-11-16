@@ -1,4 +1,4 @@
-// The acoustic guitar: a nylon-string guitar in open position. Quiet, it
+// The acoustic guitar: a steel-string guitar (or a nylon-string one) in open position. Quiet, it
 // fingerpicks the shape it is holding, one string at a time; louder, it strums
 // the same shape on an eighth-note pendulum and lets it ring. With no bassist
 // the picking hand is the Travis hand: the thumb alternates basses on the
@@ -168,7 +168,7 @@ export const acousticChords: ChordStyle = {
   // Open position (ST-acoustic-16, CH-24): up to six strings, open strings on, every fretted
   // note at or below the 4th fret where the chord has such a shape, one muted string allowed
   // inside the grip (G over its low root is 3x0003), the chord standing on its root. An eighth
-  // pendulum; an upstroke catches the top three strings and is 14 lighter (CH-27); the nylon
+  // pendulum; an upstroke catches the top three strings and is 14 lighter (CH-27); the
   // strings roll 3 ms apart (ST-acoustic-39).
   idiom: {
     instrument: "guitar",
