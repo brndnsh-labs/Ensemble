@@ -11,7 +11,6 @@ import { STYLES, styleById } from "@ensemble/styles";
 import type { CSSProperties } from "react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { Back } from "../Back.tsx";
 import { deleteChart, keptOnDevice, retitled, saveChart } from "../charts.ts";
 import { download, fileName } from "../download.ts";
 import type { LibraryChart } from "../library.ts";
@@ -19,6 +18,7 @@ import type { Editing } from "../play/ChartView.tsx";
 import { ChartView } from "../play/ChartView.tsx";
 import type { Reading } from "../play/ChordSymbol.tsx";
 import { barId } from "../play/page.ts";
+import { placeOf, Trail } from "../Trail.tsx";
 import { ArrangementGrid } from "./ArrangementGrid.tsx";
 import type { BarAction } from "./BarEditor.tsx";
 import { BarEditor } from "./BarEditor.tsx";
@@ -482,10 +482,12 @@ export function EditView({ entry, reading, style: chosen }: Props) {
   return (
     <main
       className={`edit side-${side}${typing ? " typing" : ""}${docked ? " docked" : ""}`}
+      // The ink of the style the chart will be played in: the editor's Play is printed in it.
+      data-style={(styleById(chosen ?? chart.styleId ?? "") ?? STYLES[0]!).id}
       style={fitted}
     >
       <header className="bar-top">
-        <Back />
+        <Trail place={placeOf(chart)} />
         <h1 className="title" aria-label={chart.title}>
           <input
             aria-label="Title"

@@ -10,4 +10,8 @@ createRoot(document.getElementById("app")!).render(
   </StrictMode>,
 );
 
+// Safari on a phone shows a thing as pressed (`:active`) only on a page that listens for
+// touches. Nothing is done with them: the stylesheet answers the press.
+document.addEventListener("touchstart", () => {}, { passive: true });
+
 keepOffline();

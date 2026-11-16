@@ -13,11 +13,13 @@ import {
 } from "@ensemble/engine";
 import { STYLES, styleById } from "@ensemble/styles";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { go } from "../address.ts";
 import { copyOf } from "../charts.ts";
 import { download, fileName } from "../download.ts";
 import type { LibraryChart } from "../library.ts";
 import { notePlayed } from "../recent.ts";
 import type { ChartChoices, Settings } from "../settings.ts";
+import { placeOf } from "../Trail.tsx";
 import type { KeptTake } from "../takes.ts";
 import { dayOf, followTake, heardAs, keepTake } from "../takes.ts";
 import { midiOf } from "./band.ts";
@@ -190,6 +192,8 @@ export function PlayView({ entry, takes, rig, settings, change, autoplay, starte
       preview={preview}
       reading={settings.reading}
       read={(reading) => change({ ...settings, reading })}
+      // Under the style the chart was written for, whatever style it is being played in.
+      place={placeOf(entry.chart)}
       side={
         entry.own ? (
           <a className="edit-link" href={`#/edit/${entry.id}`}>
@@ -201,7 +205,7 @@ export function PlayView({ entry, takes, rig, settings, change, autoplay, starte
             type="button"
             className="edit-link"
             onClick={() => {
-              location.hash = `#/edit/${copyOf(entry.text)}`;
+              go(`#/edit/${copyOf(entry.text)}`);
             }}
           >
             Edit a copy

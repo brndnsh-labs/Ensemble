@@ -1,7 +1,8 @@
 @import "@fontsource-variable/archivo/wdth.css";
 @import "@fontsource-variable/roboto-serif/wdth.css";
 
-/* Ink on paper, and a highlighter for the bar being played. The ink is the
+/* The poster wall. Ink on paper, a highlighter for the bar being played, and one spot
+   colour for each style, laid down flat with the ink printed over it. The ink is the
    blue-violet of a duplicated band chart; the paper is cool, not cream. */
 :root {
   color-scheme: light dark;
@@ -12,14 +13,37 @@
   --marker: #ffe53b;
   --on-marker: #1e1a4f;
   --pencil: #cf3d35;
+  /* The ink as it prints on a spot colour: the same in either theme, since the colour
+     under it is. A spot colour is always a field with this printed on it, never the
+     colour of type on paper. */
+  --press: #1e1a4f;
+
+  /* The eight inks, one for each style, and one for a style the app has not been given a
+     colour for (and for a chart that names no style). A new style is given its colour
+     here and in the list under these tokens. */
+  --ink-blues: #5aa9ff;
+  --ink-funk: #ff8b2b;
+  --ink-jazz: #1fc2b0;
+  --ink-rock: #ff5f7e;
+  --ink-disco: #e274f2;
+  --ink-neosoul: #a99bff;
+  --ink-reggae: #45c95f;
+  --ink-acoustic: #d9a968;
+  --ink-other: #b7bcd3;
+  /* The spot colour in force: whatever carries `data-style` sets it for everything inside. */
+  --spot: var(--ink-other);
+
+  /* What is printed on what, where a thing can stand on paper or on a spot colour: the
+     ink and the paper, or the press ink and the spot. */
+  --on: var(--ink);
+  --under: var(--paper);
+
   --gutter: 16px;
   /* How tall anything pressed is: a fingertip on a phone, a little less under a mouse. */
   --control: 44px;
-  --round: 8px;
   /* A breath of ink: under a pointer, and the hatching of what is only pencilled in. */
-  --wash: color-mix(in srgb, var(--ink) 16%, transparent);
+  --wash: color-mix(in srgb, var(--ink) 14%, transparent);
   --face: "Archivo Variable", system-ui, sans-serif;
-  /* The face the chart is set in: its chords, its section marks, its title. The interface's own until another is chosen. */
   /* The chart is set in a serif, so that it is the page and everything round it is the desk. */
   --chart-face: "Roboto Serif Variable", Georgia, serif;
   /* The chart's text is set in the system's own monospace, so bars typed in columns stay in them. */
@@ -28,8 +52,13 @@
 
 @media (min-width: 820px) and (pointer: fine) {
   :root {
-    --gutter: 24px;
     --control: 38px;
+  }
+}
+
+@media (min-width: 900px) {
+  :root {
+    --gutter: 32px;
   }
 }
 
@@ -42,6 +71,35 @@
     --marker: #ffd83b;
     --pencil: #ff8176;
   }
+}
+
+/* Which ink a style is printed in. A style not listed keeps the first line's. */
+[data-style] {
+  --spot: var(--ink-other);
+}
+[data-style="blues"] {
+  --spot: var(--ink-blues);
+}
+[data-style="funk"] {
+  --spot: var(--ink-funk);
+}
+[data-style="jazz"] {
+  --spot: var(--ink-jazz);
+}
+[data-style="rock"] {
+  --spot: var(--ink-rock);
+}
+[data-style="disco"] {
+  --spot: var(--ink-disco);
+}
+[data-style="neosoul"] {
+  --spot: var(--ink-neosoul);
+}
+[data-style="reggae"] {
+  --spot: var(--ink-reggae);
+}
+[data-style="acoustic"] {
+  --spot: var(--ink-acoustic);
 }
 
 *,
@@ -75,8 +133,24 @@ textarea {
   color: inherit;
 }
 
+/* Every corner is square: these are cut sheets, and a phone's own rounding of a button or
+   a search box is taken off. */
+button,
+input,
+select,
+textarea {
+  border-radius: 0;
+}
+
 button {
   cursor: pointer;
+}
+
+a,
+button,
+label {
+  /* A second tap is a second tap, not a zoom: nothing waits to see whether one is coming. */
+  touch-action: manipulation;
 }
 
 fieldset {
@@ -86,26 +160,70 @@ fieldset {
   border: 0;
 }
 
+/* On a spot colour the ring is the press ink, which shows on all eight. */
 :focus-visible {
-  outline: 2px solid var(--ink);
+  outline: 2.5px solid var(--focus, var(--ink));
   outline-offset: 2px;
+}
+
+/* ── Poster type ─────────────────────────────────────────────────────────── */
+
+/* Capitals, as narrow and as heavy as the face goes: the wordmark, a style's name, Play. */
+.wordmark,
+.poster-name,
+.last-play,
+.shows-style,
+.crumb.style,
+.trail .here,
+.go,
+.to-play {
+  font-stretch: 62%;
+  font-weight: 900;
+  line-height: 0.86;
+  text-transform: uppercase;
+}
+
+/* A style's name set to fill its measure, the way wood type is. `--w` is the name's width
+   in ems (`PosterName.tsx` measures it), so the measure divided by it is the size at which
+   the name is exactly as wide as the box it stands in. Set this tight, the letters' own
+   box is taller than the line: it is cut to the line, so that a press just above a name
+   lands on what is there and not on the name. */
+.poster-name {
+  display: block;
+  margin: 0;
+  overflow: clip;
+  font-size: calc(100cqw / var(--w));
+  white-space: nowrap;
+}
+
+/* The same letters at a known size, off the page, to be measured. */
+.poster-name.measuring {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: max-content;
+  font-size: 100px;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.tri {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
 }
 
 /* ── Things pressed ──────────────────────────────────────────────────────── */
 
-/* A plain control is an outline in ink, a fingertip tall. What is switched on is filled,
-   and the one thing a screen is for (Play) is filled and round. */
+/* A plain control is an outline in ink, a fingertip tall. What is switched on is filled.
+   Nothing here eases from one state to another: a press is answered in the frame it lands. */
+.act,
 .reading button,
 .focus-toggle,
-.edit-link,
 .tools button,
+.tools a,
 .seats button,
 .keep,
-.actions button,
-.actions label,
-.tune-tools a,
-.tune-tools button,
-.shelf-note button,
 .side,
 .fix,
 .grid-remove,
@@ -117,12 +235,11 @@ fieldset {
   justify-content: center;
   height: var(--control);
   padding: 0 14px;
-  border: 1.5px solid var(--ink);
-  border-radius: var(--round);
+  border: 2px solid var(--ink);
   background: none;
   color: var(--ink);
   font-size: 0.9375rem;
-  font-weight: 600;
+  font-weight: 700;
   text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
@@ -131,6 +248,17 @@ fieldset {
 button[aria-pressed="true"] {
   background: var(--ink);
   color: var(--paper);
+}
+
+/* The one filled button of a few: what Enter does, or what is most likely wanted. */
+.act.first {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.act.first:disabled {
+  border-color: var(--rule);
+  background: var(--rule);
 }
 
 /* What cannot be undone is the red pencil's. */
@@ -145,27 +273,24 @@ button:disabled {
 
 /* A press is answered where it lands. */
 button:active:not(:disabled),
-.actions label:active,
-.tune-tools a:active,
+.act:active,
+.tools a:active,
 .edit-link:active,
-.to-play:active {
+.tab:active {
   transform: translateY(1px);
 }
 
 /* Under a mouse, a control says it can be pressed before it is. */
 @media (hover: hover) {
   :is(
+    .act,
     .reading button,
     .focus-toggle,
     .edit-link,
     .tools button,
+    .tools a,
     .seats button,
     .keep,
-    .actions button,
-    .actions label,
-    .tune-tools a,
-    .tune-tools button,
-    .shelf-note button,
     .side,
     .fix,
     .grid-remove,
@@ -174,25 +299,21 @@ button:active:not(:disabled),
     :is(.bar-panel, .section-panel) :is(.dock-acts button, .dock-step),
     .steps button,
     .finish,
-    .tune-more,
+    .row-more,
     .stepper button,
     .kept a,
-    .back
-  ):not(:disabled, [aria-disabled="true"], [aria-pressed="true"], .first):hover {
+    .tab,
+    .shows-all
+  ):not(:disabled, [aria-disabled="true"], [aria-pressed="true"], [aria-current], .first):hover {
     background: var(--wash);
   }
 
-  .tune:hover .tune-title,
-  .style-line:hover .tune-title {
+  .row-open:hover .row-title,
+  .crumb:not(.style):hover span,
+  .crumb.place:not(.style):hover {
     text-decoration: underline;
     text-decoration-thickness: 2px;
-    text-underline-offset: 3px;
-  }
-
-  .tune-play:hover {
-    border-color: var(--on-marker);
-    background: var(--marker);
-    color: var(--on-marker);
+    text-underline-offset: 4px;
   }
 }
 
@@ -205,8 +326,7 @@ button:active:not(:disabled),
   display: block;
   min-width: 0;
   height: 48px;
-  border: 1.5px solid var(--ink);
-  border-radius: var(--round);
+  border: 2px solid var(--ink);
 }
 
 .field > span:first-child {
@@ -228,14 +348,13 @@ button:active:not(:disabled),
 .field input {
   width: 100%;
   height: 100%;
-  padding: 17px 11px 0;
+  padding: 16px 11px 0;
   border: 0;
-  border-radius: inherit;
   background: none;
   /* Sixteen pixels or more, or a phone zooms the page in when the box is touched. */
   font-size: 1rem;
   font-stretch: 90%;
-  font-weight: 650;
+  font-weight: 700;
   text-overflow: ellipsis;
 }
 
@@ -266,7 +385,7 @@ button:active:not(:disabled),
 }
 
 .field:has(select:focus-visible, input:focus-visible) {
-  outline: 2px solid var(--ink);
+  outline: 2.5px solid var(--ink);
   outline-offset: 2px;
 }
 
@@ -285,7 +404,6 @@ button:active:not(:disabled),
   width: 46px;
   padding: 0;
   border: 0;
-  border-radius: var(--round);
   background: none;
   font-size: 1.3rem;
   font-weight: 600;
@@ -294,76 +412,437 @@ button:active:not(:disabled),
 .stepper output {
   flex: 1;
   min-width: 2.6em;
-  padding-top: 21px;
-  font-weight: 650;
+  padding-top: 20px;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
   line-height: 1;
   text-align: center;
 }
 
-/* ── The home screen ─────────────────────────────────────────────────────── */
+/* ── The way back ────────────────────────────────────────────────────────── */
 
-.library {
-  max-width: 44rem;
-  margin: 0 auto;
-  padding: calc(28px + env(safe-area-inset-top)) max(var(--gutter), env(safe-area-inset-right)) 64px
-    max(var(--gutter), env(safe-area-inset-left));
+/* The places above this screen, each a link named for where it goes: home, then the part
+   of the library this screen belongs under. The same row however the player arrived. */
+.trail {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
 }
 
-/* The one loud thing on the screen: the name, as tall and narrow as a poster's. */
-.masthead h1 {
+.crumb {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 1px;
+  height: var(--control);
+  min-height: 44px;
+  color: inherit;
+  font-size: 1rem;
+  font-stretch: 85%;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+/* The arrow stands on the page's left edge, with a fingertip's room round it. */
+.crumb.to-home {
+  margin-left: -6px;
+  padding-right: 6px;
+}
+
+.crumb svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.6;
+}
+
+.crumb-sep {
+  padding: 0 8px 0 2px;
+  color: var(--faint);
+  font-weight: 600;
+}
+
+.crumb.place {
+  padding: 0 4px;
+  margin-left: -4px;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+
+/* A style's name on the way back is its bill, small. The bill is 28 px tall and is
+   pressed over a fingertip's height. */
+.crumb.style {
+  position: relative;
+  height: 28px;
+  min-height: 0;
+  margin-left: 0;
+  padding: 0 8px;
+  background: var(--spot);
+  color: var(--press);
+  font-size: 1.1rem;
+  line-height: 1;
+  text-decoration: none;
+  --focus: var(--ink);
+}
+
+.crumb.style::after {
+  content: "";
+  position: absolute;
+  inset: -8px -4px;
+}
+
+.crumb.style:active {
+  background: color-mix(in srgb, var(--spot) 84%, var(--press));
+}
+
+/* ── Home ────────────────────────────────────────────────────────────────── */
+
+.browse.home {
+  padding: calc(18px + env(safe-area-inset-top)) max(var(--gutter), env(safe-area-inset-right))
+    calc(40px + env(safe-area-inset-bottom)) max(var(--gutter), env(safe-area-inset-left));
+}
+
+.masthead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* The app's name, as a poster sets one. */
+.wordmark {
   margin: 0;
-  font-size: clamp(3.6rem, 17vw, 6.5rem);
-  font-stretch: 62%;
-  font-weight: 800;
-  line-height: 0.86;
-  letter-spacing: -0.01em;
+  font-size: clamp(2.3rem, 11.6vw, 4.4rem);
+  letter-spacing: -0.005em;
 }
 
-.masthead p {
-  margin: 10px 0 0;
+/* Charts and Takes: two views of this one screen, said where its name is. */
+.views {
+  display: flex;
+  flex: none;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 44px;
+  padding: 0 11px;
+  border: 2px solid var(--ink);
+  color: inherit;
+  font-size: 1.0625rem;
+  font-stretch: 80%;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.tab + .tab {
+  border-left: 0;
+}
+
+.tab[aria-current] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.views-count {
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+/* The search box. On home it is a line of its own under the name. */
+.finder {
+  position: relative;
+  margin-top: 16px;
+}
+
+.finder-box {
+  display: block;
+  width: 100%;
+  height: 48px;
+  padding: 0 12px;
+  border: 2px solid var(--on);
+  background: none;
+  color: var(--on);
+  /* Sixteen pixels or more, or a phone zooms the page in when the box is touched. */
+  font-size: 1rem;
+  font-weight: 550;
+  text-overflow: ellipsis;
+  appearance: none;
+}
+
+.finder-box::placeholder {
+  color: color-mix(in srgb, var(--on) 68%, var(--under));
+  font-weight: 450;
+  opacity: 1;
+}
+
+/* Each browser's own cross is replaced by the word Clear. */
+.finder-box::-webkit-search-cancel-button {
+  display: none;
+}
+
+.finder-box.typed {
+  padding-right: 70px;
+}
+
+.finder-clear {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  padding: 0 12px;
+  border: 0;
+  background: none;
+  color: var(--on);
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.note {
+  max-width: 34rem;
+  margin: 12px 0 0;
   color: var(--faint);
 }
 
-.shelf {
-  margin-top: 36px;
+/* What was last played: a poster in the ink of the style it was played in, and the one
+   large Play on the screen. */
+.last {
+  position: relative;
+  margin-top: 16px;
+  padding: 14px 14px 16px;
+  background: var(--spot);
+  color: var(--press);
+  --focus: var(--press);
 }
 
-.shelf h2 {
+.last-lead {
   margin: 0;
-  padding-bottom: 6px;
-  border-bottom: 2px solid var(--ink);
-  font-size: 1rem;
+  font-size: 0.875rem;
   font-weight: 700;
 }
 
-.shelf ul {
+.last h2 {
+  margin: 8px 0 0;
+  font-size: clamp(2.5rem, 13vw, 3.5rem);
+  font-stretch: 62%;
+  font-weight: 900;
+  line-height: 0.9;
+  text-wrap: balance;
+}
+
+.last-open {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* The whole poster opens the chart; the block on it plays it. */
+.last-open::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.last-facts {
+  max-width: 15.5rem;
+  margin: 10px 0 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.last-play {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 132px;
+  height: 60px;
+  margin: 14px 0 0 auto;
+  padding: 0;
+  border: 0;
+  background: var(--press);
+  color: var(--spot);
+  font-size: 1.9rem;
+}
+
+.last-play .tri {
+  width: 24px;
+  height: 24px;
+}
+
+/* The two before it: smaller bills, pasted under. */
+.lately {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.shelf li {
+.lately-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 10px 12px;
+  background: var(--spot);
+  color: var(--press);
+  --focus: var(--press);
+}
+
+/* One bill alone is as wide as the poster over it. */
+.lately-item:only-child {
+  grid-column: 1 / -1;
+}
+
+.lately-open {
+  flex: 1;
+  color: inherit;
+  text-decoration: none;
+}
+
+.lately-open::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.lately .row-title {
+  display: block;
+  font-size: 1.3rem;
+  font-stretch: 68%;
+  font-weight: 850;
+  line-height: 1;
+  text-wrap: balance;
+}
+
+.lately .row-facts {
+  display: block;
+  margin-top: 5px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.lately .row-play {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin: 8px 0 0 auto;
+  padding: 0;
+  border: 0;
+  background: var(--press);
+  color: var(--spot);
+}
+
+/* A press on a block of colour is the colour a shade darker, at once. */
+.last:active:not(:has(.last-play:active)),
+.lately-item:active:not(:has(.row-play:active)),
+.tile:active,
+.shows-style:active {
+  background: color-mix(in srgb, var(--spot) 86%, var(--press));
+}
+
+/* The headings of home and of the library, when it is not showing one style. */
+.styles h2,
+.yours h2,
+.takes h2,
+.showing h1 {
+  margin: 0;
+  font-size: 1.75rem;
+  font-stretch: 68%;
+  font-weight: 850;
+  line-height: 1;
+}
+
+.styles,
+.yours,
+.takes {
+  margin-top: 34px;
+}
+
+/* The wall: a bill for each style, edge to edge, and each a way into the library. */
+.wall {
+  display: flex;
+  margin-top: 12px;
+}
+
+.wall-col {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  background: var(--spot);
+  color: var(--press);
+  text-decoration: none;
+  /* The name is sized from the bill's own width. */
+  container-type: inline-size;
+}
+
+/* The shorter column's last bill runs down to meet the other's. */
+.wall-col .tile:last-child {
+  flex: 1;
+}
+
+.tile-band {
+  margin-top: 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.tile-count {
+  margin-top: 10px;
+  padding-top: 6px;
+  border-top: 2px solid var(--press);
+  font-size: 0.875rem;
+  font-stretch: 85%;
+  font-weight: 800;
+}
+
+.tile:focus-visible {
+  outline-color: var(--press);
+  outline-offset: -5px;
+}
+
+/* A line of a list: the name opens it, the round button plays it. */
+.rows {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rows > li {
   border-bottom: 1px solid var(--rule);
 }
 
-.shelf-note {
-  margin: 12px 0 0;
-  color: var(--faint);
-}
-
-.shelf-note p {
-  margin: 0 0 10px;
-}
-
-/* A line of a shelf: the name opens it, the round button plays it. */
-.tune-line {
+.row {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.tune {
+.row-open {
   flex: 1;
   min-width: 0;
   padding: 11px 0;
@@ -371,60 +850,88 @@ button:active:not(:disabled),
   text-decoration: none;
 }
 
-.tune-title {
+.row .row-title {
   display: block;
-  font-size: 1.3rem;
-  font-stretch: 80%;
-  font-weight: 650;
-  line-height: 1.15;
+  font-size: 1.35rem;
+  font-stretch: 76%;
+  font-weight: 700;
+  line-height: 1.12;
 }
 
-.tune-facts {
+.row .row-facts {
   display: block;
-  margin-top: 2px;
+  margin-top: 3px;
   color: var(--faint);
   font-size: 0.875rem;
   line-height: 1.3;
 }
 
-.tune-play {
+/* One of the player's own, in a list that holds the built-in charts too. */
+.mine {
+  display: inline-block;
+  margin-right: 7px;
+  padding: 0 5px;
+  border: 1.5px solid currentColor;
+  color: var(--ink);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+/* The mark a chart carries: its play button, in the ink of the style it was written for.
+   Round, where everything else is square, so that it is found at a glance down a list. */
+.row .row-play {
   display: grid;
   flex: none;
   place-items: center;
   width: 46px;
   height: 46px;
   padding: 0;
-  border: 2px solid var(--ink);
+  border: 0;
   border-radius: 50%;
-  background: none;
+  background: var(--spot);
+  color: var(--press);
+  --focus: var(--ink);
 }
 
-.tune-play svg {
-  width: 20px;
-  height: 20px;
-  fill: currentColor;
+.row-play .tri {
+  margin-left: 2px;
 }
 
-.tune-play:active {
-  border-color: var(--on-marker);
+.row-play:active,
+.last-play:active {
   background: var(--marker);
   color: var(--on-marker);
 }
 
-/* What can be done to a chart of the player's own waits behind this word. */
-.tune-more {
+/* A kept take's length, on a block of the ink it was played in. */
+.badge {
+  display: grid;
   flex: none;
-  height: var(--control);
+  place-items: center;
+  width: 58px;
+  height: 46px;
+  background: var(--spot);
+  color: var(--press);
+  font-size: 1.25rem;
+  font-stretch: 68%;
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+}
+
+/* What can be done to a chart of the player's own waits behind this word. */
+.row-more {
+  flex: none;
+  height: 44px;
   padding: 0 10px;
   border: 0;
-  border-radius: var(--round);
   background: none;
   color: var(--faint);
   font-size: 0.875rem;
-  font-weight: 600;
+  font-weight: 700;
 }
 
-.tune-more[aria-expanded="true"] {
+.row-more[aria-expanded="true"] {
   background: var(--wash);
   color: var(--ink);
 }
@@ -433,7 +940,7 @@ button:active:not(:disabled),
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin: 12px 0;
+  margin-top: 14px;
 }
 
 /* The file picker is the label; the browser's own control stays out of sight. */
@@ -445,103 +952,64 @@ button:active:not(:disabled),
 }
 
 .actions label:focus-within {
-  outline: 2px solid var(--ink);
+  outline: 2.5px solid var(--ink);
   outline-offset: 2px;
 }
 
-.tune-tools {
+.row-tools {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   padding-bottom: 12px;
 }
 
-.tune-tools .field {
+.row-tools .field {
   flex: 1 1 100%;
 }
 
-/* The one filled button of a few: what Enter does. */
-.tune-tools .first {
-  background: var(--ink);
-  color: var(--paper);
-}
-
-.tune-tools .first:disabled {
-  border-color: var(--rule);
-  background: var(--rule);
-  cursor: default;
-}
-
-.tune-tools .danger {
+.row-tools .danger {
   margin-left: auto;
 }
 
-/* Finding a built-in chart: what to type, and which style. */
-.finder {
-  display: flex;
-  gap: 8px;
-  margin: 12px 0 4px;
+/* The way to every chart there is: a block of the ink itself, saying how many. */
+.whole {
+  display: block;
+  margin-top: 34px;
+  padding: 14px 14px 15px;
+  background: var(--ink);
+  color: var(--paper);
+  text-decoration: none;
+  --focus: var(--ink);
 }
 
-.finder .field {
-  flex: 1 1 auto;
+.whole:active {
+  background: color-mix(in srgb, var(--ink) 84%, var(--paper));
 }
 
-.finder .field.pick {
-  flex: 0 0 9.5rem;
+.whole-name {
+  display: block;
+  font-size: 1.75rem;
+  font-stretch: 68%;
+  font-weight: 850;
+  line-height: 1;
 }
 
-/* The cross that empties the search box, drawn in the page's ink in place of each browser's own. */
-.finder input::-webkit-search-cancel-button {
-  width: 18px;
-  height: 18px;
-  margin: 0 0 0 6px;
-  background: var(--faint);
-  cursor: pointer;
-  appearance: none;
-  mask:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cpath d='M4 4l10 10M14 4L4 14' stroke='black' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E")
-    center / contain no-repeat;
-}
-
-.finder input::placeholder {
-  color: var(--faint);
-  font-weight: 450;
-  opacity: 1;
-}
-
-/* A style and what is in it, before anything has been asked for: a tap opens it. */
-.style-line {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 2px 12px;
-  align-items: baseline;
-  width: 100%;
-  padding: 11px 0;
-  border: 0;
-  background: none;
-  text-align: left;
-}
-
-.style-line .tune-facts {
-  grid-column: 1 / -1;
-  grid-row: 2;
-  margin: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.style-count {
-  color: var(--faint);
+.whole-says {
+  display: block;
+  margin-top: 6px;
   font-size: 0.875rem;
-  font-variant-numeric: tabular-nums;
+  font-weight: 550;
+  line-height: 1.3;
 }
 
 .colophon {
   margin-top: 40px;
   color: var(--faint);
   font-size: 0.875rem;
+}
+
+.colophon p {
+  margin: 0;
 }
 
 .colophon a,
@@ -554,20 +1022,303 @@ button:active:not(:disabled),
 .credits .licence {
   display: inline-flex;
   align-items: center;
-  min-height: var(--control);
+  min-height: 44px;
+}
+
+/* ── The library ─────────────────────────────────────────────────────────── */
+
+/* One page for every chart. The way home and the search box stay at the top of the
+   screen however far the list is scrolled; under them, what is being shown. */
+.library .browse-top {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: calc(48px + env(safe-area-inset-top));
+  padding: env(safe-area-inset-top) max(var(--gutter), env(safe-area-inset-right)) 0
+    max(var(--gutter), env(safe-area-inset-left));
+  background: var(--under);
+  color: var(--on);
+}
+
+.library .trail {
+  flex: none;
+}
+
+.library .finder {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+
+.library .finder-box {
+  height: 44px;
+}
+
+/* Showing one style, the page takes that style's ink: the bar, and the poster under it. */
+.library[data-style] .browse-top,
+.style-head {
+  --on: var(--press);
+  --under: var(--spot);
+  --focus: var(--press);
+}
+
+.library[data-style] .crumb-sep {
+  color: inherit;
+}
+
+/* The style's name beside the way home, once its poster has been scrolled past: where
+   there is room for it beside the search box. */
+.trail .here {
+  display: none;
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+@media (min-width: 600px) {
+  .trail .here {
+    display: block;
+  }
+}
+
+.library-main {
+  padding: 0 max(var(--gutter), env(safe-area-inset-right)) calc(40px + env(safe-area-inset-bottom))
+    max(var(--gutter), env(safe-area-inset-left));
+}
+
+/* What the page is showing, when it is not one style's: said in a heading on the paper. */
+.showing {
+  padding: 22px 0 6px;
+}
+
+.showing h1 {
+  font-size: clamp(1.75rem, 9vw, 2.5rem);
+  text-wrap: balance;
+}
+
+.showing .note {
+  margin-top: 8px;
+}
+
+/* What a search found is said smaller: the list is what is wanted, and a keyboard has half the screen. */
+.found {
+  padding-top: 14px;
+}
+
+.found h1 {
+  font-size: 1.5rem;
+}
+
+.style-head {
+  padding: 0 max(var(--gutter), env(safe-area-inset-right)) 18px
+    max(var(--gutter), env(safe-area-inset-left));
+  background: var(--spot);
+  color: var(--press);
+}
+
+/* The measure the name fills is the head's width inside its gutters. */
+.style-poster {
+  container-type: inline-size;
+}
+
+/* It fills the measure on a phone; on anything wider it stops at a size a poster would. */
+.style-head .poster-name {
+  margin-top: 12px;
+  font-size: min(calc(100cqw / var(--w)), 13rem);
+}
+
+.style-says {
+  max-width: 24rem;
+  margin: 12px 0 0;
+  font-size: 1.1875rem;
+  font-stretch: 90%;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.style-band {
+  max-width: 26rem;
+  margin: 8px 0 0;
+  font-size: 0.875rem;
+  font-weight: 550;
+  line-height: 1.35;
+}
+
+/* The strip: everything, the player's own, and a bill for each style. It moves between
+   them without going home, and the one being shown is marked. It wraps, so every place is
+   in view at once and none is a swipe away. */
+.shows {
+  display: flex;
+  flex-wrap: wrap;
+  padding-top: 6px;
+}
+
+.shows-all,
+.shows-style {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 9px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.shows-style {
+  padding: 0 6px;
+  border: 3px solid transparent;
+  background: var(--spot);
+  color: var(--press);
+  font-size: 1.2rem;
+  --focus: var(--press);
+}
+
+.shows-style:focus-visible {
+  outline-offset: -4px;
+}
+
+/* The style being shown: the ink's frame round its bill. */
+.shows-style[aria-current] {
+  border-color: var(--press);
+}
+
+.shows-all {
+  border: 2px solid var(--on);
+  color: var(--on);
+  font-size: 1rem;
+  font-stretch: 80%;
+  font-weight: 750;
+}
+
+.shows-all + .shows-all {
+  border-left: 0;
+}
+
+.shows-all[aria-current] {
+  background: var(--on);
+  color: var(--under);
+}
+
+/* ── A laptop: the same places, using the width ──────────────────────────── */
+
+@media (min-width: 900px) {
+  .browse.home {
+    max-width: 1240px;
+    margin: 0 auto;
+    padding-top: 28px;
+  }
+
+  .masthead {
+    justify-content: flex-start;
+    gap: 28px;
+  }
+
+  .wordmark {
+    font-size: 5.4rem;
+  }
+
+  .home .finder {
+    max-width: 400px;
+  }
+
+  /* What was played and the player's own charts down the left; the wall beside them. */
+  .home-body {
+    display: grid;
+    grid-template-columns: 400px minmax(0, 1fr);
+    gap: 0 44px;
+    align-items: start;
+  }
+
+  .home-body > * {
+    grid-column: 1;
+  }
+
+  .home-body > .styles {
+    grid-column: 2;
+    grid-row: 1 / span 8;
+    margin-top: 16px;
+  }
+
+  /* The wall says what it is; its heading is kept for whoever has the screen read out. */
+  .styles h2 {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .wall {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin-top: 0;
+  }
+
+  .wall-col {
+    display: contents;
+  }
+
+  .takes {
+    max-width: 44rem;
+  }
+
+  /* The library keeps to the width of a page, and its bar and poster run to the edges. */
+  .library .browse-top,
+  .style-head {
+    padding-inline: max(var(--gutter), calc((100% - 60rem) / 2));
+  }
+
+  .library .finder {
+    flex: 0 1 320px;
+    margin-left: auto;
+  }
+
+  .library-main {
+    max-width: calc(60rem + 2 * var(--gutter));
+    margin: 0 auto;
+  }
+
+  .style-head .poster-name {
+    font-size: min(calc(100cqw / var(--w)), 11rem);
+  }
+
+  .shows-all,
+  .shows-style {
+    flex: 0 1 auto;
+    padding: 0 14px;
+  }
+}
+
+/* ── Credits ─────────────────────────────────────────────────────────────── */
+
+.credits {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: env(safe-area-inset-top) max(var(--gutter), env(safe-area-inset-right)) 64px
+    max(var(--gutter), env(safe-area-inset-left));
+}
+
+.credits .trail {
+  height: 48px;
 }
 
 .credits h1 {
   margin: 12px 0 0;
   font-size: 2.6rem;
-  font-stretch: 62%;
-  font-weight: 800;
+  font-stretch: 68%;
+  font-weight: 850;
   line-height: 1;
 }
 
 .credits h2 {
   margin: 28px 0 0;
-  font-size: 1.1rem;
+  font-size: 1.25rem;
+  font-stretch: 76%;
+  font-weight: 700;
 }
 
 .credits p {
@@ -591,62 +1342,29 @@ button:active:not(:disabled),
   overflow: hidden;
 }
 
+/* The row of places, and at its end the way to the editor. */
 .bar-top {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px var(--gutter) 2px;
+  padding: 2px var(--gutter) 0;
 }
 
-/* The way back: a fingertip wide, with its arrow standing on the page's left edge. */
-.back {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  gap: 2px;
-  min-width: var(--control);
-  height: var(--control);
-  margin-left: -6px;
-  padding-right: 6px;
-  border-radius: var(--round);
-  color: inherit;
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.back svg {
-  width: 22px;
-  height: 22px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 2.4;
-}
-
-/* A style that has been opened: the way back to all of them, and its name. */
-.opened {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 4px;
-}
-
-.opened .back {
-  padding-left: 0;
-  border: 0;
-  background: none;
-}
-
-.opened h3 {
+/* A chart's name, in the chart's own face, on a line of its own under the way back. */
+.chart-title {
   margin: 0;
+  padding: 0 var(--gutter);
+  overflow: hidden;
+  font-family: var(--chart-face);
   font-size: 1.5rem;
   font-stretch: 62%;
-  font-weight: 800;
+  font-weight: 720;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* A chart's name, in the chart's own face. */
+/* In the editor the name is typed where it stands, in the row itself. */
 .bar-top h1 {
   flex: 1;
   min-width: 0;
@@ -669,24 +1387,32 @@ button:active:not(:disabled),
 .reading button {
   min-width: var(--control);
   padding: 0 10px;
-  border-radius: 0;
 }
 
 .reading :where(button + button) {
   border-left: 0;
 }
 
-.reading button:first-child {
-  border-radius: var(--round) 0 0 var(--round);
-}
-
-.reading button:last-child {
-  border-radius: 0 var(--round) var(--round) 0;
-}
-
-.focus-toggle,
-.edit-link {
+.focus-toggle {
   flex: none;
+}
+
+/* The way to the editor: a word at the end of the row, not a box. */
+.edit-link {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  height: 44px;
+  margin-right: -6px;
+  padding: 0 6px 0 10px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: 1rem;
+  font-stretch: 85%;
+  font-weight: 750;
+  text-decoration: none;
+  white-space: nowrap;
 }
 
 .view {
@@ -760,11 +1486,10 @@ button:active:not(:disabled),
   align-items: center;
   height: var(--control);
   padding: 0 12px;
-  border: 1.5px solid var(--rule);
-  border-radius: var(--round);
+  border: 2px solid var(--rule);
   color: inherit;
   font-size: 0.875rem;
-  font-weight: 600;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
   text-decoration: none;
   white-space: nowrap;
@@ -1146,6 +1871,7 @@ button:active:not(:disabled),
   align-items: center;
   gap: 8px;
   padding: 8px var(--gutter) 10px;
+  border-top: 2px solid var(--ink);
 }
 
 .strip {
@@ -1159,8 +1885,9 @@ button:active:not(:disabled),
 }
 
 .strip-where {
-  font-stretch: 80%;
-  font-weight: 750;
+  font-size: 1.125rem;
+  font-stretch: 75%;
+  font-weight: 850;
 }
 
 .strip.last .strip-where {
@@ -1231,32 +1958,49 @@ button:active:not(:disabled),
    when the other's buttons come and go. */
 .take-tools {
   display: flex;
-  flex: 1 1 auto;
+  flex: none;
   gap: 6px;
   min-width: 0;
 }
 
-.transport {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 6px;
-  margin-left: auto;
+/* Nothing to keep yet: Play has the whole row. */
+.take-tools:empty {
+  display: none;
 }
 
-/* Play, and Stop in the same place and the same ink: the one filled button on the screen,
-   so that whichever it says, it is the first choice. */
+.transport {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* Play: the one block of colour on the screen, in the ink of the style the band will play
+   in, and as wide as the row has room for. Then Stop, in the same place, in the ink
+   itself: whichever it says, it is the first choice. */
 .go {
-  flex: none;
-  width: 96px;
-  height: 52px;
-  border: 2px solid var(--ink);
-  border-radius: 26px;
+  flex: 1 1 0;
+  min-width: 0;
+  height: 56px;
+  padding: 0;
+  border: 0;
+  background: var(--spot);
+  color: var(--press);
+  font-size: 2.2rem;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  --focus: var(--ink);
+}
+
+.go.stop {
   background: var(--ink);
   color: var(--paper);
-  font-size: 1.25rem;
-  font-stretch: 75%;
-  font-weight: 750;
+}
+
+.go:active {
+  background: var(--marker);
+  color: var(--on-marker);
 }
 
 /* Finish, beside it and plainly the lesser: an outline, and as wide as its longest word so
@@ -1264,14 +2008,13 @@ button:active:not(:disabled),
 .finish {
   flex: none;
   width: 84px;
-  height: var(--control);
+  height: 56px;
   padding: 0;
-  border: 1.5px solid var(--ink);
-  border-radius: calc(var(--control) / 2);
+  border: 2px solid var(--ink);
   background: none;
-  font-size: 1rem;
-  font-stretch: 78%;
-  font-weight: 700;
+  font-size: 1.0625rem;
+  font-stretch: 75%;
+  font-weight: 800;
 }
 
 .finish:disabled {
@@ -1282,9 +2025,11 @@ button:active:not(:disabled),
 /* Keeping the take and taking it away: quieter still. */
 .keep {
   flex: none;
+  height: 56px;
   padding: 0 10px;
-  font-stretch: 85%;
-  font-weight: 650;
+  font-size: 1.0625rem;
+  font-stretch: 75%;
+  font-weight: 800;
 }
 
 .keep:disabled {
@@ -1337,8 +2082,13 @@ button:active:not(:disabled),
     width: 96px;
   }
 
+  .transport {
+    flex: none;
+  }
+
   .go {
-    width: 112px;
+    flex: none;
+    width: 168px;
   }
 }
 
@@ -1366,11 +2116,6 @@ button:active:not(:disabled),
     grid-column: 4;
     grid-row: 1;
   }
-
-  .go {
-    height: 56px;
-    border-radius: 28px;
-  }
 }
 
 /* A phone on its side has width and no height: the screen's name and how it is read share a line. */
@@ -1381,9 +2126,13 @@ button:active:not(:disabled),
   }
 
   .top .bar-top {
-    flex: 0 1 auto;
-    max-width: 58%;
+    flex: none;
     padding: 4px 0 4px var(--gutter);
+  }
+
+  .top .chart-title {
+    flex: 0 1 auto;
+    padding: 0 0 0 12px;
   }
 
   .top .view {
@@ -1413,21 +2162,34 @@ button:active:not(:disabled),
   overflow: hidden;
 }
 
-/* The editor's way to the band: the one filled thing in its header. */
+/* The editor's row of places is as wide as its words: the chart's name has the rest. */
+.edit .trail {
+  flex: none;
+}
+
+.edit .bar-top {
+  padding: 6px var(--gutter) 4px;
+}
+
+/* The editor's way to the band: Play, in the ink of the style it will be played in. */
 .to-play {
   display: inline-flex;
   flex: none;
   align-items: center;
   height: var(--control);
-  padding: 0 18px;
-  border: 1.5px solid var(--ink);
-  border-radius: calc(var(--control) / 2);
-  background: var(--ink);
-  color: var(--paper);
-  font-stretch: 80%;
-  font-weight: 750;
+  padding: 0 12px;
+  background: var(--spot);
+  color: var(--press);
+  font-size: 1.35rem;
+  line-height: 1;
   text-decoration: none;
   white-space: nowrap;
+  --focus: var(--ink);
+}
+
+.to-play:active {
+  background: var(--marker);
+  color: var(--on-marker);
 }
 
 /* The chart's name is typed where it stands. */
@@ -1441,8 +2203,7 @@ button:active:not(:disabled),
   min-width: 0;
   height: var(--control);
   padding: 0 6px;
-  border: 1.5px solid transparent;
-  border-radius: var(--round);
+  border: 2px solid transparent;
   background: none;
   font-stretch: inherit;
   text-overflow: ellipsis;
@@ -1477,7 +2238,6 @@ button:active:not(:disabled),
   height: var(--control);
   padding: 0;
   border: 0;
-  border-radius: var(--round);
   background: none;
 }
 
@@ -1591,8 +2351,7 @@ button:active:not(:disabled),
   position: relative;
   flex: 1;
   min-height: 0;
-  border: 1.5px solid var(--rule);
-  border-radius: var(--round);
+  border: 2px solid var(--rule);
 }
 
 .source:focus-within {
@@ -1620,7 +2379,6 @@ button:active:not(:disabled),
   width: 100%;
   height: 100%;
   border: 0;
-  border-radius: var(--round);
   background: transparent;
   overflow: auto;
   resize: none;
@@ -1802,7 +2560,6 @@ button:active:not(:disabled),
     height: 44px;
     padding: 0;
     border: 0;
-    border-radius: 6px;
     background: var(--paper);
     font-family: var(--mono);
     font-size: 1.25rem;
@@ -1871,7 +2628,6 @@ button:active:not(:disabled),
   width: 100%;
   padding: 0;
   border: 0;
-  border-radius: 4px;
   background: none;
 }
 
@@ -1896,7 +2652,6 @@ button:active:not(:disabled),
 
 button.mark {
   position: relative;
-  border-radius: 0;
   background: none;
   line-height: 1.15;
 }
@@ -1967,7 +2722,6 @@ button.mark[aria-expanded="true"] {
   height: var(--control);
   padding: 0 10px;
   border: 2px solid var(--ink);
-  border-radius: var(--round);
   background: var(--paper);
   color: var(--ink);
   font-family: var(--mono);
@@ -2028,8 +2782,7 @@ button.mark[aria-expanded="true"] {
 .bar-panel,
 .section-panel {
   padding: 8px 10px 10px;
-  border: 1.5px solid var(--ink);
-  border-radius: var(--round);
+  border: 2px solid var(--ink);
   background: var(--paper);
   /* A slip of paper laid on the page: its edge, and the page it covers a shade darker beside it. */
   box-shadow: 4px 5px 0 var(--wash);
@@ -2059,7 +2812,6 @@ button.mark[aria-expanded="true"] {
   margin: 0 3px 0 8px;
   padding: 1px 5px;
   border: 1px solid var(--rule);
-  border-radius: 4px;
   color: var(--ink);
   font-family: var(--face);
   font-weight: 650;
@@ -2110,8 +2862,7 @@ button.mark[aria-expanded="true"] {
   flex: none;
   height: var(--control);
   padding: 0 14px;
-  border: 1.5px solid var(--ink);
-  border-radius: var(--round);
+  border: 2px solid var(--ink);
   background: var(--ink);
   color: var(--paper);
   font-weight: 700;
@@ -2140,7 +2891,7 @@ button.mark[aria-expanded="true"] {
     margin: 0 calc(-1 * max(5px, env(safe-area-inset-right))) 0
       calc(-1 * max(5px, env(safe-area-inset-left)));
     padding: 6px var(--gutter) 5px;
-    border-top: 1.5px solid var(--ink);
+    border-top: 2px solid var(--ink);
     background: var(--paper);
     font-size: 0.8125rem;
     line-height: 1.3;
@@ -2159,7 +2910,6 @@ button.mark[aria-expanded="true"] {
     height: 44px;
     padding: 0 4px;
     border: 0;
-    border-radius: 6px;
     background: var(--paper);
     color: var(--ink);
     font-weight: 650;
@@ -2177,7 +2927,6 @@ button.mark[aria-expanded="true"] {
   .dock .bar-field {
     flex: 1 1 0;
     height: 44px;
-    border-radius: 6px;
   }
 
   .dock .dock-step {
@@ -2269,20 +3018,11 @@ button.mark[aria-expanded="true"] {
 .side {
   flex: 1 1 auto;
   padding: 0 8px;
-  border-radius: 0;
   font-weight: 650;
 }
 
 .side + .side {
   border-left: 0;
-}
-
-.side:first-child {
-  border-radius: var(--round) 0 0 var(--round);
-}
-
-.side:last-child {
-  border-radius: 0 var(--round) var(--round) 0;
 }
 
 @media (min-width: 700px) {
@@ -2385,8 +3125,7 @@ button.mark[aria-expanded="true"] {
   height: 44px;
   padding: 0;
   overflow: hidden;
-  border: 1.5px solid var(--rule);
-  border-radius: 5px;
+  border: 2px solid var(--rule);
   background: none;
 }
 
@@ -2396,7 +3135,6 @@ button.mark[aria-expanded="true"] {
   bottom: 4px;
   left: 4px;
   max-height: calc(100% - 8px);
-  border-radius: 2px;
   background: var(--cell-ink);
 }
 
@@ -2454,19 +3192,10 @@ button.mark[aria-expanded="true"] {
   max-width: 76px;
   height: 44px;
   padding: 0 6px;
-  border-radius: 0;
 }
 
 .choices :where(.choice + .choice) {
   border-left: 0;
-}
-
-.choice:first-child {
-  border-radius: var(--round) 0 0 var(--round);
-}
-
-.choice:last-child {
-  border-radius: 0 var(--round) var(--round) 0;
 }
 
 .choice:disabled {
@@ -2520,14 +3249,19 @@ button.mark[aria-expanded="true"] {
 
 /* ── A phone held upright ────────────────────────────────────────────────── */
 
-@media (max-width: 480px) {
-  .bar-top .back span {
+/* The editor's top row also holds the chart's name, Undo, Redo and Play. On a phone the
+   place after Home is left out of it: Play is the way to the chart, and Home is home. */
+@media (max-width: 699px) {
+  .edit .crumb-sep,
+  .edit .crumb.place {
     display: none;
   }
 
-  /* The arrow keeps a fingertip's width; the title moves in beside it. */
-  .bar-top h1 {
-    margin-left: -10px;
+  .edit .bar-top {
+    gap: 4px;
+  }
+
+  .edit .bar-top h1 {
     font-size: 1.15rem;
   }
 }

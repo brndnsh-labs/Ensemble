@@ -3,8 +3,8 @@
 
 import type { Pack } from "@ensemble/audio";
 import { useEffect, useState } from "react";
-import { Back } from "./Back.tsx";
 import { PACK_IDS } from "./offline.ts";
+import { Trail } from "./Trail.tsx";
 
 export function CreditsView({ packsUrl }: { packsUrl: string }) {
   const [packs, setPacks] = useState<readonly Pack[]>();
@@ -26,8 +26,8 @@ export function CreditsView({ packsUrl }: { packsUrl: string }) {
   }, [packsUrl]);
 
   return (
-    <main className="library credits">
-      <Back />
+    <main className="credits">
+      <Trail />
       <h1>Credits</h1>
       <p>
         The band plays recordings of real instruments, cut down from sample libraries their makers
