@@ -9,6 +9,8 @@ import type { Made } from "./band.ts";
 import { perform, Unplayable, warmUp } from "./band.ts";
 import type { Call, Performance, Place } from "./jam.ts";
 import { chairsOf, mixOf, OPEN_PASSES, placeAt, recipeOf, seatsOf, turnForHome } from "./jam.ts";
+import type { Following, Onsets } from "./lamps.ts";
+import { onsetsOf, replaced } from "./lamps.ts";
 import type { Rig } from "./rig.ts";
 
 export type Phase = "idle" | "loading" | "playing";
@@ -42,6 +44,8 @@ export interface Jam {
   readonly finishing: boolean;
   /** Silence, now. */
   stop(): void;
+  /** Where the band is and the notes it plays, read at the moment of asking; undefined while it is not playing. The same function for the screen's life. */
+  readonly follow: () => Following | undefined;
 }
 
 /** How often the screen asks where the band is, in milliseconds. A timer, so a hidden tab still extends its jam. */
@@ -66,6 +70,8 @@ interface Running {
   /** What is playing, as it now stands: longer when an open jam is given more, told when it is told to finish. */
   recipe: TakeRecipe;
   made: Made;
+  /** Each seat's notes as the player has them now: replaced with the take from where it was replaced. */
+  onsets: Onsets;
   /** More of an open jam has been asked for and has not arrived. */
   extending: boolean;
   /** When the band was told to finish, on the page's clock. */
@@ -159,6 +165,7 @@ export function useJam(rig: Rig, call: Call, changed?: (take: TakeRecipe) => voi
           style,
           recipe,
           made,
+          onsets: onsetsOf(made.sounds, made.plan),
           extending: false,
           toldAt: undefined,
         };
@@ -212,6 +219,7 @@ export function useJam(rig: Rig, call: Call, changed?: (take: TakeRecipe) => voi
             return;
           }
           run.player.replace(at + REPLACE_AHEAD, made.sounds);
+          run.onsets = replaced(run.onsets, onsetsOf(made.sounds, made.plan), at + REPLACE_AHEAD);
           run.made = made;
           run.recipe = told;
           setPlaying(made);
@@ -242,6 +250,7 @@ export function useJam(rig: Rig, call: Call, changed?: (take: TakeRecipe) => voi
           // Stopped, or told to finish while this was being made: the ending is what counts.
           if (running.current !== run || run.toldAt !== undefined || at === undefined) return;
           run.player.replace(at + REPLACE_AHEAD, made.sounds);
+          run.onsets = replaced(run.onsets, onsetsOf(made.sounds, made.plan), at + REPLACE_AHEAD);
           run.made = made;
           run.recipe = longer;
           setPlaying(made);
@@ -283,6 +292,13 @@ export function useJam(rig: Rig, call: Call, changed?: (take: TakeRecipe) => voi
     return () => clearInterval(timer);
   }, [phase, rig, stop, setTake]);
 
+  const follow = useCallback((): Following | undefined => {
+    const run = running.current;
+    const position = run?.player.position;
+    if (!run || position === undefined) return undefined;
+    return { heard: position - rig.latency, onsets: run.onsets };
+  }, [rig]);
+
   // Leaving the screen stops the band.
   useEffect(() => stop, [stop]);
 
@@ -312,6 +328,7 @@ export function useJam(rig: Rig, call: Call, changed?: (take: TakeRecipe) => voi
     finish,
     canFinish,
     finishing,
+    follow,
     stop: () => {
       if (performance.now() - pressedAt.current < SAME_TAP_MS) return;
       stop();
