@@ -42,8 +42,14 @@ export interface Saving {
 /** How long to wait for the service worker to take charge of a page it did not load. */
 const TAKE_CHARGE_MS = 5000;
 
-/** How many files are fetched at once. */
-const AT_ONCE = 4;
+/**
+ * How many files are fetched at once. There are about nine hundred, most of them small, and
+ * each costs a round trip whatever its size: four at a time took fifty seconds on the test
+ * site where a band's own loader, asking for all of its files together, had 267 in two. The
+ * connection is one stream each (HTTP/2 and 3), and a band someone is waiting for still goes
+ * first: the saver stops asking while one loads (`idle`).
+ */
+const AT_ONCE = 24;
 
 /** A moment for the page to draw and for a tune to be opened before the connection is used for later. */
 const SETTLE_MS = 1500;

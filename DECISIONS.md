@@ -1364,3 +1364,11 @@ Read on the main thread: the report against the pictures (a bar open over the ph
 - `docs/CHART_FORMAT.md` section 1 said the app never rewrites a user's text unless asked to format it. An edit made on the chart now does, for the section it touches and in the formatter's layout; the sentence says so.
 - Not seen on a real phone by anyone: whether a press on a bar raises the iPhone's keyboard, whether the dock sits on it, whether its keys keep it up. Brandon's to try.
 - Left as the build found them: by tapping there is no way to set key, tempo or meter, add repeats and endings, or play a section again by name (the Text side has them); a laptop's field overlaps the next bar on a six-bar line; duplicating a section that has its own key copies its bars untransposed.
+
+## the instruments, fetched faster (stage 6)
+
+Brandon, 2026-11-16, on a fresh browser: "it takes a pretty long time to pull down all the sound files". Measured on the test site from a fresh headless Chrome: the background save took 50 s for its 908 files, while a band's own loader had the jazz quartet's 267 files in 2.3 s from Play to the playhead. The bytes were never the wait (30 MB); the requests were.
+
+- **The saver fetches 24 files at once, not 4.** Four was chosen on a test pipe speaking HTTP/1.1; the live site speaks HTTP/3, where a request is a stream and the only ration was ours. A band being loaded still has the connection: the saver stops asking while one loads.
+- **A recording's address is kept for good** (`hosting/nginx.conf`): the app asks for each with a mark made from its pack's description (`?v=`), so the address changes when the pack does, and the server now says so (`immutable`, a year). The edge in front of the test site was asking the house about every file on every fetch (`cf-cache-status: MISS` or `REVALIDATED`, 0.35 to 0.65 s to the first byte); it may now answer by itself. A pack's description, the page and the worker are asked about every time, as before.
+- **Not done, and why**: one file for each pack (eleven requests in place of nine hundred) is a change to the pack format, the cutter and the loader, and over HTTP/3 the requests are no longer the wait once they are not rationed; saving only the styles someone plays gives up playing a new style on a train. Come back to either if a measurement says so.
