@@ -39,6 +39,8 @@ interface Props {
   readonly band?: ReactNode;
   /** Beside the transport, and quieter than it. */
   readonly aside?: ReactNode;
+  /** Something of the screen's own that went wrong, said where the band's own troubles are. */
+  readonly problem?: string | undefined;
 }
 
 /** Somewhere a space is typed or chooses, so it is not the transport's there. */
@@ -107,6 +109,7 @@ const READING_NAMES: Readonly<Record<Reading, readonly [shown: string, said: str
 export function Stage(props: Props) {
   const { jam, call, chart, preview, title, back, reading, read, side, before, band, aside } =
     props;
+  const problem = jam.problem ?? props.problem;
   const [focus, setFocus] = useState(false);
 
   const idle = jam.phase === "idle";
@@ -198,9 +201,9 @@ export function Stage(props: Props) {
 
       <ChartView chart={shown} reading={reading} playhead={playhead} focus={focus} />
 
-      {jam.problem && (
+      {problem && (
         <p className="problem" role="alert">
-          {jam.problem}
+          {problem}
         </p>
       )}
 

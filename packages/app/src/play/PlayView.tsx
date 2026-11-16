@@ -14,11 +14,13 @@ import {
 import { STYLES, styleById } from "@ensemble/styles";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { copyOf } from "../charts.ts";
+import { download, fileName } from "../download.ts";
 import type { LibraryChart } from "../library.ts";
 import { notePlayed } from "../recent.ts";
 import type { ChartChoices, Settings } from "../settings.ts";
 import type { KeptTake } from "../takes.ts";
 import { dayOf, followTake, heardAs, keepTake } from "../takes.ts";
+import { midiOf } from "./band.ts";
 import type { Call, JamSetup } from "./jam.ts";
 import { chartOf, SEAT_ORDER, takeOptions } from "./jam.ts";
 import type { Rig } from "./rig.ts";
@@ -155,6 +157,16 @@ export function PlayView({ entry, takes, rig, settings, change, autoplay, starte
   const take = jam.phase === "loading" ? undefined : jam.take;
   const isKept = take !== undefined && kept?.seed === take.options.seed;
   const idle = jam.phase === "idle";
+
+  const [problem, setProblem] = useState<string>();
+  /** Hand the take over as a MIDI file, named for the chart: the whole band as it played, whoever was silenced. */
+  const exportMidi = (recipe: TakeRecipe) => {
+    setProblem(undefined);
+    midiOf(recipe).then(
+      (bytes) => download(bytes, "audio/midi", fileName(recipe.chartName, "take", ".mid")),
+      () => setProblem("The MIDI file could not be made."),
+    );
+  };
   // An instrument is chosen only where the style has more than one for the seat, and the seat is in.
   const chosenFor = choices.instruments;
   const offered = BAND_SEATS.flatMap((seat) => {
@@ -196,16 +208,23 @@ export function PlayView({ entry, takes, rig, settings, change, autoplay, starte
           </button>
         )
       }
+      problem={problem}
       aside={
         take && (
-          <button
-            type="button"
-            className="keep"
-            disabled={isKept}
-            onClick={() => setKept({ id: keepTake(take, entry.id), seed: take.options.seed })}
-          >
-            {isKept ? "Kept" : "Keep"}
-          </button>
+          <>
+            <button
+              type="button"
+              className="keep"
+              disabled={isKept}
+              onClick={() => setKept({ id: keepTake(take, entry.id), seed: take.options.seed })}
+            >
+              {isKept ? "Kept" : "Keep"}
+            </button>
+            {/* The take just played, or still playing, as a file: no need to keep it first. */}
+            <button type="button" className="keep" onClick={() => exportMidi(take)}>
+              Export MIDI
+            </button>
+          </>
         )
       }
       before={
