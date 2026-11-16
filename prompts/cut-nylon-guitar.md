@@ -1,6 +1,6 @@
 # Brief: cut the nylon-string guitar pack
 
-Ten instrument packs are cut (`assets/packs/`), by `scripts/packs/cut.ts` from recipes in `scripts/packs/recipes/`. The last style, acoustic, is played on a nylon-string guitar, picked and strummed. You are adding one pack, `nylon-guitar`, in the same way as the others.
+Nine instrument packs are cut (`assets/packs/`), by `scripts/packs/cut.ts` from recipes in `scripts/packs/recipes/`. The last style, acoustic, is played on a nylon-string guitar, picked and strummed. You are adding one pack, `nylon-guitar`, in the same way as the others.
 
 Read first: `CLAUDE.md`, `docs/AUDIO_NOTES.md`, `packages/audio/src/pack.ts`, `prompts/cut-packs.md` (the brief the first five were cut to: its rules, its "what happens to every take" and its report all still hold), then `scripts/packs/` (all of it; `recipes/clean-guitar.ts` and `recipes/electric-piano.ts` are the nearest patterns), and the entries about packs in `DECISIONS.md`.
 
@@ -30,7 +30,7 @@ FreePats' Spanish classical guitar (CC0): 48 mono recordings, one of each note, 
 
 ## Check
 
-Run the round-trip check, the budgets, `pnpm typecheck`, `pnpm lint`, `pnpm check`. The ten existing packs must be untouched: `git status` shows only the new pack and your recipe (and its registration).
+Run the round-trip check, the budgets, `pnpm typecheck`, `pnpm lint`, `pnpm check`. The nine existing packs must be untouched: `git status` shows only the new pack and your recipe (and its registration).
 
 Never `pkill -f`. Never wrap node in `timeout`. In zsh, do not name a loop variable `path`.
 
