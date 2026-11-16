@@ -1503,3 +1503,11 @@ Built to `prompts/app-poster-wall-2.md`, from the study's direction A (`out/look
 
 - **Smoke journey 5** opens More before each export (the play screen's while the band plays, the take's two), presses the export inside the sheet, and reaches the kept take through More's "Kept take" line where it pressed the link under the chart. What it proves is unchanged: both MIDI files equal the CLI's. Journeys 1 to 4 are as they were.
 - **`out/wall-2/`** (the pictures of this part) is ignored by git.
+
+## the poster wall, part 2: checked and merged (stage 6)
+
+An Opus build from `prompts/app-poster-wall-2.md`. Read on the main thread: the new modules whole (`play/lamps.ts`, `play/Sheet.tsx`, `tempoFor` in `play/jam.ts`, what `useJam.ts` gained), the diff's shape (13 files, all in `packages/app` and the smoke journeys), `pnpm check` (16.1 s of 20), the five smoke journeys against the built app (10.3 s), and the screen photographed from the merged tree (a chart before Play, playing, More) beside the study's. The lamps were sampled in the page for three seconds of a playing blues: drums, bass and chords each reached full ink, the soloist sitting out stayed at nothing.
+
+- The builder's decisions stand as logged above. Two go against the brief's letter and are right: "The song, once through" is offered for every chart, as the old picker offered it; sheets close with "Done".
+- **Known and left**: at laptop width the chart sets eight bars a line in the 64rem column where the study drew four (the chart's own layout rule, not opened here); a take's Rename shows its chart's name; a phone on its side is only compacted. Nothing has been seen on an iPhone: the sheet (the browser's own modal dialog) over Safari's toolbars, the flood in a dark room, whether the lamps sit on the notes by ear.
+- **Part 3 (Edit as a mode of this screen) waits for Brandon's hands on parts 1 and 2**: it is the largest piece, it moves the editor he passed on his phone the same day, and what he says of the chart's screen changes what it is built on.
