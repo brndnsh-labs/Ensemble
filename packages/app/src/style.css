@@ -624,6 +624,28 @@ button:active:not(:disabled),
   stroke-width: 2.4;
 }
 
+/* A style that has been opened: the way back to all of them, and its name. */
+.opened {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.opened .back {
+  padding-left: 0;
+  border: 0;
+  background: none;
+}
+
+.opened h3 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-stretch: 62%;
+  font-weight: 800;
+}
+
 /* A chart's name, in the chart's own face. */
 .bar-top h1 {
   flex: 1;
@@ -2499,7 +2521,7 @@ button.mark[aria-expanded="true"] {
 /* ── A phone held upright ────────────────────────────────────────────────── */
 
 @media (max-width: 480px) {
-  .back span {
+  .bar-top .back span {
     display: none;
   }
 

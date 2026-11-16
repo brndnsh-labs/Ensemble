@@ -6,7 +6,7 @@
 import { keyToString, seconds } from "@ensemble/engine";
 import { STYLES, styleById } from "@ensemble/styles";
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import {
   addChart,
   deleteChart,
@@ -238,7 +238,20 @@ function OwnChart({
   );
 }
 
+/** How far down home was when it was last left, so that coming back from a chart is coming back to the same place. */
+let leftAt = 0;
+
 export function LibraryView({ play, own, takes, recent, finding, find, saving }: Props) {
+  useLayoutEffect(() => {
+    scrollTo(0, leftAt);
+    // Kept as the page moves: by the time this screen is taken down the next one may have moved it.
+    const keep = () => {
+      leftAt = scrollY;
+    };
+    addEventListener("scroll", keep, { passive: true });
+    return () => removeEventListener("scroll", keep);
+  }, []);
+
   /** The chart of the player's whose More is open: one at a time. */
   const [open, setOpen] = useState<string>();
 
@@ -370,6 +383,24 @@ export function LibraryView({ play, own, takes, recent, finding, find, saving }:
             </select>
           </label>
         </div>
+        {chosen && (
+          // A style was opened: the way back to all of them is said where its list starts, and
+          // not left to the picker above.
+          <div className="opened">
+            <button
+              type="button"
+              className="back"
+              onClick={() => find({ ...finding, style: "" })}
+              aria-label="Back to all the styles"
+            >
+              <svg viewBox="0 0 22 22" aria-hidden="true">
+                <path d="M13.5 4.5L7 11l6.5 6.5" />
+              </svg>
+              <span>All styles</span>
+            </button>
+            <h3>{chosen.name}</h3>
+          </div>
+        )}
         {!searching && !chosen ? (
           // Nothing asked for yet: the styles themselves, each a tap from its charts.
           <ul>

@@ -1372,3 +1372,12 @@ Brandon, 2026-11-16, on a fresh browser: "it takes a pretty long time to pull do
 - **The saver fetches 24 files at once, not 4.** Four was chosen on a test pipe speaking HTTP/1.1; the live site speaks HTTP/3, where a request is a stream and the only ration was ours. A band being loaded still has the connection: the saver stops asking while one loads.
 - **A recording's address is kept for good** (`hosting/nginx.conf`): the app asks for each with a mark made from its pack's description (`?v=`), so the address changes when the pack does, and the server now says so (`immutable`, a year). The edge in front of the test site was asking the house about every file on every fetch (`cf-cache-status: MISS` or `REVALIDATED`, 0.35 to 0.65 s to the first byte); it may now answer by itself. A pack's description, the page and the worker are asked about every time, as before.
 - **Not done, and why**: one file for each pack (eleven requests in place of nine hundred) is a change to the pack format, the cutter and the loader, and over HTTP/3 the requests are no longer the wait once they are not rationed; saving only the styles someone plays gives up playing a new style on a train. Come back to either if a measurement says so.
+
+## a style opened on home has a way back (stage 6)
+
+Brandon, 2026-11-16: "i opened a genre, then opened a chart, and when leaving the chart, i couldn't navigate back home". Reproduced: back from the chart lands on home with the style still chosen, at the top of the page, and the only way to the other styles was the Style picker set to "Every style".
+
+- **Where a style's list starts it says "All styles", with the arrow, and the style's name.** Home still remembers the style (he was browsing it); what was missing was the way out.
+- **Home comes back where it was left**, not at its top: the list he opened the chart from is the list he returns to.
+- The back arrow's word is hidden on a phone only in a screen's top bar, where the title needs the room; the credits page shows "Charts" beside its arrow now.
+- A stopgap: the study of the app's structure (`prompts/app-look-study.md`) makes a style its own page.
