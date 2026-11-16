@@ -123,6 +123,23 @@ export const GOLDENS: readonly Golden[] = [
     style: "reggae",
     options: { mode: "song", seed: 2 },
   },
+  // Acoustic: a tune in two parts with a solo over it (the upright's root and fifth with its
+  // step on beat 4, the strum lines and the last upstroke leaning in, the second nylon guitar).
+  {
+    file: "acoustic-minor-ballad-am-solo.mid",
+    chart: "acoustic-minor-ballad-am.chart",
+    style: "acoustic",
+    options: { mode: "jam", passes: 4, seed: 1, solo: true },
+  },
+  // Acoustic: the arranged song, in song mode (an intro and a first verse fingerpicked by the
+  // guitar alone, the thumb alternating basses; picked and strummed verses and choruses with
+  // the band; the soft ending).
+  {
+    file: "acoustic-song-c.mid",
+    chart: "acoustic-song-c.chart",
+    style: "acoustic",
+    options: { mode: "song", seed: 2 },
+  },
 ];
 
 export const goldenUrl = (golden: Golden): URL =>

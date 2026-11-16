@@ -1,0 +1,9 @@
+title: Four Open Chords in G
+key: G
+tempo: 100
+style: acoustic
+
+// I IV vi V, a bar each, round and round: every chord an open shape.
+[A]
+| G | C | Em | D |
+| G | C | Em | D |

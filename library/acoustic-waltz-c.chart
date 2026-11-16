@@ -1,0 +1,12 @@
+title: Folk Waltz in C
+key: C
+tempo: 104
+meter: 3/4
+style: acoustic
+
+// Three to the bar, sixteen bars, a chord to a bar: boom-tick-tick.
+[A]
+| C | %  | F  | C  |
+| C | Am | Dm | G7 |
+| C | C7 | F  | Dm |
+| C | G7 | C  | %  |
