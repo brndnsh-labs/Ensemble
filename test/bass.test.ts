@@ -68,10 +68,14 @@ test("a lead-in resolves by step in actual pitch: a note a step from the next ro
   assert.ok(leadIns > enough(500), `only ${leadIns} stepwise lead-ins across the library`);
 });
 
-test("the bass line never leaps more than an octave", () => {
+test("the bass line never leaps more than an octave (from one note to the next, not across a section it lays out of)", () => {
   for (const { chart, options, take } of takes((jam) => jam.chart.meter === "4/4")) {
     const bass = notesOf(take, "bass");
+    // Bars the arrangement lays the bass out of: the line starts again after them.
+    const out = take.plan.bars.filter((bar) => bar.kind === "music" && bar.seats.bass === null);
     for (let i = 1; i < bass.length; i++) {
+      const [from, to] = [bass[i - 1]!.tick, bass[i]!.tick];
+      if (out.some((bar) => bar.start > from && bar.start < to)) continue;
       const leap = Math.abs(bass[i]!.pitch - bass[i - 1]!.pitch);
       assert.ok(leap <= 12, `${chart.file} seed ${options.seed}: a leap of ${leap} semitones`);
     }
@@ -118,7 +122,7 @@ test("the last bass note of a jam that ends is the lowest root on the instrument
   }
 });
 
-test("a bass note outside its chord's scale only passes: it is stepped into and out of the same way, or it is the half step onto the next change", () => {
+test("a bass note outside its chord's scale only passes: it is stepped into and out of the same way, or it is the half step onto the note that states the next change", () => {
   let outside = 0;
   for (const { chart, options, take } of takes((jam) => jam.chart.meter === "4/4")) {
     const bass = notesOf(take, "bass");
@@ -147,8 +151,14 @@ test("a bass note outside its chord's scale only passes: it is stepped into and 
       const out = after.pitch - note.pitch;
       // The lope may strike it again before it lands.
       const landing = out === 0 ? bass[i + 2] : after;
-      if (landing && changes.has(landing.tick) && Math.abs(landing.pitch - note.pitch) === 1)
-        return;
+      // The note that states the change: on it, or the first after it where the line keeps a
+      // hole on the One across the barline (ST-reggae-14).
+      const states = (next: (typeof bass)[number]) =>
+        changes.has(next.tick) ||
+        [...changes].some(
+          (tick) => tick > note.tick && tick < next.tick && next.tick - tick <= 2 * PPQ,
+        );
+      if (landing && states(landing) && Math.abs(landing.pitch - note.pitch) === 1) return;
       if (!landing && take.plan.open) return;
       assert.ok(before, `${where}: the line starts on it`);
       const into = note.pitch - before.pitch;

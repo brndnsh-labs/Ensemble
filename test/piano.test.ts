@@ -484,8 +484,26 @@ test("a guitarist holds a grip: the notes under the hand change only where the c
       since = stroke.tick;
     }
   }
+  // A guitar that never scratches, or never leans into a change, has none of either to show:
+  // the reggae skank is chops alone and is never early (ST-reggae-19, ST-reggae-29).
+  const scratching = guitars.some((style) => {
+    const book = style.chords.rhythm;
+    return (
+      book !== null &&
+      [book.tiers.low, book.tiers.mid, book.tiers.high].some((tier) =>
+        Object.values(tier.articulation).some((attack) => attack.muted === true),
+      )
+    );
+  });
+  const leaning = guitars.some(
+    (style) =>
+      Object.values(style.chords.anticipation.barline).some((chance) => chance > 0) ||
+      style.chords.anticipation.midBar === "tie",
+  );
   assert.ok(
-    moves > enough(1000) && scratches > enough(5000) && leant > enough(100),
+    moves > enough(1000) &&
+      (!scratching || scratches > enough(5000)) &&
+      (!leaning || leant > enough(100)),
     `only ${moves} moves, ${scratches} scratches, ${leant} chords leant into`,
   );
 });
@@ -520,8 +538,10 @@ test("the strumming hand is a pendulum: on the grid it strums, a stroke between 
       if (rolled && !between) downs++;
     }
   }
+  // The reggae hand comes up only for the flick after a chop (ST-reggae-19): on the full run it
+  // rolls about 1,300 upstrokes where funk's and disco's roll 32,000 and 76,000.
   assert.ok(
-    ups > enough(5000) && downs > enough(5000),
+    ups > enough(1000) && downs > enough(5000),
     `only ${ups} upstrokes and ${downs} downstrokes rolled`,
   );
 });

@@ -48,6 +48,8 @@ interface Hit {
   readonly pitches: readonly number[];
   /** A scratch: the stroke with the notes deadened. It keeps the time and states no chord. */
   readonly muted: boolean;
+  /** How hard, as played: the loudest of its notes. */
+  readonly level: number;
 }
 
 /** One phrase of comping as it was played: its bars and their rhythms. */
@@ -94,6 +96,7 @@ function read(take: Take): Reading {
       length: Math.max(hit?.length ?? 0, note.duration),
       pitches: [...(hit?.pitches ?? []), note.pitch],
       muted: note.voice === MUTED,
+      level: Math.max(hit?.level ?? 0, note.velocity),
     });
   }
   const struck = [...byTick.values()].sort((a, b) => a.tick - b.tick);
@@ -547,7 +550,71 @@ export const compingMeasures: readonly Measure[] = [
       return share(on, cases);
     },
   },
+  // An offbeat comp: the skank chops 2 and 4, is loudest there, and leaves 1 and 3 alone
+  // (ST-reggae-20). One way of playing, on the scorecard of a style that sets it targets.
+  {
+    id: "chords.on-one-and-three",
+    seat: "chords",
+    idiom: true,
+    says: "Nothing is played on 1 or 3: those beats are the bass's and the drop's, and the hand is off them.",
+    unit: "share",
+    of(take) {
+      const { bars, strokes } = read(take);
+      const all = bars.flatMap((bar) =>
+        strokes.get(bar.index)!.map((stroke) => stroke.tick - bar.start),
+      );
+      return share(all.filter((at) => at === 0 || at === 2 * PPQ).length, all.length);
+    },
+  },
+  {
+    id: "chords.chop-loudest",
+    seat: "chords",
+    idiom: true,
+    says: "The chop on 2 and 4 is the loudest stroke in the hand: in a bar with other strokes, every one of them is softer than both chops.",
+    unit: "share",
+    of(take) {
+      const loudest = chopsAgainstTheRest(take, () => true).filter(
+        ({ chops, rest }) => Math.min(...chops) > Math.max(...rest),
+      );
+      return share(loudest.length, chopsAgainstTheRest(take, () => true).length);
+    },
+  },
+  {
+    id: "chords.chop-over-the-rest",
+    seat: "chords",
+    idiom: true,
+    says: "When the band is hot the chop on 2 and 4 stands over the hand's other strokes by a clear margin, not a shout: its level over theirs, on average.",
+    unit: "ratio",
+    of(take) {
+      const bars = chopsAgainstTheRest(take, (tier) => tier === "high");
+      const average = (levels: readonly number[]) =>
+        levels.reduce((sum, level) => sum + level, 0) / levels.length;
+      return mean(bars.map(({ chops, rest }) => average(chops) / average(rest)));
+    },
+  },
 ];
+
+/**
+ * The bars at the levels asked for that chop on both 2 and 4 and have other
+ * strokes besides: the chops' levels and the rest's.
+ */
+function chopsAgainstTheRest(
+  take: Take,
+  at: (tier: Tier) => boolean,
+): { chops: number[]; rest: number[] }[] {
+  const { bars, strokes } = read(take);
+  const result: { chops: number[]; rest: number[] }[] = [];
+  for (const bar of bars) {
+    if (!at(tierAt(bar))) continue;
+    const own = strokes.get(bar.index)!;
+    const isChop = (stroke: Hit) =>
+      stroke.tick - bar.start === PPQ || stroke.tick - bar.start === 3 * PPQ;
+    const chops = own.filter(isChop).map((stroke) => stroke.level);
+    const rest = own.filter((stroke) => !isChop(stroke)).map((stroke) => stroke.level);
+    if (chops.length === 2 && rest.length > 0) result.push({ chops, rest });
+  }
+  return result;
+}
 
 /** A bar of a strummed line: its strokes, and what the harmony does at its barlines. */
 interface Line {

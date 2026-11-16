@@ -356,4 +356,41 @@ export const drumMeasures: readonly Measure[] = [
       return share(late.length, bars.length);
     },
   },
+  {
+    id: "drums.drop-on-three",
+    idiom: true,
+    seat: "drums",
+    says: "The one drop: in every bar the kick lands on beat 3 together with the cross-stick, or the snare in the hot riddims.",
+    unit: "share",
+    of(take) {
+      const drums = notesOf(take, "drums");
+      const bars = musicBars(take).filter(
+        (bar) =>
+          !bar.ending && bar.seats.drums !== null && bar.meter.beats === 4 && bar.meter.unit === 4,
+      );
+      const dropped = bars.filter((bar) => {
+        const three = notesIn(drums, bar).filter((note) => note.tick === bar.start + 2 * PPQ);
+        const hand = three.some((note) => note.voice === "crossStick" || note.voice === "snare");
+        return hand && three.some((note) => note.voice === "kick");
+      });
+      return share(dropped.length, bars.length);
+    },
+  },
+  {
+    id: "drums.kick-on-one-quiet",
+    idiom: true,
+    seat: "drums",
+    says: "When the band is quiet the One is empty: hardly a bar has the kick on beat 1, and those only where the drummer crashes there.",
+    unit: "share",
+    of(take) {
+      const drums = notesOf(take, "drums");
+      const bars = musicBars(take).filter(
+        (bar) => !bar.ending && bar.seats.drums !== null && drumTier(bar) === "low",
+      );
+      const hits = bars.filter((bar) =>
+        drums.some((note) => note.tick === bar.start && note.voice === "kick"),
+      );
+      return share(hits.length, bars.length);
+    },
+  },
 ];

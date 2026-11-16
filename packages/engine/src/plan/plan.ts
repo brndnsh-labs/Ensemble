@@ -113,17 +113,19 @@ export function planBars(
               ...(rise(run.pass) === undefined ? {} : { rise: rise(run.pass)! }),
             })
           : 0;
+      // A level the player set is held: the band must not drift away from it (CO-05, CO-06).
+      const base =
+        options.energy === undefined
+          ? level
+          : options.energy + (level - style.arc.defaultLevel) / 2;
       drafts.push({
         flat: bar,
         run,
         line,
         occurrence,
         level,
-        // A level the player set is held: the band must not drift away from it (CO-05, CO-06).
-        energy:
-          options.energy === undefined
-            ? level + offset * style.arc.depth
-            : options.energy + (level - style.arc.defaultLevel) / 2,
+        base,
+        energy: options.energy === undefined ? level + offset * style.arc.depth : base,
         barInSection: i,
         barInPass,
         phrase: { index: phraseIndex, bar: barInPhrase, length: phraseLength },
@@ -152,7 +154,7 @@ export function planBars(
     // The build is a swell, not a new part: it never carries its one bar across a tier line,
     // or the groove would change for a single bar before the fill.
     const lifted = builds ? withinTier(draft.energy, style.arc.build) : draft.energy;
-    return clamp01(holdTierLine(lifted, draft.level, style));
+    return clamp01(holdTierLine(lifted, draft.base, style));
   });
 
   const endingIndex = ends ? playedBars - 1 : -1;
@@ -205,7 +207,7 @@ export function planBars(
             : null;
       }
     }
-    if (previous && !isEnding) {
+    if (previous && !isEnding && energy >= (style.drums.crashFrom ?? 0)) {
       const previousFill = bars[bars.length - 1]?.fill ?? null;
       const newSection = draft.barInSection === 0;
       if (newSection) {
@@ -290,6 +292,11 @@ interface Draft {
   readonly line: ArrangementLine | undefined;
   readonly occurrence: number;
   readonly level: number;
+  /**
+   * The level the bar is asked for before any build, arc or lift: the section's, or the one the
+   * player set. The high-tier line is held against what is added to it, never against this.
+   */
+  readonly base: number;
   readonly energy: number;
   readonly barInSection: number;
   readonly barInPass: number;
@@ -469,7 +476,10 @@ export function sectionIdentity(label: string): string {
     .replace(/[\s\d'’′]+$/u, "");
 }
 
-/** Where the high tier is a different groove, no lift carries a bar across its line. */
+/**
+ * Where the high tier is a different groove, no lift carries a bar across its line: a bar is
+ * on the side of it that its base level is, the section's or the player's.
+ */
 function holdTierLine(lifted: number, level: number, style: StylePack): number {
   if (style.arc.liftsCrossHigh) return lifted;
   if (level < TIER_HIGH) return Math.min(lifted, TIER_HIGH - 0.01);

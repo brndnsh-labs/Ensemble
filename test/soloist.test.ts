@@ -130,8 +130,13 @@ test("the band builds with the solo: it never comes down from one chorus of a so
           const last = pass + solo.of - 1;
           const where = `${chart.file}, ${passes} passes, the solo from pass ${pass}`;
           assert.ok(mean(last) >= mean(pass) - 1e-9, `${where}: ${mean(pass)} then ${mean(last)}`);
+          // Louder by a fiftieth of the range at least, less for a style that plays its arc
+          // shallower: reggae's builds are heard in dynamics only, at half depth (ST-reggae-34).
           if (solo.of === 3) {
-            assert.ok(mean(last) > mean(pass) + 0.02, `${where}: no build under the solo`);
+            assert.ok(
+              mean(last) > mean(pass) + 0.02 * style.arc.depth,
+              `${where}: no build under the solo`,
+            );
           }
         }
       }
@@ -225,7 +230,10 @@ test("the soloist lands the changes: a note struck where a chord arrives is a to
       }
     }
   }
-  assert.ok(landings > enough(800), `only ${landings} landings`);
+  // A reggae line enters after the One and rests on the drop (ST-reggae-25), so few of its
+  // notes are struck where a chord arrives: about 300 on the full run, where funk's and
+  // disco's are about 2,000 each.
+  assert.ok(landings > enough(250), `only ${landings} landings`);
 });
 
 test("a solo breathes and keeps going: no silence inside it reaches three bars, and it has one top note, in its last chorus", () => {

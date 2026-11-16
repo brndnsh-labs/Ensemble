@@ -336,8 +336,8 @@ test("the bass stays on the instrument: nothing below the open E, nothing above 
   }
 });
 
-test("where a chord is written the bass plays a tone of that chord, and at a change of chord it is the chord's bass note", () => {
-  for (const { chart, options, take } of takes()) {
+test("where a chord is written the bass plays a tone of that chord, and at a change of chord it is the chord's bass note: struck where the chord lands, or, at a barline in a line that keeps its hole on the One, the first note it plays under the chord", () => {
+  for (const { chart, options, style, take } of takes()) {
     const bass = notesOf(take, "bass");
     let previous = "";
     for (const bar of take.plan.bars) {
@@ -355,7 +355,13 @@ test("where a chord is written the bass plays a tone of that chord, and at a cha
           continue;
         }
         const at = bar.start + span.start;
-        const struck = bass.find((note) => note.tick === at);
+        // A riff with a hole on the One keeps it across a change at the barline (ST-reggae-14):
+        // the chord is stated by the first note under it, wherever in its span that falls.
+        const hole: boolean =
+          span.start === 0 && style.bass.lines[tierOf(bar.seats.bass)].keepsHole === true;
+        const struck: (typeof bass)[number] | undefined = hole
+          ? bass.find((note) => note.tick >= at && note.tick < at + span.duration)
+          : bass.find((note) => note.tick === at);
         const where = `${chart.file} seed ${options.seed} bar ${bar.index}`;
         assert.ok(struck, `${where}: no bass note on the arrival`);
         const name = `${pitchClass(chord.root)}:${chord.quality.base}:${chord.bass ? pitchClass(chord.bass) : ""}`;
@@ -715,6 +721,9 @@ test("in a jam on a one-section form, the biggest fill is kept for where the ban
   const rank = (energy: number) => ["low", "mid", "high"].indexOf(tierOf(energy));
   let tops = 0;
   let plain = 0;
+  // Whether the band stepped up a level anywhere: a style that plays its arc inside one level
+  // (reggae, ST-reggae-33 and ST-reggae-34) has no step to keep the biggest fill for.
+  let stepped = false;
   for (const { chart, take } of takes((jam) => jam.options.mode === "jam")) {
     const body = take.plan.bars.filter(
       (bar) => bar.kind === "music" && bar.section.role === "body",
@@ -723,6 +732,7 @@ test("in a jam on a one-section form, the biggest fill is kept for where the ban
     for (let i = 0; i + 1 < body.length; i++) {
       const bar = body[i]!;
       const next = body[i + 1]!;
+      if (rank(next.energy) > rank(bar.energy)) stepped = true;
       if (next.pass === bar.pass || next.ending) continue;
       assert.ok(bar.fill, `${chart.file}: a chorus ends without a fill`);
       const stepsUp = rank(next.energy) > rank(bar.energy);
@@ -731,7 +741,7 @@ test("in a jam on a one-section form, the biggest fill is kept for where the ban
       else plain++;
     }
   }
-  assert.ok(tops > 0 && plain > 0, `${tops} tops and ${plain} ordinary chorus ends`);
+  assert.ok((tops > 0 || !stepped) && plain > 0, `${tops} tops and ${plain} ordinary chorus ends`);
 });
 
 function musicSeconds(roadmap: Plan): number {

@@ -86,6 +86,8 @@ export function plainStrikes(
           if (tick > stretch.start && tick < stretch.end) at.push(tick);
         }
         at.sort((a, b) => a - b);
+        // An offbeat part leaves the bar's first pulse alone, where it has another to chop on.
+        if (chords.plain.pulse === "offbeats" && at[0] === bar.start && at.length > 1) at.shift();
       }
       at.forEach((tick, i) => {
         const arrives = tick === stretch.start;

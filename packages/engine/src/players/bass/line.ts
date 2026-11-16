@@ -192,15 +192,27 @@ export function lineOf(
   let inside: Onset[] = strokes
     .filter((onset) => onset.tick >= from && onset.tick < to)
     .map((onset) => ({ ...onset, space: Math.min(onset.space, to - onset.tick) }));
-  if (piece.struck && inside[0]?.tick !== from) {
+  // A riff that keeps its hole on the One states a chord arriving at the barline with its
+  // own first note in the bar (ST-reggae-14).
+  const holeKept = line.keepsHole === true && from === 0 && inside.length > 0 && !figure.plain;
+  if (piece.struck && inside[0]?.tick !== from && !holeKept) {
     inside.unshift({ tick: from, space: (inside[0]?.tick ?? to) - from, echo: false });
   }
   // The kick is a floor under the figure (BA-94): a root where the drummer's foot falls
-  // and the figure says nothing, and the note before it makes way.
-  const kicks = line.followsKick ? (played?.kicks ?? []) : [];
+  // and the figure says nothing, and the note before it makes way. A line that follows
+  // only the kick on the One plays it for a beat at most, and the figure's notes inside
+  // that beat give way (BA-47).
+  const onlyOne = line.followsKick === "one";
+  const kicks = line.followsKick
+    ? (played?.kicks ?? []).filter((tick) => !onlyOne || tick === 0)
+    : [];
   const added = kicks.filter(
     (tick) => tick >= from && tick < to && !inside.some((onset) => onset.tick === tick),
   );
+  if (onlyOne && added.length > 0) {
+    const beat = pulses(bar)[0] ?? PPQ;
+    inside = inside.filter((onset) => onset.tick <= 0 || onset.tick >= beat);
+  }
   const gap = line.length.gap;
   if (added.length > 0 || gap !== undefined) {
     const locked = new Set(added);
@@ -212,7 +224,11 @@ export function lineOf(
       const room = (all[i + 1]?.tick ?? to) - onset.tick;
       // With a gap the figure's rests are not written lengths: a note has until the next.
       const whole = gap !== undefined || locked.has(onset.tick);
-      return { ...onset, space: whole ? room : Math.min(onset.space, room) };
+      const space = whole ? room : Math.min(onset.space, room);
+      return {
+        ...onset,
+        space: onlyOne && locked.has(onset.tick) ? Math.min(space, pulses(bar)[0] ?? PPQ) : space,
+      };
     });
   }
   const offLevel = line.velocity.off !== undefined;

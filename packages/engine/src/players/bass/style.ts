@@ -256,8 +256,23 @@ export interface BassLine {
    * the bass plays the chord's bass note with it. A floor under the figure,
    * never in place of it (BA-94). Feathered and ghosted kicks are not kicks
    * to lock to.
+   *
+   * `"one"`: only the kick on the bar's downbeat, for a line that leaves the
+   * One open while the drummer does (BA-47, ST-reggae-13). Where the kick
+   * plays the One the bass plays the root with it for a beat at most, and the
+   * figure's own notes inside that beat give way to it: root and root again an
+   * eighth later is a stutter, not a line.
    */
-  readonly followsKick?: boolean;
+  readonly followsKick?: boolean | "one";
+  /**
+   * A chord that arrives at the barline is stated by the figure's first note
+   * in the bar, wherever that falls, and not forced onto the downbeat: a riff
+   * with a hole on the One keeps it across a change (ST-reggae-14). A chord
+   * that changes inside the bar is still stated where it lands, and a bar
+   * whose figure has nothing under the chord still gets its root there.
+   * Left out, every chord is struck where it arrives (BA-01).
+   */
+  readonly keepsHole?: boolean;
   /**
    * In any meter but 4/4 the line is played plainly (BA-16): its tones read
    * from the top in every bar, one to a pulse, or only the first of them held

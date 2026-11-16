@@ -158,6 +158,13 @@ export interface DrumStyle {
    * stroke on beat 1 (DR-03, DR-20). A style that rides the crash lists it here.
    */
   readonly timekeepers: readonly DrumVoice[];
+  /**
+   * The arrival crash is played only at this energy and above; under it a
+   * quiet band marks the top of a section with its fill alone, and the crash's
+   * kick never fills a One the groove leaves empty (ST-reggae-05: no kick on
+   * the One at the low level). Left out, every arrival is crashed (CO-41).
+   */
+  readonly crashFrom?: number;
   /** Touches laid over the groove after it is built (not over fills or the ending). */
   readonly touches: readonly Touch[];
   readonly fills: DrumFills;

@@ -179,8 +179,13 @@ export interface PlainRhythm {
    * Struck on every pulse of the bar, not only where a chord arrives: what a
    * strummed or chopped part falls back to in a meter its book is not written
    * for (CH-54). Left out, the chord is a pad.
+   *
+   * `"offbeats"`: every pulse but the bar's first, the One left to the bass
+   * and the drop (ST-reggae-04: the skank chops at the start of every pulse
+   * but the first). A chord that sounds only on the first pulse is still
+   * struck where it arrives.
    */
-  readonly pulse?: boolean;
+  readonly pulse?: boolean | "offbeats";
   readonly velocity: {
     /** A chord arriving on a beat. */
     readonly beat: number;
