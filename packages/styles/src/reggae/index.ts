@@ -62,10 +62,21 @@ export const reggae: StylePack = {
       ...DEFAULT_MIX,
       seats: {
         ...DEFAULT_MIX.seats,
+        // The tone control all the way down (Brandon's ear, from `scripts/bass-study.ts`). The
+        // soft recordings turned up read 0.6 dB louder than the hard ones did, so the seat comes
+        // down by that and the band is as loud as it was measured.
+        bass: {
+          ...DEFAULT_MIX.seats.bass,
+          level: DEFAULT_MIX.seats.bass.level - 0.6,
+          lowpass: 400,
+        },
         chords: { ...DEFAULT_MIX.seats.chords, level: -3 },
         solo: { ...DEFAULT_MIX.seats.solo, level: 2.5 },
       },
       master: DEFAULT_MIX.master + 1,
     },
+    // And plucked much more gently than its level says, with the thumb: the softest
+    // recordings the bass has, turned up. Round and dark, all low end.
+    touch: { bass: -24 },
   },
 };

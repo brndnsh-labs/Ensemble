@@ -83,7 +83,7 @@ An open jam of k passes is planned as k passes plus one look-ahead pass that pla
 
 ## Resume here
 
-State on 2026-11-16: **stages 1 to 5 are built and their gates passed.** **Stage 6 (the app) is under way: parts 1 to 4 are built and on the test site, and all five of part 5's styles (rock, disco, neo-soul, reggae, acoustic) are built, on the test site, and heard and passed by Brandon.** Acoustic plays a steel-string guitar, with the nylon as a choice. **Open: the electric bass is "a little harsh"** (`DECISIONS.md`, "every style heard; the electric bass is harsh"): a study of touch and tone is rendered (`node scripts/bass-study.ts`, `out/bass-study/`) and waits on his ear; when he chooses, set `sound.touch.bass` and `mix.seats.bass.lowpass` in the styles he names, `pnpm levels` for each, deploy. Then: the pass over the whole interface for how things are found and used, then gate 6.
+State on 2026-11-16: **stages 1 to 5 are built and their gates passed.** **Stage 6 (the app) is under way: parts 1 to 4 are built and on the test site, and all five of part 5's styles (rock, disco, neo-soul, reggae, acoustic) are built, on the test site, and heard and passed by Brandon.** Acoustic plays a steel-string guitar, with the nylon as a choice. **The electric bass was "a little harsh"; he chose its touch and tone from a study** (`DECISIONS.md`, "every style heard; the electric bass is harsh", "the electric bass, by Brandon's ear"): a softer touch in neo-soul, funk and (unheard, by inference) disco, a much softer touch with the tone down in reggae; rock as it was. On the test site. **Part 5 is done.** Then: the pass over the whole interface for how things are found and used, then gate 6.
 
 ### Stage 6: where it stands
 

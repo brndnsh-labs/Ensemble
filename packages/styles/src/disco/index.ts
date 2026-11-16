@@ -55,5 +55,9 @@ export const disco: StylePack = {
       },
       master: DEFAULT_MIX.master - 1.5,
     },
+    // The bass is plucked more gently than its level says and turned up, as funk's is: its
+    // softer, rounder recordings. Brandon chose this for funk by ear (`scripts/bass-study.ts`)
+    // and named disco among the styles whose bass was harsh; disco itself was not in the study.
+    touch: { bass: -12 },
   },
 };

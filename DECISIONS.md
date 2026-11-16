@@ -1235,3 +1235,13 @@ Brandon, 2026-11-16, of acoustic: "everything i'm listening to sounds great so f
   - `SeatMix.lowpass`: the instrument's tone control, a 12 dB an octave roll-off in the seat's channel.
 - **A study for his ear** (`scripts/bass-study.ts`, `out/bass-study/`): the top of one take in neo-soul, reggae and funk, six ways each, with the band and the bass alone. Measured on the bass alone, a softer touch (12 under) takes 5 to 8 dB off what lies above 800 Hz and a much softer one (24 under) 11 to 12, with the loudness within a few tenths; a tone roll-off at 1 kHz changes that figure by under a decibel, so the study's tone clips are at 400 and 600 Hz. Nothing is chosen until he has listened.
 - Not looked for yet: another bass. The library's second instrument is played with a pick on the bridge pickup, which is brighter, not mellower. If touch and tone are not enough for neo-soul and reggae, the next thing is a source search for a flatwound or a thumb-plucked bass.
+
+## the electric bass, by Brandon's ear (stage 6, part 5)
+
+From the study (2026-11-16): "neo-soul - B / reggae - F / funk - B".
+
+- **Neo-soul and funk: a softer touch** (`sound.touch.bass` -12): each note plays the recording a dynamic under its own, at its own level.
+- **Reggae: a much softer touch and the tone down** (`touch.bass` -24, `mix.seats.bass.lowpass` 400). The soft recordings turned up read 0.6 dB louder, so the seat is 0.6 down and the band is as loud as it was.
+- **Disco: the softer touch too, by the main thread's reading and not by his ear.** Disco was not in the study. He named it among the styles whose bass was harsh, it plays the hardest recordings as often as funk does (51% of notes), and he chose this for funk. To be told plainly and undone if he says so.
+- **Rock is left as it was**: he passed it earlier and did not name it.
+- Measured after (`pnpm levels`): with everyone playing, funk -17.1 LUFS, disco -17.0, neo-soul -17.6, reggae -17.1 with the alto 1.1 dB under the band. All where they were. Notes are untouched: no golden and no scorecard reads a sound.

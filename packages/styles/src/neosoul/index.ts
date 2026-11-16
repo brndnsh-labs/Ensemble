@@ -53,5 +53,9 @@ export const neosoul: StylePack = {
       ...DEFAULT_MIX,
       seats: { ...DEFAULT_MIX.seats, solo: { ...DEFAULT_MIX.seats.solo, level: 3 } },
     },
+    // The bass is plucked more gently than its level says and turned up: its softer, rounder
+    // recordings (Brandon's ear, from `scripts/bass-study.ts`: the electric bass as the band
+    // played it was "a little harsh").
+    touch: { bass: -12 },
   },
 };
