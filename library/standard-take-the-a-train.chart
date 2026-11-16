@@ -1,0 +1,21 @@
+title: Take the "A" Train
+key: C
+tempo: 160
+style: jazz
+
+// Thirty-two bars, AABA. The A sections make the two chord a dominant with
+// a flat five, two bars of it before the real two-five; the bridge sits on
+// the four and comes back through the two as a dominant again.
+[A]
+| C6  | %  | D7b5 | %      |
+| Dm7 | G7 | C6   | Dm7 G7 |
+
+[A2]
+| C6  | %  | D7b5 | %  |
+| Dm7 | G7 | C6   | C7 |
+
+[B]
+| Fmaj7 | % | %   | %  |
+| D7    | % | Dm7 | G7 |
+
+[A]

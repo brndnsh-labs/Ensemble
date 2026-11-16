@@ -1,0 +1,21 @@
+title: Autumn Leaves
+key: Gm
+tempo: 132
+style: jazz
+
+// Thirty-two bars, AABC. Two-five-ones round the relative major and then
+// round the minor key: every chord falls a fifth to the next. C, the last
+// eight, goes round the minor key twice as fast on its way home.
+[A]
+| Cm7   | F7   | Bbmaj7 | Ebmaj7 |
+| Am7b5 | D7b9 | Gm6    | %      |
+
+[A]
+
+[B]
+| Am7b5 | D7b9 | Gm6    | %      |
+| Cm7   | F7   | Bbmaj7 | Ebmaj7 |
+
+[C]
+| Am7b5  | D7b9       | Gm7 C7 | Fm7 Bb7 |
+| Ebmaj7 | Am7b5 D7b9 | Gm6    | %       |

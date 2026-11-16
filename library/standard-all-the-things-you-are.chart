@@ -1,0 +1,25 @@
+title: All the Things You Are
+key: Ab
+tempo: 160
+style: jazz
+
+// Thirty-six bars, AABA with a last A of twelve. The first A goes round the
+// cycle from F minor to C major, the second the same a fifth lower to G; the
+// bridge is in G and then E, and C7#5 turns E back to the F minor of the
+// last A, which goes further round, by the minor four, before it lands.
+[A]
+| Fm7    | Bbm7   | Eb7   | Abmaj7 |
+| Dbmaj7 | Dm7 G7 | Cmaj7 | %      |
+
+[A2]
+| Cm7    | Fm7    | Bb7   | Ebmaj7 |
+| Abmaj7 | Am7 D7 | Gmaj7 | %      |
+
+[B]
+| Am7  | D7 | Gmaj7 | %    |
+| F#m7 | B7 | Emaj7 | C7#5 |
+
+[A3]
+| Fm7    | Bbm7 | Eb7    | Abmaj7     |
+| Dbmaj7 | Dbm7 | Cm7    | Bdim7      |
+| Bbm7   | Eb7  | Abmaj7 | Gm7b5 C7b9 |

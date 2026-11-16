@@ -1,0 +1,26 @@
+title: Night and Day
+key: C
+tempo: 144
+style: jazz
+
+// Forty-eight bars, ABABCB. A is the flat-six major seventh falling to the
+// five and home, twice; B is a chromatic descent from the sharp four down
+// to the two-five; C, the bridge, swings between the flat-three major
+// seventh and the one.
+[A]
+| Abmaj7 | G7 | Cmaj7 | % |
+| Abmaj7 | G7 | Cmaj7 | % |
+
+[B]
+| F#m7b5 | Fm7 | Em7   | Ebdim7 |
+| Dm7    | G7  | Cmaj7 | %      |
+
+[A]
+
+[B]
+
+[C]
+| Ebmaj7 | % | Cmaj7 | % |
+| Ebmaj7 | % | Cmaj7 | % |
+
+[B]

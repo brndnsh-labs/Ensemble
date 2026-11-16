@@ -1,0 +1,19 @@
+title: So What
+key: Dm
+tempo: 136
+style: jazz
+
+// Thirty-two bars, AABA, two chords in all: sixteen bars of D minor, eight
+// a half step up in E-flat minor, and eight of D minor again. Nothing
+// changes for a long time, so the players have to make the shape.
+[A]
+| Dm7 | % | % | % |
+| Dm7 | % | % | % |
+
+[A]
+
+[B]
+| Ebm7 | % | % | % |
+| Ebm7 | % | % | % |
+
+[A]

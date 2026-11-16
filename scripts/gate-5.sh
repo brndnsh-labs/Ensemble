@@ -29,13 +29,13 @@ take() { # take <name> <chart> [key=value...]
 echo "1. Jazz: drum kit, upright bass, grand piano."
 take 1-jazz-rhythm-changes-bb-alto jazz-rhythm-changes-bb.chart passes=4 seed=1 solo=alto-sax
 take 1-jazz-two-five-one-c-vibes jazz-two-five-one-c.chart passes=4 seed=4 solo=vibraphone
-take 1-jazz-ballad-eb-alto jazz-ballad-eb.chart passes=2 seed=8 solo=alto-sax
+take 1-jazz-body-and-soul-alto standard-body-and-soul.chart passes=2 seed=8 solo=alto-sax
 take 1-jazz-waltz-f-no-solo jazz-waltz-f.chart passes=3 seed=9
 
 echo "2. Blues: the same three instruments."
 take 2-blues-12-bar-a-alto blues-12-bar-a.chart passes=5 seed=2 solo=alto-sax
-take 2-blues-slow-g-vibes blues-slow-g.chart passes=3 seed=4 solo=vibraphone
-take 2-blues-quick-change-e-no-solo blues-quick-change-e.chart passes=4 seed=3
+take 2-blues-minor-am-vibes blues-minor-am.chart passes=3 seed=4 solo=vibraphone
+take 2-blues-intro-outro-d-no-solo blues-intro-outro-d.chart passes=4 seed=3
 
 echo "3. Funk: drum kit, electric bass, clean guitar."
 take 3-funk-vamp-a-alto funk-vamp-a.chart passes=4 seed=1 solo=alto-sax
