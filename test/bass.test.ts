@@ -14,10 +14,11 @@ import {
   pitchClass,
   render,
   scaleHas,
+  strongPulses,
   tierOf,
 } from "@ensemble/engine";
-import { blues } from "./reading.ts";
-import { enough, LIBRARY, notesOf, only, STYLES, takes } from "./takes.ts";
+import { bluesWritten } from "./reading.ts";
+import { enough, LIBRARY, notesOf, only, STYLES, takes, written } from "./takes.ts";
 
 // ── the bass line ───────────────────────────────────────────────────────────
 
@@ -69,7 +70,7 @@ test("a lead-in resolves by step in actual pitch: a note a step from the next ro
 });
 
 test("the bass line never leaps more than an octave (from one note to the next, not across a section it lays out of)", () => {
-  for (const { chart, options, take } of takes((jam) => jam.chart.meter === "4/4")) {
+  for (const { chart, options, take } of takes(written)) {
     const bass = notesOf(take, "bass");
     // Bars the arrangement lays the bass out of: the line starts again after them.
     const out = take.plan.bars.filter((bar) => bar.kind === "music" && bar.seats.bass === null);
@@ -104,9 +105,7 @@ test("a bass note held for a half note or more is a tone of its chord", () => {
 });
 
 test("the last bass note of a jam that ends is the lowest root on the instrument, or the root an octave over it where the fall from the note before would be more than an octave", () => {
-  for (const { chart, options, take } of takes(
-    (jam) => !jam.options.open && jam.chart.meter === "4/4",
-  )) {
+  for (const { chart, options, take } of takes((jam) => !jam.options.open && written(jam))) {
     const bass = notesOf(take, "bass");
     const last = bass.at(-1)!;
     const ending = take.plan.bars.findLast((bar) => bar.kind === "music")!;
@@ -124,7 +123,7 @@ test("the last bass note of a jam that ends is the lowest root on the instrument
 
 test("a bass note outside its chord's scale only passes: it is stepped into and out of the same way, or it is the half step onto the note that states the next change", () => {
   let outside = 0;
-  for (const { chart, options, take } of takes((jam) => jam.chart.meter === "4/4")) {
+  for (const { chart, options, take } of takes(written)) {
     const bass = notesOf(take, "bass");
     const harmony = arrivals(take.plan);
     const changes = new Set(
@@ -179,7 +178,7 @@ test(
   only("blues"),
   () => {
     let compared = 0;
-    for (const { chart, options, take } of takes(blues)) {
+    for (const { chart, options, take } of takes(bluesWritten)) {
       const bass = notesOf(take, "bass");
       const openings = new Map<string, string>();
       for (const bar of take.plan.bars) {
@@ -364,6 +363,55 @@ test(
       bars > enough(3000) && approaches > enough(2000),
       `only ${bars} bars, ${approaches} approaches`,
     );
+  },
+);
+
+test(
+  "jazz: in six the bass does not walk every beat until the band is hot: every note is on a beat (a chord that lands off one gets its root there), both of the bar's strong beats, 1 and 4, are played, and a bar of one chord has two to five notes at the working level and three to six hot; when the band is quiet it is in two, a note on each strong beat and at most a lead-in",
+  only("jazz"),
+  () => {
+    const counted = { low: 0, mid: 0, high: 0 };
+    for (const { chart, options, take } of takes(
+      (jam) => jam.style.id === "jazz" && jam.chart.meter === "6/4",
+    )) {
+      const bass = notesOf(take, "bass");
+      const harmony = arrivals(take.plan);
+      let at = 0;
+      for (const bar of take.plan.bars) {
+        const own: typeof bass = [];
+        while (at < bass.length && bass[at]!.tick < bar.start + bar.ticks) own.push(bass[at++]!);
+        if (bar.kind !== "music" || bar.ending || bar.seats.bass === null) continue;
+        if (bar.spans.some((span) => span.chord === null)) continue;
+        const where = `${chart.file} seed ${options.seed} bar ${bar.index}`;
+        const landings = harmony
+          .filter((arrival) => arrival.bar === bar.index)
+          .map((arrival) => arrival.tick - bar.start);
+        const ticks = own.map((note) => note.tick - bar.start);
+        for (const tick of ticks) {
+          assert.ok(tick % PPQ === 0 || landings.includes(tick), `${where}: a note off the beat`);
+        }
+        for (const strong of strongPulses(bar.meter)) {
+          assert.ok(ticks.includes(strong), `${where}: nothing on beat ${strong / PPQ + 1}`);
+        }
+        // How many notes is asked of a bar the chart leaves alone: one chord, all bar.
+        if (landings.some((tick) => tick !== 0)) continue;
+        // The bar before the band opens up already plays where it is going (BA-25).
+        const next = take.plan.bars[bar.index + 1];
+        const tier = tierOf(bar.seats.bass);
+        if (next?.seats.bass != null && tierOf(next.seats.bass) !== tier) continue;
+        counted[tier]++;
+        const [fewest, most] = tier === "low" ? [2, 3] : tier === "mid" ? [2, 5] : [3, 6];
+        assert.ok(
+          own.length >= fewest && own.length <= most,
+          `${where}: ${own.length} notes in a bar at the ${tier} level`,
+        );
+      }
+    }
+    if (LIBRARY.some((chart) => chart.meter === "6/4"))
+      assert.ok(
+        counted.low > enough(60) && counted.mid > enough(150) && counted.high > enough(60),
+        `only ${counted.low} quiet bars, ${counted.mid} working, ${counted.high} hot`,
+      );
   },
 );
 

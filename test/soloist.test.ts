@@ -10,6 +10,7 @@ import {
   chordTones,
   contextOf,
   MEASURES,
+  onPulse,
   PPQ,
   parse,
   pitchClass,
@@ -331,8 +332,8 @@ test("the soloist plays no wrong note on a beat or held: nothing a half step ove
       while (harmony[at + 1] && harmony[at + 1]!.tick <= note.tick) at++;
       while (bars[bar + 1] && bars[bar + 1]!.start <= note.tick) bar++;
       const measure = bars[bar]!;
-      if (measure.meter.unit !== 4) continue;
-      const onBeat = (note.tick - measure.start) % PPQ === 0;
+      // A beat is the bar's pulse: a quarter note, or in six-eight and twelve-eight a dotted one.
+      const onBeat = onPulse(measure.meter, note.tick - measure.start);
       if (!onBeat && note.duration < PPQ * 0.75) continue;
       // A note struck in the eighth before a change and held over it is the new chord's
       // (X-B-07); one struck where its own chord arrives is that chord's, however soon the
@@ -801,10 +802,9 @@ test(
         const coming = harmony[at + 1];
         if (coming && coming.tick - note.tick <= PPQ / 2 && has(coming, note.pitch)) return;
         const bar = take.plan.bars.findLast((candidate) => candidate.start <= note.tick)!;
-        if (bar.meter.unit !== 4) return;
         chromatic++;
         const where = `${chart.file} seed ${options.seed} bar ${bar.index}: ${note.pitch} over ${harmony[at]!.chord!.text}`;
-        assert.notEqual((note.tick - bar.start) % PPQ, 0, `${where}: on a beat`);
+        assert.ok(!onPulse(bar.meter, note.tick - bar.start), `${where}: on a beat`);
         const next = solo[i + 1];
         assert.ok(
           next && next.tick - note.tick <= PPQ / 2,

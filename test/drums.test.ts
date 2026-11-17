@@ -5,11 +5,36 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { PlanBar, Take } from "@ensemble/engine";
-import { parse, plan, STEP, TIER_MID, tierOf } from "@ensemble/engine";
-import { enough, type Jam, notesOf, only, ownCharts, STYLES, takes } from "./takes.ts";
+import {
+  isCompound,
+  PPQ,
+  parse,
+  plan,
+  pulseStarts,
+  render,
+  STEP,
+  strongPulses,
+  TIER_MID,
+  tierOf,
+} from "@ensemble/engine";
+import {
+  enough,
+  type Jam,
+  LIBRARY,
+  notesOf,
+  only,
+  ownCharts,
+  STYLES,
+  takes,
+  written,
+} from "./takes.ts";
 
 const in44 = (id: string) => (jam: Pick<Jam, "style" | "chart">) =>
   jam.style.id === id && jam.chart.meter === "4/4";
+
+/** A style wherever it plays from its own parts: in 4/4, and in a meter it has written. */
+const itsOwn = (id: string) => (jam: Pick<Jam, "style" | "chart">) =>
+  jam.style.id === id && written(jam);
 
 /** A bar of the kit as written: for each piece, the sixteenths it strikes. */
 type Kit = Map<string, Set<number>>;
@@ -183,29 +208,35 @@ test(
 );
 
 test(
-  "jazz: once the band has opened up the ride is on every beat, through the fills too, unless a crash takes the One or the stick goes round the toms; the hat foot is on 2 and 4; the snare stays off 1, 2 and 4",
+  "jazz: once the band has opened up the ride is on every beat, through the fills too, unless a crash takes the One or the stick goes round the toms; the hat foot closes on the second beat of each half of the bar (2 and 4; in six, 2 and 5) and on no other; the snare stays off the One and off the foot's beats",
   only("jazz"),
   () => {
     let bars = 0;
-    for (const { chart, options, take } of takes(in44("jazz"))) {
+    let six = 0;
+    for (const { chart, options, take } of takes(itsOwn("jazz"))) {
       for (const { bar, kit, energy } of kitBars(take)) {
         if (bar.ending || energy < TIER_MID) continue;
         const where = `${chart.file} seed ${options.seed} bar ${bar.index}`;
         bars++;
+        if (chart.meter !== "4/4") six++;
+        const beats = pulseStarts(bar.meter).map((tick) => tick / STEP);
+        // The second beat of each half: the beat after each strong pulse.
+        const foot = strongPulses(bar.meter).map((tick) => (tick + PPQ) / STEP);
         const toms = TOMS.some((voice) => kit.has(voice));
-        for (const beat of [0, 4, 8, 12]) {
-          if (toms && beat >= 8) continue;
+        for (const beat of beats) {
+          if (toms && beat >= beats.at(-2)!) continue;
           assert.ok(
             strikes(kit, "ride", beat) || (beat === 0 && strikes(kit, "crash", 0)),
             `${where}: no ride on beat ${beat / 4 + 1}`,
           );
+          assert.equal(
+            strikes(kit, "pedalHat", beat),
+            foot.includes(beat),
+            `${where}: the hat foot on beat ${beat / 4 + 1}`,
+          );
         }
-        assert.ok(
-          strikes(kit, "pedalHat", 4) && strikes(kit, "pedalHat", 12),
-          `${where}: the hat foot`,
-        );
         if (bar.fill) continue;
-        for (const beat of [0, 4, 12]) {
+        for (const beat of [0, ...foot]) {
           for (const voice of ["snare", "ghostSnare"]) {
             assert.ok(!strikes(kit, voice, beat), `${where}: the snare on beat ${beat / 4 + 1}`);
           }
@@ -213,6 +244,8 @@ test(
       }
     }
     assert.ok(bars > enough(2000), `only ${bars} bars`);
+    if (LIBRARY.some((chart) => chart.meter === "6/4"))
+      assert.ok(six > enough(300), `only ${six} bars of six`);
   },
 );
 
@@ -264,7 +297,7 @@ test(
       }
     }
     let heads = 0;
-    for (const { style, chart, options, take } of takes(in44("jazz"))) {
+    for (const { style, chart, options, take } of takes(itsOwn("jazz"))) {
       if (options.mode !== "jam" || options.energy !== undefined || take.plan.passes < 2) continue;
       for (const { bar, kit, energy } of kitBars(take)) {
         if (bar.pass !== 0 || bar.section.role !== "body" || bar.ending) continue;
@@ -285,6 +318,78 @@ test(
     assert.ok(heads > enough(500), `only ${heads} bars of head`);
   },
 );
+
+// ── six and twelve ──────────────────────────────────────────────────────────
+
+const compound = (jam: Pick<Jam, "chart">) => isCompound(parse(jam.chart.text).chart.meter);
+const anyCompound = LIBRARY.some((chart) => compound({ chart }));
+
+/**
+ * The bars of dotted pulses a style plays time in: every take of the library's in six-eight
+ * or twelve-eight that it is handed, and each such chart held quiet and held loud.
+ */
+function compoundBars(): { where: string; bar: PlanBar; kit: Kit; held: number | undefined }[] {
+  const played = [
+    ...takes(compound).map(({ style, chart, options, take }) => ({
+      where: `${style.id} ${chart.file} seed ${options.seed}`,
+      take,
+      held: undefined,
+    })),
+    ...STYLES.flatMap((style) =>
+      LIBRARY.filter((chart) => compound({ chart })).flatMap((chart) =>
+        [0.3, 0.85].map((held) => ({
+          where: `${style.id} ${chart.file} at ${held}`,
+          take: render(chart.text, style, { mode: "jam", passes: 2, energy: held, seed: 1 }),
+          held,
+        })),
+      ),
+    ),
+  ];
+  return played.flatMap(({ where, take, held }) =>
+    kitBars(take)
+      .filter(({ bar }) => !bar.fill && !bar.ending && isCompound(bar.meter))
+      .map(({ bar, kit }) => ({ where: `${where} bar ${bar.index}`, bar, kit, held })),
+  );
+}
+
+test("in a bar of dotted pulses the drummer's time is on the eighths: no stroke of it falls between them, so a cymbal's skip note is the pulse's last eighth and never its last sixteenth (a fill is its own figure)", {
+  skip: !anyCompound,
+}, () => {
+  let strokes = 0;
+  for (const { where, kit } of compoundBars()) {
+    for (const [voice, steps] of kit) {
+      for (const step of steps) {
+        strokes++;
+        assert.equal(step % 2, 0, `${where}: the ${voice} between the eighths`);
+      }
+    }
+  }
+  assert.ok(strokes > 300, `only ${strokes} strokes`);
+});
+
+test("in six and twelve the drums thin out as the band gets quiet and are never busy: in a bar of dotted pulses the kick and the snare between them (ghosts aside) are on no more than half the bar's eighths, in any style at any level, and a style's quiet bars have no more strokes than its loud ones", {
+  skip: !anyCompound,
+}, () => {
+  const perBar = { quiet: [] as number[], loud: [] as number[] };
+  for (const { where, bar, kit, held } of compoundBars()) {
+    const eighths = bar.ticks / (PPQ / 2);
+    const struck = new Set([...(kit.get("kick") ?? []), ...(kit.get("snare") ?? [])]);
+    assert.ok(
+      struck.size <= eighths / 2,
+      `${where}: kick and snare on ${struck.size} of ${eighths} eighths`,
+    );
+    if (held === undefined) continue;
+    perBar[held < TIER_MID ? "quiet" : "loud"].push(
+      [...kit.values()].reduce((sum, steps) => sum + steps.size, 0),
+    );
+  }
+  const mean = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
+  assert.ok(perBar.quiet.length > 10 && perBar.loud.length > 10, "both levels are heard");
+  assert.ok(
+    mean(perBar.quiet) <= mean(perBar.loud),
+    `quiet ${mean(perBar.quiet).toFixed(2)} strokes a bar, loud ${mean(perBar.loud).toFixed(2)}`,
+  );
+});
 
 const buttons = STYLES.some((style) => style.ending.gesture.kind === "button");
 
