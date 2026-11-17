@@ -10,7 +10,7 @@ import { isCompound, onAnd } from "../../perform/meter.ts";
 import type { WrittenNote } from "../../perform/notes.ts";
 import type { Plan } from "../../plan/types.ts";
 import type { Chord } from "../../theory/chord.ts";
-import { toneInterval } from "../../theory/chord.ts";
+import { chordFamily, toneInterval } from "../../theory/chord.ts";
 import { mod12, pitchClass } from "../../theory/pitch.ts";
 import type { InstrumentIdiom } from "./idiom.ts";
 import type { VoicedStrike, Voicing } from "./strike.ts";
@@ -18,6 +18,7 @@ import { LOW_LIMITS, MUTED, PICKED } from "./strike.ts";
 import type { Guitar, PickPlace } from "./style.ts";
 import type { FittedTone } from "./tones.ts";
 import { alterationsOf } from "./tones.ts";
+import { growls } from "./voicing.ts";
 
 /** Standard tuning, low string first: E2 A2 D3 G3 B3 E4. */
 export const OPEN_STRINGS: readonly number[] = [40, 45, 50, 55, 59, 64];
@@ -492,13 +493,20 @@ export function guitar(style: Guitar): InstrumentIdiom {
           !strike.down && (dotted ? onAnd(bar.meter, inBar) : inBar % pair >= pair / 2);
         const strings = voicing.strings ?? voicing.pitches.map((_, string) => string);
         // An upstroke catches only the top strings of the grip, and as many more under them
-        // as it takes to sound every tone the chord is heard by (X-B-13).
+        // as it takes to sound every tone the chord is heard by (X-B-13), and to leave no
+        // growl on the bottom of what it sounds: a grip with the 13th under the 7th is clean
+        // from its root, and its top three strings are not (Q-03).
         let from = upstroke ? Math.max(0, voicing.pitches.length - up) : 0;
         if (from > 0) {
           const needed = heardBy(voicing, strike.arrival.chord);
+          const family = strike.arrival.chord ? chordFamily(strike.arrival.chord.quality) : null;
           const caught = (pitch: number) =>
             voicing.pitches.slice(from).some((other) => mod12(other - pitch) === 0);
-          while (from > 0 && needed.some((pitch) => !caught(pitch))) from--;
+          const growl = () =>
+            family !== null &&
+            !growls(voicing, family) &&
+            growls({ pitches: voicing.pitches.slice(from) }, family);
+          while (from > 0 && (needed.some((pitch) => !caught(pitch)) || growl())) from--;
         }
         const [lowest, highest] = [strings[from]!, strings.at(-1)!];
         const across = (highest - lowest) * roll;

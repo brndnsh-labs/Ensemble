@@ -229,7 +229,7 @@ export const VOICING_FEATURES: readonly Feature<VoicingCandidate>[] = [
  * A half step between the two lowest voices, except on a dominant from E4 up,
  * where the 13th under the 7th is a colour in the middle of the keyboard (CH-66).
  */
-function growls(voicing: Voicing, family: ChordFamily): boolean {
+export function growls(voicing: Pick<Voicing, "pitches">, family: ChordFamily): boolean {
   const [low, next] = voicing.pitches;
   if (low === undefined || next === undefined || next - low !== 1) return false;
   return family !== "dominant" || low < RUB_FLOOR;
