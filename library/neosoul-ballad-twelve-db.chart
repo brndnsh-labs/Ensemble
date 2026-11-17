@@ -1,0 +1,19 @@
+title: Soul Ballad in Twelve
+key: Db
+tempo: 58
+meter: 12/8
+style: neosoul
+
+// The soul ballad in twelve-eight: four slow pulses to the bar, three eighths
+// in each. Sixteen bars, a verse and a chorus. The verse goes down to the six
+// and round a two-five, leaves the one for the four made a dominant, and comes
+// back through the three, the six and the two to a suspended five. The chorus
+// opens on the four, steps down through the three and the two to the one,
+// borrows the minor four, and turns round through the five of two.
+[Verse]
+| Dbmaj9 | Bbm9 | Ebm9 Ab13 | Dbmaj9 Gb13  |
+| Fm7    | Bbm9 | Ebm9      | Ab7sus4 Ab13 |
+
+[Chorus]
+| Gbmaj9 | Fm9  | Ebm9      | Dbmaj9    |
+| Gbmaj9 | Gbm9 | Fm7 Bb7b9 | Ebm9 Ab13 |

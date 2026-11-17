@@ -707,13 +707,16 @@ test("neo-soul: in six and twelve the whole band is on the triplet's eighths, th
   const seats = new Set<string>();
   let pickups = 0;
   for (const { chart, options, take } of played) {
-    const arrivals = new Set(
-      take.plan.bars.flatMap((bar) =>
+    // Where a chord arrives, and where an open jam goes round again past what is planned.
+    const last = take.plan.bars.at(-1)!;
+    const arrivals = new Set([
+      ...take.plan.bars.flatMap((bar) =>
         bar.kind === "music"
           ? bar.spans.filter((span) => span.chord !== null).map((span) => bar.start + span.start)
           : [],
       ),
-    );
+      ...(options.open ? [last.start + last.ticks] : []),
+    ]);
     for (const note of notesOf(take)) {
       const bar = take.plan.bars.findLast((candidate) => candidate.start <= note.tick)!;
       if (bar.kind !== "music" || !isCompound(bar.meter)) continue;
