@@ -103,7 +103,50 @@ const rhythm: RhythmBook = {
   candidates: 1,
 };
 
+// ── in twelve and in six ────────────────────────────────────────────────────
+// A pulse to a group of six sixteenths; only a pulse's three eighths are struck.
+// Twelve is four's skank said in pulses: the chop on 2 and 4, now dotted
+// quarters; the flick on the eighth after it, the triplet's middle note, where
+// four has it a sixteenth after; the hot "and"s on each pulse's last eighth.
+// The hand still swings in sixteenths, so every stroke on an eighth is a
+// downstroke, the flick too (at the lighter 86, not four's upstroke at 72).
+// Six is twelve's first half: the chop on the second pulse, which in a bar of
+// two is the drop's (ST-reggae-04: the skank chops every pulse but the first).
+
+/** The first half of a line written for twelve: the same skank in a bar of six. */
+const half = (line: string) => line.split(" ").slice(0, 2).join(" ");
+
+const PLAIN_IN_TWELVE = "...... X..... ...... X.....";
+const DOUBLE_IN_TWELVE = "...... X.x... ...... X.x...";
+const ANDS_IN_TWELVE = "....x. X...x. ....x. X...x.";
+
+/** The book in a compound bar: four's tiers and weights, with the meter's figures. */
+function compoundBook(plain: string, double: string, ands: string, chops: number): RhythmBook {
+  const { low, mid, high } = rhythm.tiers;
+  return {
+    ...rhythm,
+    tiers: {
+      low: { ...low, figures: [figure("plain", 1, plain)], busy: { from: chops, to: chops } },
+      mid: {
+        ...mid,
+        figures: [figure("plain", 3, plain), figure("double", 1, double)],
+        busy: { from: chops, to: chops * 2 },
+      },
+      high: {
+        ...high,
+        figures: [figure("plain", 1, plain), figure("double", 2, double), figure("ands", 2, ands)],
+        busy: { from: chops, to: chops * 3 },
+      },
+    },
+  };
+}
+
 export const reggaeChords: ChordStyle = {
+  // The shuffle in twelve and the bar of two in six, written above.
+  meters: {
+    "12/8": compoundBook(PLAIN_IN_TWELVE, DOUBLE_IN_TWELVE, ANDS_IN_TWELVE, 2),
+    "6/8": compoundBook(half(PLAIN_IN_TWELVE), half(DOUBLE_IN_TWELVE), half(ANDS_IN_TWELVE), 1),
+  },
   // Three strings high on the neck, no open strings (the chop is damped by letting go, CH-23),
   // the hand parked about the eighth fret, where a grip topped near C5 sits on the top three
   // strings. A sixteenth pendulum; an upstroke catches the whole small grip, as the funk and
