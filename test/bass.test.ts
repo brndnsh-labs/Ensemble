@@ -40,12 +40,13 @@ function bassChanges(take: Take): { tick: number; root: number }[] {
   return changes;
 }
 
-test("a lead-in resolves by step in actual pitch: a note a step from the next root by name is a step from the note the bass plays next", () => {
+test("a lead-in resolves by step in actual pitch: a note a step from the next root by name is a step from the note the bass plays next, unless it is the root or the fifth of the chord it is played over", () => {
   let leadIns = 0;
   for (const { chart, options, take } of takes()) {
     const bass = notesOf(take, "bass");
     const arrivalTicks = new Set(bassChanges(take).map((change) => change.tick));
-    for (const change of bassChanges(take)) {
+    const changes = bassChanges(take);
+    for (const [at, change] of changes.entries()) {
       const landing = bass.find((note) => note.tick === change.tick);
       const before = bass.findLast((note) => note.tick < change.tick);
       if (!landing || !before || change.tick - before.tick > PPQ) continue;
@@ -58,7 +59,13 @@ test("a lead-in resolves by step in actual pitch: a note a step from the next ro
         (before.pitch - change.root + 120) % 12,
         (change.root - before.pitch + 120) % 12,
       );
-      if (byName === 1 || byName === 2) {
+      // The root and the fifth of the chord being played are the line's own figure, not a way
+      // into the next chord: a riff's fifth above its root, then a root a half step over it and
+      // an octave down, is in a take Brandon passed (the neo-soul golden, F#2 over Bm9 into G1).
+      const over = changes[at - 1]?.root;
+      const figure =
+        over !== undefined && [0, 7].includes((before.pitch - over + 120) % 12) && byName !== 0;
+      if ((byName === 1 || byName === 2) && !figure) {
         leadIns++;
         const leap = Math.abs(before.pitch - landing.pitch);
         assert.ok(leap <= 2, `${where}: a leading tone ${leap} semitones from where it leads`);
