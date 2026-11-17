@@ -78,6 +78,8 @@ async function perform(): Promise<Performance> {
     seed: Number($<HTMLInputElement>("seed").value),
     passes: Number($<HTMLInputElement>("passes").value),
     ...(soloInstrument ? { solo: true, soloInstrument } : {}),
+    // `energy=0.3` holds the band at a level, as the CLI's --energy does.
+    ...(params.has("energy") ? { energy: Number(params.get("energy")) } : {}),
   });
   const only = params.get("only")?.split(",");
   // `packs=chords:electric-piano` puts another instrument in a seat: for hearing a pack
