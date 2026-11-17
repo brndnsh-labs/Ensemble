@@ -1036,8 +1036,8 @@ test(
     const counted = { low: 0, mid: 0, high: 0 };
     const played = [
       ...takes((jam) => jam.style.id === "funk" && written(jam)),
-      ...heldTakes(funk, "6/8"),
-      ...heldTakes(funk, "12/8"),
+      ...heldTakes(funk, "6/8", false, true),
+      ...heldTakes(funk, "12/8", false, true),
     ];
     for (const { chart, options, take } of played) {
       if (chart.meter !== "6/8" && chart.meter !== "12/8") continue;

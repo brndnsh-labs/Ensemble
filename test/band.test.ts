@@ -671,8 +671,8 @@ test(
     const played = [
       ...takes(compound),
       ...soloistTakes().filter(compound),
-      ...heldTakes(funk, "6/8"),
-      ...heldTakes(funk, "12/8"),
+      ...heldTakes(funk, "6/8", false, true),
+      ...heldTakes(funk, "12/8", false, true),
     ];
     const seats = new Set<string>();
     for (const { chart, options, take } of played) {

@@ -68,7 +68,9 @@ const funk = STYLES.find((style) => style.id === "funk");
 /** Funk where it plays its own parts, and funk in six and in twelve held at each of its levels. */
 const funkPlayed = (): Jam[] => [
   ...takes(itsOwn("funk")),
-  ...(funk ? [...heldTakes(funk, "6/8"), ...heldTakes(funk, "12/8")] : []),
+  ...(funk
+    ? [...heldTakes(funk, "6/8", false, true), ...heldTakes(funk, "12/8", false, true)]
+    : []),
 ];
 
 test(
