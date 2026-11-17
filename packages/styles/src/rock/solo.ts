@@ -10,7 +10,7 @@
 // Reading the rhythms: sixteen sixteenths to the bar, grouped by beat. `x`
 // strikes a note, `-` holds it, `.` is silence.
 
-import type { SoloStyle, Way } from "@ensemble/engine";
+import type { SoloStyle, SoloTime, Way } from "@ensemble/engine";
 
 const NEW: Way = { name: "statement", make: "new", oneRhythm: false };
 const NEW_RIFFED: Way = { name: "statement", make: "new", oneRhythm: true };
@@ -32,7 +32,81 @@ const ELSE = {
   lift: 0,
 } satisfies Way;
 
+// ── in twelve ───────────────────────────────────────────────────────────────
+// The rock ballad. A bar of 12/8 is four slow pulses of three eighths: a rhythm
+// is twenty-four sixteenths, written in sixes. ST-rock-22's cells said in
+// pulses: a quarter note of four is a pulse held (`x-----`), its eighths the
+// pulse and its last eighth (`x---x-`), and the sixteenth bursts of the busy
+// level are the triplet (`x-x-x-`). Nothing is quicker than an eighth. The
+// levels are the levels of four, by name; the hand is the same player's, so its
+// bends and its shake are as they are in four.
+const rockSoloInTwelve: SoloTime = {
+  levels: [
+    {
+      name: "sparse",
+      notesPerBar: 1.6,
+      span: 6,
+      cells: [
+        "x----- ------ x----- ------",
+        "x----- ----x- x----- ------",
+        "...... x----- x----- ------",
+        "x----- x----- ------ ......",
+      ],
+      shapes: [
+        { weight: 4.3, bars: "L E R R" },
+        { weight: 4.3, bars: "R L E R" },
+        { weight: 3.6, bars: "E R L E" },
+        { weight: 2.4, bars: "L L E R" },
+      ],
+    },
+    {
+      name: "medium",
+      notesPerBar: 3.5,
+      span: 9,
+      cells: [
+        "x---x- x----- x----- ------",
+        "x----- x---x- x----- x-----",
+        "....x- x---x- x----- ------",
+        "x---x- x---x- x----- ------",
+      ],
+      shapes: [
+        { weight: 6, bars: "L L E R" },
+        { weight: 3.6, bars: "E R L E" },
+        { weight: 2, bars: "L E L E" },
+      ],
+    },
+    {
+      // The triplet at the peak, where four has its sixteenth bursts.
+      name: "busy",
+      notesPerBar: 6,
+      span: 12,
+      cells: [
+        "x---x- x-x-x- x---x- x-----",
+        "x-x-x- x---x- x----- ------",
+        "x---x- x---x- x---x- x---x-",
+        "x---x- x-x-x- x---x- x-x-x-",
+      ],
+      shapes: [
+        { weight: 4, bars: "L L L E" },
+        { weight: 4.8, bars: "L L E R" },
+        { weight: 2, bars: "L E L E" },
+      ],
+    },
+  ],
+  // Each lands on a long note and leaves the last pulse unstruck.
+  endings: [
+    "x----- ------ ------ ------",
+    "x---x- x----- ------ ------",
+    "x----- x----- ------ ------",
+    "....x- x---x- ------ ------",
+  ],
+  // No pickups, as in four (ST-rock-24).
+  pickups: [],
+  peak: "x----- ------ ...... ......",
+};
+
 export const rockSolo: SoloStyle = {
+  meters: { "12/8": rockSoloInTwelve },
   instrument: "driven-guitar",
   lift: 0,
 
