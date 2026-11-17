@@ -324,6 +324,15 @@ function realise(world: World, phrase: Phrase, accent: number): SoloNote[] {
       const swung = where.meter.unit === 4 && within < where.ticks;
       return where.start + (swung ? swing(within, world.feel) : within);
     };
+    // A horn whose air is gone before its next note starts breathes before that note: this
+    // one is let go early, where it is long enough to give a breath up. It happens where
+    // one bar is most of a breath long: a slow tune in six.
+    if (next && next.spot.tick - breathed >= lungs) {
+      const entry = heard(next.spot.tick, next.spot.bar);
+      let until = next.spot.tick - breath;
+      while (until > tick && entry - heard(until, bar) < breath) until -= STEP;
+      if (until - tick >= STEP) duration = Math.min(duration, until - tick);
+    }
     if (next) {
       const gap = heard(next.spot.tick, next.spot.bar) - heard(tick + duration, bar);
       if (gap >= breath) breathed = next.spot.tick;

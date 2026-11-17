@@ -2,7 +2,7 @@
 
 import { PPQ } from "../../chart/types.ts";
 import { STEP } from "../../perform/grid.ts";
-import { pulseTicks } from "../../perform/meter.ts";
+import { pulseTicks, strongPulses } from "../../perform/meter.ts";
 import type { NoteEvent } from "../../perform/notes.ts";
 import type { PlanBar } from "../../plan/types.ts";
 import { tierOf } from "../../style/types.ts";
@@ -172,6 +172,19 @@ function movingBars(take: Take): PlanBar[] {
   });
 }
 
+/** A bar of six quarter-note beats: two threes. */
+const inSix = (bar: PlanBar) => bar.meter.beats === 6 && bar.meter.unit === 4;
+
+/** The bass's notes a bar in its bars of six at one level. */
+function notesInSix(take: Take, tier: "mid" | "high") {
+  const bass = notesOf(take, "bass");
+  return mean(
+    musicBars(take)
+      .filter((bar) => inSix(bar) && !bar.ending && bassTier(bar) === tier)
+      .map((bar) => notesIn(bass, bar).length),
+  );
+}
+
 /** Whether a note is one of its chord's own (its slash bass included). */
 function onTheChord(take: Take, note: NoteEvent): boolean | null {
   const chord = chordAt(take, note.tick);
@@ -232,10 +245,46 @@ const idiomMeasures: readonly Measure[] = [
     unit: "per beat",
     of(take) {
       const bass = notesOf(take, "bass");
-      const rates = movingBars(take).map(
-        (bar) => notesIn(bass, bar).length / pulseTicks(bar.meter).length,
-      );
+      // A bar of six beats is a waltz twice, and a waltz bass does not walk every beat:
+      // that is measured by itself, below.
+      const rates = movingBars(take)
+        .filter((bar) => !inSix(bar))
+        .map((bar) => notesIn(bass, bar).length / pulseTicks(bar.meter).length);
       return mean(rates);
+    },
+  },
+  {
+    id: "bass.notes-per-bar-in-six",
+    seat: "bass",
+    idiom: true,
+    says: "In six at the working level the bass plays the two strong beats and a pickup or two: about three notes a bar, not a note a beat (AU-93).",
+    unit: "per bar",
+    of: (take) => notesInSix(take, "mid"),
+  },
+  {
+    id: "bass.notes-per-bar-in-six-hot",
+    seat: "bass",
+    idiom: true,
+    says: "In six when the band is hot the bass is nearly walking: about five notes a bar (AU-93).",
+    unit: "per bar",
+    of: (take) => notesInSix(take, "high"),
+  },
+  {
+    id: "bass.strong-beats-in-six",
+    seat: "bass",
+    idiom: true,
+    says: "In six the bass plays both of the bar's strong beats, 1 and 4.",
+    unit: "share",
+    of(take) {
+      const bass = notesOf(take, "bass");
+      const bars = musicBars(take).filter(
+        (bar) => inSix(bar) && !bar.ending && bassTier(bar) !== null,
+      );
+      const both = bars.filter((bar) => {
+        const ticks = new Set(notesIn(bass, bar).map((note) => note.tick - bar.start));
+        return strongPulses(bar.meter).every((tick) => ticks.has(tick));
+      });
+      return share(both.length, bars.length);
     },
   },
   {

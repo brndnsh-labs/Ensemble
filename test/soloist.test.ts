@@ -15,6 +15,7 @@ import {
   parse,
   pitchClass,
   plan,
+  pulseTicks,
   render,
   SOLO_INSTRUMENTS,
   swing,
@@ -724,8 +725,9 @@ test("under a solo the piano leaves the soloist its note: a voice held on the so
             const to = Math.min(ends, note.tick + note.offset + note.duration);
             return sum + Math.max(0, to - from);
           }, 0);
-        // A beat on paper; the feel moves both ends of both notes, so a quarter more as heard.
-        if (shared < PPQ * 1.25) continue;
+        // A beat on paper (the bar's pulse: a dotted quarter in twelve-eight); the feel moves
+        // both ends of both notes, so a quarter more as heard.
+        if (shared < pulseTicks(bar.meter)[0]! * 1.25) continue;
         const needed = chordsUnder(take, strike).some(({ chord }) => {
           const interval = (pitch - pitchClass(chord.root) + 120) % 12;
           const altered = { b5: 6, "#5": 8, b9: 1, "#9": 3, "#11": 6, b13: 8 } as const;

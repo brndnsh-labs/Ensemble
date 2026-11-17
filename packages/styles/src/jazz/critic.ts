@@ -28,6 +28,15 @@ export const jazzCritic: CriticStyle = {
     "bass.changes-stated": { min: 0.95, kind: "intent" },
     // In four past the quiet level, in two under it (ST-jazz-24, BA-23).
     "bass.notes-per-beat-walking": { min: 0.85, max: 1.05, kind: "intent", minCases: 8 },
+    // In six (AU-93): two to five notes a bar up to the hot level, three to seven in it,
+    // and both strong beats played.
+    "bass.notes-per-bar-in-six": { min: 2, max: 5, kind: "intent", minCases: 8 },
+    "bass.notes-per-bar-in-six-hot": { min: 3, max: 7, kind: "intent", minCases: 4 },
+    "bass.strong-beats-in-six": { min: 0.98, kind: "intent", minCases: 8 },
+    // In six (AU-94): one to four chords a bar, seven in ten on a strong beat or the
+    // eighth before one.
+    "chords.strikes-per-bar-in-six": { min: 1, max: 4, kind: "intent", minCases: 8 },
+    "chords.on-the-strong-beats-in-six": { min: 0.7, kind: "intent", minCases: 8 },
     "bass.notes-per-beat-when-quiet": { min: 0.45, max: 0.75, kind: "intent", minCases: 4 },
     // The walk never repeats a pitch, and moves 1.5 to 4.5 semitones on average (BA-20).
     "bass.repeated-notes": { max: 0.02, kind: "intent", minCases: 40 },

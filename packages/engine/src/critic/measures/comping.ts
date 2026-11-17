@@ -231,7 +231,59 @@ const returns = (rhythm: readonly BarRhythm[]) =>
   rhythm.slice(1).some((bar) => alike(bar, rhythm[0]!));
 const turns = (rhythm: readonly BarRhythm[]) => rhythm.some((bar) => !alike(bar, rhythm[0]!));
 
+/**
+ * The chords struck in each bar of six (6/4) the seat plays, short of the ending bar and
+ * from the working level up, as ticks from the barline. The 4/4 reading above does not
+ * read these bars.
+ */
+function strikesInSix(take: Take): number[][] {
+  const struck = new Map<number, Set<number>>();
+  for (const note of notesOf(take, "chords")) {
+    if (note.voice === MUTED || note.voice === PICKED) continue;
+    const bar = take.plan.bars.findLast((candidate) => candidate.start <= note.tick);
+    if (!bar) continue;
+    let ticks = struck.get(bar.index);
+    if (!ticks) {
+      ticks = new Set();
+      struck.set(bar.index, ticks);
+    }
+    ticks.add(note.tick - bar.start);
+  }
+  return take.plan.bars
+    .filter(
+      (bar) =>
+        bar.kind === "music" &&
+        !bar.ending &&
+        bar.meter.beats === 6 &&
+        bar.meter.unit === 4 &&
+        bar.seats.chords !== null &&
+        tierOf(bar.seats.chords) !== "low",
+    )
+    .map((bar) => [...(struck.get(bar.index) ?? [])]);
+}
+
 export const compingMeasures: readonly Measure[] = [
+  {
+    id: "chords.strikes-per-bar-in-six",
+    seat: "chords",
+    idiom: true,
+    says: "In six, from the working level up, the piano strikes one to four chords a bar: about two or three (AU-94).",
+    unit: "per bar",
+    of: (take) => mean(strikesInSix(take).map((ticks) => ticks.length)),
+  },
+  {
+    id: "chords.on-the-strong-beats-in-six",
+    seat: "chords",
+    idiom: true,
+    says: "In six most of the piano's chords are on a strong beat, 1 or 4, or on the eighth before one (AU-94).",
+    unit: "share",
+    of(take) {
+      const ticks = strikesInSix(take).flat();
+      // Beats 1 and 4, and the "and"s of 3 and 6.
+      const strong = [0, 3 * PPQ, 2.5 * PPQ, 5.5 * PPQ];
+      return share(ticks.filter((tick) => strong.includes(tick)).length, ticks.length);
+    },
+  },
   // How busy a comp is at each level is one way of playing: these three say what a blues
   // piano does, and a strummed part has its own below (`chords.strokes-per-bar`).
   {
