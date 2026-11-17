@@ -779,7 +779,7 @@ test(
 // ── a reggae riff in six and twelve ─────────────────────────────────────────
 
 test(
-  "reggae: in six and twelve the bass plays the section's riff, with holes in it, and not the pulses: every note starts on an eighth; from the working level up every bar of one chord has a note between the pulses; and in twelve no bar strikes all four pulses, but where the drummer's kick takes the One and the bass goes with it (ST-reggae-12, ST-reggae-13)",
+  "reggae: in six and twelve the bass plays the section's riff, with holes in it, and not the pulses: every note starts on an eighth; from the working level up every bar of one chord has a note between the pulses; and in twelve no bar of one chord strikes all four pulses, but where the drummer's kick takes the One and the bass goes with it (ST-reggae-12, ST-reggae-13; a change is stated where it lands, ST-reggae-14)",
   only("reggae"),
   () => {
     const reggae = STYLES.find((style) => style.id === "reggae")!;
@@ -815,7 +815,7 @@ test(
             `${where}: only the pulses (${ticks})`,
           );
         }
-        if (pulses.length === 4 && !kicks.has(bar.start)) {
+        if (oneChord && pulses.length === 4 && !kicks.has(bar.start)) {
           twelve++;
           assert.ok(
             pulses.some((tick) => !ticks.includes(tick)),
