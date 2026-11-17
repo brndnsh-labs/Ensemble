@@ -10,7 +10,7 @@
 //
 // X accent, x normal, o soft, g ghost.
 
-import type { DrumStyle } from "@ensemble/engine";
+import type { DrumStyle, DrumTime } from "@ensemble/engine";
 
 // ── the time ────────────────────────────────────────────────────────────────
 
@@ -102,6 +102,238 @@ const TRIPLETS_TO_FLOOR = {
   snare: "oox. xx..",
   lowTom: ".... ..X.",
   kick: KICK_UNDER,
+};
+
+// ── in twelve ───────────────────────────────────────────────────────────────
+// The slow blues. A bar of 12/8 is four slow beats of three eighths each:
+// twenty-four sixteenths, written in sixes, a beat to a group, and only its
+// three eighths (the first, third and fifth character) are ever struck.
+// Nothing swings: the three eighths are the triplet the shuffle swings to.
+//
+// What the shuffle cannot say is the triplet's middle note, and that is the
+// slow blues: the cymbal plays all three eighths of every beat, the beat
+// leaned on. The kick is still on 1 and 3 and the backbeat on 2 and 4 (the
+// same rule as in four, said in beats: AU-97). Quiet, the cymbal goes back to
+// the shuffle's two notes a beat and the drums thin out (AU-96); the kick and
+// the snare are never on the eighths between the beats, but for the kick's
+// push into the One and ghosts.
+
+/** One and three. */
+const TWELVE_KICK_PLAIN = { kick: "x..... ...... x..... ......" };
+/** One and three, and a soft kick on the last eighth, into the next bar. */
+const TWELVE_KICK_PUSHED = { kick: "x..... ...... x..... ....o." };
+/** Two and four, cracked. */
+const TWELVE_BACKBEAT = { snare: "...... X..... ...... X....." };
+/** The triplets: every eighth, the beat leaned on. */
+const TRIPLETS = "x.o.o. x.o.o. x.o.o. x.o.o.";
+
+const TWELVE_BREATH = {
+  bars: { phraseBars: [2, 4, 6], playing: "closedHat" },
+  open: { openHat: "...... ...... ...... ....o." },
+} as const;
+
+// Fills in twelve. A pickup is the bar's last eighth, as in four. A beat's worth is its
+// three eighths; two beats go down the kit. Each ends on the last eighth, its loudest.
+
+/** "DA-da-DA": the triplet on 4. */
+const TWELVE_TRIPLET = { snare: "x.o.X." };
+/** "Four, AND": the backbeat, then the last eighth harder. */
+const TWELVE_FOUR_AND = { snare: "x...X." };
+/** "Crack, boom": the backbeat, then the floor tom. */
+const TWELVE_CRACK_BOOM = { snare: "x.....", lowTom: "....X." };
+/** "DA-da-BOOM". */
+const TWELVE_TRIPLET_BOOM = { snare: "x.o...", lowTom: "....X." };
+/** The backbeat, then both hands on the last eighth. */
+const TWELVE_FOUR_AND_BOTH = { snare: "x...X.", lowTom: "....X." };
+
+/** The kick on beats 3 and 4 under a two-beat fill (DR-19). */
+const TWELVE_KICK_UNDER = "x..... x.....";
+/** Down the kit a triplet a beat: snare-snare-high, mid-mid-floor. */
+const TWELVE_RUN_TRIPLETS = {
+  snare: "x.o... ......",
+  highTom: "....o. ......",
+  midTom: "...... x.o...",
+  lowTom: "...... ....X.",
+  kick: TWELVE_KICK_UNDER,
+};
+/** The same run in the shuffle's eighths: snare, high, mid, floor. */
+const TWELVE_RUN = {
+  snare: "x..... ......",
+  highTom: "....o. ......",
+  midTom: "...... x.....",
+  lowTom: "...... ....X.",
+  kick: TWELVE_KICK_UNDER,
+};
+/** Two beats of snare triplets, growing. The feet keep the groove. */
+const TWELVE_SNARE_TRIPLETS = { snare: "o.o.x. x.x.X.", kick: TWELVE_KICK_UNDER };
+/** The snare on the beat and its last eighth, twice, growing. */
+const TWELVE_SNARE_SHUFFLE = { snare: "x...o. x...X." };
+/** Six notes round the kit. */
+const TWELVE_ROUND_THE_KIT = {
+  snare: "x.o... ......",
+  highTom: "....x. ......",
+  midTom: "...... x.....",
+  lowTom: "...... ..x.X.",
+  kick: TWELVE_KICK_UNDER,
+};
+/** Both hands flat on snare and floor tom. */
+const TWELVE_FLAT_HANDED = {
+  snare: "o...x. x...X.",
+  lowTom: "o...x. x...X.",
+  kick: TWELVE_KICK_UNDER,
+};
+/** Snare triplets that land on the floor tom. */
+const TWELVE_TRIPLETS_TO_FLOOR = {
+  snare: "o.o.x. x.x...",
+  lowTom: "...... ....X.",
+  kick: TWELVE_KICK_UNDER,
+};
+
+const bluesDrumsInTwelve: DrumTime = {
+  grooves: {
+    // Quiet: the shuffle's two notes a beat on a soft hat, a plain backbeat, mostly a plain kick.
+    low: [
+      {
+        id: "time",
+        hold: "section",
+        options: [{ weight: 1, lines: { closedHat: "o...g. o...g. o...g. o...g." } }],
+      },
+      {
+        id: "kick",
+        hold: "section",
+        options: [
+          { weight: 3, lines: TWELVE_KICK_PLAIN },
+          { weight: 1, lines: TWELVE_KICK_PUSHED },
+        ],
+      },
+      {
+        id: "snare",
+        hold: "section",
+        when: { energyFrom: 0.3 },
+        options: [{ weight: 1, lines: { snare: "...... x..... ...... x....." } }],
+      },
+      {
+        id: "rim",
+        hold: "section",
+        when: { energyBelow: 0.3 },
+        options: [{ weight: 1, lines: { crossStick: "...... x..... ...... x....." } }],
+      },
+    ],
+
+    // The working slow blues: the triplets on the hat, the backbeat cracked.
+    mid: [
+      { id: "time", hold: "section", options: [{ weight: 1, lines: { closedHat: TRIPLETS } }] },
+      {
+        id: "kick",
+        hold: "section",
+        options: [
+          { weight: 2, lines: TWELVE_KICK_PLAIN },
+          { weight: 3, lines: TWELVE_KICK_PUSHED },
+        ],
+      },
+      {
+        id: "snare",
+        hold: "section",
+        options: [
+          { weight: 7, lines: TWELVE_BACKBEAT },
+          // A ghost on the last eighth, loping into the one.
+          { weight: 3, lines: { snare: "...... X..... ...... X...g." } },
+        ],
+      },
+      {
+        id: "breath",
+        hold: "section",
+        when: TWELVE_BREATH.bars,
+        options: [
+          { weight: 65, lines: {} },
+          { weight: 35, lines: TWELVE_BREATH.open },
+        ],
+      },
+    ],
+
+    // Hot: the triplets on the hat or the ride, the kick always pushed, ghosts in the left hand.
+    high: [
+      {
+        id: "time",
+        hold: "pass",
+        options: [
+          { weight: 1, lines: { closedHat: TRIPLETS } },
+          { weight: 1, lines: { ride: TRIPLETS, pedalHat: "...... x..... ...... x....." } },
+        ],
+      },
+      { id: "kick", hold: "section", options: [{ weight: 1, lines: TWELVE_KICK_PUSHED }] },
+      {
+        id: "feather",
+        hold: "section",
+        options: [
+          { weight: 2, lines: {} },
+          { weight: 3, lines: { kick: "...... g..... ...... g....." } },
+        ],
+      },
+      {
+        id: "snare",
+        hold: "section",
+        options: [
+          { weight: 2, lines: TWELVE_BACKBEAT },
+          // Ghosts on the last eighths of 2 and 4, rolling into 3 and 1.
+          { weight: 2, lines: { snare: "...... X...g. ...... X...g." } },
+          // The triplet ghosted under the backbeat.
+          { weight: 1, lines: { snare: "....g. X.g.g. ....g. X.g.g." } },
+        ],
+      },
+      {
+        id: "breath",
+        hold: "section",
+        when: TWELVE_BREATH.bars,
+        options: [
+          { weight: 2, lines: {} },
+          { weight: 3, lines: TWELVE_BREATH.open },
+        ],
+      },
+    ],
+  },
+
+  // The lope: the last eighths of 2 and 4 are played lighter, so the bar circles in two.
+  touches: [{ voices: ["closedHat", "ride"], steps: [10, 22], scale: 0.8 }],
+
+  fills: {
+    // An eighth, a beat, two beats.
+    length: {
+      phrase: { low: 0, mid: 2, high: 6 },
+      section: { low: 2, mid: 6, high: 12 },
+    },
+    phrase: [
+      { weight: 3, lines: PICKUP },
+      { weight: 1, lines: PICKUP_FLOOR },
+      { weight: 2, lines: TWELVE_FOUR_AND },
+      { weight: 3, lines: TWELVE_TRIPLET },
+      { weight: 1, lines: TWELVE_CRACK_BOOM },
+    ],
+    section: [
+      { weight: 3, lines: PICKUP },
+      { weight: 1, lines: PICKUP_FLOOR },
+      { weight: 2, lines: TWELVE_FOUR_AND },
+      { weight: 3, lines: TWELVE_TRIPLET },
+      { weight: 1, lines: TWELVE_CRACK_BOOM },
+      { weight: 1, lines: TWELVE_TRIPLET_BOOM },
+      { weight: 1, lines: TWELVE_RUN },
+      { weight: 3, lines: TWELVE_RUN_TRIPLETS },
+      { weight: 1, lines: TWELVE_SNARE_SHUFFLE },
+      { weight: 2, lines: TWELVE_SNARE_TRIPLETS },
+    ],
+    top: [
+      { weight: 2, lines: PICKUP },
+      { weight: 2, lines: PICKUP_BOTH },
+      { weight: 1, lines: PICKUP_FLOOR },
+      { weight: 2, lines: TWELVE_TRIPLET },
+      { weight: 2, lines: TWELVE_TRIPLET_BOOM },
+      { weight: 1, lines: TWELVE_FOUR_AND_BOTH },
+      { weight: 1, lines: TWELVE_FOUR_AND },
+      { weight: 2, lines: TWELVE_ROUND_THE_KIT },
+      { weight: 2, lines: TWELVE_FLAT_HANDED },
+      { weight: 2, lines: TWELVE_TRIPLETS_TO_FLOOR },
+    ],
+  },
 };
 
 export const bluesDrums: DrumStyle = {
@@ -217,6 +449,9 @@ export const bluesDrums: DrumStyle = {
       },
     ],
   },
+
+  // The slow blues in twelve-eight, written above.
+  meters: { "12/8": bluesDrumsInTwelve },
 
   // The shuffle is carried on the hat or the ride; a crash on an arrival takes that hand.
   timekeepers: ["closedHat", "ride"],

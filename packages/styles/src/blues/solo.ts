@@ -9,7 +9,7 @@
 // triplet), and the fourth is never played. `x` strikes a note, `-` holds it,
 // `.` is silence.
 
-import type { SoloStyle, Way } from "@ensemble/engine";
+import type { SoloStyle, SoloTime, Way } from "@ensemble/engine";
 
 // The ways a blues phrase is made. A new statement, and one that keeps to a single rhythm
 // all along its line, so the critic hears the difference.
@@ -25,7 +25,107 @@ const AS_A_RIFF: Way = {
   oneRhythm: true,
 };
 
+// ── in twelve ───────────────────────────────────────────────────────────────
+// The slow blues. A bar of 12/8 is four slow beats of three eighths: a rhythm
+// is twenty-four sixteenths, written in sixes. `x-x-x-` on a beat is its
+// triplet, `x---x-` the shuffle's long-short, `x-----` the beat held. The
+// levels are the levels of four (the solo's arc names them): what the shuffle
+// plays as swung eighths is the long-short here, and the triplets that only
+// "flying" has in four come in two levels sooner, because a slow blues is
+// where they live. Nothing is quicker than the eighth: a note between the
+// triplet's would flam against the band, as a shuffle's last sixteenth does.
+const bluesSoloInTwelve: SoloTime = {
+  levels: [
+    {
+      name: "sparse",
+      notesPerBar: 2,
+      span: 6,
+      cells: [
+        "x---x- x----- ------ ......",
+        "....x- x---x- ------ ......",
+        "x----- x---x- ------ ......",
+        "...... x---x- x---x- ------",
+      ],
+      shapes: [
+        { weight: 4.3, bars: "L E R R" },
+        { weight: 4.3, bars: "R L E R" },
+        { weight: 3.6, bars: "E R L E" },
+        { weight: 2.4, bars: "L L E R" },
+      ],
+    },
+    {
+      name: "medium",
+      notesPerBar: 3.5,
+      span: 9,
+      cells: [
+        "x---x- x---x- x----- ------",
+        "....x- x---x- x-x-x- x-----",
+        "x-x-x- x----- x---x- ------",
+        "x----- x---x- x-x-x- ------",
+        // These two run over the barline into the next bar.
+        "x---x- x----- x----- x---x-",
+        "....x- x-x-x- ------ ....x-",
+      ],
+      shapes: [
+        { weight: 6, bars: "L L E R" },
+        { weight: 3.6, bars: "E R L E" },
+        { weight: 2, bars: "L E L E" },
+      ],
+    },
+    {
+      // Triplets and the long-short by turns, all the way through the bar.
+      name: "busy",
+      notesPerBar: 5,
+      span: 12,
+      cells: [
+        "x-x-x- x---x- x-x-x- x---x-",
+        "x---x- x-x-x- x---x- x-----",
+        "....x- x-x-x- x-x-x- x---x-",
+        "x-x-x- x-x-x- x----- x---x-",
+      ],
+      shapes: [
+        { weight: 4, bars: "L L L E" },
+        { weight: 4.8, bars: "L L E R" },
+        { weight: 2, bars: "L E L E" },
+      ],
+    },
+    {
+      // Triplets throughout.
+      name: "flying",
+      notesPerBar: 6.5,
+      span: 12,
+      cells: [
+        "x-x-x- x-x-x- x-x-x- x-----",
+        "x-x-x- x-x-x- x-x-x- x---x-",
+        "x-x-x- x-x-x- x-x-x- x-x-x-",
+        "....x- x-x-x- x-x-x- x-x-x-",
+      ],
+      shapes: [
+        { weight: 4, bars: "L L L E" },
+        { weight: 4.8, bars: "L L E R" },
+        { weight: 2, bars: "L E L E" },
+      ],
+    },
+  ],
+  // Each lands on a long note and leaves beat 4 unstruck.
+  endings: [
+    "x----- ------ ------ ......",
+    "x---x- x----- ------ ------",
+    "x----- ------ ------ ------",
+    "....x- x---x- ------ ------",
+    "x-x-x- x----- ------ ......",
+  ],
+  // From beat 4: its last eighth, the long-short, or the triplet.
+  pickups: [
+    { weight: 1, beat: "....x-" },
+    { weight: 1, beat: "x---x-" },
+    { weight: 1, beat: "x-x-x-" },
+  ],
+  peak: "x----- ------ ------ ......",
+};
+
 export const bluesSolo: SoloStyle = {
+  meters: { "12/8": bluesSoloInTwelve },
   // The player's to change. Vibes are the default because every sampler has a good set.
   instrument: "vibraphone",
   lift: 0,

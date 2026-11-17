@@ -178,6 +178,104 @@ const rhythm: RhythmBook = {
   candidates: 6,
 };
 
+// ── in twelve ───────────────────────────────────────────────────────────────
+// The slow blues. A bar of 12/8 is four slow beats of three eighths: a figure
+// is twenty-four sixteenths, written in sixes, and only a beat's three eighths
+// (its first, third and fifth character) are struck. The figures are the
+// shuffle's own, said in twelve, with the one thing the shuffle cannot write:
+// the triplets, the chord on all three eighths of a beat, which is what a
+// slow blues piano does when the band is up. None of it is from the notes,
+// which have no slow blues ("There is no 12/8 slow-blues groove", ST-blues-06).
+
+/** The triplets: the beat, then two lighter, each let go before the next. */
+const TRIPLET: Articulation = { x: { level: 84, steps: 1.5 }, o: { level: 66, steps: 1.5 } };
+/** Chops with a triplet in them: the beat hardest, its two eighths under it. */
+const CHOPS: Articulation = { ...STAB, o: { level: 70, steps: 1.5 } };
+
+const rhythmInTwelve: RhythmBook = {
+  tiers: {
+    // Quiet: the pad. One chord a bar, mostly.
+    low: {
+      draw: "quiet",
+      articulation: PAD,
+      figures: [
+        { name: "held", weight: 3, grid: "x----- ------ ------ ------" },
+        // Struck again on the last eighth, leaning into the next bar.
+        { name: "held and a lean", weight: 2, grid: "x----- ------ ------ ----X-" },
+        // Beat 1, then the last eighth of 2 held to the barline.
+        { name: "charleston", weight: 1, grid: "x----- ----X- ------ ------" },
+      ],
+      answers: [{ name: "halves", weight: 2, grid: "x----- ------ x----- ------" }],
+      busy: { from: 1, to: 1.5 },
+      arrival: { level: 80, steps: 24 },
+    },
+
+    // The working level: chops on the backbeat, and the triplet that leads out of one.
+    mid: {
+      draw: "working",
+      articulation: CHOPS,
+      figures: [
+        // Chops on 2 and 4, like a second snare.
+        { name: "chops", weight: 3, grid: "...... X..... ...... X....." },
+        // The chop on 2, and all three eighths of 4.
+        { name: "chop, and the triplet on four", weight: 2, grid: "...... X..... ...... X.o.o." },
+        // Beat 1 and the last eighth of 2.
+        { name: "charleston", weight: 2, grid: "x..... ....X. ...... ......" },
+        // The chops pushed late: the last eighths of 2 and 4.
+        { name: "late ones", weight: 1, grid: "...... ....X. ...... ....X." },
+      ],
+      answers: [
+        { name: "chop and a late one", weight: 2, grid: "...... X..... ...... ....X." },
+        { name: "late one and a chop", weight: 2, grid: "...... ....X. ...... X....." },
+        // The triplet on 2, the chop on 4.
+        { name: "the triplet on two, and a chop", weight: 1, grid: "...... X.o.o. ...... X....." },
+      ],
+      busy: { from: 2, to: 4 },
+      arrival: { level: 80, steps: 6 },
+    },
+
+    // Hot: the triplets all bar, or on the backbeats.
+    high: {
+      draw: "hot",
+      articulation: CHOPS,
+      figures: [
+        // Every eighth of the bar, the beats leaned on: a groove, not a conversation, and
+        // in close position as the pump is (ST-blues-32).
+        {
+          name: "triplets",
+          weight: 2,
+          grid: "x.o.o. x.o.o. x.o.o. x.o.o.",
+          articulation: TRIPLET,
+          voicing: "close",
+          groove: true,
+        },
+        // All three eighths of 2 and of 4.
+        { name: "backbeat triplets", weight: 2, grid: "...... X.o.o. ...... X.o.o." },
+        // Beat 1 and three late ones.
+        { name: "one and the late ones", weight: 1, grid: "x..... ....X. ....X. ....X." },
+      ],
+      answers: [
+        {
+          name: "the triplet on two, then late ones",
+          weight: 2,
+          grid: "...... X.o.o. ....X. ....X.",
+        },
+        {
+          name: "charleston, then the triplet on four",
+          weight: 2,
+          grid: "x..... ....X. ...... X.o.o.",
+        },
+        { name: "backbeats, one triplet", weight: 1, grid: "...... X.o.o. ...... X....." },
+      ],
+      busy: { from: 5, to: 8 },
+      arrival: { level: 80, steps: 6 },
+    },
+  },
+  hold: rhythm.hold,
+  forms: rhythm.forms,
+  candidates: rhythm.candidates,
+};
+
 export const bluesChords: ChordStyle = {
   idiom: "keys",
   kinds: { rootless, close },
@@ -192,6 +290,7 @@ export const bluesChords: ChordStyle = {
   // four fifths of that, as a rock keyboard re-strikes a held chord (CH-48: 64 against 80).
   plain: { length: 0.95, velocity: { beat: 74, offbeat: 80, restrike: 60 } },
   rhythm,
+  meters: { "12/8": rhythmInTwelve },
   // The hand leans into a change at the barline three times in ten when quiet, four at the
   // working level, five when hot (ST-blues-46), as a leaned-on strike. A change inside the
   // bar is played early by any strike in the eighth before it (ST-blues-47). Where the hand
