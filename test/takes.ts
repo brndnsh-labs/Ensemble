@@ -73,6 +73,7 @@ export const WRITTEN: Readonly<Record<string, readonly string[]>> = {
   neosoul: ["12/8", "6/8"],
   funk: ["6/8", "12/8"],
   disco: ["12/8", "6/8"],
+  reggae: ["6/8", "12/8"],
 };
 
 /** A take whose chart is in 4/4 or in a meter its style has written. */
@@ -158,6 +159,9 @@ const standardsOf = (style: StylePack): LibraryChart[] =>
 const SOLO_KIND = KINDS.find((kind) => kind.solo)!;
 const BAND_KINDS = KINDS.filter((kind) => !kind.solo);
 
+/** A style with few charts of its own: the blues has six, and no seed of them to spare. */
+const few = (style: StylePack): boolean => ownCharts(style).length <= 6;
+
 const otherCharts = (style: StylePack): LibraryChart[] => {
   const mine = new Set([...ownCharts(style), ...standardsOf(style)]);
   const others = LIBRARY.filter((chart) => !mine.has(chart));
@@ -169,9 +173,10 @@ const otherCharts = (style: StylePack): LibraryChart[] => {
 const TAKE_SPECS: readonly JamSpec[] = STYLES.flatMap((style) => [
   // A style's own charts: every kind of take on every seed. On a push, one in a meter other
   // than 4/4 is played on the first seed only (the full run plays it on all six): six styles
-  // write two more meters each, and their charts had taken the push suite over its time.
+  // write two more meters each, and their charts had taken the push suite over its time. A
+  // style with six charts or fewer keeps both seeds: its properties' floors need them.
   ...ownCharts(style).flatMap((chart) =>
-    (FULL || chart.meter === "4/4" ? SEEDS : SEEDS.slice(0, 1)).flatMap((seed) =>
+    (FULL || chart.meter === "4/4" || few(style) ? SEEDS : SEEDS.slice(0, 1)).flatMap((seed) =>
       KINDS.map((kind) => ({ style, chart, options: { ...kind, seed } })),
     ),
   ),

@@ -139,6 +139,15 @@ function foldsOf(request: LeadInRequest): Fold[] {
     if (note.tick < landing.tick - PPQ) break;
     if (note.dead || Math.abs(note.pitch - landing.pitch) <= OCTAVE) continue;
     const pitch = note.pitch > landing.pitch ? note.pitch - OCTAVE : note.pitch + OCTAVE;
+    // Not where it would open a leap of more than an octave behind it: after a pop a beat
+    // or more back, which stays where it is, the note keeps its octave and the line comes
+    // down through it (a bar of six: the pop on the first pulse, the turn on the second).
+    const before = notes[index - 1];
+    const stays =
+      before !== undefined &&
+      !before.dead &&
+      (before.tick < landing.tick - PPQ || Math.abs(before.pitch - landing.pitch) <= OCTAVE);
+    if (stays && Math.abs(before.pitch - pitch) > OCTAVE) continue;
     if (pitch >= LOW_E && pitch <= TOP) folds.push({ index, pitch });
   }
   return folds;

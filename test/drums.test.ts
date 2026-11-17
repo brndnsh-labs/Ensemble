@@ -30,9 +30,6 @@ import {
   written,
 } from "./takes.ts";
 
-const in44 = (id: string) => (jam: Pick<Jam, "style" | "chart">) =>
-  jam.style.id === id && jam.chart.meter === "4/4";
-
 /** A style wherever it plays from its own parts: in 4/4, and in a meter it has written. */
 const itsOwn = (id: string) => (jam: Pick<Jam, "style" | "chart">) =>
   jam.style.id === id && written(jam);
@@ -277,23 +274,41 @@ test("disco: in six and twelve the hat is the triplet: from the working level up
 
 // ── reggae ──────────────────────────────────────────────────────────────────
 
+/** Reggae where it plays its own parts, and in six and twelve held at each level on its own charts. */
+const reggae = STYLES.find((style) => style.id === "reggae");
+const reggaePlayed = (): Jam[] => [
+  ...takes(itsOwn("reggae")),
+  ...(reggae
+    ? [...heldTakes(reggae, "6/8", false, true), ...heldTakes(reggae, "12/8", false, true)]
+    : []),
+];
+
+/**
+ * Where the drop lands (ST-reggae-04): the bar's second strong pulse (beat 3 of four, pulse 3
+ * of twelve), or in a bar with one strong pulse, the pulse after it (the second pulse of six).
+ */
+const dropOf = (bar: PlanBar) => strongPulses(bar.meter)[1] ?? pulseStarts(bar.meter)[1]!;
+
 test(
-  "reggae: the one drop: in every bar the kick lands on beat 3 with the cross-stick, or with the snare when the band is hot; below the hot level nothing kicks the One but an arrival crash, and hot the kick is back on it",
+  "reggae: the one drop: in every bar the kick lands on the drop (beat 3 in four, the third pulse in twelve, the second in six) with the cross-stick, or with the snare when the band is hot; below the hot level nothing kicks the One but an arrival crash, and hot the kick is back on it",
   only("reggae"),
   () => {
     let bars = 0;
     let hot = 0;
-    for (const { chart, options, take } of takes(in44("reggae"))) {
+    let compound = 0;
+    for (const { chart, options, take } of reggaePlayed()) {
       for (const { bar, kit, energy } of kitBars(take)) {
         // The last bar is the stop: the drop's own pair moved onto the One.
         if (bar.ending) continue;
-        const where = `${chart.file} seed ${options.seed} bar ${bar.index}`;
+        const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
         bars++;
+        if (isCompound(bar.meter)) compound++;
+        const drop = dropOf(bar) / STEP;
         const high = tierOf(energy) === "high";
-        assert.ok(strikes(kit, "kick", 8), `${where}: no kick on 3`);
+        assert.ok(strikes(kit, "kick", drop), `${where}: no kick on the drop`);
         assert.ok(
-          strikes(kit, high ? "snare" : "crossStick", 8),
-          `${where}: no ${high ? "snare" : "cross-stick"} on 3`,
+          strikes(kit, high ? "snare" : "crossStick", drop),
+          `${where}: no ${high ? "snare" : "cross-stick"} on the drop`,
         );
         if (high) {
           hot++;
@@ -304,6 +319,8 @@ test(
       }
     }
     assert.ok(bars > enough(2000) && hot > enough(200), `only ${bars} bars, ${hot} of them hot`);
+    if (reggae && ownCharts(reggae).some((chart) => isCompound(parse(chart.text).chart.meter)))
+      assert.ok(compound > 100, `only ${compound} bars of six and twelve`);
   },
 );
 

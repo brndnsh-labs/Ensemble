@@ -3,7 +3,9 @@
 // 4; a deep bass with holes in it; and a horn laying back over the top. When
 // the band is hot the drummer plays one riddim for the whole performance,
 // steppers or rockers, and puts the kick back on the One (ST-reggae-01 to
-// ST-reggae-37).
+// ST-reggae-37). In twelve it is the reggae shuffle, in six a bar of two with
+// the drop on its second pulse, each seat's part written for the meter in its
+// own file.
 
 import { DEFAULT_ARC, DEFAULT_MIX, type StylePack } from "@ensemble/engine";
 import { reggaeBass } from "./bass.ts";
@@ -18,7 +20,19 @@ export const reggae: StylePack = {
   // ST-reggae-01: the slow count, about 60 to 90, 76 for the import and the loudness reference.
   // A chart written in the fast count (the skank on every "and") is not read as such: it would
   // play at twice the tempo it is written at.
-  tempo: { default: 76, min: 60, max: 90 },
+  // In twelve and in six the pulse is the slow count's beat: twelve is the shuffle, the one
+  // drop with its beat a triplet, and six is a bar of two of the same pulse, the drop on the
+  // second. So the range is four's in both, as the blues' is for its shuffle in twelve, and
+  // not the two thirds of it that keeps a style's eighths at four's speed.
+  tempo: {
+    default: 76,
+    min: 60,
+    max: 90,
+    meters: {
+      "12/8": { default: 76, min: 60, max: 90 },
+      "6/8": { default: 76, min: 60, max: 90 },
+    },
+  },
   feel: {
     // Swing 20 on the sixteenths: the off-sixteenth at 53.3% of its pair (ST-reggae-02). The bass
     // drags most, the chop a touch less so it stays crisp against the hat, the horn furthest

@@ -15,7 +15,9 @@ import {
   pitchClass,
   pulseStarts,
   render,
+  STEP,
   scaleHas,
+  strongPulses,
   tierOf,
 } from "@ensemble/engine";
 import {
@@ -1127,6 +1129,63 @@ test("a guitar strums a bar of six as a pendulum in eighths: it strikes both pul
     `only ${bars} bars of six strummed, ${leant} leant into`,
   );
 });
+
+// ── the reggae skank in six and twelve ──────────────────────────────────────
+
+test(
+  "reggae: in six and twelve the skank chops the pulses between the strong ones (2 and 4 in twelve, the second pulse in six) and nothing else that matters: the guitar never strikes a strong pulse (but a chord gone before the next chop, where it arrives), every bar of chords has a chop on each of those pulses, the loudest stroke in the bar, and any other stroke is the flick on the eighth after a chop or a lighter stroke on a pulse's last eighth",
+  only("reggae"),
+  () => {
+    const reggae = STYLES.find((style) => style.id === "reggae")!;
+    const played = [
+      ...takes((jam) => jam.style.id === "reggae" && written(jam)),
+      ...heldTakes(reggae, "6/8", false, true),
+      ...heldTakes(reggae, "12/8", false, true),
+    ];
+    let bars = 0;
+    for (const { chart, options, take } of played) {
+      if (chart.meter !== "6/8" && chart.meter !== "12/8") continue;
+      const chords = notesOf(take, "chords");
+      for (const bar of take.plan.bars) {
+        if (bar.kind !== "music" || bar.ending || bar.seats.chords === null) continue;
+        if (!isCompound(bar.meter) || bar.spans.some((span) => span.chord === null)) continue;
+        bars++;
+        const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
+        const notes = chords.filter((n) => n.tick >= bar.start && n.tick < bar.start + bar.ticks);
+        const strong = strongPulses(bar.meter);
+        const chops = pulseStarts(bar.meter).filter((tick) => !strong.includes(tick));
+        const loudest = (ticks: (tick: number) => boolean) =>
+          Math.max(0, ...notes.filter((n) => ticks(n.tick - bar.start)).map((n) => n.velocity));
+        for (const chop of chops)
+          assert.ok(
+            notes.some((n) => n.tick - bar.start === chop),
+            `${where}: no chop at ${chop}`,
+          );
+        for (const note of notes) {
+          const tick = note.tick - bar.start;
+          const step = tick / STEP;
+          // A chord gone before the next chop is struck where it arrives, or it would not sound.
+          const unchopped = bar.spans.some(
+            (span) =>
+              span.start === tick &&
+              !chops.some((c) => c >= span.start && c < span.start + span.duration),
+          );
+          if (unchopped) continue;
+          assert.ok(!strong.includes(tick), `${where}: a stroke on the strong pulse at ${tick}`);
+          assert.ok(
+            chops.includes(tick) || chops.includes(tick - PPQ / 2) || step % 6 === 4,
+            `${where}: a stroke at ${tick}`,
+          );
+        }
+        const chop = loudest((tick) => chops.includes(tick));
+        const rest = loudest((tick) => !chops.includes(tick));
+        assert.ok(chop > rest, `${where}: the chop at ${chop}, another stroke at ${rest}`);
+      }
+    }
+    if (ownCharts(reggae).some((chart) => chart.meter === "6/8" || chart.meter === "12/8"))
+      assert.ok(bars > 300, `only ${bars} bars of six and twelve`);
+  },
+);
 
 // ── a funk guitar in six and twelve ─────────────────────────────────────────
 
