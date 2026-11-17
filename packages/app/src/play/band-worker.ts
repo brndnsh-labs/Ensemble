@@ -42,7 +42,8 @@ scope.onmessage = ({ data }) => {
     if (!style) throw new Error(`no style "${recipe.style}"`);
     if (data.midi) {
       const take = render(recipe.chartText, style, recipe.options);
-      scope.postMessage({ id: data.id, midi: toMidi(take.plan, take.events, style), took: took() });
+      const midi = toMidi(take.plan, take.events, style, recipe.options.instruments);
+      scope.postMessage({ id: data.id, midi, took: took() });
     } else {
       const made = performanceOf(recipe, style, data.since);
       scope.postMessage({ id: data.id, performance: made, took: took() });

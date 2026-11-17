@@ -27,7 +27,7 @@ import { takeRow } from "../rows.tsx";
 import type { ChartChoices, Settings } from "../settings.ts";
 import { placeOf } from "../Trail.tsx";
 import type { KeptTake } from "../takes.ts";
-import { dayOf, followTake, keepTake } from "../takes.ts";
+import { followTake, keepTake, takeName } from "../takes.ts";
 import { midiOf } from "./band.ts";
 import type { Call, JamSetup } from "./jam.ts";
 import { chartOf, SEAT_ORDER, takeOptions, tempoFor } from "./jam.ts";
@@ -63,21 +63,13 @@ const SEAT_NAMES: Readonly<Record<Seat, string>> = {
   chords: "Chords",
   solo: "Soloist",
 };
+/** The meters the band has parts written for, offered in the editing mode's More. Any other is typed. */
+const METERS: readonly string[] = ["4/4", "3/4", "6/8", "12/8", "6/4"];
 /** How far one press of minus or plus moves the tempo. */
 const TEMPO_STEP = 4;
 
 /** The seats whose instrument a style may offer a choice of. The soloist's has its own list. */
 const BAND_SEATS = ["drums", "bass", "chords"] as const;
-
-/** A kept take in a few words: its own name if it was given one, else when it was kept. */
-function takeName(take: KeptTake): string {
-  const named = take.name.trim();
-  if (named && named !== take.recipe.chartName) return named;
-  const kept = new Date(take.kept);
-  const today = kept.toDateString() === new Date().toDateString();
-  // The time of day for one kept today, since several may have been.
-  return `Kept take, ${today ? kept.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) : dayOf(take.kept)}`;
-}
 
 /** The twelve keys of a mode, as they are conventionally written, from C. */
 const keysOf = (mode: Key["mode"]): Key[] =>
@@ -104,7 +96,7 @@ export function PlayView(props: Props) {
   const chosen = choices.soloInstrument;
   const soloInstrument =
     chosen !== undefined && chosen in SOLO_INSTRUMENTS ? chosen : style.solo.instrument;
-  // The pencil: down where the address says so, for a chart of the player's own. Done takes it up
+  // The pencil: down where the address says so, for a chart of the player's own. Stop editing takes it up
   // in the press, before the address has caught up with the browser's history.
   const [asked, setAsked] = useState(props.mode);
   const [leaving, setLeaving] = useState(false);
@@ -113,7 +105,7 @@ export function PlayView(props: Props) {
     setLeaving(false);
   }
   const editing = props.mode === "edit" && entry.own && !leaving;
-  /** The mode was entered from this screen with Edit: Done goes back to that entry of the history, rather than piling up another. */
+  /** The mode was entered from this screen with Edit: Stop editing goes back to that entry of the history, rather than piling up another. */
   const pushed = useRef(false);
   const editor = useEditor({
     entry,
@@ -351,13 +343,14 @@ export function PlayView(props: Props) {
         place={placeOf(entry.chart)}
         side={
           entry.own ? (
-            // One button, in one place: Edit, and Done while the pencil is down.
+            // One button, in one place: Edit, and Stop editing while the pencil is down. Not Done:
+            // that is the dock's word on a phone's keyboard, for closing the bar being typed.
             <button
               type="button"
               className={`edit-link edit-toggle${editing ? " done" : ""}`}
               onClick={editing ? leave : enter}
             >
-              {editing ? "Done" : "Edit"}
+              {editing ? "Stop editing" : "Edit"}
             </button>
           ) : (
             // A built-in stays as it ships; the player changes a copy of their own.
@@ -478,6 +471,25 @@ export function PlayView(props: Props) {
                 <small>As a .chart file, to keep or to send</small>
               </button>
             </li>
+            {/* The meter, with the pencil down: a step of the editor, as Rename is there. */}
+            {editing && (
+              <li>
+                <label className="menu-pick">
+                  <span>Meter</span>
+                  <small>{editor.meter}</small>
+                  <select value={editor.meter} onChange={(e) => editor.remeter(e.target.value)}>
+                    {/* One typed in the text that is not offered here is shown as it is. */}
+                    {(METERS.includes(editor.meter) ? METERS : [editor.meter, ...METERS]).map(
+                      (meter) => (
+                        <option key={meter} value={meter}>
+                          {meter}
+                        </option>
+                      ),
+                    )}
+                  </select>
+                </label>
+              </li>
+            )}
             {entry.own ? (
               <>
                 <li>

@@ -76,13 +76,17 @@ export function addChart(text: string): string {
   return id;
 }
 
+/** A chart's text named as a copy, as Duplicate names one. */
+const copyText = (text: string): string => retitled(text, `${parse(text).chart.title} copy`);
+
 /**
- * The player's copy of a text to edit: the copy they already have, if they
- * made one and have not changed it, or a new one. Asking twice does not leave
- * two.
+ * The player's copy of a built-in to edit, named as a copy: the copy they
+ * already have, if they made one and have not changed it, or a new one.
+ * Asking twice does not leave two.
  */
 export function copyOf(text: string): string {
-  return charts.items().find((chart) => chart.text === text)?.id ?? addChart(text);
+  const copy = copyText(text);
+  return charts.items().find((chart) => chart.text === copy)?.id ?? addChart(copy);
 }
 
 export function saveChart(id: string, text: string): void {
@@ -118,7 +122,7 @@ export function renameChart(id: string, title: string): void {
 /** A second copy of one of the player's charts, named as a copy, and its id. */
 export function duplicateChart(id: string): string | undefined {
   const entry = shelf.find((chart) => chart.id === id);
-  return entry && addChart(retitled(entry.text, `${entry.chart.title} copy`));
+  return entry && addChart(copyText(entry.text));
 }
 
 export function deleteChart(id: string): void {

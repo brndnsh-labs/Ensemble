@@ -114,6 +114,22 @@ export const dayOf = (time: number): string => {
   });
 };
 
+/** The name a take was given, or empty where it has none of its own: it is kept with its chart's name. */
+export const ownName = (take: KeptTake): string => {
+  const named = take.name.trim();
+  return named === take.recipe.chartName ? "" : named;
+};
+
+/** A kept take in a few words: its own name if it was given one, else when it was kept. */
+export function takeName(take: KeptTake): string {
+  const named = ownName(take);
+  if (named) return named;
+  const kept = new Date(take.kept);
+  const today = kept.toDateString() === new Date().toDateString();
+  // The time of day for one kept today, since several may have been.
+  return `Kept take, ${today ? kept.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) : dayOf(take.kept)}`;
+}
+
 /** A take as it was heard: its style, its chart in the key it was played in, and its roadmap. */
 export interface Heard {
   readonly style: StylePack;
