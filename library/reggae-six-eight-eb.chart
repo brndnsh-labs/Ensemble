@@ -1,0 +1,24 @@
+title: Reggae in Six
+key: Eb
+tempo: 70
+meter: 6/8
+style: reggae
+
+// Two slow pulses to the bar, three eighths in each, the drop on the second.
+// Thirty-two bars, AABA, each chord held two bars. The A goes from the one to
+// the six, the four and the five; its second time it comes home through the
+// two and the five in one bar. The bridge opens on the four, goes down through
+// the three and the two, and waits on the five.
+[A]
+| Eb | % | Cm | % |
+| Ab | % | Bb | % |
+
+[A2]
+| Eb | %     | Cm | % |
+| Ab | Fm Bb | Eb | % |
+
+[Bridge]
+| Ab | % | Gm | %   |
+| Fm | % | Bb | Bb7 |
+
+[A2]

@@ -1,0 +1,22 @@
+title: Minor Reggae in Twelve
+key: Am
+tempo: 72
+meter: 12/8
+style: reggae
+
+// A minor reggae with a shuffle under it: four slow pulses to the bar, three
+// eighths in each. An eight-bar verse that walks down from the one through the
+// flat seven and the flat six and back, closing on the major five; an eight-bar
+// chorus that rocks between the four and the one, climbs through the flat six
+// and the flat seven, and turns home on the five in the drop's half of the bar.
+[Verse]
+| Am | G | F | G  |
+| Am | G | F | E7 |
+
+[Chorus]
+| Dm | Am | Dm    | Am |
+| F  | G  | Am E7 | Am |
+
+[Verse]
+
+[Chorus]
