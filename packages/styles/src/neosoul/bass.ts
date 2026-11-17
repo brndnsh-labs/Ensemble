@@ -82,9 +82,9 @@ const SIX_LINES = [
   { name: "root and a breath", grid: "R---.. ..5-7-", weights: [2, 3, 1] },
   // The lazy re-strike leaning into the backbeat, the fifth into the One.
   { name: "lazy re-strike", grid: "R-..R- ----5-", weights: [0, 3, 2] },
-  // The hammer-on to the 2nd, the root again into the backbeat; the octave late after it falling
-  // to the fifth.
-  { name: "hammer-on", grid: "R-2-R- ..8-5-", weights: [0, 1, 3] },
+  // The hammer-on to the 2nd, the root again into the backbeat, the fifth into the One. Four's
+  // octave has no room in a bar of six: it put five notes and the pickup in six eighths.
+  { name: "hammer-on", grid: "R-2-R- ....5-", weights: [0, 1, 3] },
   // A dead note into the backbeat, the root late after it, the seventh into the One.
   { name: "dead-note chatter", grid: "R-..m. ..R-7-", weights: [0, 0, 2] },
 ] as const;
