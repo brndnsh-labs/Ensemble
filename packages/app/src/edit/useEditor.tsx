@@ -12,7 +12,7 @@
 // back: the chart to press, the text or the grid, the dock's words and
 // controls, and the dock that sits on a phone's keyboard.
 
-import type { Chart, Diagnostic, StylePack } from "@ensemble/engine";
+import type { Chart, ChartField, Diagnostic, StylePack } from "@ensemble/engine";
 import { parse, print } from "@ensemble/engine";
 import type { ReactNode } from "react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
@@ -34,6 +34,7 @@ import {
   labelOf,
   labelTaken,
   playedSections,
+  remetered,
   renamed,
   retyped,
   sourceOf,
@@ -104,6 +105,10 @@ export interface Editor {
   readonly finish: () => void;
   /** Give the chart another title: a step that can be taken back. */
   readonly rename: (title: string) => void;
+  /** The chart's meter as its text says it: `4/4` where it says none. */
+  readonly meter: string;
+  /** Put the chart in another meter: its `meter:` line rewritten, a step that can be taken back. */
+  readonly remeter: (meter: string) => void;
   /** Drop what is waiting to be written: the chart is being deleted. */
   readonly forget: () => void;
 }
@@ -683,6 +688,11 @@ export function useEditor({ entry, on, style, copied, remove }: Options): Editor
       const clean = title.replace(/\s+/g, " ").trim();
       if (clean && clean !== chart.title) commit(retitled(latest.current, clean));
     },
+    meter:
+      chart.header.find(
+        (item): item is ChartField => item.kind === "field" && item.name === "meter",
+      )?.value ?? "4/4",
+    remeter: (meter) => commit(remetered(latest.current, meter)),
     forget: () => {
       clearTimeout(timer.current);
       timer.current = undefined;

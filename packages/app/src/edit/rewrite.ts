@@ -5,7 +5,15 @@
 // written out the way `fmt` writes it, so its columns line up again. Everything
 // outside that section is left letter for letter as it was typed.
 
-import type { ArrangementLine, Bar, BarToken, Chart, Section, SectionItem } from "@ensemble/engine";
+import type {
+  ArrangementLine,
+  Bar,
+  BarToken,
+  Chart,
+  ChartField,
+  Section,
+  SectionItem,
+} from "@ensemble/engine";
 import {
   arrangedLines,
   chordText,
@@ -172,6 +180,31 @@ const spliced = (text: string, splices: readonly Splice[]): string =>
 /** A bar line to stand in front of a bar that is the first thing on its line, so nothing typed there starts a line. */
 const lead = (text: string, bar: Bar): string =>
   text.slice(lineStart(text, bar.range.start), bar.range.start).trim() === "" ? "| " : " ";
+
+// ── the header ──────────────────────────────────────────────────────────────
+
+/**
+ * The chart in another meter. Only the `meter:` line is written: the one the
+ * chart reads, or a new one under the header's last line where it has none. The
+ * bars are left as they were typed; a bar that does not fit the new meter is
+ * the parser's to point out, as any bar that does not fit is.
+ */
+export function remetered(text: string, meter: string): string {
+  const { chart } = parse(text);
+  const fields = chart.header.filter((item): item is ChartField => item.kind === "field");
+  const line = `meter: ${meter}`;
+  // The first is the one that counts: a second is ignored by the parser.
+  const field = fields.find((item) => item.name === "meter");
+  if (field)
+    return field.value === meter
+      ? text
+      : spliced(text, [{ at: field.range.start, end: field.range.end, text: line }]);
+  const last = fields.at(-1);
+  if (!last) return `${line}\n${text}`;
+  const end = text.indexOf("\n", last.range.end);
+  const at = end < 0 ? text.length : end;
+  return spliced(text, [{ at, end: at, text: `\n${line}` }]);
+}
 
 // ── a bar ───────────────────────────────────────────────────────────────────
 

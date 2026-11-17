@@ -63,6 +63,8 @@ const SEAT_NAMES: Readonly<Record<Seat, string>> = {
   chords: "Chords",
   solo: "Soloist",
 };
+/** The meters the band has parts written for, offered in the editing mode's More. Any other is typed. */
+const METERS: readonly string[] = ["4/4", "3/4", "6/8", "12/8", "6/4"];
 /** How far one press of minus or plus moves the tempo. */
 const TEMPO_STEP = 4;
 
@@ -479,6 +481,25 @@ export function PlayView(props: Props) {
                 <small>As a .chart file, to keep or to send</small>
               </button>
             </li>
+            {/* The meter, with the pencil down: a step of the editor, as Rename is there. */}
+            {editing && (
+              <li>
+                <label className="menu-pick">
+                  <span>Meter</span>
+                  <small>{editor.meter}</small>
+                  <select value={editor.meter} onChange={(e) => editor.remeter(e.target.value)}>
+                    {/* One typed in the text that is not offered here is shown as it is. */}
+                    {(METERS.includes(editor.meter) ? METERS : [editor.meter, ...METERS]).map(
+                      (meter) => (
+                        <option key={meter} value={meter}>
+                          {meter}
+                        </option>
+                      ),
+                    )}
+                  </select>
+                </label>
+              </li>
+            )}
             {entry.own ? (
               <>
                 <li>
