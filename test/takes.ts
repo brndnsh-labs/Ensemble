@@ -206,19 +206,23 @@ const TAKE_SPECS: readonly JamSpec[] = STYLES.flatMap((style) => [
  * jam of three passes with the soloist in each.
  */
 export function heldTakes(style: StylePack, meter: string, solo = false): Jam[] {
-  return LIBRARY.filter((chart) => chart.meter === meter).flatMap((chart) =>
-    [0.3, 0.55, 0.85].flatMap((energy) =>
+  return LIBRARY.filter((chart) => chart.meter === meter).flatMap((chart) => {
+    // A chart written for another style at this style's usual tempo, as the app plays it.
+    const written = parse(chart.text).chart;
+    const tempo =
+      written.styleId === style.id ? {} : { tempo: tempoRange(style, written.meter).default };
+    return [0.3, 0.55, 0.85].flatMap((energy) =>
       [1, 2].map((seed) =>
         render1({
           style,
           chart,
           options: solo
-            ? { mode: "jam", passes: 3, solo: true, energy, seed }
-            : { mode: "jam", passes: 2, energy, seed },
+            ? { mode: "jam", passes: 3, solo: true, energy, seed, ...tempo }
+            : { mode: "jam", passes: 2, energy, seed, ...tempo },
         }),
       ),
-    ),
-  );
+    );
+  });
 }
 
 /** The library's takes that pass `only`, which reads the style, chart, and options. */
@@ -303,14 +307,14 @@ const SOLOIST_SPECS: readonly JamSpec[] = STYLES.flatMap((style) => [
         : [],
     ),
   ),
-  ...otherCharts(style).map((chart, c) => ({
-    style,
-    chart,
-    options: {
-      ...inPulses(style, SOLOIST_KINDS[c % SOLOIST_KINDS.length]!, chart),
-      seed: 1 + (c % 2),
-    },
-  })),
+  // A chart written for another style, where the kind names no tempo, is played at this style's
+  // usual tempo, as the app plays it and as the band's takes are: disco's chart in six at 116
+  // is twice the top of neo-soul's range there.
+  ...otherCharts(style).map((chart, c) => {
+    const kind = inPulses(style, SOLOIST_KINDS[c % SOLOIST_KINDS.length]!, chart);
+    const usual = tempoRange(style, parse(chart.text).chart.meter).default;
+    return { style, chart, options: { tempo: usual, ...kind, seed: 1 + (c % 2) } };
+  }),
 ]);
 
 /**
