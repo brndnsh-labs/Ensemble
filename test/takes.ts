@@ -4,7 +4,7 @@
 
 import { readdirSync, readFileSync } from "node:fs";
 import type { NoteEvent, Seat, StylePack, Take, TakeOptions } from "@ensemble/engine";
-import { parse, render } from "@ensemble/engine";
+import { parse, render, tempoRange } from "@ensemble/engine";
 import { STYLES as SHIPPING, styleById } from "@ensemble/styles";
 
 /**
@@ -191,7 +191,7 @@ const TAKE_SPECS: readonly JamSpec[] = STYLES.flatMap((style) => [
     options: {
       ...KINDS[c % KINDS.length]!,
       seed: SEEDS[c % SEEDS.length]!,
-      tempo: style.tempo.default,
+      tempo: tempoRange(style, parse(chart.text).chart.meter).default,
     },
   })),
 ]);

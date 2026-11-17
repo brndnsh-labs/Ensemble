@@ -11,7 +11,13 @@ import { bluesSolo } from "./solo.ts";
 export const blues: StylePack = {
   id: "blues",
   name: "Blues",
-  tempo: { default: 100, min: 60, max: 150 },
+  // In twelve the same range, a shuffle being a bar of 12/8, but a slow blues goes under its floor.
+  tempo: {
+    default: 100,
+    min: 60,
+    max: 150,
+    meters: { "12/8": { default: 60, min: 40, max: 150 } },
+  },
   feel: {
     // Tuned by ear in the previous band: 90 was not enough, 100 is a hard triplet.
     swing: { unit: "eighth", amount: 100 },

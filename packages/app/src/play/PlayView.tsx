@@ -12,6 +12,7 @@ import {
   plan as planOf,
   SOLO_INSTRUMENTS,
   seatChoice,
+  tempoRange,
 } from "@ensemble/engine";
 import { STYLES, styleById } from "@ensemble/styles";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -291,8 +292,10 @@ export function PlayView(props: Props) {
   // The tempo without one set: what "back" goes to.
   const unset = tempoFor(entry.chart, style, undefined);
   const written = entry.chart.tempo;
-  const usual = unset ?? written ?? style.tempo.default;
-  const inLimits = (bpm: number) => Math.min(style.tempo.max, Math.max(style.tempo.min, bpm));
+  // The style's limits in the chart's meter: a slow blues in twelve goes under the shuffle's floor.
+  const range = tempoRange(style, entry.chart.meter);
+  const usual = unset ?? written ?? range.default;
+  const inLimits = (bpm: number) => Math.min(range.max, Math.max(range.min, bpm));
 
   const writtenKey = entry.chart.key;
   const keyShown = keyToString(chart.key);
@@ -309,10 +312,15 @@ export function PlayView(props: Props) {
       <b className="part">{shown}</b>
     );
 
+  // A chart counted in anything but four says so: it is what the tempo counts.
+  const { beats, unit } = entry.chart.meter;
+  const meterShown = beats === 4 && unit === 4 ? "" : `${beats}/${unit}`;
+
   const sentence = (
     <p className={`sentence${idle ? "" : " told"}`}>
-      {part("style", "Style", style.name)} in {part("key", "Key", keyShown)} at{" "}
-      {part("tempo", "Tempo", `${shownTempo} bpm`)}, {part("length", "Length", length)}
+      {part("style", "Style", style.name)} in {part("key", "Key", keyShown)}
+      {meterShown && `, ${meterShown},`} at {part("tempo", "Tempo", `${shownTempo} bpm`)},{" "}
+      {part("length", "Length", length)}
       {!idle && <span className="vh"> (changed when the band is stopped)</span>}
     </p>
   );
@@ -612,7 +620,7 @@ export function PlayView(props: Props) {
             type="button"
             className="step"
             aria-label={`Slower by ${TEMPO_STEP}`}
-            disabled={shownTempo <= style.tempo.min}
+            disabled={shownTempo <= range.min}
             onClick={() => choose({ tempo: inLimits(shownTempo - TEMPO_STEP) })}
           >
             −
@@ -625,7 +633,7 @@ export function PlayView(props: Props) {
             type="button"
             className="step"
             aria-label={`Faster by ${TEMPO_STEP}`}
-            disabled={shownTempo >= style.tempo.max}
+            disabled={shownTempo >= range.max}
             onClick={() => choose({ tempo: inLimits(shownTempo + TEMPO_STEP) })}
           >
             +
@@ -634,15 +642,15 @@ export function PlayView(props: Props) {
         <input
           className="tempo-range"
           type="range"
-          min={style.tempo.min}
-          max={style.tempo.max}
+          min={range.min}
+          max={range.max}
           step={1}
           value={shownTempo}
-          aria-label={`Tempo, ${style.tempo.min} to ${style.tempo.max} bpm`}
+          aria-label={`Tempo, ${range.min} to ${range.max} bpm`}
           onChange={(e) => choose({ tempo: inLimits(Number(e.target.value)) })}
         />
         <div className="tempo-ends">
-          <span>{style.tempo.min}</span>
+          <span>{range.min}</span>
           {choices.tempo !== undefined && inLimits(choices.tempo) !== Math.round(usual) ? (
             <button
               type="button"
@@ -672,7 +680,7 @@ export function PlayView(props: Props) {
           ) : (
             <span />
           )}
-          <span>{style.tempo.max}</span>
+          <span>{range.max}</span>
         </div>
       </Sheet>
 

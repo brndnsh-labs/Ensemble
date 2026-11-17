@@ -6,6 +6,7 @@ import { validateChordStyle } from "../players/chords/validate.ts";
 import { validateDrumStyle } from "../players/drums/validate.ts";
 import { validateSoloStyle } from "../players/solo/validate.ts";
 import { BASE_QUALITIES } from "../theory/chord.ts";
+import { readMeter } from "./meters.ts";
 import type { StylePack } from "./types.ts";
 
 /** Problems in plain words. An empty list means the pack is sound. */
@@ -24,6 +25,14 @@ export function validateStyle(style: StylePack): string[] {
     tempo.min <= tempo.default && tempo.default <= tempo.max && tempo.min > 0,
     "tempo: the default must lie between a positive min and the max",
   );
+  for (const [name, range] of Object.entries(tempo.meters ?? {})) {
+    check(readMeter(name) !== null, `tempo: "${name}" is not a meter a chart can write`);
+    if (!range) continue;
+    check(
+      range.min <= range.default && range.default <= range.max && range.min > 0,
+      `tempo in ${name}: the default must lie between a positive min and the max`,
+    );
+  }
   check(feel.swing.amount >= 0 && feel.swing.amount <= 100, "feel: swing amount is 0 to 100");
   check(feel.humanize >= 0 && feel.humanize <= 100, "feel: humanize is 0 to 100");
   for (const [seat, ms] of Object.entries(feel.lean)) {

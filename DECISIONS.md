@@ -1757,3 +1757,11 @@ A Fable design and build from `prompts/meters-design.md`. On the main thread: th
 - **Nobody has heard it.** The page for his ear is `out/meter-study-2/`.
 - **Open, from the build**: the blues' floor of 60 shuts out the slowest slow blues, and lowering it moves 4/4 too; a chart in twelve borrowed by another style goes at that style's usual figure in dotted quarters (a tempo range per meter would answer both); nothing on the chart's screen says a chart is in 12/8 or 6/4; a new chart's meter is set only in the Text side; the alto on `jazz-waltz-f` at 60, seed 5, plays 8.96 s on one breath (older than this work); a bar of 2/2 is comped as a pad.
 - **Next from the design, for Opus**: acoustic in 6/8 and rock in 12/8 (`meters["6/8"]`, `meters["12/8"]` on the style's seats; a line in `WRITTEN` in `test/takes.ts`; the worked example is `bluesDrums.meters["12/8"]`).
+
+## six and twelve heard; a style's tempo range in a meter; the chart's screen says its meter (stage 6)
+
+Brandon, 2026-11-16, after `out/meter-study-2/`: "done listening - great job so far". Jazz in six and the blues in twelve stand.
+
+- **A style may say its tempo range again for a meter** (`StylePack.tempo.meters`, read by `tempoRange(style, meter)`). The blues in 12/8 is 40 to 150, usually 60: a slow blues goes under the shuffle's floor without the floor moving in 4/4. **Where the pulse is a dotted quarter and a style has said nothing, its range is two thirds of its own**, which keeps the eighth notes at the speed of its 4/4 (rock's 120 is 80 in 12/8), so a chart in twelve borrowed by another style is no longer half as fast again. The engine's default, the app's tempo sheet and its limits, the lists' figures and the tests' borrowed tempo all read it. Nothing in 4/4, 3/4 or 6/4 moves: goldens and scorecards unchanged.
+- **The setup sentence says the meter where it is not 4/4** ("Blues in G, 12/8, at 60 bpm, about 3 min"): it is what the tempo counts. Not pressed; the meter is the chart's text.
+- **Next**: acoustic in 6/8 and rock in 12/8, two Opus builds side by side from the design.

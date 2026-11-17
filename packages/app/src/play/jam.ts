@@ -23,6 +23,7 @@ import {
   render,
   seatChoice,
   secondsAt,
+  tempoRange,
   timedNotes,
   transpose,
 } from "@ensemble/engine";
@@ -101,12 +102,12 @@ export function tempoFor(
   style: StylePack,
   chosen: number | undefined,
 ): number | null {
-  const { min, max } = style.tempo;
+  const { min, max, default: usual } = tempoRange(style, chart.meter);
   if (chosen !== undefined) return Math.min(max, Math.max(min, chosen));
   // A style this version does not have is no style: the chart is played as written.
   const written = styleById(chart.styleId ?? "");
   if (!written || written.id === style.id) return null;
-  return style.tempo.default;
+  return usual;
 }
 
 /** The take a call becomes when play is pressed: everything that decides what is heard. */

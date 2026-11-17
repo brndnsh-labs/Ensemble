@@ -2,7 +2,7 @@
 // button playing it in one tap. The button is printed in the ink of the
 // chart's style, which is the mark every chart carries wherever it is listed.
 
-import { keyToString, seconds } from "@ensemble/engine";
+import { keyToString, seconds, tempoRange } from "@ensemble/engine";
 import { STYLES, styleById } from "@ensemble/styles";
 import type { ReactNode } from "react";
 import { useState } from "react";
@@ -40,7 +40,7 @@ export const PLAY = (
 /** A chart as it is written. `withStyle` where the list does not already say the style. */
 export function chartRow(entry: LibraryChart, withStyle: boolean): Row {
   const style = writtenFor(entry);
-  const tempo = entry.chart.tempo ?? style?.tempo.default;
+  const tempo = entry.chart.tempo ?? (style && tempoRange(style, entry.chart.meter).default);
   const key = keyToString(entry.chart.key);
   return {
     address: `#/chart/${entry.id}`,
@@ -58,7 +58,9 @@ export function playedRow(entry: LibraryChart, choices: ChartChoices | undefined
   const style = styleById(choices?.style ?? entry.chart.styleId ?? "") ?? STYLES[0]!;
   // The tempo the chart's own screen shows, and its Play starts.
   const tempo =
-    tempoFor(entry.chart, style, choices?.tempo) ?? entry.chart.tempo ?? style.tempo.default;
+    tempoFor(entry.chart, style, choices?.tempo) ??
+    entry.chart.tempo ??
+    tempoRange(style, entry.chart.meter).default;
   const key = choices?.key ?? keyToString(entry.chart.key);
   return {
     address: `#/chart/${entry.id}`,

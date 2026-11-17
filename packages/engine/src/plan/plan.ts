@@ -14,6 +14,7 @@ import type {
 } from "../chart/types.ts";
 import { PPQ } from "../chart/types.ts";
 import { tempoPulse } from "../perform/meter.ts";
+import { tempoRange } from "../style/meters.ts";
 import type { Seat, StylePack } from "../style/types.ts";
 import { LEVEL_ENERGY, SEATS, TIER_HIGH, TIER_MID, tierOf } from "../style/types.ts";
 import { chordFamily, chordToString, makeQuality } from "../theory/chord.ts";
@@ -46,7 +47,7 @@ export function planBars(
   style: StylePack,
   options: PlanOptions,
 ): Plan {
-  const tempo = clampTempo(options.tempo ?? chartTempo ?? style.tempo.default);
+  const tempo = clampTempo(options.tempo ?? chartTempo ?? tempoRange(style, meter).default);
   // A tick is a fraction of a quarter note, so time is kept in quarter notes a minute.
   const quarters = tempo * tempoPulse(meter);
   // The jam as it set out: how many passes, or none in particular. The arc and the solos are

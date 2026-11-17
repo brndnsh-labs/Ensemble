@@ -62,6 +62,7 @@ export type { Slot } from "./players/solo/slots.ts";
 export type * from "./players/solo/style.ts";
 export { validateSoloStyle } from "./players/solo/validate.ts";
 export * from "./rng.ts";
+export * from "./style/meters.ts";
 export * from "./style/types.ts";
 export * from "./style/validate.ts";
 export * from "./take.ts";

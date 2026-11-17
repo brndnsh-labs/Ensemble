@@ -2,6 +2,7 @@
 // here, so a pack could be JSON. Adding or tuning a style changes data only.
 
 import type { CriticStyle } from "../critic/types.ts";
+import type { MeterName } from "../perform/meter.ts";
 import type { BassStyle } from "../players/bass/style.ts";
 import type { ChordStyle } from "../players/chords/style.ts";
 import type { DrumStyle } from "../players/drums/style.ts";
@@ -141,10 +142,23 @@ export interface EndingStyle {
   readonly tailBars: number;
 }
 
+export interface TempoRange {
+  readonly default: number;
+  readonly min: number;
+  readonly max: number;
+}
+
 export interface StylePack {
   readonly id: string;
   readonly name: string;
-  readonly tempo: { readonly default: number; readonly min: number; readonly max: number };
+  /**
+   * The style's usual tempo and its limits, in pulses a minute. `meters` says them again for a
+   * meter where the style is played at other speeds (a slow blues in 12/8 goes under the
+   * shuffle's floor); a meter not named is read by `tempoRange`.
+   */
+  readonly tempo: TempoRange & {
+    readonly meters?: Readonly<Partial<Record<MeterName, TempoRange>>>;
+  };
   readonly feel: FeelStyle;
   readonly arc: ArcStyle;
   readonly ending: EndingStyle;
