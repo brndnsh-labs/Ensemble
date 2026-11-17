@@ -132,24 +132,34 @@ const workingInSixes = (riff: string) =>
 /** Quiet, the roots alone (BA-39, X-A-08). */
 const quietInSixes = (riff: string) => thinnedInSixes(riff, (symbol) => symbol === "R");
 
-/** Four's turns said in pulses: the fifth and the seventh into the One; the octaves for two pulses. */
-const PICKUP_IN_PULSES: Figure = { name: "pickup", weight: 2, grid: "..5.7.", under: true };
+/** Four's turns said in pulses: the fifth and the seventh into the One, under the root; the octaves for two pulses. */
+const PICKUP_IN_TWELVE: Figure = { name: "pickup", weight: 2, grid: "..5.7.", under: true };
 const OCTAVES_IN_TWELVE: Figure = { name: "octaves", weight: 1, grid: "R...8. R...8." };
-/** In six, two pulses are the whole bar: the octaves are one pulse's. */
+/**
+ * In six a turn of a pulse is half the bar, and comes straight after the riff's first pulse,
+ * which may end on its pop: the pickup's fifth is taken over the root, where under it the line
+ * would fall more than an octave from the pop. Two pulses are the whole bar: the octaves are
+ * one pulse's.
+ */
+const PICKUP_IN_SIX: Figure = { name: "pickup", weight: 2, grid: "..5.7." };
 const OCTAVES_IN_SIX: Figure = { name: "octaves", weight: 1, grid: "R...8." };
 
-function compoundLines(list: readonly string[], octaves: Figure): BassStyle["lines"] {
+function compoundLines(
+  list: readonly string[],
+  pickup: Figure,
+  octaves: Figure,
+): BassStyle["lines"] {
   return {
     low: { ...touch, figures: compoundRiffs(list, quietInSixes) },
     mid: {
       ...touch,
       figures: compoundRiffs(list, workingInSixes),
-      turns: { offer: 0.2, hold: "section", options: [PICKUP_IN_PULSES] },
+      turns: { offer: 0.2, hold: "section", options: [pickup] },
     },
     high: {
       ...touch,
       figures: compoundRiffs(list, (riff) => riff),
-      turns: { offer: 0.2, hold: "section", options: [PICKUP_IN_PULSES, octaves] },
+      turns: { offer: 0.2, hold: "section", options: [pickup, octaves] },
     },
   };
 }
@@ -157,8 +167,8 @@ function compoundLines(list: readonly string[], octaves: Figure): BassStyle["lin
 export const funkBass: BassStyle = {
   // The same bassist in twelve-eight and six-eight, written above.
   meters: {
-    "12/8": compoundLines(RIFFS_IN_TWELVE, OCTAVES_IN_TWELVE),
-    "6/8": compoundLines(RIFFS_IN_SIX, OCTAVES_IN_SIX),
+    "12/8": compoundLines(RIFFS_IN_TWELVE, PICKUP_IN_TWELVE, OCTAVES_IN_TWELVE),
+    "6/8": compoundLines(RIFFS_IN_SIX, PICKUP_IN_SIX, OCTAVES_IN_SIX),
   },
 
   // Every root has one place, from F1 up to E2, so a riff keeps its octave from bar to bar

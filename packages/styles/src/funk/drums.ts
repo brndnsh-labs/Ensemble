@@ -164,8 +164,8 @@ const TWELVE_BACKBEAT = { snare: "...... X..... ...... X....." };
 const TWELVE_KICKS = [
   // The One, the "and" of 2 into 3, the middle of 3.
   { lines: { kick: "x..... ....x. ..x... ......" }, weights: [3, 3, 2] },
-  // The One and its middle, 3 and its "and" into the backbeat.
-  { lines: { kick: "x.x... ...... x...x. ......" }, weights: [1, 3, 3] },
+  // The One and its middle, and the "and" of 3 into the backbeat.
+  { lines: { kick: "x.x... ...... ....x. ......" }, weights: [1, 3, 3] },
   // The One and the pushes into 3 and into 4.
   { lines: { kick: "x..... ....x. ....x. ......" }, weights: [3, 2, 1] },
   // The One and its "and", and the middle of 4, straight after the backbeat.
