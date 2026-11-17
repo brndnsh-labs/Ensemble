@@ -8,7 +8,7 @@
 // Reading the rhythms: sixteen sixteenths to the bar, grouped by beat. `x`
 // strikes a note, `-` holds it, `.` is silence.
 
-import type { SoloStyle, Way } from "@ensemble/engine";
+import type { Density, SoloStyle, SoloTime, Way } from "@ensemble/engine";
 
 const NEW: Way = { name: "statement", make: "new", oneRhythm: false };
 const NEW_RIFFED: Way = { name: "statement", make: "new", oneRhythm: true };
@@ -32,7 +32,132 @@ const ELSE = {
   lift: 2,
 } satisfies Way;
 
+// ST-reggae-25's cells: phrases start after the One and rest on the drop.
+const reggaeLevels: Density[] = [
+  {
+    name: "sparse",
+    notesPerBar: 1.8,
+    span: 7,
+    cells: [
+      "..x- x--- ---- ....",
+      ".... x--- x--- ----",
+      ".... ..x- x-x- ----",
+      "..x- --.. x--- ----",
+    ],
+    shapes: [
+      { weight: 4.3, bars: "L E R R" },
+      { weight: 4.3, bars: "R L E R" },
+      { weight: 3.6, bars: "E R L E" },
+      { weight: 2.4, bars: "L L E R" },
+    ],
+  },
+  {
+    name: "medium",
+    notesPerBar: 3.2,
+    span: 9,
+    cells: [
+      "..x- x-x- x--- ----",
+      "x--- ..x- x--- x---",
+      "..x- x-.. x-x- x---",
+      ".... x-x- x--- ..x-",
+    ],
+    shapes: [
+      { weight: 6, bars: "L L E R" },
+      { weight: 3.6, bars: "E R L E" },
+      { weight: 2, bars: "L E L E" },
+    ],
+  },
+  {
+    name: "busy",
+    notesPerBar: 5,
+    span: 10,
+    cells: [
+      "..x- x-x- x-x- x---",
+      "x-x- ..x- x-x- x-x-",
+      "..xx x-x- x--- x-x-",
+      ".... x-xx x-x- x---",
+    ],
+    shapes: [
+      { weight: 4, bars: "L L L E" },
+      { weight: 4.8, bars: "L L E R" },
+      { weight: 2, bars: "L E L E" },
+    ],
+  },
+];
+
+// ── in twelve and in six ────────────────────────────────────────────────────
+// Reading the rhythms: a pulse to a group of six sixteenths; a note starts only
+// on a pulse's three eighths. Twelve is the shuffle, and its cells are
+// ST-reggae-25's said in pulses (a beat a pulse; an "e" its middle eighth; an
+// "and" its last, or its middle where the "a" is struck too): phrases that start
+// after the One and come to rest on the drop on the third pulse. Its levels'
+// notes a bar and shapes are four's, since a bar of twelve lasts as long as
+// four's at the same count; its endings are four's said in pulses with the last
+// pulse left unstruck, as every meter's must be.
+//
+// Six is a bar of two, the drop on its second pulse, and its cells are written
+// for it: in on the One's later eighths, landing on the drop, half four's notes
+// a bar since the bar is half as long. None enters later than the One's last
+// eighth, so that a first phrase's two bars of air, with its ending's tail and
+// the next entry, stay under three bars of six. An ending lands in the first
+// pulse and is held into the second.
+
+/** Four's levels, with a compound bar's cells and notes a bar. */
+const levelsIn = (cells: readonly (readonly string[])[], notes: readonly number[]): Density[] =>
+  reggaeLevels.map((level, i) => ({ ...level, notesPerBar: notes[i]!, cells: cells[i]! }));
+
+const reggaeSoloInTwelve = (): SoloTime => ({
+  levels: levelsIn(
+    [
+      [
+        "....x- x----- ------ ......",
+        "...... x----- x----- ------",
+        "...... ....x- x---x- ------",
+        "....x- --.... x----- ------",
+      ],
+      [
+        "....x- x---x- x----- ------",
+        "x----- ....x- x----- x-----",
+        "....x- x-.... x---x- x-----",
+        "...... x---x- x----- ....x-",
+      ],
+      [
+        "....x- x---x- x---x- x-----",
+        "x---x- ....x- x---x- x---x-",
+        "..x-x- x---x- x----- x---x-",
+        "...... x-x-x- x---x- x-----",
+      ],
+    ],
+    [1.8, 3.2, 5],
+  ),
+  endings: [
+    "....x- x----- ------ ......",
+    "...... x----- ------ ......",
+    "....x- x---x- ------ ......",
+  ],
+  pickups: [],
+  peak: "....x- ------ ...... ......",
+});
+
+const reggaeSoloInSix = (): SoloTime => ({
+  levels: levelsIn(
+    [
+      ["....x- x-----", "..x--- x-----", "....x- x---x-", "..x-x- ------"],
+      ["..x-x- x-----", "....x- x---x-", "x----- ..x-x-", "..x--- x---x-"],
+      ["..x-x- x---x-", "x---x- x-x-x-", "....x- x-x-x-", "..x-x- ..x-x-"],
+    ],
+    [0.9, 1.6, 2.5],
+  ),
+  // In a bar of two the long note lands in the first pulse and is held into the second.
+  endings: ["....x- ----..", "x----- ----..", "..x-x- ----.."],
+  pickups: [],
+  peak: "..x--- ----..",
+});
+
 export const reggaeSolo: SoloStyle = {
+  // The shuffle in twelve and the bar of two in six, written above.
+  meters: { "12/8": reggaeSoloInTwelve(), "6/8": reggaeSoloInSix() },
+
   instrument: "alto-sax",
   // Home a major third over the instrument's own (ST-reggae-27).
   lift: 4,
@@ -66,58 +191,7 @@ export const reggaeSolo: SoloStyle = {
     strandsTheBeat: 0,
   },
 
-  // ST-reggae-25's cells: phrases start after the One and rest on the drop.
-  levels: [
-    {
-      name: "sparse",
-      notesPerBar: 1.8,
-      span: 7,
-      cells: [
-        "..x- x--- ---- ....",
-        ".... x--- x--- ----",
-        ".... ..x- x-x- ----",
-        "..x- --.. x--- ----",
-      ],
-      shapes: [
-        { weight: 4.3, bars: "L E R R" },
-        { weight: 4.3, bars: "R L E R" },
-        { weight: 3.6, bars: "E R L E" },
-        { weight: 2.4, bars: "L L E R" },
-      ],
-    },
-    {
-      name: "medium",
-      notesPerBar: 3.2,
-      span: 9,
-      cells: [
-        "..x- x-x- x--- ----",
-        "x--- ..x- x--- x---",
-        "..x- x-.. x-x- x---",
-        ".... x-x- x--- ..x-",
-      ],
-      shapes: [
-        { weight: 6, bars: "L L E R" },
-        { weight: 3.6, bars: "E R L E" },
-        { weight: 2, bars: "L E L E" },
-      ],
-    },
-    {
-      name: "busy",
-      notesPerBar: 5,
-      span: 10,
-      cells: [
-        "..x- x-x- x-x- x---",
-        "x-x- ..x- x-x- x-x-",
-        "..xx x-x- x--- x-x-",
-        ".... x-xx x-x- x---",
-      ],
-      shapes: [
-        { weight: 4, bars: "L L L E" },
-        { weight: 4.8, bars: "L L E R" },
-        { weight: 2, bars: "L E L E" },
-      ],
-    },
-  ],
+  levels: reggaeLevels,
   // ST-reggae-25's phrase endings, but the last (`......x-x-------`): its last note is struck on
   // beat 3, and in a bar of three at a fast tempo the engine cannot cut it short enough to
   // leave the style's breath before a phrase that opens on the next One.
