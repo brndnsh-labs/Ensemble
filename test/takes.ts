@@ -167,8 +167,13 @@ const otherCharts = (style: StylePack): LibraryChart[] => {
 };
 
 const TAKE_SPECS: readonly JamSpec[] = STYLES.flatMap((style) => [
+  // A style's own charts: every kind of take on every seed. On a push, one in a meter other
+  // than 4/4 is played on the first seed only (the full run plays it on all six): six styles
+  // write two more meters each, and their charts had taken the push suite over its time.
   ...ownCharts(style).flatMap((chart) =>
-    SEEDS.flatMap((seed) => KINDS.map((kind) => ({ style, chart, options: { ...kind, seed } }))),
+    (FULL || chart.meter === "4/4" ? SEEDS : SEEDS.slice(0, 1)).flatMap((seed) =>
+      KINDS.map((kind) => ({ style, chart, options: { ...kind, seed } })),
+    ),
   ),
   ...standardsOf(style).flatMap((chart, c) =>
     FULL
@@ -211,7 +216,9 @@ const HELD_SEEDS: readonly number[] = FULL ? [1, 2] : [1];
  * the meter (the others it is handed in the library's takes).
  */
 export function heldTakes(style: StylePack, meter: string, solo = false, own = false): Jam[] {
-  const charts = own ? ownCharts(style) : LIBRARY;
+  // On a push only the style's own charts in the meter are held (the rest of the library's
+  // charts in it are among the takes it is handed anyway); the full run holds every one.
+  const charts = own || !FULL ? [...ownCharts(style), ...standardsOf(style)] : LIBRARY;
   return charts
     .filter((chart) => chart.meter === meter)
     .flatMap((chart) => {
