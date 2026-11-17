@@ -472,14 +472,16 @@ const sixesOnce = () => {
   sixesMade ??= sixes();
   return sixesMade;
 };
-// Floors for the bars of six, written for the full run and scaled to its seeds.
-const COMPOUND_STRUMS = 1500;
-/** Not scaled: the bars held quiet with no bassist are rendered on two seeds on every run. */
+// Floors for the bars of six. The strums are counted over the library's takes, written for the
+// full run and scaled to its seeds (6,500 on the full run); the rest are mostly the charts held
+// at a level, rendered on two seeds on every run, and are not scaled (the full run sees 62 bars
+// picked alone, 457 chords picked, 290 bars picked and 124 of them quiet, 1,374 strummed).
+const COMPOUND_STRUMS = 4000;
 const ALONE_IN_SIX = 40;
-const PICKED_IN_SIX = 100;
-const PICKED_BARS_IN_SIX = 100;
-const QUIET_IN_SIX = 100;
-const STRUMMED_BARS_IN_SIX = 100;
+const PICKED_IN_SIX = 300;
+const PICKED_BARS_IN_SIX = 200;
+const QUIET_IN_SIX = 80;
+const STRUMMED_BARS_IN_SIX = 300;
 
 /** Standard tuning, low string first. */
 const OPEN = [40, 45, 50, 55, 59, 64];
@@ -853,6 +855,10 @@ function barsOfSix() {
           bar,
           plucks: inBar(plucked),
           strums: inBar(strums),
+          // The chord leant into on the eighth before the barline, still ringing in this bar.
+          pushed: strums.some(
+            (strum) => strum.tick === bar.start - PPQ / 2 && strum.ends > bar.start + POCKET,
+          ),
           velocities: new Map(
             [...Map.groupBy(inBar(notesOf(take, "chords")), (note) => note.tick)].map(
               ([tick, notes]) => [
@@ -909,20 +915,25 @@ test("a guitar picks a bar of six as six-eight is picked: quiet it always picks,
   );
 });
 
-test("a guitar strums a bar of six as a pendulum in eighths: it strikes both pulses and at least one eighth between them, every stroke between is lighter than the pulse it follows, so the six eighths are never all hammered", {
+test("a guitar strums a bar of six as a pendulum in eighths: it strikes both pulses (the first may be the chord leant into on the eighth before, still ringing) and at least one eighth between them, and every stroke between is lighter than the pulse it follows, so the six eighths are never all hammered", {
   skip: guitarsInSix.length === 0,
 }, () => {
   let bars = 0;
-  for (const { where, bar, plucks, strums, velocities } of barsOfSix()) {
+  let leant = 0;
+  for (const { where, bar, plucks, strums, velocities, pushed } of barsOfSix()) {
     if (strums.length === 0 || plucks.length > 0) continue;
     bars++;
     const ticks = strums.map((strum) => strum.tick - bar.start);
-    for (const pulse of [0, PULSE])
-      assert.ok(ticks.includes(pulse), `${where}: no strum at ${pulse}`);
+    if (!ticks.includes(0)) {
+      assert.ok(pushed, `${where}: no strum on the first pulse`);
+      leant++;
+    }
+    assert.ok(ticks.includes(PULSE), `${where}: no strum on the second pulse`);
     const between = ticks.filter((tick) => tick !== 0 && tick !== PULSE);
     assert.ok(between.length > 0, `${where}: only the two pulses strummed`);
     for (const tick of between) {
       const pulse = tick < PULSE ? 0 : PULSE;
+      if (!ticks.includes(pulse)) continue;
       const on = velocities.get(bar.start + pulse)!;
       const off = velocities.get(bar.start + tick)!;
       assert.ok(
@@ -931,5 +942,8 @@ test("a guitar strums a bar of six as a pendulum in eighths: it strikes both pul
       );
     }
   }
-  assert.ok(bars > STRUMMED_BARS_IN_SIX, `only ${bars} bars of six strummed`);
+  assert.ok(
+    bars > STRUMMED_BARS_IN_SIX && leant > 50,
+    `only ${bars} bars of six strummed, ${leant} leant into`,
+  );
 });

@@ -1,0 +1,17 @@
+title: Folk Song in Six
+key: Em
+tempo: 66
+meter: 6/8
+style: acoustic
+
+// Two slow pulses to the bar, three eighths in each. The verse stays in the
+// minor and turns home through the five, with two chords a pulse each in its
+// seventh bar; the chorus opens on the relative major and walks down to the
+// four through the five over its third.
+[Verse]
+| Em | C | G     | D  |
+| Em | C | Am B7 | Em |
+
+[Chorus]
+| G | D | Em | C  |
+| G | D/F# | C B7 | Em |

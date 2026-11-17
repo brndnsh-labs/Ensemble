@@ -676,7 +676,7 @@ test(
       }
     }
     if (LIBRARY.some((chart) => chart.meter === "6/8"))
-      assert.ok(notes > enough(20000), `only ${notes} notes in six`);
+      assert.ok(notes > enough(30000), `only ${notes} notes in six`);
   },
 );
 

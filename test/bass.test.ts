@@ -416,7 +416,7 @@ test(
 );
 
 test(
-  "acoustic: in six the upright is in two: every note on an eighth and no more than four in a bar; the chord's bass note on the first pulse; when the band is quiet nothing else but a chord arriving, and from the working level the second pulse is always played, as the chord's fifth or its bass note, or a step into the next bass note",
+  "acoustic: in six the upright is in two: every note on an eighth and no more than four in a bar; the chord's bass note on the first pulse; when the band is quiet nothing else but a chord arriving (or, where the root lies a seventh over the next one, the step down into it on the second pulse), and from the working level the second pulse is always played, as the chord's fifth or its bass note, or a step into the next bass note",
   only("acoustic"),
   () => {
     const counted = { low: 0, mid: 0, high: 0 };
@@ -427,10 +427,12 @@ test(
         ({ chart, options, take }) => ({ where: `${chart.file} seed ${options.seed}`, take }),
       ),
       ...sixes.flatMap((chart) =>
-        [0.3, 0.55, 0.85].map((energy) => ({
-          where: `${chart.file} held at ${energy}`,
-          take: render(chart.text, acoustic, { mode: "jam", passes: 2, energy, seed: 3 }),
-        })),
+        [0.3, 0.55, 0.85].flatMap((energy) =>
+          [1, 3].map((seed) => ({
+            where: `${chart.file} at ${energy} seed ${seed}`,
+            take: render(chart.text, acoustic, { mode: "jam", passes: 2, energy, seed }),
+          })),
+        ),
       ),
     ];
     const PULSE = PPQ * 1.5;
@@ -457,11 +459,19 @@ test(
         const first = own.find((note) => note.tick === bar.start);
         assert.ok(first, `${where}: nothing on the first pulse`);
         assert.equal(first.pitch % 12, bassOf(sounding(bar.start)), `${where}: the One`);
+        const next = harmony.find((arrival) => arrival.tick >= end && arrival.chord);
+        const into = next?.chord ? bassOf(next.chord) : -1;
+        const stepsInto = (pitch: number) =>
+          into >= 0 && [1, 2, 10, 11].includes(((pitch % 12) - into + 12) % 12);
         const tier = tierOf(bar.seats.bass);
         counted[tier]++;
         if (tier === "low") {
-          for (const tick of ticks) {
-            assert.ok(tick === 0 || landings.includes(tick), `${where}: quiet, a note at ${tick}`);
+          for (const note of own) {
+            const tick = note.tick - bar.start;
+            assert.ok(
+              tick === 0 || landings.includes(tick) || (tick === PULSE && stepsInto(note.pitch)),
+              `${where}: quiet, a note at ${tick}`,
+            );
           }
           continue;
         }
@@ -469,9 +479,7 @@ test(
         assert.ok(second, `${where}: nothing on the second pulse at the ${tier} level`);
         const chord = sounding(second.tick);
         const pc = second.pitch % 12;
-        const next = harmony.find((arrival) => arrival.tick >= end && arrival.chord);
-        const into = next?.chord ? bassOf(next.chord) : -1;
-        const step = into >= 0 && [1, 2, 10, 11].includes((pc - into + 12) % 12);
+        const step = stepsInto(second.pitch);
         assert.ok(
           pc === (pitchClass(chord.root) + 7) % 12 || pc === bassOf(chord) || step,
           `${where}: ${second.pitch} on the second pulse over ${chord.text}`,
@@ -480,7 +488,7 @@ test(
     }
     if (sixes.length > 0)
       assert.ok(
-        counted.low > enough(40) && counted.mid > enough(100) && counted.high > enough(40),
+        counted.low > 40 && counted.mid > enough(450) && counted.high > enough(450),
         `only ${counted.low} quiet bars, ${counted.mid} working, ${counted.high} hot`,
       );
   },
