@@ -14,7 +14,19 @@ export const disco: StylePack = {
   id: "disco",
   name: "Disco",
   // ST-disco-01: 120, the only number the old band attached to it.
-  tempo: { default: 120, min: 100, max: 136 },
+  // In six and twelve the figure counts the dotted quarter, and disco's pulse is the floor's:
+  // the kick on every pulse at the dancer's speed, as in four, not two thirds of it. Its eighths
+  // are then a triplet at half as fast again as four's (six a second at 120 against four's
+  // sixteenths at eight), and the pump, the bark and the chop come as often as they do in four.
+  tempo: {
+    default: 120,
+    min: 100,
+    max: 136,
+    meters: {
+      "12/8": { default: 120, min: 100, max: 136 },
+      "6/8": { default: 120, min: 100, max: 136 },
+    },
+  },
   feel: {
     // Straight sixteenths, machine-tight. The bass a hair ahead, pulling the floor forward; the
     // guitar on the grid, since its chops double the open hat and any lag flams; the lead
