@@ -14,7 +14,15 @@ import { notePlayed } from "../recent.ts";
 import type { Place } from "../Trail.tsx";
 import { Trail } from "../Trail.tsx";
 import type { Heard, KeptTake } from "../takes.ts";
-import { dayOf, deleteTake, heardAs, renameTake, takesKeptOnDevice } from "../takes.ts";
+import {
+  dayOf,
+  deleteTake,
+  heardAs,
+  ownName,
+  renameTake,
+  takeName,
+  takesKeptOnDevice,
+} from "../takes.ts";
 import { midiOf } from "./band.ts";
 import type { Reading } from "./ChordSymbol.tsx";
 import type { Call } from "./jam.ts";
@@ -141,7 +149,8 @@ function TakeStage({
   );
 
   const [problem, setProblem] = useState<string>();
-  const [naming, setNaming] = useState(false);
+  /** The name being typed, while the take is being renamed: it starts as the take's own, empty if it has none. */
+  const [naming, setNaming] = useState<string>();
   const named = take.name.trim() || recipe.chartName;
   const exportMidi = () => {
     setProblem(undefined);
@@ -180,30 +189,33 @@ function TakeStage({
       more={(close) => (
         <>
           <li>
-            {naming ? (
+            {naming !== undefined ? (
               <label className="field menu-name">
                 <span>Name</span>
                 <input
                   type="text"
-                  value={take.name}
+                  value={naming}
+                  // With no name of its own, what it is called is said where one would be typed.
+                  placeholder={takeName(take)}
                   enterKeyHint="done"
                   // biome-ignore lint/a11y/noAutofocus: the box appears because Rename was pressed, to be typed in
                   autoFocus
-                  onChange={(e) => renameTake(take.id, e.target.value)}
+                  onChange={(e) => {
+                    setNaming(e.target.value);
+                    renameTake(take.id, e.target.value);
+                  }}
                   onKeyDown={(e) => {
                     if (e.key !== "Enter") return;
                     e.preventDefault();
-                    setNaming(false);
+                    setNaming(undefined);
                   }}
-                  onBlur={() => setNaming(false)}
+                  onBlur={() => setNaming(undefined)}
                 />
               </label>
             ) : (
-              <button type="button" className="menu-line" onClick={() => setNaming(true)}>
+              <button type="button" className="menu-line" onClick={() => setNaming(ownName(take))}>
                 <span>Rename</span>
-                <small>
-                  {take.name.trim() ? `Called “${take.name.trim()}”` : "It has its chart's name"}
-                </small>
+                <small>Called “{takeName(take)}”</small>
               </button>
             )}
           </li>

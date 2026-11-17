@@ -27,7 +27,7 @@ import { takeRow } from "../rows.tsx";
 import type { ChartChoices, Settings } from "../settings.ts";
 import { placeOf } from "../Trail.tsx";
 import type { KeptTake } from "../takes.ts";
-import { dayOf, followTake, keepTake } from "../takes.ts";
+import { followTake, keepTake, takeName } from "../takes.ts";
 import { midiOf } from "./band.ts";
 import type { Call, JamSetup } from "./jam.ts";
 import { chartOf, SEAT_ORDER, takeOptions, tempoFor } from "./jam.ts";
@@ -70,16 +70,6 @@ const TEMPO_STEP = 4;
 
 /** The seats whose instrument a style may offer a choice of. The soloist's has its own list. */
 const BAND_SEATS = ["drums", "bass", "chords"] as const;
-
-/** A kept take in a few words: its own name if it was given one, else when it was kept. */
-function takeName(take: KeptTake): string {
-  const named = take.name.trim();
-  if (named && named !== take.recipe.chartName) return named;
-  const kept = new Date(take.kept);
-  const today = kept.toDateString() === new Date().toDateString();
-  // The time of day for one kept today, since several may have been.
-  return `Kept take, ${today ? kept.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) : dayOf(take.kept)}`;
-}
 
 /** The twelve keys of a mode, as they are conventionally written, from C. */
 const keysOf = (mode: Key["mode"]): Key[] =>
