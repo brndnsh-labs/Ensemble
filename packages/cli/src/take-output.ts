@@ -27,7 +27,8 @@ export function playTake(
 ): void {
   const take = render(text, style, options);
   reportDiagnostics(chartName, take.diagnostics);
-  if (out !== undefined) writeFileSync(out, toMidi(take.plan, take.events, style));
+  if (out !== undefined)
+    writeFileSync(out, toMidi(take.plan, take.events, style, options.instruments));
   const notes = take.events.filter((event) => event.kind === "note").length;
   const length = Math.round(seconds(take.plan));
   console.log(

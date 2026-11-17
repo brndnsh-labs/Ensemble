@@ -8,7 +8,8 @@ import { CURVE_STEP, pitchCurve } from "../perform/pitch.ts";
 import type { Plan } from "../plan/types.ts";
 import { SOLO_INSTRUMENTS } from "../players/solo/instruments.ts";
 import type { Seat, StylePack } from "../style/types.ts";
-import { SEATS } from "../style/types.ts";
+import { SEATS, seatChoice } from "../style/types.ts";
+import type { TakeOptions } from "../take.ts";
 import type { SmfMeta, SmfNote, SmfTrack } from "./smf.ts";
 import { writeSmf } from "./smf.ts";
 
@@ -25,10 +26,27 @@ const BEND_STEP = 3;
 /** General MIDI puts drums on channel 10 (index 9). The pitched seats take the first channels. */
 const CHANNELS: Readonly<Record<Seat, number>> = { drums: 9, bass: 0, chords: 1, solo: 2 };
 
+/**
+ * The General MIDI program a band seat is played on: the style's own, or, where
+ * the player chose another of the style's instruments for it, that one's. An
+ * instrument is known by its pack, as the soloists' list names them.
+ */
+function programOf(
+  style: StylePack,
+  seat: Exclude<Seat, "drums" | "solo">,
+  instruments: TakeOptions["instruments"],
+): number {
+  const played = seatChoice(style, seat, instruments).pack;
+  if (played === style.sound.packs[seat]) return style.instruments[seat];
+  return SOLO_INSTRUMENTS[played]?.program ?? style.instruments[seat];
+}
+
+/** `instruments` is the take's own (`TakeOptions.instruments`): the file names what was heard. */
 export function toMidi(
   plan: Plan,
   events: readonly PerformanceEvent[],
   style: StylePack,
+  instruments?: TakeOptions["instruments"],
 ): Uint8Array {
   // A MIDI file's tempo is quarter notes a minute, whatever the pulse the figure counts.
   const conductor: SmfMeta[] = [{ tick: 0, type: "tempo", bpm: plan.quarters }];
@@ -101,7 +119,7 @@ export function toMidi(
     if (seat === "drums") tracks.push(track);
     // The soloist's notes name the instrument that played them.
     else if (seat === "solo") tracks.push({ ...track, program: soloProgram ?? 0 });
-    else tracks.push({ ...track, program: style.instruments[seat] });
+    else tracks.push({ ...track, program: programOf(style, seat, instruments) });
   }
   return writeSmf({ ppq: PPQ, conductor, tracks });
 }
