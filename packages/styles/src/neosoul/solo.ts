@@ -8,7 +8,7 @@
 // Reading the rhythms: sixteen sixteenths to the bar, grouped by beat. `x`
 // strikes a note, `-` holds it, `.` is silence.
 
-import type { SoloStyle, Way } from "@ensemble/engine";
+import type { SoloStyle, SoloTime, Way } from "@ensemble/engine";
 
 const NEW: Way = { name: "statement", make: "new", oneRhythm: false };
 const NEW_RIFFED: Way = { name: "statement", make: "new", oneRhythm: true };
@@ -30,7 +30,120 @@ const ELSE = {
   lift: 2,
 } satisfies Way;
 
+/** Each level's phrase shapes, the same in every meter. */
+const neosoulSparseShapes = [
+  { weight: 4.3, bars: "L E R R" },
+  { weight: 4.3, bars: "R L E R" },
+  { weight: 3.6, bars: "E R L E" },
+  { weight: 2.4, bars: "L L E R" },
+];
+const neosoulMediumShapes = [
+  { weight: 6, bars: "L L E R" },
+  { weight: 3.6, bars: "E R L E" },
+  { weight: 2, bars: "L E L E" },
+];
+const neosoulBusyShapes = [
+  { weight: 4, bars: "L L L E" },
+  { weight: 4.8, bars: "L L E R" },
+  { weight: 2, bars: "L E L E" },
+];
+
+// ── in twelve and in six ────────────────────────────────────────────────────
+// The same guitarist over the soul ballad. A bar of 12/8 is four slow pulses of
+// three eighths, written in sixes; a bar of 6/8 is two. Only the eighths are
+// struck. The late entries of four (on the "e"s and the "a"s) come in on the
+// triplet's middle eighth and on the pulse's last: twelve's rhythms are
+// ST-neosoul-31's said in pulses (a beat a pulse, its "e" the middle eighth, its
+// "and" and its "a" the last), so the levels, the shapes and the endings are
+// four's, and a sixteenth burst is the triplet. Six's are written for a bar of
+// two: a phrase cell leans into the backbeat or comes in late after it, and an
+// ending holds through the second pulse, which belongs to the next phrase.
+const rhythmsInTwelve: SoloTime = {
+  levels: [
+    {
+      name: "sparse",
+      notesPerBar: 1.8,
+      span: 7,
+      cells: [
+        "....x- --x--- ------ ......",
+        "....x- x---x- ------ --....",
+        "x---x- ------ --.... ......",
+        "...... ....x- x-x-x- ------",
+        "..x-x- ------ -----. ......",
+      ],
+      shapes: neosoulSparseShapes,
+    },
+    {
+      name: "medium",
+      notesPerBar: 3.4,
+      span: 9,
+      cells: [
+        "....x. ..x--- --x-x- ------",
+        "x---x- --x-x- x----- ------",
+        "....x- --x-x- x---x- --....",
+        "x---x- --x--- --..x- --x---",
+        "..x-x- --x--- x---x- ------",
+      ],
+      shapes: neosoulMediumShapes,
+    },
+    {
+      name: "busy",
+      notesPerBar: 5.5,
+      span: 12,
+      cells: [
+        "x---x. x---x- x-x-x- ------",
+        "....x. x-x-x- --x-x- x---x-",
+        "x-x-x- x---x- x---x- x-----",
+        "x---x- x-x-x- x---x- --x---",
+        "..x-x. ..x-x- --x-x. ..x---",
+      ],
+      shapes: neosoulBusyShapes,
+    },
+  ],
+  endings: [
+    "....x- x----- ------ ......",
+    "x---x- ------ ------ ......",
+    "....x- --x--- ------ ......",
+    "x----- ------ ------ ......",
+    "..x-x- --x--- ------ ......",
+  ],
+  pickups: [],
+  peak: "x----- ------ ...... ......",
+};
+
+const rhythmsInSix: SoloTime = {
+  levels: [
+    {
+      name: "sparse",
+      notesPerBar: 1.3,
+      span: 7,
+      cells: ["....x- --x---", "x---x- ------", "..x--- ------", "...... ..x-x-", "..x-x- ------"],
+      shapes: neosoulSparseShapes,
+    },
+    {
+      name: "medium",
+      notesPerBar: 2.3,
+      span: 9,
+      cells: ["..x-x- ..x---", "x---x- --x-x-", "....x- x-x---", "x---x- ..x---", "..x-x- x-----"],
+      shapes: neosoulMediumShapes,
+    },
+    {
+      name: "busy",
+      notesPerBar: 3.3,
+      span: 12,
+      cells: ["x-x-x- x-x-x-", "..x-x- x-x-x-", "x-x-x- ..x-x-", "x---x- x-x-x-", "..x-x- x---x-"],
+      shapes: neosoulBusyShapes,
+    },
+  ],
+  // Each lands in the first pulse and holds through the second.
+  endings: ["....x- ------", "x---x- ------", "..x--- ------", "x----- ------", "..x-x- ------"],
+  pickups: [],
+  peak: "x----- ------",
+};
+
 export const neosoulSolo: SoloStyle = {
+  // The soul ballad in twelve and in six, written above.
+  meters: { "12/8": rhythmsInTwelve, "6/8": rhythmsInSix },
   instrument: "clean-guitar",
   // Home a major third over the instrument's own, over the Rhodes (ST-neosoul-30).
   lift: 4,
@@ -77,12 +190,7 @@ export const neosoulSolo: SoloStyle = {
         ".... ..x- xx-x ----",
         ".x-x ---- ---. ....",
       ],
-      shapes: [
-        { weight: 4.3, bars: "L E R R" },
-        { weight: 4.3, bars: "R L E R" },
-        { weight: 3.6, bars: "E R L E" },
-        { weight: 2.4, bars: "L L E R" },
-      ],
+      shapes: neosoulSparseShapes,
     },
     {
       name: "medium",
@@ -95,11 +203,7 @@ export const neosoulSolo: SoloStyle = {
         "x-.x -x-- -..x -x--",
         ".x-x -x-- x-x- ----",
       ],
-      shapes: [
-        { weight: 6, bars: "L L E R" },
-        { weight: 3.6, bars: "E R L E" },
-        { weight: 2, bars: "L E L E" },
-      ],
+      shapes: neosoulMediumShapes,
     },
     {
       name: "busy",
@@ -112,11 +216,7 @@ export const neosoulSolo: SoloStyle = {
         "x-x- xxx- x--x -x--",
         ".xxx -x-x -xxx -x--",
       ],
-      shapes: [
-        { weight: 4, bars: "L L L E" },
-        { weight: 4.8, bars: "L L E R" },
-        { weight: 2, bars: "L E L E" },
-      ],
+      shapes: neosoulBusyShapes,
     },
   ],
   // ST-neosoul-31's phrase endings.

@@ -686,6 +686,55 @@ test("rock: in twelve the whole band is on the triplet's eighths: no note of the
   }
   assert.equal(seats.size, 4, `only ${[...seats].join(", ")} heard`);
 });
+// ── neo-soul ────────────────────────────────────────────────────────────────
+
+test("neo-soul: in six and twelve the whole band is on the triplet's eighths, the drummer's fills and the soloist too, and nothing swings them; the one note between them is the bass's lazy pickup, the sixteenth before a chord it leads into (ST-neosoul-17)", {
+  skip:
+    only("neosoul").skip ||
+    !LIBRARY.some((chart) => chart.meter === "12/8" || chart.meter === "6/8"),
+}, () => {
+  const neosoul = STYLES.find((style) => style.id === "neosoul")!;
+  const compound = (jam: { style: { id: string }; chart: { meter: string } }) =>
+    jam.style.id === "neosoul" && (jam.chart.meter === "12/8" || jam.chart.meter === "6/8");
+  const played = [
+    ...takes(compound),
+    ...soloistTakes().filter(compound),
+    ...heldTakes(neosoul, "12/8"),
+    ...heldTakes(neosoul, "12/8", true),
+    ...heldTakes(neosoul, "6/8"),
+    ...heldTakes(neosoul, "6/8", true),
+  ];
+  const seats = new Set<string>();
+  let pickups = 0;
+  for (const { chart, options, take } of played) {
+    // Where a chord arrives, and where an open jam goes round again past what is planned.
+    const last = take.plan.bars.at(-1)!;
+    const arrivals = new Set([
+      ...take.plan.bars.flatMap((bar) =>
+        bar.kind === "music"
+          ? bar.spans.filter((span) => span.chord !== null).map((span) => bar.start + span.start)
+          : [],
+      ),
+      ...(options.open ? [last.start + last.ticks] : []),
+    ]);
+    for (const note of notesOf(take)) {
+      const bar = take.plan.bars.findLast((candidate) => candidate.start <= note.tick)!;
+      if (bar.kind !== "music" || !isCompound(bar.meter)) continue;
+      seats.add(note.seat);
+      const where = `${chart.file} ${JSON.stringify(options)}: the ${note.seat} (${note.voice ?? ""}) at ${note.tick}`;
+      assert.ok(Math.abs(note.offset) <= POCKET, `${where}, moved ${note.offset}`);
+      if ((note.tick - bar.start) % (PPQ / 2) === 0) continue;
+      assert.ok(
+        note.seat === "bass" && arrivals.has(note.tick + PPQ / 4),
+        `${where}, between the eighths`,
+      );
+      pickups++;
+    }
+  }
+  assert.equal(seats.size, 4, `only ${[...seats].join(", ")} heard`);
+  assert.ok(pickups > 20, `only ${pickups} pickups on the sixteenth`);
+});
+
 // ── acoustic ────────────────────────────────────────────────────────────────
 
 test(

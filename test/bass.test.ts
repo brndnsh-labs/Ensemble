@@ -481,6 +481,52 @@ test(
   },
 );
 
+// ── neo-soul ────────────────────────────────────────────────────────────────
+
+test(
+  "neo-soul: in six and twelve the bass plays its line, not the pulse: in a bar of one chord it is struck on the One, it plays a note of its own between the pulses (on an eighth: a late note, a re-strike or a pickup), and it never strikes every pulse, so the kick has room",
+  only("neosoul"),
+  () => {
+    const neosoul = STYLES.find((style) => style.id === "neosoul")!;
+    const compound = (jam: { chart: { meter: string } }) =>
+      jam.chart.meter === "12/8" || jam.chart.meter === "6/8";
+    const played = [
+      ...takes((jam) => jam.style.id === "neosoul" && compound(jam)),
+      ...heldTakes(neosoul, "12/8"),
+      ...heldTakes(neosoul, "6/8"),
+    ];
+    let bars = 0;
+    for (const { chart, options, take } of played) {
+      const bass = notesOf(take, "bass");
+      for (const bar of take.plan.bars) {
+        if (bar.kind !== "music" || bar.seats.bass === null || bar.ending) continue;
+        if (bar.spans.length !== 1 || bar.spans[0]!.chord === null) continue;
+        bars++;
+        const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
+        const end = bar.start + bar.ticks;
+        // In sixteenths: a pulse is six, its eighths at 0, 2 and 4 into it.
+        const steps = new Set(
+          bass
+            .filter((note) => note.tick >= bar.start && note.tick < end)
+            .map((note) => (note.tick - bar.start) / (PPQ / 4)),
+        );
+        const pulses = Array.from({ length: Math.round(bar.ticks / (PPQ * 1.5)) }, (_, i) => i * 6);
+        assert.ok(steps.has(0), `${where}: nothing on the One`);
+        assert.ok(
+          [...steps].some((step) => step % 2 === 0 && step % 6 !== 0),
+          `${where}: only the pulses (${[...steps].join(" ")})`,
+        );
+        assert.ok(
+          !pulses.every((pulse) => steps.has(pulse)),
+          `${where}: every pulse struck (${[...steps].join(" ")})`,
+        );
+      }
+    }
+    if (LIBRARY.some((chart) => compound({ chart })))
+      assert.ok(bars > 200, `only ${bars} bars of six and twelve`);
+  },
+);
+
 // ── an upright in six ───────────────────────────────────────────────────────
 
 test(

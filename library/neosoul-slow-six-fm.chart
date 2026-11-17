@@ -1,0 +1,23 @@
+title: Slow Jam in Six
+key: Fm
+tempo: 60
+meter: 6/8
+style: neosoul
+
+// A minor slow jam in six-eight: two slow pulses to the bar, three eighths in
+// each. Thirty-two bars, AABA. The A goes from the one to the six and the four
+// and home by the five, with a minor two-five in its seventh bar. The bridge
+// opens on the relative major and falls back to the one by its two-five, then
+// takes a two-five to the six and another to the relative major, and comes back
+// by the minor two-five.
+[A]
+| Fm9 | Dbmaj9 | Bbm9       | C7#9 |
+| Fm9 | Dbmaj9 | Gm7b5 C7b9 | Fm9  |
+
+[A]
+
+[Bridge]
+| Abmaj9 | Gm7b5 C7b9 | Fm9    | Ebm9 Ab13  |
+| Dbmaj9 | Bbm9 Eb13  | Abmaj9 | Gm7b5 C7b9 |
+
+[A]

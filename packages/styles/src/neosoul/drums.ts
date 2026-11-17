@@ -9,7 +9,7 @@
 // The band swings the sixteenths (ST-neosoul-02). X accent, x normal, o soft,
 // g ghost, "-" the stroke taken away. The drums never lean: the band does.
 
-import type { DrumStyle, GrooveOption } from "@ensemble/engine";
+import type { DrumStyle, DrumTime, GrooveLayer, GrooveOption } from "@ensemble/engine";
 
 // ── the time ────────────────────────────────────────────────────────────────
 
@@ -87,7 +87,219 @@ const SHORT = { weight: 1, lines: { closedHat: "x.", snare: "gX" } };
 /** Four steps: the snare on beat 4 and an accented mid tom on its "and". */
 const TOM = { weight: 1, lines: { snare: "x...", midTom: "..X." } };
 
+// ── in twelve and in six ────────────────────────────────────────────────────
+// The soul ballad in twelve-eight that neo-soul comes out of, played by the
+// same drummer: the loop, the lazy kick, the backbeat with its ghosts, the
+// feathered hat. A bar of 12/8 is four slow pulses of three eighths, written in
+// sixes, a pulse to a group; a bar of 6/8 is two. Only the eighths are struck
+// and nothing swings: the three eighths are the triplet, so the sixteenth swing
+// of four has nothing to bend.
+//
+// Four said in pulses: a beat is a pulse; its "e" the triplet's middle eighth;
+// its "and" and its "a", the notes that lean into the next beat, the pulse's
+// last eighth. So the hat's sixteenths ("x g o g") are the triplets with the
+// middle eighth ghosted ("x.g.o."), the kick's pushes are the pulses' last
+// eighths, and the ghosts sit on the triplet's inner notes. The late four is the
+// backbeat moved one step of the grid the band plays: a sixteenth in four, the
+// triplet's middle eighth here (ST-neosoul-08: a written rhythm, not a drag).
+//
+// Six is not half of twelve but for its basic beat: the hat and the backbeat
+// are twelve's first two pulses (`half` below), the kick on the One and the
+// snare on the second pulse (SU-D-14). Its kicks and ghosts are written for a
+// bar of two: there is no "beat 3" for a second kick, and the kick and the snare
+// keep to half the bar's eighths (AU-96), so the Dilla skip, three kicks and a
+// snare in six eighths, is not played in six.
+
+/** The first two pulses of a line written for twelve: the same beat, a bar of six. */
+const half = (line: string): string => line.split(" ").slice(0, 2).join(" ");
+const halves = (lines: Readonly<Record<string, string>>): Record<string, string> =>
+  Object.fromEntries(Object.entries(lines).map(([voice, line]) => [voice, half(line)]));
+
+/** The five kicks of four in twelve, with the same weights (ST-neosoul-06). */
+const TWELVE_KICKS = [
+  // Boom-bap: the One and the "and" of 3, the last eighth of the third pulse.
+  { lines: { kick: "x..... ...... ....x. ......" }, weights: [3, 3, 1] },
+  // Plain 1 and 3.
+  { lines: { kick: "x..... ...... x..... ......" }, weights: [2, 2, 1] },
+  // A pickup into 3 stumbling into the "and" of 3.
+  { lines: { kick: "x..... ....x. ....x. ......" }, weights: [0, 2, 2] },
+  // A stumble on the "a" of 1, into the backbeat.
+  { lines: { kick: "x...x. ...... ....x. ......" }, weights: [0, 1, 2] },
+  // The Dilla skip: the last eighth of the bar pushes into the One (ST-neosoul-38).
+  { lines: { kick: "x..... ....x. ....x. ....x." }, weights: [0, 0, 3] },
+] as const;
+
+/** The kicks of six: the One, a push into the next One, or a stumble into the backbeat. */
+const SIX_KICKS = [
+  { lines: { kick: "x..... ......" }, weights: [3, 3, 1] },
+  { lines: { kick: "x..... ....x." }, weights: [2, 2, 2] },
+  { lines: { kick: "x...x. ......" }, weights: [0, 2, 2] },
+] as const;
+
+const drawn = (
+  list: readonly { lines: Readonly<Record<string, string>>; weights: readonly number[] }[],
+  tier: 0 | 1 | 2,
+): GrooveOption[] => list.map((kick) => ({ weight: kick.weights[tier]!, lines: kick.lines }));
+
+/** The pulse and a ghost on its last eighth, never the triplet's middle note (four's "o.g."). */
+const TWELVE_HAT_QUIET = { closedHat: "o...g. o...g. o...g. o...g." };
+/** The triplets, the middle eighth ghosted and the last soft (four's "xgog"). */
+const TWELVE_HAT = { closedHat: "x.g.o. x.g.o. x.g.o. x.g.o." };
+const TWELVE_BACKBEAT = { snare: "...... X..... ...... X....." };
+const TWELVE_CROSS_STICK = { crossStick: "...... x..... ...... x....." };
+
+/** The ghost sets in twelve, on the triplet's inner notes: three a bar working, five hot. */
+const TWELVE_GHOSTS = {
+  mid: [
+    "...... ..g... ..g... ..g...",
+    "....g. ...... ..g... ..g...",
+    "...... ..g.g. ...... ..g...",
+  ],
+  high: [
+    "..g... ..g... ..g.g. ..g...",
+    "....g. ..g... ..g... ..g.g.",
+    "..g... ..g.g. ....g. ..g...",
+  ],
+};
+/** The ghost sets in six: two a bar working, three hot. */
+const SIX_GHOSTS = {
+  mid: ["..g... ..g...", "....g. ..g...", "..g... ....g."],
+  high: ["..g.g. ..g...", "....g. ..g.g.", "..g... ..g.g."],
+};
+
+/** The late four: the last backbeat on the triplet's middle eighth after it, in 35% of sections. */
+const lateFour = (snare: string): GrooveOption[] => [
+  { weight: 65, lines: {} },
+  { weight: 35, lines: { snare } },
+];
+
+/** Hot, the hat breathes open on the last eighth of the second or the last pulse (ST-neosoul-10). */
+const TWELVE_BREATH: GrooveOption[] = [
+  {
+    weight: 1,
+    lines: { openHat: "...... ....x. ...... ......", closedHat: "...... ....-. ...... ......" },
+  },
+  {
+    weight: 1,
+    lines: { openHat: "...... ...... ...... ....x.", closedHat: "...... ...... ...... ....-." },
+  },
+];
+const SIX_BREATH: GrooveOption[] = [
+  { weight: 1, lines: { openHat: "....x. ......", closedHat: "....-. ......" } },
+  { weight: 1, lines: { openHat: "...... ....x.", closedHat: "...... ....-." } },
+];
+
+interface Written {
+  readonly kick: (tier: 0 | 1 | 2) => GrooveOption[];
+  readonly hatQuiet: Readonly<Record<string, string>>;
+  readonly hat: Readonly<Record<string, string>>;
+  readonly backbeat: Readonly<Record<string, string>>;
+  readonly crossStick: Readonly<Record<string, string>>;
+  readonly ghosts: { readonly mid: readonly string[]; readonly high: readonly string[] };
+  readonly late: string;
+  readonly breath: readonly GrooveOption[];
+}
+
+/** The loop's layers for a meter, as four's are: the same ids, holds and conditions. */
+function loop(w: Written): DrumTime["grooves"] {
+  const hat = (lines: Readonly<Record<string, string>>): GrooveLayer => ({
+    id: "hat",
+    hold: "section",
+    options: [{ weight: 1, lines }],
+  });
+  const backbeat: GrooveLayer = {
+    id: "backbeat",
+    hold: "section",
+    options: [{ weight: 1, lines: w.backbeat }],
+  };
+  const late: GrooveLayer = {
+    id: "late-four",
+    hold: "section",
+    when: { phraseBars: SECOND_BARS },
+    options: lateFour(w.late),
+  };
+  return {
+    low: [
+      hat(w.hatQuiet),
+      { id: "kick", hold: "section", options: w.kick(0) },
+      { ...backbeat, when: { energyFrom: 0.35 } },
+      {
+        id: "cross-stick",
+        hold: "section",
+        when: { energyBelow: 0.35 },
+        options: [{ weight: 1, lines: w.crossStick }],
+      },
+    ],
+    mid: [
+      hat(w.hat),
+      { id: "kick", hold: "section", options: w.kick(1) },
+      backbeat,
+      { id: "ghosts", hold: "section", options: ghosts(w.ghosts.mid) },
+      late,
+    ],
+    high: [
+      hat(w.hat),
+      { id: "kick", hold: "section", options: w.kick(2) },
+      backbeat,
+      { id: "ghosts", hold: "section", options: ghosts(w.ghosts.high) },
+      late,
+      { id: "breath", hold: "section", when: { phraseBars: SECOND_BARS }, options: w.breath },
+    ],
+  };
+}
+
+// Fills in twelve and six, the same few strokes before the barline in either, on the eighths:
+// two eighths (the ghost with the hand still on the hat, then the accent), or the last pulse
+// (the snare on it and the accented mid tom on its last eighth).
+const SHORT_IN_PULSES = { weight: 1, lines: { closedHat: "x...", snare: "g.X." } };
+const TOM_IN_PULSES = { weight: 1, lines: { snare: "x.....", midTom: "....X." } };
+const FILLS_IN_PULSES: DrumTime["fills"] = {
+  // ST-neosoul-11 in eighths: none inside a section until hot, then two eighths; a section's
+  // end two eighths, hot the last pulse.
+  length: {
+    phrase: { low: 0, mid: 0, high: 4 },
+    section: { low: 4, mid: 4, high: 6 },
+  },
+  phrase: [SHORT_IN_PULSES],
+  section: [SHORT_IN_PULSES, TOM_IN_PULSES],
+  top: [SHORT_IN_PULSES, TOM_IN_PULSES],
+};
+
+const neosoulDrumsInTwelve: DrumTime = {
+  grooves: loop({
+    kick: (tier) => drawn(TWELVE_KICKS, tier),
+    hatQuiet: TWELVE_HAT_QUIET,
+    hat: TWELVE_HAT,
+    backbeat: TWELVE_BACKBEAT,
+    crossStick: TWELVE_CROSS_STICK,
+    ghosts: TWELVE_GHOSTS,
+    late: "...... ...... ...... -.X...",
+    breath: TWELVE_BREATH,
+  }),
+  touches: [{ voices: ["closedHat", "openHat"], scale: 0.8 }],
+  fills: FILLS_IN_PULSES,
+};
+
+const neosoulDrumsInSix: DrumTime = {
+  grooves: loop({
+    kick: (tier) => drawn(SIX_KICKS, tier),
+    // The basic beat is twelve's, halved.
+    hatQuiet: halves(TWELVE_HAT_QUIET),
+    hat: halves(TWELVE_HAT),
+    backbeat: halves(TWELVE_BACKBEAT),
+    crossStick: halves(TWELVE_CROSS_STICK),
+    ghosts: SIX_GHOSTS,
+    late: "...... -.X...",
+    breath: SIX_BREATH,
+  }),
+  touches: [{ voices: ["closedHat", "openHat"], scale: 0.8 }],
+  fills: FILLS_IN_PULSES,
+};
+
 export const neosoulDrums: DrumStyle = {
+  // The soul ballad in twelve and in six, written above.
+  meters: { "12/8": neosoulDrumsInTwelve, "6/8": neosoulDrumsInSix },
+
   grooves: {
     // Quiet: the soft hat, the section's kick, the backbeat (a cross-stick under 0.35), no ghosts.
     low: [

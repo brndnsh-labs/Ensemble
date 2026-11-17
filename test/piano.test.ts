@@ -428,6 +428,50 @@ test(
   },
 );
 
+test(
+  "neo-soul: in six and twelve the Rhodes holds and leans: away from a soloist, in a bar of one chord, it is never struck on every pulse, and from the working level up it leans into a pulse, struck on an eighth between them (the lazy re-strike, or a chord laid in late)",
+  only("neosoul"),
+  () => {
+    let quiet = 0;
+    let working = 0;
+    const neosoul = STYLES.find((style) => style.id === "neosoul")!;
+    const compound = (jam: { chart: { meter: string } }) =>
+      jam.chart.meter === "12/8" || jam.chart.meter === "6/8";
+    const played = [
+      ...takes((jam) => jam.style.id === "neosoul" && compound(jam)),
+      ...heldTakes(neosoul, "12/8"),
+      ...heldTakes(neosoul, "6/8"),
+    ];
+    for (const { chart, options, take } of played) {
+      const byBar = strikesByBar(take);
+      for (const bar of take.plan.bars) {
+        if (bar.kind !== "music" || bar.ending || bar.seats.chords === null) continue;
+        if (bar.solo !== null || bar.spans.length !== 1 || bar.spans[0]!.chord === null) continue;
+        const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
+        const steps = (byBar.get(bar.index) ?? []).map(
+          (strike) => (strike.tick - bar.start) / (PPQ / 4),
+        );
+        const pulses = pulseStarts(bar.meter).map((tick) => tick / (PPQ / 4));
+        assert.ok(
+          !pulses.every((pulse) => steps.includes(pulse)),
+          `${where}: a chord on every pulse (${steps.join(" ")})`,
+        );
+        if (tierOf(bar.seats.chords) === "low") {
+          quiet++;
+          continue;
+        }
+        working++;
+        assert.ok(
+          steps.some((step) => step % 2 === 0 && !pulses.includes(step)),
+          `${where}: struck only on the pulses (${steps.join(" ")})`,
+        );
+      }
+    }
+    if (LIBRARY.some((chart) => compound({ chart })))
+      assert.ok(working > 100 && quiet > 50, `only ${working} bars working and ${quiet} quiet`);
+  },
+);
+
 test("a section keeps its figure: away from a solo, every phrase opens on the same rhythm each time the section comes round at the same level", () => {
   let compared = 0;
   for (const { chart, options, take } of takes(written)) {
