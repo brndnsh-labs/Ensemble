@@ -133,9 +133,10 @@ function lineBars(world: World, slot: Slot, bars: readonly BarPlan[]): LaidBar[]
       const room = (spot: Spot) => bend(bar.ticks) - bend(spot.tick - bar.start + EIGHTH);
       while (spots.length > 1 && room(spots.at(-1)!) < breath) spots.pop();
       // A bar of dotted pulses shorter than the rhythm (a 4/4 ending in six-eight) would strike
-      // in its last pulse, which belongs to the next phrase, as a written ending never does.
+      // in its last pulse, which belongs to the next phrase where the phrase ends with the bar,
+      // as a written ending never does.
       const last = bar.ticks - lastPulse(bar.meter);
-      if (isCompound(bar.meter))
+      if (isCompound(bar.meter) && i === slot.bars.length - 1)
         while (spots.length > 1 && spots.at(-1)!.tick - bar.start >= last) spots.pop();
     }
     return { spots, again: plan.again, stab: plan.stab, tied: false };
