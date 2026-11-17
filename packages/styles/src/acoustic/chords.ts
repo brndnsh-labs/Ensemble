@@ -164,6 +164,93 @@ const rhythm: RhythmBook = {
   candidates: 1,
 };
 
+// ── in six ──────────────────────────────────────────────────────────────────
+// A bar of 6/8 is two slow pulses of three eighths, "ONE two three FOUR five
+// six": twelve sixteenths, written in sixes, a pulse to a group. Nothing
+// swings. The same two hands as in four, said in pulses.
+//
+// Picked, the thumb takes both pulses and the fingers the eighths between, as
+// six-eight is picked: with a bassist the thumb is on the shape's lowest string
+// each time; with none it alternates, the bass on the One and the alternate
+// bass (the chord's fifth) on four, so the bar still has a bass in two.
+//
+// Strummed, the hand swings in eighths through each pulse, down, down, up:
+// down on the pulse and on its middle eighth, up on its last (the engine reads
+// the direction from the place; DR-10, ST-acoustic-04). The pulses are struck
+// full, the strokes between lighter, so the six eighths are never all one
+// weight: the middle eighth is written lighter (`o`), and the upstroke on the
+// last is lighter by itself.
+
+const HAND_IN_SIX: Articulation = {
+  ...HAND,
+  // A strum rings up to a pulse and is never choked: the next stroke takes over.
+  x: { level: 86, steps: 6 },
+  X: { level: 100, steps: 6 },
+  // The middle eighth of a pulse, down and lighter.
+  o: { level: 76, steps: 6 },
+};
+
+/**
+ * The three patterns in six, each with the roll its section plays when there
+ * is no bassist. Picked with a bassist the places are the thumb on the shape's
+ * lowest string and the fingers on its three top strings, as in four; alone the
+ * thumb plays the bass on the One and the alternate bass on four.
+ */
+const PICKED_IN_SIX = (weight: number): CompFigure[] => [
+  // Up the shape from each pulse: thumb, index, middle; thumb, index, middle. Alone, strings 3 2.
+  picked("rising in threes", weight, "T.i.m. t.i.m.", "B.3.2. v.3.2."),
+  // Up to the top in the second pulse: thumb, index, middle; thumb, ring, middle. Alone, 3 2, 1 2.
+  picked("up and over", weight, "T.i.m. t.a.m.", "B.3.2. v.1.2."),
+  // The fingers rocking on top: thumb, middle, ring, twice. Alone, strings 2 1.
+  picked("thumb and rocking fingers", weight, "T.m.a. t.m.a.", "B.2.1. v.2.1."),
+];
+
+const rhythmInSix: RhythmBook = {
+  tiers: {
+    // Quiet: always fingerpicked, one pattern a section (ST-acoustic-17).
+    low: {
+      draw: "quiet",
+      articulation: HAND_IN_SIX,
+      figures: PICKED_IN_SIX(1),
+      answers: [],
+      busy: { from: 6, to: 6 },
+      arrival: { level: 72, steps: 6 },
+    },
+    // The working level: 35% of sections pick, the rest strum, in the weights of four.
+    mid: {
+      draw: "working",
+      articulation: HAND_IN_SIX,
+      figures: [
+        ...PICKED_IN_SIX(14),
+        // The first pulse left to ring, the second rolled: down; down, down, up.
+        strummed("ring and roll", 39, "x...x. x.o.x."),
+        // Both pulses rolled: down, down, up; down, down, up.
+        strummed("rolling", 26, "x.o.x. x.o.x."),
+        // Each pulse left to ring, an upstroke into the One: down; down, up.
+        strummed("in two", 13, "x..... x...x."),
+      ],
+      answers: [],
+      busy: { from: 3, to: 6 },
+      arrival: { level: 86, steps: 6 },
+    },
+    // Hot: always strummed, the second pulse leaned on with the snare (ST-acoustic-20).
+    high: {
+      draw: "hot",
+      articulation: HAND_IN_SIX,
+      figures: [
+        strummed("rolling, four leaned on", 1, "x.o.x. X.o.x."),
+        strummed("ring and roll, four leaned on", 1, "x...x. X.o.x."),
+      ],
+      answers: [],
+      busy: { from: 5, to: 6 },
+      arrival: { level: 86, steps: 6 },
+    },
+  },
+  hold: 1,
+  forms: [{ weight: 1, bars: "a a a a" }],
+  candidates: 1,
+};
+
 export const acousticChords: ChordStyle = {
   // Open position (ST-acoustic-16, CH-24): up to six strings, open strings on, every fretted
   // note at or below the 4th fret where the chord has such a shape, one muted string allowed
@@ -190,6 +277,8 @@ export const acousticChords: ChordStyle = {
   // on a pulse's last eighth is not played).
   plain: { length: 1, pulse: true, velocity: { beat: 86, offbeat: 86, restrike: 86 } },
   rhythm,
+  // Six-eight, written above.
+  meters: { "6/8": rhythmInSix },
   // The last upstroke of a strummed bar changes early 20% of the time at the working level
   // and 30% hot, never quiet; a picked bar never does (ST-acoustic-30). Nothing leans into a
   // change inside the bar (ST-acoustic-33).
