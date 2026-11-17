@@ -49,13 +49,14 @@ const RIFFS_IN_TWELVE = [
  * Six is a bar of two, the One and the drop on the second pulse, and its riffs are written
  * for it with four's ideas and weights: up to the octave on the drop from the One's last
  * eighth; the One and an answer after the drop; a third into the drop from the One's middle;
- * the heavy halves, each pulse a root, a fifth leading on; just the drop.
+ * the heavy halves, a root on each pulse, the first let go an eighth before the drop for the
+ * room four's has, and a fifth leading on; just the drop.
  */
 const RIFFS_IN_SIX = [
   "....R- 8---5-",
   "R---.. R-..5-",
   "..R-3- R---5-",
-  "R----- R---5-",
+  "R---.. R---5-",
   "...... R-----",
 ] as const;
 
