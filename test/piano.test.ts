@@ -546,9 +546,17 @@ const strummed = (jam: { style: (typeof STYLES)[number] }) => guitars.includes(j
 
 /** The library's charts in six-eight. */
 const SIXES = LIBRARY.filter((chart) => chart.meter === "6/8");
-/** The guitars that have written a band for six-eight, where the library has a chart in it. */
+/**
+ * The guitars whose hand swings in eighths that have written a band for six-eight, where the
+ * library has a chart in it: what is picked and strummed in six as six-eight is (acoustic's). A
+ * hand that swings in sixteenths (funk's) is held to its own rules in six.
+ */
 const guitarsInSix = guitars.filter(
-  (style) => SIXES.length > 0 && (WRITTEN[style.id] ?? []).includes("6/8"),
+  (style) =>
+    SIXES.length > 0 &&
+    (WRITTEN[style.id] ?? []).includes("6/8") &&
+    style.chords.idiom !== "keys" &&
+    style.chords.idiom.strum.grid === "eighth",
 );
 const inSix = (jam: { style: (typeof STYLES)[number]; chart: { meter: string } }) =>
   guitarsInSix.includes(jam.style) && jam.chart.meter === "6/8";
@@ -1061,3 +1069,55 @@ test("a guitar strums a bar of six as a pendulum in eighths: it strikes both pul
     `only ${bars} bars of six strummed, ${leant} leant into`,
   );
 });
+
+// ── a funk guitar in six and twelve ─────────────────────────────────────────
+
+test(
+  "funk: in six and twelve the guitar scratches the eighths: quiet it stabs and never scratches; from the working level up it strokes more of the bar than its pulses, a muted scratch among them; and hot every eighth is a stroke but where a chord leant into still rings over the barline",
+  only("funk"),
+  () => {
+    const funk = STYLES.find((style) => style.id === "funk")!;
+    const counted = { low: 0, mid: 0, high: 0 };
+    const played = [
+      ...takes((jam) => jam.style.id === "funk" && written(jam)),
+      ...heldTakes(funk, "6/8", false, true),
+      ...heldTakes(funk, "12/8", false, true),
+    ];
+    for (const { chart, options, take } of played) {
+      if (chart.meter !== "6/8" && chart.meter !== "12/8") continue;
+      const strokes = [...strikesOf(take), ...strikesOf(take, true)];
+      const scratches = new Set(strikesOf(take, true).map((strike) => strike.tick));
+      for (const bar of take.plan.bars) {
+        if (bar.kind !== "music" || bar.ending || bar.seats.chords === null) continue;
+        if (!isCompound(bar.meter) || bar.spans.some((span) => span.chord === null)) continue;
+        const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
+        const ticks = new Set(
+          strokes
+            .filter((s) => s.tick >= bar.start && s.tick < bar.start + bar.ticks)
+            .map((s) => s.tick - bar.start),
+        );
+        const scratched = [...ticks].some((tick) => scratches.has(bar.start + tick));
+        const tier = tierOf(bar.seats.chords);
+        counted[tier]++;
+        if (tier === "low") {
+          assert.ok(!scratched, `${where}: a scratch, quiet`);
+          continue;
+        }
+        assert.ok(ticks.size > pulseStarts(bar.meter).length, `${where}: ${ticks.size} strokes`);
+        assert.ok(scratched, `${where}: no scratch`);
+        if (tier !== "high") continue;
+        // The chord leant into on the eighth before the barline, still ringing in this bar.
+        const pushed = strokes.some(
+          (s) => s.tick === bar.start - PPQ / 2 && s.ends > bar.start + POCKET,
+        );
+        for (let tick = pushed ? PPQ / 2 : 0; tick < bar.ticks; tick += PPQ / 2)
+          assert.ok(ticks.has(tick), `${where}: hot, and nothing on the eighth at ${tick}`);
+      }
+    }
+    if (LIBRARY.some((chart) => chart.meter === "6/8" || chart.meter === "12/8"))
+      assert.ok(
+        counted.low > 50 && counted.mid > 50 && counted.high > 50,
+        `only ${counted.low} quiet bars, ${counted.mid} working, ${counted.high} hot`,
+      );
+  },
+);

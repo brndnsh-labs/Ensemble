@@ -77,7 +77,100 @@ const touch = {
   },
 } as const;
 
+// ── in twelve and in six ────────────────────────────────────────────────────
+// The same bassist handed a chart in 12/8 or 6/8: one riff to a section, made of
+// the same notes (roots, octave pops, the fifth, the flat seventh, dead notes),
+// locked to the kick, short, and on the eighths, the only places a bar of
+// dotted pulses has (nothing swings). The notes have no compound-time bass for
+// funk; these are four's riffs said in pulses: four's beat is a pulse, four's
+// "and" and "a" (the pushes into the next beat) the pulse's last eighth, four's
+// "e" its middle eighth. A riff in twelve turns over all four pulses, the push
+// into 3 and the run into the One where four has them. A riff in six is a bar of
+// one strong pulse and one answering it, and every one ends on a note on the
+// last eighth that pushes back into the One; it is not half of twelve's.
+//
+// The levels thin as in four: the working level leaves out the dead notes on a
+// pulse's last eighth (four's "a"), quiet keeps the roots. The riffs are listed
+// in the same order as four's and drawn under the same name, so a section that
+// plays four's first riff plays the first here.
+
+/** The five riffs in twelve, hot. */
+const RIFFS_IN_TWELVE = [
+  "R...m. R...8. m...R. ..7.8.",
+  "R..... m...R. 8...R. ..m.5.",
+  "R...m. ..R.8. ....R. ..7.m.",
+  "R...8. m...R. ....R. m...8.",
+  "R..... ....7. 8...R. ..5...",
+] as const;
+
+/** The five riffs in six, hot. */
+const RIFFS_IN_SIX = [
+  "R.m... R...8.",
+  "R..... m.R.5.",
+  "R.5.m. ..7.8.",
+  "R...8. m...R.",
+  "R.8... ....R.",
+] as const;
+
+/** A riff in sixes with some of its strokes left out. */
+function thinnedInSixes(riff: string, keeps: (symbol: string, step: number) => boolean): string {
+  const steps = [...riff.replace(/\s+/g, "")].map((symbol, step) =>
+    keeps(symbol, step) ? symbol : ".",
+  );
+  return steps.join("").replace(/(.{6})(?=.)/g, "$1 ");
+}
+
+const compoundRiffs = (list: readonly string[], at: (riff: string) => string): Line["figures"] => ({
+  hold: "section",
+  draw: "riff",
+  options: list.map((riff): Figure => ({ weight: 1, grid: at(riff) })),
+});
+
+/** The working level leaves out the dead notes on a pulse's last eighth (four's "a", BA-39). */
+const workingInSixes = (riff: string) =>
+  thinnedInSixes(riff, (symbol, step) => !(symbol === "m" && step % 6 === 4));
+/** Quiet, the roots alone (BA-39, X-A-08). */
+const quietInSixes = (riff: string) => thinnedInSixes(riff, (symbol) => symbol === "R");
+
+/** Four's turns said in pulses: the fifth and the seventh into the One, under the root; the octaves for two pulses. */
+const PICKUP_IN_TWELVE: Figure = { name: "pickup", weight: 2, grid: "..5.7.", under: true };
+const OCTAVES_IN_TWELVE: Figure = { name: "octaves", weight: 1, grid: "R...8. R...8." };
+/**
+ * In six a turn of a pulse is half the bar, and comes straight after the riff's first pulse,
+ * which may end on its pop: the pickup's fifth is taken over the root, where under it the line
+ * would fall more than an octave from the pop. Two pulses are the whole bar: the octaves are
+ * one pulse's.
+ */
+const PICKUP_IN_SIX: Figure = { name: "pickup", weight: 2, grid: "..5.7." };
+const OCTAVES_IN_SIX: Figure = { name: "octaves", weight: 1, grid: "R...8." };
+
+function compoundLines(
+  list: readonly string[],
+  pickup: Figure,
+  octaves: Figure,
+): BassStyle["lines"] {
+  return {
+    low: { ...touch, figures: compoundRiffs(list, quietInSixes) },
+    mid: {
+      ...touch,
+      figures: compoundRiffs(list, workingInSixes),
+      turns: { offer: 0.2, hold: "section", options: [pickup] },
+    },
+    high: {
+      ...touch,
+      figures: compoundRiffs(list, (riff) => riff),
+      turns: { offer: 0.2, hold: "section", options: [pickup, octaves] },
+    },
+  };
+}
+
 export const funkBass: BassStyle = {
+  // The same bassist in twelve-eight and six-eight, written above.
+  meters: {
+    "12/8": compoundLines(RIFFS_IN_TWELVE, PICKUP_IN_TWELVE, OCTAVES_IN_TWELVE),
+    "6/8": compoundLines(RIFFS_IN_SIX, PICKUP_IN_SIX, OCTAVES_IN_SIX),
+  },
+
   // Every root has one place, from F1 up to E2, so a riff keeps its octave from bar to bar
   // and from section to section, and its pop tops out at E3. The notes anchor each section
   // somewhere from C2 to E2 (ST-funk-19), which puts a vamp in A on A2 with its pops on A3
@@ -111,6 +204,8 @@ export const funkBass: BassStyle = {
   // riff did not have.
   leadIn: {
     at: "sixteenth",
+    // In six and twelve the line is all eighths: the step into the next root is its last one.
+    inDotted: "eighth",
     pickup: false,
     // A pop that would be followed by a root more than an octave below it folds down.
     throughOctave: true,

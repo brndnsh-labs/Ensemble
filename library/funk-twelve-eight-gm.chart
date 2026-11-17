@@ -1,0 +1,22 @@
+title: Minor Funk in Twelve
+key: Gm
+tempo: 70
+meter: 12/8
+style: funk
+
+// Four slow pulses to the bar, three eighths in each. Thirty-two bars, AABA.
+// The A sits on the minor one and its dorian four, and turns home from the
+// flat six through the five, a chord a half bar. The bridge goes up to the
+// flat six and the five, back to the one and the four, and climbs through the
+// flat seven to the five, suspended and then sharp nine.
+[A]
+| Gm9 | % | C9       | %   |
+| Gm9 | % | Eb9 D7#9 | Gm9 |
+
+[A]
+
+[Bridge]
+| Ebmaj7 | D7#9 | Gm9    | C9   |
+| Ebmaj7 | F9   | D9sus4 | D7#9 |
+
+[A]

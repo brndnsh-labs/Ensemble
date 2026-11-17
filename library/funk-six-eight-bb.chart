@@ -1,0 +1,19 @@
+title: Funk in Six
+key: Bb
+tempo: 74
+meter: 6/8
+style: funk
+
+// Two slow pulses to the bar, three eighths in each. A sixteen-bar verse that
+// sits on the one, goes to the four and comes home, then turns round through
+// the two and the five with a sharp-nine push into the two; an eight-bar
+// chorus on the four that ends on two bars of a chord a pulse.
+[Verse]
+| Bb9 | %  | %   | %    |
+| Eb9 | %  | Bb9 | %    |
+| Cm7 | F9 | Bb9 | G7#9 |
+| Cm7 | F9 | Bb9 | %    |
+
+[Chorus]
+| Eb9 | % | Bb9    | %      |
+| Eb9 | % | Cm7 F9 | Bb9 F9 |

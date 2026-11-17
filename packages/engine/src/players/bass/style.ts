@@ -385,6 +385,12 @@ export interface LeadInPolicy {
    * pulse, so a dotted quarter in 6/8), the last eighth, or the last sixteenth.
    */
   readonly at: "beat" | "eighth" | "sixteenth";
+  /**
+   * Where it sits in a bar of dotted pulses the style has written its line for (6/8, 12/8),
+   * where that is not `at`: funk's sixteenth has no place in a line that is all eighths, and
+   * leads in on the eighth there; neo-soul's lazy sixteenth is kept as it is.
+   */
+  readonly inDotted?: "beat" | "eighth" | "sixteenth";
   /** How likely a change is led into, 0 to 1. */
   readonly chance: {
     readonly inside: PerTier<number>;

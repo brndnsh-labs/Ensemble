@@ -143,7 +143,109 @@ const rhythm: RhythmBook = {
   candidates: 1,
 };
 
+// ── in twelve and in six ────────────────────────────────────────────────────
+// The same guitarist handed a chart in 12/8 or 6/8. Reading the grids: a pulse
+// of three eighths to a group of six sixteenths, and only the eighths (the
+// first, third and fifth character) are stroked. The hand keeps swinging in
+// sixteenths, down on every eighth and up unheard between them: at the meter's
+// usual tempo (two thirds of four's, in dotted quarters) the hand moves at the
+// speed it moves in four, and every stroke the line makes is a downstroke.
+//
+// The lines are four's three said in pulses, and they thin as four's do: quiet
+// the stabs alone; the working level one scratch a pulse, the last the line
+// leaves open in it (four's keeps the scratches on its eighths, two a beat; a
+// pulse has no eighths of its own to keep, and a scratch on the One gives way
+// to the chord's own stab where it arrives); hot every eighth the line leaves
+// open is scratched. Under a soloist the line is played as it
+// stands: a strummed groove keeps its figure (CH-68).
+//
+//   backbeat     the stab on the pulse's last eighth into the backbeat, the
+//                backbeat leaned on, and its own last eighth into the next pulse
+//   two-against-three
+//                four's three against four is a cross-rhythm; compound time has
+//                its own: a stab every two eighths, three of them across each
+//                two pulses (six-eight's three-four), the last leaned on
+//   ands         stabs on the last and the middle eighths, round the backbeats
+//
+// In twelve the backbeat and the cross-rhythm lines are the six's twice: four
+// pulses are two bars of two for them, as four's backbeat line is two halves the
+// same. The ands are written for each meter. In the last bar of a phrase each
+// line stabs once more in its last pulse, where it had none, as four's flick
+// does on the last sixteenth (the turn).
+
+/** A bar of six's line, twice: the same in a bar of twelve. */
+const twiceOver = (six: string) => `${six} ${six}`;
+
+/** One line in six and in twelve at one level: a groove, tied over a change it leans into. */
+const compoundLine = (name: string, grid: string, turn: string): CompFigure =>
+  line(name, grid, turn);
+
+/**
+ * A line's three levels in a compound bar, from the hot line: quiet its stabs alone; the
+ * working level one scratch a pulse, the last its line leaves open there; hot all of them.
+ */
+function levelsOf(hot: string) {
+  const pulses = hot.split(" ");
+  const keepLast = (pulse: string) => {
+    const last = pulse.lastIndexOf("~");
+    return [...pulse].map((symbol, i) => (symbol === "~" && i !== last ? "." : symbol)).join("");
+  };
+  return {
+    low: hot.replaceAll("~", "."),
+    mid: pulses.map(keepLast).join(" "),
+    high: hot,
+  };
+}
+
+/** The lines in six, hot, and each line's last bar of a phrase. */
+const SIX_LINES = {
+  backbeat: { hot: "~.~.x. X.~.x.", turn: "~.~.x. X.x.x." },
+  "two against three": { hot: "x.~.x. ~.X.~.", turn: "x.~.x. ~.X.x." },
+  ands: { hot: "~.x.x. X.~.~.", turn: "~.x.x. X.~.x." },
+} as const;
+
+/** The lines in twelve, hot: the backbeat and the cross-rhythm are the six's twice. */
+const TWELVE_LINES = {
+  backbeat: {
+    hot: twiceOver(SIX_LINES.backbeat.hot),
+    turn: `${SIX_LINES.backbeat.hot} ${SIX_LINES.backbeat.turn}`,
+  },
+  "two against three": {
+    hot: twiceOver(SIX_LINES["two against three"].hot),
+    turn: `${SIX_LINES["two against three"].hot} ${SIX_LINES["two against three"].turn}`,
+  },
+  ands: { hot: "~.~.x. X.x.~. ~.x.~. X.~.x.", turn: "~.~.x. X.x.~. ~.x.~. X.x.x." },
+} as const;
+
+function compoundBook(lines: Record<string, { hot: string; turn: string }>, steps: number) {
+  const tier = (level: "low" | "mid" | "high", busy: { from: number; to: number }) => ({
+    draw: "line",
+    articulation: SCRATCH,
+    figures: Object.entries(lines).map(([name, { hot, turn }]) =>
+      compoundLine(name, levelsOf(hot)[level], levelsOf(turn)[level]),
+    ),
+    answers: [],
+    busy,
+    arrival: { level: 86, steps: 0.9 },
+  });
+  const eighths = steps / 2;
+  const book: RhythmBook = {
+    tiers: {
+      low: tier("low", { from: eighths / 3, to: eighths / 2 }),
+      mid: tier("mid", { from: (eighths * 2) / 3, to: (eighths * 5) / 6 }),
+      high: tier("high", { from: eighths, to: eighths }),
+    },
+    hold: rhythm.hold,
+    forms: rhythm.forms,
+    candidates: rhythm.candidates,
+  };
+  return book;
+}
+
 export const funkChords: ChordStyle = {
+  // The same guitarist in twelve-eight and six-eight, written above.
+  meters: { "12/8": compoundBook(TWELVE_LINES, 24), "6/8": compoundBook(SIX_LINES, 12) },
+
   // Three strings, no open strings (the hand mutes by letting go, CH-23), the hand parked
   // around the fifth fret: with the top aimed at F#4 that is mostly the D, G and B strings,
   // where an E9 is `x x 6 7 7 x`. A sixteenth pendulum; a stroke takes 6 ms a string to

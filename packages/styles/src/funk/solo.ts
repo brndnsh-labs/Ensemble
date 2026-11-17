@@ -7,7 +7,7 @@
 // band swings sixteenths by a trace. `x` strikes a note, `-` holds it, `.` is
 // silence: `x.` is a sixteenth and a hole, which is most of what is played.
 
-import type { SoloStyle, Way } from "@ensemble/engine";
+import type { SoloStyle, SoloTime, Way } from "@ensemble/engine";
 
 // A new riff: one bar's figure all along its line, said again as the style's habit has it.
 const RIFF: Way = { name: "riff", make: "new", oneRhythm: true };
@@ -31,7 +31,126 @@ const ELSE = {
   lift: 3,
 } satisfies Way;
 
+/** Each level's phrase shapes, the player's and not the bar's: the same in every meter. */
+const SHAPES = {
+  // SO-09's weights, each a fifth heavier for every bar of rest: funk leaves room (SO-11).
+  sparse: [
+    { weight: 4.3, bars: "L E R R" },
+    { weight: 4.3, bars: "R L E R" },
+    { weight: 3.6, bars: "E R L E" },
+    { weight: 2.4, bars: "L L E R" },
+  ],
+  medium: [
+    { weight: 6, bars: "L L E R" },
+    { weight: 3.6, bars: "E R L E" },
+    { weight: 2, bars: "L E L E" },
+  ],
+  busy: [
+    { weight: 4, bars: "L L L E" },
+    { weight: 4.8, bars: "L L E R" },
+    { weight: 2, bars: "L E L E" },
+  ],
+} as const;
+
+// ── in twelve and in six ────────────────────────────────────────────────────
+// The same horn handed a chart in 12/8 or 6/8. A rhythm is a bar of the meter
+// in sixes, a pulse to a group, and every note starts on an eighth: nothing is
+// quicker, and nothing swings. The horn's own clip is kept: `x.` is still a
+// note let go after a sixteenth, so an eighth is struck and stopped short, the
+// stab of four; `-` holds. The cells are four's said in pulses (a beat a pulse,
+// an "and" or an "a" the pulse's last eighth, an "e" its middle): short figures
+// with the rest of the bar left open, the busy level's sixteenth bursts the
+// pulse's three eighths, never wall to wall. The same three levels by name, the
+// same phrase shapes, no pickups and nothing over the barline (ST-funk-33).
+//
+// A bar of twelve lasts half as long again as a bar of four at the meter's
+// usual tempo, so its levels play half as many notes again; a bar of six three
+// quarters as many. Each ending lands on the phrase's one long note and leaves
+// the last pulse unstruck.
+
+const funkSoloInTwelve: SoloTime = {
+  levels: [
+    {
+      name: "sparse",
+      notesPerBar: 3,
+      span: 6,
+      cells: [
+        "x...x. ....x. ...... ......",
+        "....x. x...x. ...... ......",
+        "x.x... ....x. x..... ......",
+        "...... x...x. ..x... ......",
+      ],
+      shapes: SHAPES.sparse,
+    },
+    {
+      name: "medium",
+      notesPerBar: 5,
+      span: 9,
+      cells: [
+        "x...x. ....x. x.x... ......",
+        "....x. x.x.x. ....x. x.....",
+        "x.x.x. ....x. x...x. ......",
+        "x...x. ..x... x...x. ..x...",
+      ],
+      shapes: SHAPES.medium,
+    },
+    {
+      name: "busy",
+      notesPerBar: 8,
+      span: 12,
+      cells: [
+        "x.x.x. ..x.x. x.x... x.x...",
+        "x.x... x.x.x. ..x.x. x.....",
+        "....x. x.x.x. x...x. x.x...",
+        "x...x. x.x... x.x.x. ..x.x.",
+      ],
+      shapes: SHAPES.busy,
+    },
+  ],
+  endings: [
+    "x.x.x. x----- ----.. ......",
+    "x----- ------ ...... ......",
+    "....x. x.x--- ----.. ......",
+    "x...x. ..x--- ------ ......",
+  ],
+  pickups: [],
+  peak: "x----- ------ ...... ......",
+};
+
+const funkSoloInSix: SoloTime = {
+  levels: [
+    {
+      name: "sparse",
+      notesPerBar: 1.5,
+      span: 6,
+      cells: ["x...x. ......", "....x. x.....", "x.x... ....x.", "...... x...x."],
+      shapes: SHAPES.sparse,
+    },
+    {
+      name: "medium",
+      notesPerBar: 2.6,
+      span: 9,
+      cells: ["x...x. ..x...", "..x.x. x.....", "x.x... x...x.", "x...x. x.x..."],
+      shapes: SHAPES.medium,
+    },
+    {
+      name: "busy",
+      notesPerBar: 4.1,
+      span: 12,
+      cells: ["x.x.x. ..x.x.", "x.x... x.x.x.", "..x.x. x.x...", "x...x. x.x.x."],
+      shapes: SHAPES.busy,
+    },
+  ],
+  // In a bar of two the long note lands in the first pulse and is held into the second.
+  endings: ["x----- ----..", "x.x--- --....", "..x.x- ---...", "x...x- ----.."],
+  pickups: [],
+  peak: "x----- ----..",
+};
+
 export const funkSolo: SoloStyle = {
+  // The same horn in twelve-eight and six-eight, written above.
+  meters: { "12/8": funkSoloInTwelve, "6/8": funkSoloInSix },
+
   instrument: "alto-sax",
   lift: 0,
 
@@ -78,13 +197,7 @@ export const funkSolo: SoloStyle = {
         "x.x. ..x. x... ....",
         ".... x..x .x.. ....",
       ],
-      // SO-09's weights, each a fifth heavier for every bar of rest: funk leaves room (SO-11).
-      shapes: [
-        { weight: 4.3, bars: "L E R R" },
-        { weight: 4.3, bars: "R L E R" },
-        { weight: 3.6, bars: "E R L E" },
-        { weight: 2.4, bars: "L L E R" },
-      ],
+      shapes: SHAPES.sparse,
     },
     {
       name: "medium",
@@ -96,11 +209,7 @@ export const funkSolo: SoloStyle = {
         "x.xx ..x. x..x ....",
         "x..x .x.. x..x .x..",
       ],
-      shapes: [
-        { weight: 6, bars: "L L E R" },
-        { weight: 3.6, bars: "E R L E" },
-        { weight: 2, bars: "L E L E" },
-      ],
+      shapes: SHAPES.medium,
     },
     {
       // Sixteenths in bursts, still with holes: never a bar played wall to wall.
@@ -113,11 +222,7 @@ export const funkSolo: SoloStyle = {
         "..xx .x.x x.x. xx..",
         "x.x. xx.x .xx. x.x.",
       ],
-      shapes: [
-        { weight: 4, bars: "L L L E" },
-        { weight: 4.8, bars: "L L E R" },
-        { weight: 2, bars: "L E L E" },
-      ],
+      shapes: SHAPES.busy,
     },
   ],
   // Each finishes on the one long note of the phrase and leaves beat 4 unstruck.
