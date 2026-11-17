@@ -124,26 +124,38 @@ test(
 
 // ── disco ───────────────────────────────────────────────────────────────────
 
+const disco = STYLES.find((style) => style.id === "disco");
+/** Disco where it plays its own parts, and in six and in twelve held at each of its levels. */
+const discoPlayed = (): Jam[] => [
+  ...takes(itsOwn("disco")),
+  ...(disco ? [...heldTakes(disco, "12/8"), ...heldTakes(disco, "6/8")] : []),
+];
+
 test(
-  'disco: four on the floor: the kick is on every beat of every bar at every level, straight through every fill; from the working level up the open hat barks on every "and" wherever no fill takes the hand, and when the band is quiet it never opens',
+  'disco: four on the floor: the kick is on every pulse of every bar at every level (every beat in four, each of the dotted quarters in six and twelve), straight through every fill; from the working level up the open hat barks on every "and" (in six and twelve each pulse\'s last eighth) wherever no fill takes the hand, and when the band is quiet it never opens',
   only("disco"),
   () => {
     let bars = 0;
     let fills = 0;
-    for (const { chart, options, take } of takes(in44("disco"))) {
+    const meters = new Map<string, number>();
+    for (const { chart, options, take } of discoPlayed()) {
       for (const { bar, kit, energy } of kitBars(take)) {
         // The last bar is one hit where the final chord lands.
         if (bar.ending) continue;
-        const where = `${chart.file} seed ${options.seed} bar ${bar.index}`;
+        const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
         bars++;
+        meters.set(chart.meter, (meters.get(chart.meter) ?? 0) + 1);
         if (bar.fill) fills++;
-        for (const beat of [0, 4, 8, 12]) {
-          assert.ok(strikes(kit, "kick", beat), `${where}: no kick on beat ${beat / 4 + 1}`);
+        const pulses = pulseStarts(bar.meter).map((tick) => tick / STEP);
+        for (const pulse of pulses) {
+          assert.ok(strikes(kit, "kick", pulse), `${where}: no kick on the pulse at ${pulse}`);
         }
         if (energy < TIER_MID) {
           assert.ok(!kit.has("openHat"), `${where}: the hat opens when the band is quiet`);
         } else if (!bar.fill) {
-          for (const and of [2, 6, 10, 14]) {
+          // The "and": the eighth before the next pulse, or before the barline.
+          const steps = Math.round(bar.ticks / STEP);
+          for (const and of [...pulses.slice(1), steps].map((next) => next - 2)) {
             assert.ok(strikes(kit, "openHat", and), `${where}: no open hat on step ${and}`);
           }
         }
@@ -151,8 +163,50 @@ test(
     }
     assert.ok(bars > enough(2000), `only ${bars} bars`);
     assert.ok(fills > enough(200), `only ${fills} bars with a fill`);
+    for (const meter of ["12/8", "6/8"])
+      if (LIBRARY.some((chart) => chart.meter === meter))
+        assert.ok(
+          (meters.get(meter) ?? 0) > 100,
+          `only ${meters.get(meter) ?? 0} bars of ${meter}`,
+        );
   },
 );
+
+test("disco: in six and twelve the hat is the triplet: from the working level up every eighth of every bar of time has the hat or the shaker on it (the closed hat on each pulse, the open hat on its last eighth, the middle eighth the closed hat or the shaker), unless a fill or a crash has the hand; and quiet, the closed hat alone, on each pulse and its last eighth, never the triplet's middle note", {
+  skip: only("disco").skip || !LIBRARY.some((chart) => isCompound(parse(chart.text).chart.meter)),
+}, () => {
+  let working = 0;
+  let quiet = 0;
+  const CYMBALS = ["closedHat", "openHat", "crash"];
+  for (const { chart, options, take } of discoPlayed()) {
+    if (chart.meter !== "12/8" && chart.meter !== "6/8") continue;
+    for (const { bar, kit, energy } of kitBars(take)) {
+      if (bar.ending || bar.fill) continue;
+      const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
+      const steps = Math.round(bar.ticks / STEP);
+      const cymbal = new Set(CYMBALS.flatMap((voice) => [...(kit.get(voice) ?? [])]));
+      if (energy >= TIER_MID) {
+        working++;
+        const shaker = kit.get("shaker") ?? new Set();
+        for (let step = 0; step < steps; step += 2)
+          assert.ok(
+            cymbal.has(step) || shaker.has(step),
+            `${where}: nothing on eighth ${step / 2 + 1}`,
+          );
+        continue;
+      }
+      quiet++;
+      assert.ok(!kit.has("shaker"), `${where}: the shaker, quiet`);
+      // In sixteenths: a pulse is six, its eighths at 0, 2 and 4 into it.
+      for (let pulse = 0; pulse < steps; pulse += 6) {
+        assert.ok(cymbal.has(pulse), `${where}: no hat on pulse ${pulse / 6 + 1}`);
+        assert.ok(cymbal.has(pulse + 4), `${where}: no hat on the last eighth of ${pulse / 6 + 1}`);
+        assert.ok(!cymbal.has(pulse + 2), `${where}: the triplet's middle eighth, quiet`);
+      }
+    }
+  }
+  assert.ok(working > 100 && quiet > 50, `only ${working} bars working and ${quiet} quiet`);
+});
 
 // ── reggae ──────────────────────────────────────────────────────────────────
 

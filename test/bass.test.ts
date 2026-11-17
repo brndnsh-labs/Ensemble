@@ -527,6 +527,63 @@ test(
   },
 );
 
+// ── disco ───────────────────────────────────────────────────────────────────
+
+test(
+  "disco: in six and twelve the bass pumps with the floor: every note is on an eighth and every pulse is struck, with the kick; quiet it plays nothing between the pulses but a pickup on the bar's last eighth; from the working level up it strikes a pulse's last eighth in every bar, the octave over the pulse's note where it pumps, and below the hot level never the triplet's middle eighth",
+  only("disco"),
+  () => {
+    const disco = STYLES.find((style) => style.id === "disco")!;
+    const compound = (jam: { chart: { meter: string } }) =>
+      jam.chart.meter === "12/8" || jam.chart.meter === "6/8";
+    const played = [
+      ...takes((jam) => jam.style.id === "disco" && compound(jam)),
+      ...heldTakes(disco, "12/8"),
+      ...heldTakes(disco, "6/8"),
+    ];
+    let bars = 0;
+    let octaves = 0;
+    for (const { chart, options, take } of played) {
+      const bass = notesOf(take, "bass");
+      for (const bar of take.plan.bars) {
+        if (bar.kind !== "music" || bar.seats.bass === null || bar.ending) continue;
+        if (bar.spans.some((span) => span.chord === null)) continue;
+        bars++;
+        const tier = tierOf(bar.seats.bass);
+        const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
+        const end = bar.start + bar.ticks;
+        const notes = bass.filter((note) => note.tick >= bar.start && note.tick < end);
+        // In sixteenths: a pulse is six, its eighths at 0, 2 and 4 into it.
+        const at = new Map(notes.map((note) => [(note.tick - bar.start) / (PPQ / 4), note.pitch]));
+        const steps = Math.round(bar.ticks / (PPQ / 4));
+        for (const step of at.keys()) assert.equal(step % 2, 0, `${where}: between the eighths`);
+        for (let pulse = 0; pulse < steps; pulse += 6) {
+          assert.ok(at.has(pulse), `${where}: nothing on the pulse at ${pulse}`);
+          if (at.get(pulse + 4) === at.get(pulse)! + 12) octaves++;
+          if (tier !== "high")
+            assert.ok(!at.has(pulse + 2), `${where}: the middle eighth of the pulse at ${pulse}`);
+        }
+        const between = [...at.keys()].filter((step) => step % 6 !== 0);
+        if (tier === "low") {
+          assert.ok(
+            between.every((step) => step === steps - 2),
+            `${where}: quiet, and ${between.join(" ")} between the pulses`,
+          );
+        } else {
+          assert.ok(
+            between.some((step) => step % 6 === 4),
+            `${where}: only the pulses (${[...at.keys()].join(" ")})`,
+          );
+        }
+      }
+    }
+    if (LIBRARY.some((chart) => compound({ chart }))) {
+      assert.ok(bars > 200, `only ${bars} bars of six and twelve`);
+      assert.ok(octaves > bars / 2, `only ${octaves} octaves pumped in ${bars} bars`);
+    }
+  },
+);
+
 // ── an upright in six ───────────────────────────────────────────────────────
 
 test(
