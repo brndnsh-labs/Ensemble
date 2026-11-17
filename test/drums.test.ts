@@ -402,7 +402,7 @@ const neosoulPlayed = (): Jam[] => [
 ];
 
 test(
-  "neo-soul: the loop's time is the kick on the One and a backbeat on every pulse between the strong ones (2 and 4 in four and in twelve, the second pulse in six), on the snare or, very quiet, the cross-stick; the last of them may come one step of the grid late in the second bar of a pair (a sixteenth in four, the triplet's middle eighth in six and twelve), and a fill may take it",
+  "neo-soul: the loop's time is the kick on the One and a backbeat on every pulse between the strong ones (2 and 4 in four and in twelve, the second pulse in six), on the snare or, very quiet, the cross-stick; the last of them may come one step of the grid late in the second bar of a pair (a sixteenth, in four and in six and twelve alike: as late in time, since the tempo counts the pulse), and a fill may take it",
   only("neosoul"),
   () => {
     let bars = 0;
@@ -424,7 +424,7 @@ test(
           assert.ok(backbeat(step), `${where}: no backbeat at ${step}`);
         if (bar.fill) continue;
         const last = between.at(-1)!;
-        const late = last + (isCompound(bar.meter) ? 2 : 1);
+        const late = last + 1;
         assert.ok(
           backbeat(last) || (bar.phrase.bar % 2 === 1 && backbeat(late)),
           `${where}: no backbeat at ${last}`,
@@ -507,7 +507,7 @@ function compoundBars(): { where: string; bar: PlanBar; kit: Kit; held: number |
   );
 }
 
-test("in a bar of dotted pulses the drummer's time is on the eighths: no stroke of it falls between them, so a cymbal's skip note is the pulse's last eighth and never its last sixteenth (a fill is its own figure)", {
+test("in a bar of dotted pulses the drummer's time is on the eighths: no stroke of it falls between them, so a cymbal's skip note is the pulse's last eighth and never its last sixteenth (a fill is its own figure, and a backbeat a style writes a sixteenth late is the snare a sixteenth after a pulse, nowhere else)", {
   skip: !anyCompound,
 }, () => {
   let strokes = 0;
@@ -515,6 +515,8 @@ test("in a bar of dotted pulses the drummer's time is on the eighths: no stroke 
     for (const [voice, steps] of kit) {
       for (const step of steps) {
         strokes++;
+        // A displaced backbeat (neo-soul's late four) is late by a sixteenth, as it is in four.
+        if (voice === "snare" && step % 6 === 1) continue;
         assert.equal(step % 2, 0, `${where}: the ${voice} between the eighths`);
       }
     }

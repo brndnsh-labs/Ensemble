@@ -100,8 +100,10 @@ const TOM = { weight: 1, lines: { snare: "x...", midTom: "..X." } };
 // last eighth. So the hat's sixteenths ("x g o g") are the triplets with the
 // middle eighth ghosted ("x.g.o."), the kick's pushes are the pulses' last
 // eighths, and the ghosts sit on the triplet's inner notes. The late four is the
-// backbeat moved one step of the grid the band plays: a sixteenth in four, the
-// triplet's middle eighth here (ST-neosoul-08: a written rhythm, not a drag).
+// backbeat a sixteenth late, as in four (ST-neosoul-08: a written rhythm, not a
+// drag). It was first written on the triplet's middle eighth, twice as late in
+// time as four's (0.34 s against 0.18), and Brandon heard that it "might drag a
+// little": the sixteenth is the one drum stroke here that is not on an eighth.
 //
 // Six is not half of twelve but for its basic beat: the hat and the backbeat
 // are twelve's first two pulses (`half` below), the kick on the One and the
@@ -167,7 +169,7 @@ const SIX_GHOSTS = {
   high: ["..g.g. ..g...", "....g. ..g.g.", "..g... ..g.g."],
 };
 
-/** The late four: the last backbeat on the triplet's middle eighth after it, in 35% of sections. */
+/** The late four: the last backbeat a sixteenth after its pulse, as late in time as it is in four, in 35% of sections. */
 const lateFour = (snare: string): GrooveOption[] => [
   { weight: 65, lines: {} },
   { weight: 35, lines: { snare } },
@@ -273,7 +275,7 @@ const neosoulDrumsInTwelve: DrumTime = {
     backbeat: TWELVE_BACKBEAT,
     crossStick: TWELVE_CROSS_STICK,
     ghosts: TWELVE_GHOSTS,
-    late: "...... ...... ...... -.X...",
+    late: "...... ...... ...... -X....",
     breath: TWELVE_BREATH,
   }),
   touches: [{ voices: ["closedHat", "openHat"], scale: 0.8 }],
@@ -289,7 +291,7 @@ const neosoulDrumsInSix: DrumTime = {
     backbeat: halves(TWELVE_BACKBEAT),
     crossStick: halves(TWELVE_CROSS_STICK),
     ghosts: SIX_GHOSTS,
-    late: "...... -.X...",
+    late: "...... -X....",
     breath: SIX_BREATH,
   }),
   touches: [{ voices: ["closedHat", "openHat"], scale: 0.8 }],

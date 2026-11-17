@@ -688,7 +688,7 @@ test("rock: in twelve the whole band is on the triplet's eighths: no note of the
 });
 // ── neo-soul ────────────────────────────────────────────────────────────────
 
-test("neo-soul: in six and twelve the whole band is on the triplet's eighths, the drummer's fills and the soloist too, and nothing swings them; the one note between them is the bass's lazy pickup, the sixteenth before a chord it leads into (ST-neosoul-17)", {
+test("neo-soul: in six and twelve the whole band is on the triplet's eighths, the drummer's fills and the soloist too, and nothing swings them; the notes between them are the bass's lazy pickup, the sixteenth before a chord it leads into (ST-neosoul-17), and the late four, the last backbeat a sixteenth after its pulse (ST-neosoul-08)", {
   skip:
     only("neosoul").skip ||
     !LIBRARY.some((chart) => chart.meter === "12/8" || chart.meter === "6/8"),
@@ -724,6 +724,14 @@ test("neo-soul: in six and twelve the whole band is on the triplet's eighths, th
       const where = `${chart.file} ${JSON.stringify(options)}: the ${note.seat} (${note.voice ?? ""}) at ${note.tick}`;
       assert.ok(Math.abs(note.offset) <= POCKET, `${where}, moved ${note.offset}`);
       if ((note.tick - bar.start) % (PPQ / 2) === 0) continue;
+      // The late four: the snare a sixteenth after the bar's last pulse.
+      const lastPulse = pulseStarts(bar.meter).at(-1)!;
+      if (
+        note.seat === "drums" &&
+        note.voice === "snare" &&
+        note.tick - bar.start === lastPulse + PPQ / 4
+      )
+        continue;
       assert.ok(
         note.seat === "bass" && arrivals.has(note.tick + PPQ / 4),
         `${where}, between the eighths`,

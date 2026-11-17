@@ -30,7 +30,7 @@
     "inTarget": 1
   },
   "drums.ghosts-per-bar": {
-    "mean": 3.7152,
+    "mean": 3.756,
     "p10": 2.4521,
     "p90": 5,
     "inTarget": 0.8909
@@ -138,7 +138,7 @@
     "inTarget": 0.8729
   },
   "chords.top-holds": {
-    "mean": 0.254,
+    "mean": 0.2539,
     "p10": 0,
     "p90": 0.4894,
     "inTarget": null
@@ -162,7 +162,7 @@
     "inTarget": 1
   },
   "chords.top-movement": {
-    "mean": 2.1327,
+    "mean": 2.1329,
     "p10": 1.2381,
     "p90": 3.4375,
     "inTarget": 1
@@ -186,10 +186,10 @@
     "inTarget": 0.985
   },
   "chords.lowest-note": {
-    "mean": 52.6627,
+    "mean": 52.6632,
     "p10": 49.7292,
     "p90": 56.0268,
-    "inTarget": 0.74
+    "inTarget": 0.735
   },
   "chords.colour": {
     "mean": 0.968,
