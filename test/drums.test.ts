@@ -392,6 +392,88 @@ test("rock: in twelve the cymbal is on every eighth from the working level up, a
   assert.ok(working > 100 && quiet > 50, `only ${working} bars working and ${quiet} quiet`);
 });
 
+// ── neo-soul ────────────────────────────────────────────────────────────────
+
+const neosoul = STYLES.find((style) => style.id === "neosoul");
+/** Neo-soul where it plays its own parts, and in six and in twelve held at each of its levels. */
+const neosoulPlayed = (): Jam[] => [
+  ...takes(itsOwn("neosoul")),
+  ...(neosoul ? [...heldTakes(neosoul, "12/8"), ...heldTakes(neosoul, "6/8")] : []),
+];
+
+test(
+  "neo-soul: the loop's time is the kick on the One and a backbeat on every pulse between the strong ones (2 and 4 in four and in twelve, the second pulse in six), on the snare or, very quiet, the cross-stick; the last of them may come one step of the grid late in the second bar of a pair (a sixteenth in four, the triplet's middle eighth in six and twelve), and a fill may take it",
+  only("neosoul"),
+  () => {
+    let bars = 0;
+    const meters = new Map<string, number>();
+    for (const { chart, options, take } of neosoulPlayed()) {
+      for (const { bar, kit } of kitBars(take)) {
+        if (bar.ending) continue;
+        bars++;
+        meters.set(chart.meter, (meters.get(chart.meter) ?? 0) + 1);
+        const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
+        assert.ok(strikes(kit, "kick", 0), `${where}: no kick on the One`);
+        const strong = strongPulses(bar.meter);
+        const between = pulseStarts(bar.meter)
+          .filter((tick) => !strong.includes(tick))
+          .map((tick) => tick / STEP);
+        const backbeat = (step: number) =>
+          strikes(kit, "snare", step) || strikes(kit, "crossStick", step);
+        for (const step of between.slice(0, -1))
+          assert.ok(backbeat(step), `${where}: no backbeat at ${step}`);
+        if (bar.fill) continue;
+        const last = between.at(-1)!;
+        const late = last + (isCompound(bar.meter) ? 2 : 1);
+        assert.ok(
+          backbeat(last) || (bar.phrase.bar % 2 === 1 && backbeat(late)),
+          `${where}: no backbeat at ${last}`,
+        );
+      }
+    }
+    assert.ok(bars > enough(2000), `only ${bars} bars`);
+    for (const meter of ["12/8", "6/8"])
+      if (LIBRARY.some((chart) => chart.meter === meter))
+        assert.ok(
+          (meters.get(meter) ?? 0) > 100,
+          `only ${meters.get(meter) ?? 0} bars of ${meter}`,
+        );
+  },
+);
+
+test("neo-soul: in six and twelve the hat plays the soul ballad's triplets: from the working level up on every eighth of every bar of time (where it breathes open, the open hat), unless a fill or a crash has the hand, with a ghost on the snare in every bar; and quiet, on each pulse and at most its last eighth, never the triplet's middle note, and no ghost", {
+  skip: only("neosoul").skip || !LIBRARY.some((chart) => isCompound(parse(chart.text).chart.meter)),
+}, () => {
+  let working = 0;
+  let quiet = 0;
+  const CYMBALS = ["closedHat", "openHat", "crash"];
+  for (const { chart, options, take } of neosoulPlayed()) {
+    if (chart.meter !== "12/8" && chart.meter !== "6/8") continue;
+    for (const { bar, kit, energy } of kitBars(take)) {
+      if (bar.ending || bar.fill) continue;
+      const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
+      const steps = Math.round(bar.ticks / STEP);
+      const cymbal = new Set(CYMBALS.flatMap((voice) => [...(kit.get(voice) ?? [])]));
+      const ghosts = kit.get("ghostSnare")?.size ?? 0;
+      if (energy >= TIER_MID) {
+        working++;
+        for (let step = 0; step < steps; step += 2)
+          assert.ok(cymbal.has(step), `${where}: no hat on eighth ${step / 2 + 1}`);
+        assert.ok(ghosts > 0, `${where}: no ghost on the snare`);
+        continue;
+      }
+      quiet++;
+      // In sixteenths: a pulse is six, its eighths at 0, 2 and 4 into it.
+      for (let pulse = 0; pulse < steps; pulse += 6) {
+        assert.ok(cymbal.has(pulse), `${where}: no hat on pulse ${pulse / 6 + 1}`);
+        assert.ok(!cymbal.has(pulse + 2), `${where}: the triplet's middle eighth, quiet`);
+      }
+      assert.equal(ghosts, 0, `${where}: a ghost, quiet`);
+    }
+  }
+  assert.ok(working > 100 && quiet > 50, `only ${working} bars working and ${quiet} quiet`);
+});
+
 // ── six and twelve ──────────────────────────────────────────────────────────
 
 const compound = (jam: Pick<Jam, "chart">) => isCompound(parse(jam.chart.text).chart.meter);

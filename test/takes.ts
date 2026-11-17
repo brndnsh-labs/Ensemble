@@ -70,6 +70,7 @@ export const WRITTEN: Readonly<Record<string, readonly string[]>> = {
   blues: ["12/8"],
   rock: ["12/8"],
   acoustic: ["6/8"],
+  neosoul: ["12/8", "6/8"],
 };
 
 /** A take whose chart is in 4/4 or in a meter its style has written. */
