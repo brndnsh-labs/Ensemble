@@ -14,8 +14,7 @@ import { keyToString, planBar, SOLO_INSTRUMENTS, seatChoice } from "@ensemble/en
 import type { ReactNode } from "react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Editor } from "../edit/useEditor.tsx";
-import { flood } from "../motion/moves.ts";
-import { useSwitches } from "../motion/switches.ts";
+import { flood } from "../motion.ts";
 import { instrument } from "../posters.ts";
 import type { Place } from "../Trail.tsx";
 import { Trail } from "../Trail.tsx";
@@ -165,16 +164,13 @@ export function Stage(props: Props) {
 
   const idle = jam.phase === "idle";
 
-  // The motion study: the flood comes in from the press of Play (8), or is printed (9).
-  const motion = useSwitches();
-  const flooding = motion.on.flood || motion.on.print;
-  const dock = useRef<HTMLElement>(null);
-  const floodRef = useRef<HTMLSpanElement>(null);
+  // The dock's ink is printed from the press of Play, before the frame that shows it.
+  const field = useRef<HTMLSpanElement>(null);
   const wasIdle = useRef(idle);
   useLayoutEffect(() => {
     const from = wasIdle.current;
     wasIdle.current = idle;
-    if (from && !idle && floodRef.current && dock.current) flood(floodRef.current, dock.current);
+    if (from && !idle && field.current) flood(field.current);
   }, [idle]);
   const playing = jam.phase === "playing";
   // With the pencil down the space bar is the keyboard's: it presses the bar or the name it is on.
@@ -279,8 +275,8 @@ export function Stage(props: Props) {
         </p>
       )}
 
-      <footer className="band-dock" ref={dock}>
-        {flooding && <span className="flood" ref={floodRef} aria-hidden="true" />}
+      <footer className="band-dock">
+        <span className="flood" ref={field} aria-hidden="true" />
         <StatusStrip
           plan={plan}
           place={playing ? jam.place : undefined}

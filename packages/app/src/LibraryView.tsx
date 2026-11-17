@@ -12,7 +12,6 @@ import { LIBRARY, showing, YOURS } from "./address.ts";
 import { NewCharts } from "./HomeView.tsx";
 import type { LibraryChart } from "./library.ts";
 import { LIBRARY as BUILT_IN } from "./library.ts";
-import { useSwitches } from "./motion/switches.ts";
 import { PosterName, usePosterWidths } from "./PosterName.tsx";
 import { byTitle, count, lineUp, saysOf, writtenFor } from "./posters.ts";
 import { Charts } from "./rows.tsx";
@@ -46,13 +45,12 @@ export function Library({ show, find, own, play }: Props) {
   const style = styleShown(show, find);
   const yours = !searching && show === YOURS;
 
-  // The motion study's pivot (6): the place shown is at the row's left edge, the next peeking in at the right.
-  const pivot = useSwitches().on.pivot;
+  // The places are one row that scrolls sideways: the place shown is put at its left edge, the next peeking in at the right.
   const strip = useRef<HTMLElement>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: the place shown changes with `show`, and is read from the page
   useLayoutEffect(() => {
     const row = strip.current;
-    if (!pivot || !row) return;
+    if (!row) return;
     const place = () => {
       const here = row.querySelector<HTMLElement>("[aria-current]");
       if (!here) return;
@@ -66,7 +64,7 @@ export function Library({ show, find, own, play }: Props) {
     return () => {
       current = false;
     };
-  }, [pivot, show]);
+  }, [show]);
 
   if (searching) {
     const found = all.filter((entry) => matches(entry, words)).sort(byTitle);

@@ -18,9 +18,7 @@ export type Route =
   /** `show` is empty for every chart, `yours`, or a style's id. A search is across all of them. */
   | { readonly screen: "library"; readonly show: string; readonly find: string }
   | { readonly screen: "chart" | "edit" | "take"; readonly id: string }
-  | { readonly screen: "credits" }
-  /** The motion study's switchboard (`motion/`): not part of the app. */
-  | { readonly screen: "motion" };
+  | { readonly screen: "credits" };
 
 export const HOME = "#/";
 export const TAKES = "#/takes";
@@ -50,7 +48,6 @@ export function routeOf(hash: string): Route {
   const id = decoded(rest.join("/"));
   if (first === "takes") return { screen: "home", takes: true };
   if (first === "credits") return { screen: "credits" };
-  if (first === "motion") return { screen: "motion" };
   if (first === "charts") {
     const find = /(?:^|&)find=([^&]*)/.exec(query)?.[1];
     return { screen: "library", show: id, find: find === undefined ? "" : decoded(find) };
@@ -73,13 +70,13 @@ let returned = false;
 /** The address shown before this one. */
 let before = "";
 let current = location.hash;
-/** The address the screens are drawn for: `current`, unless the motion study is between the two. */
+/** The address the screens are drawn for: `current`, except while a view transition captures the old screen (`motion.ts`). */
 let shown = current;
 let entries = 0;
 
 /**
- * The motion study's hold on an arrival: given the way the screens are told,
- * it may tell them itself, from inside a view transition, and say so.
+ * A hold on an arrival (`motion.ts`): given the way the screens are told, it
+ * may tell them itself, from inside a view transition, and say so.
  */
 type Arrival = (from: string, to: string, show: () => void) => boolean;
 let arrival: Arrival | undefined;

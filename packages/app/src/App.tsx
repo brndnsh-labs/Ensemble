@@ -8,8 +8,7 @@ import { address, cameBack, go, routeOf, subscribeAddress } from "./address.ts";
 import { Browse } from "./Browse.tsx";
 import { CreditsView } from "./CreditsView.tsx";
 import { findChart, ownCharts, subscribeCharts } from "./charts.ts";
-import { screenOf, stage, turn } from "./motion/moves.ts";
-import { MotionPage } from "./motion/Switchboard.tsx";
+import { arrived, screenOf } from "./motion.ts";
 import type { Saving } from "./offline.ts";
 import { saveInstruments } from "./offline.ts";
 import { PlayView } from "./play/PlayView.tsx";
@@ -21,8 +20,9 @@ import { loadSettings, saveSettings } from "./settings.ts";
 import { chartFor, findTake, keptTakes, subscribeTakes } from "./takes.ts";
 
 /**
- * The motion study: a screen arrived at is turned in (4) and its pieces are
- * staged (2, 9), before its first frame. A search being typed is not arrived at.
+ * A screen arrived at moves in before its first frame (`motion.ts`): turned in
+ * from the side it came from, unless it is the first, and its pieces staged.
+ * A search being typed is not arrived at.
  */
 function useArrival(route: ReturnType<typeof routeOf>): void {
   const screen = screenOf(route);
@@ -33,8 +33,7 @@ function useArrival(route: ReturnType<typeof routeOf>): void {
     was.current = screen;
     const root = document.getElementById("app")?.firstElementChild;
     if (!(root instanceof HTMLElement)) return;
-    if (before) turn(root, cameBack() || screen.depth < before.depth);
-    stage(root);
+    arrived(root, route, before && (cameBack() || screen.depth < before.depth));
   });
 }
 
@@ -68,7 +67,6 @@ export function App() {
 
   const route = routeOf(hash);
   useArrival(route);
-  if (route.screen === "motion") return <MotionPage />;
   if (route.screen === "credits") return <CreditsView packsUrl={PACKS_URL} />;
   if (route.screen === "take") {
     const take = findTake(route.id);

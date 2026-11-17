@@ -1,16 +1,46 @@
-// The study's motions. Every one animates `transform` and `opacity` only, by the
-// browser's own animations (`Element.animate`), which run off the main thread
-// where they can; none waits on anything before a press is acted on, and each
-// is cut short by the next press. Nothing here runs where the device asks for
-// less movement.
+// How the app moves: a thing pressed tilts toward the finger; a screen's pieces
+// arrive one after another, the inks printed and the rest feathered in, the
+// whole turned in from the side it came from; the thing pressed becomes the
+// heading where it leads; the dock's ink is printed when the band starts.
+//
+// Every motion is the browser's own animation of `transform` and `opacity`
+// only, started in the press's own task or before the screen's first frame.
+// Nothing waits on one, and the next press cuts it short. Nothing moves where
+// the device asks for less movement. The times and distances are the
+// stylesheet's tokens (`--move-*` at the top of `style.css`), read once.
 
 import { flushSync } from "react-dom";
-import type { Route } from "../address.ts";
-import { onArrival, routeOf } from "../address.ts";
-import { moving, ms } from "./switches.ts";
+import type { Route } from "./address.ts";
+import { onArrival, routeOf } from "./address.ts";
 
-/** Metro's ease: quick, and out. */
+const less = matchMedia("(prefers-reduced-motion: reduce)");
+
+/** Asked at the moment a motion would start, so a change of the device's setting holds at once. */
+const still = (): boolean => less.matches;
+
+/** Quick, and out: the ease of everything that arrives. */
 const OUT = "cubic-bezier(0.1, 0.9, 0.2, 1)";
+
+let tokens: Record<string, number> | undefined;
+
+/** A `--move-*` token of the stylesheet, as a number of milliseconds or pixels. */
+function token(name: string): number {
+  if (!tokens) {
+    tokens = {};
+    const root = getComputedStyle(document.documentElement);
+    for (const each of [
+      "press-back",
+      "feather",
+      "feather-step",
+      "feather-in",
+      "print",
+      "turn",
+      "turn-in",
+    ])
+      tokens[each] = Number.parseFloat(root.getPropertyValue(`--move-${each}`)) || 0;
+  }
+  return tokens[name] ?? 0;
+}
 
 // ── Tilt on press ───────────────────────────────────────────────────────────
 
@@ -25,23 +55,21 @@ function release(): void {
   const { element, transform } = tilted;
   tilted = undefined;
   element.style.transform = "";
-  // Back in under 120 ms, a hair past level and home: a spring, not a fade.
+  // A spring back, a hair past level and home, rather than a fade.
   element.animate(
     [{ transform }, { transform: "scale(1.004)", offset: 0.7 }, { transform: "none" }],
-    {
-      duration: ms(100),
-      easing: "cubic-bezier(0.2, 0.7, 0.3, 1)",
-    },
+    { duration: token("press-back"), easing: "cubic-bezier(0.2, 0.7, 0.3, 1)" },
   );
 }
 
-function press(event: PointerEvent): void {
-  if (!moving("tilt") || event.button !== 0 || !(event.target instanceof Element)) return;
+function tilt(event: PointerEvent): void {
+  if (still() || event.button !== 0 || !(event.target instanceof Element)) return;
   const element = event.target.closest<HTMLElement>(TILTS);
-  if (!element || element.closest(".motion-sheet") || (element as HTMLButtonElement).disabled)
-    return;
+  if (!element || (element as HTMLButtonElement).disabled) return;
+  // The editor's dock holds still under the keyboard: Play there does not tilt.
+  if (element.closest(".play.editing .band-dock")) return;
   release();
-  // A live tile in the middle of turning over is put down where it is going.
+  // Pressed while it is still arriving: put down where it is going, so the tilt is what shows.
   for (const running of element.getAnimations({ subtree: true })) running.finish();
   const box = element.getBoundingClientRect();
   const size = Math.max(box.width, box.height);
@@ -53,24 +81,25 @@ function press(event: PointerEvent): void {
   const centred = 1 - Math.max(Math.abs(across), Math.abs(down));
   const scale = 0.985 - 0.015 * centred;
   const transform = `perspective(${Math.round(Math.max(300, size * 3))}px) rotateX(${(-down * most).toFixed(2)}deg) rotateY(${(across * most).toFixed(2)}deg) scale(${scale.toFixed(3)})`;
-  // In the frame of the press: written at once, with no transition.
+  // Written in the press's own task, with no transition: the frame of the press shows it.
   element.style.transform = transform;
   tilted = { element, transform };
 }
 
-// ── Arriving on a screen: feathered, printed, turned ────────────────────────
+// ── Arriving on a screen: printed, feathered, turned ────────────────────────
 
-/** A field of a style's ink: printed where (9) is on, rather than feathered. */
+/** A field of a style's ink, printed rather than feathered. */
 const INK = ".last, .lately-item, .tile, .style-head";
-/** The pieces a screen's arrival stages: home's poster, bills and tiles, and a list's rows. */
+/** The pieces an arrival stages: home's poster, bills and tiles, and a list's rows. */
 const PIECES = `${INK}, .rows > li`;
 
-const STEP = 22;
-const PIECE = 110;
-/** Steps at most: the last starts at 88 ms and is in by 198 ms. */
-const STEPS = 5;
+/** Lines staged one after another at most: past the fifth, the rest come with the fifth. */
+const LINES = 5;
 
-export const inView = (element: Element): boolean => {
+/** How faint a piece is at the start of its arrival, or a field of ink as it is printed: enough to read from the first frame. */
+const ARRIVING_FROM = 0.5;
+
+const inView = (element: Element): boolean => {
   const box = element.getBoundingClientRect();
   return (
     box.height > 0 &&
@@ -82,59 +111,44 @@ export const inView = (element: Element): boolean => {
 };
 
 /**
- * Stage the pieces in view, one line after another: pieces at the same height
- * come together, and past the fifth line the rest come with the fifth. A move
- * and a fade each, all in by 200 ms. The pieces are where they will be, and
- * pressable, from the first frame.
+ * The pieces in view, one line after another: pieces at the same height come
+ * together. A short move from the right with a little fade, all in by about
+ * 200 ms; the pieces are where they will be, legible and pressable, from the
+ * first frame.
  */
-export function feather(root: ParentNode, selector: string, skip = ""): void {
+function feather(root: ParentNode, selector: string, skip = ""): void {
   const pieces = [...root.querySelectorAll<HTMLElement>(selector)].filter(
     (piece) => inView(piece) && !(skip && piece.matches(skip)),
   );
-  const lines = [
-    ...new Set(pieces.map((piece) => Math.round(piece.getBoundingClientRect().top / 8))),
-  ].sort((a, b) => a - b);
-  for (const piece of pieces) {
-    const line = lines.indexOf(Math.round(piece.getBoundingClientRect().top / 8));
+  const heights = pieces.map((piece) => Math.round(piece.getBoundingClientRect().top / 8));
+  const lines = [...new Set(heights)].sort((a, b) => a - b);
+  pieces.forEach((piece, at) => {
+    const line = lines.indexOf(heights[at] ?? 0);
     piece.animate(
       [
-        { transform: "translateX(28px)", opacity: 0 },
+        { transform: `translateX(${token("feather-in")}px)`, opacity: ARRIVING_FROM },
         { transform: "none", opacity: 1 },
       ],
       {
-        duration: ms(PIECE),
-        delay: ms(Math.min(line, STEPS - 1) * STEP),
+        duration: token("feather"),
+        delay: Math.min(line, LINES - 1) * token("feather-step"),
         easing: OUT,
         fill: "backwards",
       },
     );
-  }
+  });
 }
 
-/** Ink pressed onto the paper: from a hair oversize to size, as it comes up from nothing. */
-export function print(elements: Iterable<HTMLElement>, over = 1.03): void {
-  for (const element of elements) {
+/** Ink pressed onto the paper: from a hair oversize to size, as it comes up to full. */
+function print(elements: Iterable<HTMLElement>, over: number): void {
+  for (const element of elements)
     element.animate(
       [
-        { transform: `scale(${over})`, opacity: 0 },
+        { transform: `scale(${over})`, opacity: ARRIVING_FROM },
         { transform: "none", opacity: 1 },
       ],
-      { duration: ms(120), easing: "cubic-bezier(0.3, 0.6, 0.2, 1)" },
+      { duration: token("print"), easing: "cubic-bezier(0.3, 0.6, 0.2, 1)" },
     );
-  }
-}
-
-/** The pieces of a screen just arrived at, staged by whichever of (2) and (9) is on. */
-export function stage(root: ParentNode): void {
-  if (moving("print")) print([...root.querySelectorAll<HTMLElement>(INK)].filter(inView));
-  if (moving("feather")) feather(root, PIECES, moving("print") ? INK : "");
-}
-
-/** A sheet's options, as it opens: never over the chart while the band plays. */
-export function stageSheet(sheet: HTMLElement): void {
-  if (!moving("feather") || sheet.classList.contains("motion-sheet")) return;
-  if (document.querySelector('.play:not([data-state="idle"])')) return;
-  feather(sheet, ".opt, .menu > li, .tempo-set, .tempo-range");
 }
 
 /** Which screen an address is, for arriving: none for a search being typed, which is not arrived at. */
@@ -157,13 +171,32 @@ export function screenOf(
   }
 }
 
-/** The arriving screen's content, from the right going forward and from the left going back: 150 ms, nothing leaving. */
-export function turn(root: HTMLElement, back: boolean): void {
-  if (!moving("turn")) return;
-  root.animate([{ transform: `translateX(${back ? -32 : 32}px)` }, { transform: "none" }], {
-    duration: ms(150),
-    easing: OUT,
-  });
+/**
+ * A screen arrived at, before its first frame: its content turned in from the
+ * right going forward and from the left going back, with nothing leaving, and
+ * its pieces in view printed or feathered. Not into the editing mode, where the
+ * keyboard may be coming up and the frame holds still for it.
+ */
+export function arrived(root: HTMLElement, route: Route, back: boolean | undefined): void {
+  if (still() || route.screen === "edit") return;
+  if (back !== undefined)
+    root.animate(
+      [{ transform: `translateX(${back ? -token("turn-in") : token("turn-in")}px)` }, {}],
+      { duration: token("turn"), easing: OUT },
+    );
+  print([...root.querySelectorAll<HTMLElement>(INK)].filter(inView), 1.03);
+  feather(root, PIECES, INK);
+}
+
+/** A sheet's options, as it opens: never over the chart while the band plays. */
+export function stageSheet(sheet: HTMLElement): void {
+  if (still() || document.querySelector('.play:not([data-state="idle"])')) return;
+  feather(sheet, ".opt, .menu > li, .tempo-set, .tempo-range");
+}
+
+/** The dock's flood of the style's ink, printed from the press of Play. */
+export function flood(field: HTMLElement): void {
+  if (!still()) print([field], 1.02);
 }
 
 // ── Continuum ───────────────────────────────────────────────────────────────
@@ -191,7 +224,7 @@ function linkTo(address: string): HTMLElement | undefined {
 function headingOf(address: string): HTMLElement | undefined {
   const route = routeOf(address);
   const heading =
-    route.screen === "chart" || route.screen === "edit"
+    route.screen === "chart"
       ? document.querySelector<HTMLElement>(".chart-title")
       : route.screen === "library" && route.find === "" && route.show !== ""
         ? document.querySelector<HTMLElement>(".style-head .poster-name")
@@ -199,7 +232,20 @@ function headingOf(address: string): HTMLElement | undefined {
   return heading && inView(heading) ? heading : undefined;
 }
 
-let running: ViewTransition | undefined;
+/** The flight under way, and how to show its screen at once if a press comes before the browser has. */
+let running: { readonly transition: ViewTransition; readonly reveal: () => void } | undefined;
+
+/**
+ * A press while a flight is under way: it ends where it is, and the press is
+ * answered at once. Before the browser has captured the screen being left,
+ * the screen arrived at is shown in the press's own task, not after the capture.
+ */
+function cut(): void {
+  if (!running) return;
+  const { transition, reveal } = running;
+  transition.skipTransition();
+  reveal();
+}
 
 /**
  * The thing pressed becomes the heading where it leads, and back again, by
@@ -210,14 +256,16 @@ let running: ViewTransition | undefined;
  */
 function continuum(from: string, to: string, show: () => void): boolean {
   if (running) {
-    // A press while one is under way: it ends where it is, and this one is acted on at once.
-    running.skipTransition();
+    cut();
     return false;
   }
-  if (!moving("continuum") || typeof document.startViewTransition !== "function") return false;
+  if (still() || typeof document.startViewTransition !== "function") return false;
   // A play button starts the band as its screen opens: that is not held back a frame for a flight.
   if (pressed?.closest(".row-play, .last-play")) return false;
-  const [fromScreen, toScreen] = [screenOf(routeOf(from)), screenOf(routeOf(to))];
+  const [fromRoute, toRoute] = [routeOf(from), routeOf(to)];
+  // Into or out of the editing mode the keyboard has the screen.
+  if (fromRoute.screen === "edit" || toRoute.screen === "edit") return false;
+  const [fromScreen, toScreen] = [screenOf(fromRoute), screenOf(toRoute)];
   if (!fromScreen || !toScreen || fromScreen.key === toScreen.key) return false;
   // Going to where a link on this screen leads: its words become the heading there.
   // Otherwise, leaving a screen whose heading a link on the next one leads back to.
@@ -225,28 +273,35 @@ function continuum(from: string, to: string, show: () => void): boolean {
   const old = forward ?? headingOf(from);
   if (!old) return false;
   const root = document.documentElement;
-  root.classList.add("m-continuum-run");
+  root.classList.add("continuum");
   old.style.viewTransitionName = "continuum";
-  let arrived: HTMLElement | undefined;
-  const transition = document.startViewTransition(() => {
+  let shown = false;
+  const reveal = () => {
+    if (shown) return;
+    shown = true;
     old.style.viewTransitionName = "";
     flushSync(show);
-    arrived = forward ? headingOf(to) : linkTo(from);
-    if (!arrived) {
+  };
+  let landing: HTMLElement | undefined;
+  const transition = document.startViewTransition(() => {
+    if (shown) return;
+    reveal();
+    landing = forward ? headingOf(to) : linkTo(from);
+    if (!landing) {
       transition.skipTransition();
       return;
     }
-    arrived.style.viewTransitionName = "continuum";
+    landing.style.viewTransitionName = "continuum";
     // What it lands in is not also staged: it is already moving.
-    for (const piece of [arrived, arrived.closest<HTMLElement>(PIECES)])
+    for (const piece of [landing, landing.closest<HTMLElement>(PIECES)])
       for (const animation of piece?.getAnimations() ?? []) animation.cancel();
   });
-  running = transition;
+  running = { transition, reveal };
   const done = () => {
     old.style.viewTransitionName = "";
-    if (arrived) arrived.style.viewTransitionName = "";
-    root.classList.remove("m-continuum-run");
-    if (running === transition) running = undefined;
+    if (landing) landing.style.viewTransitionName = "";
+    root.classList.remove("continuum");
+    if (running?.transition === transition) running = undefined;
   };
   transition.finished.then(done, done);
   transition.ready.catch(() => {});
@@ -254,49 +309,15 @@ function continuum(from: string, to: string, show: () => void): boolean {
   return true;
 }
 
-// ── The flood ───────────────────────────────────────────────────────────────
-
-/**
- * The dock's flood of the style's ink, from the press of Play: risen from
- * Play's own block in 120 ms (8), or pressed on as a print (9, which is taken
- * where both are on). `flood` covers the dock, under its words.
- */
-export function flood(flood: HTMLElement, dock: HTMLElement): void {
-  if (moving("print")) {
-    flood.style.transformOrigin = "50% 50%";
-    print([flood], 1.02);
-    return;
-  }
-  if (!moving("flood")) return;
-  const go = dock.querySelector(".go");
-  if (!go) return;
-  const whole = dock.getBoundingClientRect();
-  const from = go.getBoundingClientRect();
-  if (whole.width === 0 || whole.height === 0) return;
-  flood.style.transformOrigin = "";
-  flood.animate(
-    [
-      {
-        transform: `translate(${from.left - whole.left}px, ${from.top - whole.top}px) scale(${from.width / whole.width}, ${from.height / whole.height})`,
-      },
-      { transform: "none" },
-    ],
-    { duration: ms(120), easing: "cubic-bezier(0.3, 0.5, 0.2, 1)" },
-  );
-}
-
 // ── Installed once ──────────────────────────────────────────────────────────
 
-let installed = false;
-
 export function installMotion(): void {
-  if (installed) return;
-  installed = true;
   document.addEventListener(
     "pointerdown",
     (event) => {
       pressed = event.target instanceof Element ? event.target : null;
-      press(event);
+      cut();
+      tilt(event);
     },
     { capture: true, passive: true },
   );
@@ -305,6 +326,7 @@ export function installMotion(): void {
     "keydown",
     () => {
       pressed = document.activeElement;
+      cut();
     },
     { capture: true, passive: true },
   );

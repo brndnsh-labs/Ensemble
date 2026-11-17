@@ -6,7 +6,7 @@
 
 import type { ReactNode } from "react";
 import { useEffect, useId, useRef } from "react";
-import { stageSheet } from "../motion/moves.ts";
+import { stageSheet } from "../motion.ts";
 
 interface Props {
   readonly open: boolean;
