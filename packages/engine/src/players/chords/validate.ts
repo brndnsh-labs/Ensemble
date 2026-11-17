@@ -320,6 +320,8 @@ export function validateChordStyle(chords: ChordStyle): string[] {
         if (figure.turn !== undefined) readGrid(figure.turn, articulation, `${at}, its turn`);
         if (figure.alone !== undefined)
           readGrid(figure.alone, articulation, `${at}, with no bassist`);
+        if (figure.soloing !== undefined)
+          readGrid(figure.soloing, articulation, `${at}, under the soloist`);
         say(
           !figure.ties || figure.groove === true,
           `${at}: only a groove need say it ties a pushed chord; any other figure does.`,

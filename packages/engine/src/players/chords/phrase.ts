@@ -159,17 +159,28 @@ export function compStrikes(
     return [first, held.fork("second").weighted(rest, (figure) => figure.weight)];
   });
 
-  // A figure written a second way for a bar with no bassist is played that way there: the
-  // plan says who is playing (CH-26).
+  // A figure written a second way for a bar with no bassist, or for a bar under a soloist, is
+  // played that way there: the plan says who is playing (CH-26).
   const unaccompanied = new Map<CompFigure, CompFigure>();
+  const underTheLine = new Map<CompFigure, CompFigure>();
   const asPlayed = (bar: PlanBar, figure: CompFigure): CompFigure => {
-    if (figure.alone === undefined || bar.seats.bass !== null) return figure;
-    let known = unaccompanied.get(figure);
-    if (!known) {
-      known = { ...figure, name: `${figure.name}, alone`, grid: figure.alone };
-      unaccompanied.set(figure, known);
+    if (figure.alone !== undefined && bar.seats.bass === null) {
+      let known = unaccompanied.get(figure);
+      if (!known) {
+        known = { ...figure, name: `${figure.name}, alone`, grid: figure.alone };
+        unaccompanied.set(figure, known);
+      }
+      return known;
     }
-    return known;
+    if (figure.soloing !== undefined && bar.solo !== null) {
+      let known = underTheLine.get(figure);
+      if (!known) {
+        known = { ...figure, name: `${figure.name}, under the soloist`, grid: figure.soloing };
+        underTheLine.set(figure, known);
+      }
+      return known;
+    }
+    return figure;
   };
 
   // The chord the next bar opens on, where that is a change the piano plays into.

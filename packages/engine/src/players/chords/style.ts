@@ -321,6 +321,14 @@ export interface CompFigure {
    * out, the figure is the same with or without a bassist.
    */
   readonly alone?: string;
+  /**
+   * The figure as it is played in a bar where the soloist has the lead, written
+   * whole like any figure: a groove too busy to sit under a line makes room by
+   * playing less there (rock's ballad triplets in twelve become a chord a
+   * pulse, as its quarter notes are in four). Where there is no bassist either,
+   * `alone` is played. Left out, the figure is the same whoever has the lead.
+   */
+  readonly soloing?: string;
 }
 
 /** The comping vocabulary at one level of energy. */
