@@ -6,6 +6,7 @@
 
 import type { ReactNode } from "react";
 import { useEffect, useId, useRef } from "react";
+import { stageSheet } from "../motion/moves.ts";
 
 interface Props {
   readonly open: boolean;
@@ -31,6 +32,7 @@ export function Sheet({ open, close, title, kind, children }: Props) {
     // The sheet itself takes the focus: the next Tab is its first control, and nothing is
     // ringed by a touch.
     sheet.focus({ preventScroll: true });
+    stageSheet(sheet);
     return () => {
       sheet.close();
       opener?.focus({ preventScroll: true });

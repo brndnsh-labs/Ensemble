@@ -18,7 +18,9 @@ export type Route =
   /** `show` is empty for every chart, `yours`, or a style's id. A search is across all of them. */
   | { readonly screen: "library"; readonly show: string; readonly find: string }
   | { readonly screen: "chart" | "edit" | "take"; readonly id: string }
-  | { readonly screen: "credits" };
+  | { readonly screen: "credits" }
+  /** The motion study's switchboard (`motion/`): not part of the app. */
+  | { readonly screen: "motion" };
 
 export const HOME = "#/";
 export const TAKES = "#/takes";
@@ -48,6 +50,7 @@ export function routeOf(hash: string): Route {
   const id = decoded(rest.join("/"));
   if (first === "takes") return { screen: "home", takes: true };
   if (first === "credits") return { screen: "credits" };
+  if (first === "motion") return { screen: "motion" };
   if (first === "charts") {
     const find = /(?:^|&)find=([^&]*)/.exec(query)?.[1];
     return { screen: "library", show: id, find: find === undefined ? "" : decoded(find) };
@@ -70,7 +73,20 @@ let returned = false;
 /** The address shown before this one. */
 let before = "";
 let current = location.hash;
+/** The address the screens are drawn for: `current`, unless the motion study is between the two. */
+let shown = current;
 let entries = 0;
+
+/**
+ * The motion study's hold on an arrival: given the way the screens are told,
+ * it may tell them itself, from inside a view transition, and say so.
+ */
+type Arrival = (from: string, to: string, show: () => void) => boolean;
+let arrival: Arrival | undefined;
+
+export function onArrival(take: Arrival): void {
+  arrival = take;
+}
 
 /** A history entry the app has seen carries a mark; one it has not is new. */
 const marked = (): boolean =>
@@ -89,7 +105,12 @@ function arrive(at: string, byHistory: boolean): void {
   before = current;
   current = at;
   returned = byHistory;
-  for (const listener of listeners) listener();
+  const show = () => {
+    shown = current;
+    for (const listener of listeners) listener();
+  };
+  if (arrival?.(before, at, show)) return;
+  show();
 }
 
 // The page's own scrolling is put back by the screens themselves, each to where it was left.
@@ -108,7 +129,7 @@ export function subscribeAddress(listener: () => void): () => void {
   return () => listeners.delete(listener);
 }
 
-export const address = (): string => current;
+export const address = (): string => shown;
 
 /** True when this address was come back to through the browser's history. */
 export const cameBack = (): boolean => returned;

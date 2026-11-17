@@ -8,6 +8,8 @@ import { go, LIBRARY, showing } from "./address.ts";
 import { addChart, findChart, readChartFile, STARTER } from "./charts.ts";
 import type { LibraryChart } from "./library.ts";
 import { LIBRARY as BUILT_IN } from "./library.ts";
+import { useLiveTiles } from "./motion/live.ts";
+import { useSwitches } from "./motion/switches.ts";
 import type { Saving } from "./offline.ts";
 import { PosterName, usePosterWidths } from "./PosterName.tsx";
 import { count, lineUp, spelled, writtenFor } from "./posters.ts";
@@ -102,24 +104,29 @@ export function HomeCharts({ play, own, takes, recent, choices, saving }: Props)
   const width = usePosterWidths();
 
   // What was played lately and is still here, as it was played.
-  const played = recent
-    .flatMap((item): (Row & { readonly at: number })[] => {
-      const [, kind, id] = /^#\/(chart|take)\/(.+)$/.exec(item.id) ?? [];
-      if (kind === "take") {
-        const take = takes.find((kept) => kept.id === id);
-        if (!take) return [];
-        const row = takeRow(take);
-        // On a poster a take says that it is one, and how long it runs.
-        const facts = row.short
-          ? `A take kept ${dayOf(take.kept)}: ${row.short}, ${row.length}`
-          : row.facts;
-        return [{ ...row, facts, at: item.played }];
-      }
-      const entry = id === undefined ? undefined : findChart(id);
-      return entry ? [{ ...playedRow(entry, choices[entry.id]), at: item.played }] : [];
-    })
-    .slice(0, 1 + LATELY);
-  const [last, ...lately] = played;
+  const played = recent.flatMap((item): (Row & { readonly at: number })[] => {
+    const [, kind, id] = /^#\/(chart|take)\/(.+)$/.exec(item.id) ?? [];
+    if (kind === "take") {
+      const take = takes.find((kept) => kept.id === id);
+      if (!take) return [];
+      const row = takeRow(take);
+      // On a poster a take says that it is one, and how long it runs.
+      const facts = row.short
+        ? `A take kept ${dayOf(take.kept)}: ${row.short}, ${row.length}`
+        : row.facts;
+      return [{ ...row, facts, at: item.played }];
+    }
+    const entry = id === undefined ? undefined : findChart(id);
+    return entry ? [{ ...playedRow(entry, choices[entry.id]), at: item.played }] : [];
+  });
+  const [last, ...lately] = played.slice(0, 1 + LATELY);
+
+  // The motion study's live tiles (5): the last chart played in each style, for its tile's back.
+  const live = useSwitches().on.live;
+  useLiveTiles(live);
+  const lastIn = new Map<string, string>();
+  for (const row of played)
+    if (row.style && !lastIn.has(row.style)) lastIn.set(row.style, row.title);
   const first = FIRST.flatMap((id) => BUILT_IN.filter((entry) => entry.id === id));
   const [start, ...next] = first;
 
@@ -176,19 +183,36 @@ export function HomeCharts({ play, own, takes, recent, choices, saving }: Props)
         <div className="wall">
           {columns.map((column) => (
             <div key={column[0]?.id} className="wall-col">
-              {column.map((style) => (
-                <a key={style.id} className="tile" data-style={style.id} href={showing(style.id)}>
-                  <PosterName name={style.name} width={width(style.name)} />
-                  <span className="tile-band">{lineUp(style)}</span>
-                  <span className="tile-count">
-                    {count(
-                      all.filter((entry) => writtenFor(entry) === style).length,
-                      "chart",
-                      "charts",
+              {column.map((style) => {
+                const written = all.filter((entry) => writtenFor(entry) === style).length;
+                const lastPlayed = lastIn.get(style.id);
+                return (
+                  <a key={style.id} className="tile" data-style={style.id} href={showing(style.id)}>
+                    <PosterName name={style.name} width={width(style.name)} />
+                    <span className="tile-band">{lineUp(style)}</span>
+                    <span className="tile-count">{count(written, "chart", "charts")}</span>
+                    {live && (
+                      <>
+                        <span className="tile-fact" aria-hidden="true">
+                          <span className="fact-big">{written}</span>
+                          <span className="fact-says">
+                            {written === 1 ? "chart" : "charts"} written for{" "}
+                            {style.name.toLowerCase()}
+                          </span>
+                        </span>
+                        {lastPlayed && (
+                          <span className="tile-fact" aria-hidden="true">
+                            <span className="fact-lead">
+                              Last played in {style.name.toLowerCase()}
+                            </span>
+                            <span className="fact-title">{lastPlayed}</span>
+                          </span>
+                        )}
+                      </>
                     )}
-                  </span>
-                </a>
-              ))}
+                  </a>
+                );
+              })}
             </div>
           ))}
         </div>
