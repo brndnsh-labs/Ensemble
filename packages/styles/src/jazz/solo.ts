@@ -10,7 +10,7 @@
 // would land between the swung eighths and read as a flam (ST-jazz-06).
 // `x` strikes a note, `-` holds it, `.` is silence.
 
-import type { SoloStyle, Way } from "@ensemble/engine";
+import type { SoloStyle, SoloTime, Way } from "@ensemble/engine";
 
 // A new line, through-composed: its bars take two rhythms by turns.
 const NEW: Way = { name: "statement", make: "new", oneRhythm: false };
@@ -28,7 +28,87 @@ const ELSE = {
   lift: 4,
 } satisfies Way;
 
+// ── in six ──────────────────────────────────────────────────────────────────
+// A bar of 6/4, six beats in two threes: twenty-four sixteenths, grouped by
+// beat, and still nothing but beats and their swung "and"s. The levels are
+// the levels of 4/4 (the solo's arc names them), each with rhythms a bar and
+// a half as long: a line that phrases across the two threes, not one that
+// stops where a bar of four would.
+const jazzSoloInSix: SoloTime = {
+  levels: [
+    {
+      name: "sparse",
+      notesPerBar: 2,
+      span: 6,
+      cells: [
+        "..x- x-x- ---- .... .... ....",
+        "x--- ..x- x--- ---- .... ....",
+        ".... .... x-x- x--- ---- ....",
+        "x-x- --x- ---- .... x-x- x---",
+        "..x- ---- x-x- x--- ---- ....",
+      ],
+      shapes: [
+        { weight: 3, bars: "L E R R" },
+        { weight: 3, bars: "R L E R" },
+        { weight: 3, bars: "E R L E" },
+        { weight: 2, bars: "L L E R" },
+      ],
+    },
+    {
+      name: "medium",
+      notesPerBar: 3.5,
+      span: 9,
+      cells: [
+        "x--- x-x- x--- --.. x-x- x---",
+        // These two end on the "and" of 6: a run that can be tied over the barline.
+        "..x- x-x- --.. x-x- x--- x-x-",
+        "x-x- x--- --.. x-x- x-x- x-x-",
+        ".... x-x- x--- x--- x-x- --..",
+        "..x- --x- x--- .... x-x- x---",
+      ],
+      shapes: [
+        { weight: 5, bars: "L L E R" },
+        { weight: 3, bars: "E R L E" },
+        { weight: 2, bars: "L E L E" },
+      ],
+    },
+    {
+      name: "busy",
+      notesPerBar: 5.5,
+      span: 12,
+      cells: [
+        "x-x- x-x- x-x- x-x- x-x- x-x-",
+        "..x- x-x- x-x- x-x- x-x- x-x-",
+        "x-x- x-x- x-x- x-x- x-x- x---",
+        ".... x-x- x-x- x-x- x-x- x-x-",
+        "x-x- x--- x-x- x-x- x--- x-x-",
+      ],
+      shapes: [
+        { weight: 4, bars: "L L L E" },
+        { weight: 4, bars: "L L E R" },
+        { weight: 2, bars: "L E L E" },
+      ],
+    },
+  ],
+  // Each lands on a long note and leaves beat 6 unstruck.
+  endings: [
+    "x-x- x--- ---- ---- ---- ....",
+    "..x- x-x- ---- ---- .... ....",
+    "x-x- --.. .... .... .... ....",
+    "x--- x--- x--- ---- ---- ....",
+    "..x- x-x- x--- x--- ---- ----",
+    "x--- ---- ---- .... .... ....",
+  ],
+  // From beat 6, as from beat 4 in four.
+  pickups: [
+    { weight: 2, beat: "..x-" },
+    { weight: 1, beat: "x-x-" },
+  ],
+  peak: "x--- ---- ---- ---- .... ....",
+};
+
 export const jazzSolo: SoloStyle = {
+  meters: { "6/4": jazzSoloInSix },
   instrument: "alto-sax",
   lift: 0,
 

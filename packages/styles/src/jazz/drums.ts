@@ -16,7 +16,7 @@
 // "e" or an "a" would land between the swung eighths and flam (ST-jazz-06).
 // X accent, x normal, o soft, g ghost, "-" the stroke taken away.
 
-import type { DrumStyle, FillShape, GrooveLayer, GrooveOption } from "@ensemble/engine";
+import type { DrumStyle, DrumTime, FillShape, GrooveLayer, GrooveOption } from "@ensemble/engine";
 
 // ── the time ────────────────────────────────────────────────────────────────
 
@@ -256,6 +256,191 @@ const QUIET_PHRASE = lengths(1, WHISPER_FILL);
 const QUIET_SECTION = [...lengths(1, WHISPER_FILL), ...lengths(1, SOFT_SHOT)];
 const QUIET_TOP = [...lengths(1, EIGHTHS), ...lengths(1, SOFT_SHOT)];
 
+// ── in six ──────────────────────────────────────────────────────────────────
+// A bar of 6/4 is six beats in two threes: a waltz twice, with the second
+// three answering the first (the modal blues in six). Twenty-four sixteenths
+// to the bar, grouped by beat as 4/4 is, and still only beats and their
+// "and"s. The bar's strong beats are 1 and 4.
+//
+// The ride plays every beat with its skip on the "and" of the second beat of
+// each three: "ding, ding-a, ding". Never on a sixteenth: a skip a sixteenth
+// before the beat was the most audible fault of the old band's six (AU-92).
+// The hat foot closes on 2 and 5, the middle of each three; the bass drum is
+// felt on 1 and 4 and nowhere else. Quiet, the drums are thinner, not just
+// softer (AU-96): the head on the closed hat with no bass drum and no comping,
+// and a ballad's ride with no skip at all.
+
+const SIX_RIDE = { ride: "x... X.x. x... x... X.x. x..." };
+/** The ballad's ride in six: the beats alone, 2 and 5 leaned on. */
+const SIX_RIDE_SOFT = { ride: "o... x... o... o... x... o..." };
+const SIX_HEAD_HAT = { closedHat: "x... X.x. x... x... X.x. x..." };
+const SIX_FOOT = { pedalHat: ".... x... .... .... x... ...." };
+const SIX_FEATHER = { kick: "g... .... .... g... .... ...." };
+
+const footSix: GrooveLayer = { ...foot, options: [{ weight: 1, lines: SIX_FOOT }] };
+const featherSix: GrooveLayer = { ...feather, options: [{ weight: 1, lines: SIX_FEATHER }] };
+
+/** A comping figure in six, written out as `comp` writes one in four. */
+function compSix(figure: Figure, later: "g" | "o"): GrooveOption["lines"] {
+  if (figure.length === 0) return {};
+  const steps = new Array<string>(24).fill(".");
+  figure.forEach((step, i) => {
+    steps[step] = i === 0 ? "o" : later;
+  });
+  return { snare: steps.join("") };
+}
+
+// Where the left hand may fall in six: the "and"s, and beats 3 and 6, which lead to the
+// strong beats. Never 1 or 4 (the bass drum's) and never 2 or 5 (the hat foot's).
+const SIX = { and1: 2, and2: 6, three: 8, and3: 10, and4: 14, and5: 18, six: 20, and6: 22 };
+
+/** One chord, and the same chord after it: the first three, or both, or nothing. */
+const SIX_STILL: readonly [Figure, number][] = [
+  [[SIX.and2], 3],
+  [[SIX.and2, SIX.and5], 2],
+  [[SIX.and3], 1],
+  [[SIX.and5], 1],
+  [[], 3],
+];
+/** A change at the barline: the second three leans into it. */
+const SIX_INTO_CHANGE: readonly [Figure, number][] = [
+  [[SIX.and5], 2],
+  [[SIX.and6], 2],
+  [[SIX.and2, SIX.and6], 2],
+  [[], 2],
+];
+/** A change inside the bar, on beat 4 as a rule: the "and" of 3 sets it up. */
+const SIX_MOVING: readonly [Figure, number][] = [
+  [[SIX.and3], 2],
+  [[SIX.and6], 2],
+  [[SIX.and3, SIX.and6], 1],
+  [[SIX.three], 1],
+  [[], 1],
+];
+
+function compingSix(later: "g" | "o", nothing: number): GrooveLayer[] {
+  const places = [
+    { name: "odd", phraseBars: [1, 3, 5, 7] },
+    { name: "even", phraseBars: [2, 4, 6, 8] },
+  ];
+  const kinds = [
+    { name: "still", list: SIX_STILL, when: { changeInBar: false, changeAhead: false } },
+    { name: "into", list: SIX_INTO_CHANGE, when: { changeInBar: false, changeAhead: true } },
+    { name: "moving", list: SIX_MOVING, when: { changeInBar: true } },
+  ];
+  return places.flatMap((place) =>
+    kinds.map(
+      (kind): GrooveLayer => ({
+        id: `comp-${place.name}-${kind.name}`,
+        hold: "phrase",
+        when: { phraseBars: place.phraseBars, phraseEnd: false, ...kind.when },
+        options: kind.list.map(([figure, weight]) => ({
+          weight: figure.length === 0 ? weight * nothing : weight,
+          lines: compSix(figure, later),
+        })),
+      }),
+    ),
+  );
+}
+
+// The set-ups in six: the same shots, on the "and" of 6. The bass drum has no feathered
+// beat there to leave.
+const SIX_SHOT_AND_BOMB = {
+  snare: ".... .... .... .... .... ..x.",
+  kick: ".... .... .... .... .... ..x.",
+};
+const SIX_SHOT = { snare: ".... .... .... .... .... ..x." };
+const SIX_TWO_ANDS = { snare: ".... .... .... .... ..o. ..x." };
+const SIX_WHISPER = { snare: ".... .... .... .... .... ..o." };
+
+const setUpsSix: GrooveLayer[] = [
+  {
+    id: "set-up-into",
+    hold: "bar",
+    when: { ...plainEnd, changeAhead: true },
+    options: [
+      { weight: 3, lines: SIX_SHOT_AND_BOMB },
+      { weight: 1, lines: SIX_SHOT },
+      { weight: 1, lines: SIX_TWO_ANDS },
+      { weight: 1, lines: {} },
+    ],
+  },
+  {
+    id: "set-up-still",
+    hold: "bar",
+    when: { ...plainEnd, changeAhead: false },
+    options: [
+      { weight: 1, lines: SIX_SHOT },
+      { weight: 1, lines: SIX_TWO_ANDS },
+      { weight: 2, lines: {} },
+    ],
+  },
+];
+const quietSetUpsSix: GrooveLayer[] = [
+  {
+    id: "set-up-into",
+    hold: "bar",
+    when: { ...plainEnd, changeAhead: true },
+    options: [
+      { weight: 1, lines: SIX_WHISPER },
+      { weight: 1, lines: {} },
+    ],
+  },
+  {
+    id: "set-up-still",
+    hold: "bar",
+    when: { ...plainEnd, changeAhead: false },
+    options: [
+      { weight: 1, lines: SIX_WHISPER },
+      { weight: 3, lines: {} },
+    ],
+  },
+];
+
+/**
+ * A fill is so many sixteenths before the barline in any meter, so six plays
+ * the shapes four plays, over beats 5 and 6. The two-beat shapes keep a
+ * feathered beat under their start in four; in six beat 5 has none to keep.
+ */
+const unfeathered = (shapes: readonly FillShape[]): FillShape[] =>
+  shapes.map((shape) =>
+    shape.lines.kick?.startsWith("g")
+      ? { ...shape, lines: { ...shape.lines, kick: `.${shape.lines.kick.slice(1)}` } }
+      : shape,
+  );
+
+const jazzDrumsInSix: DrumTime = {
+  grooves: {
+    low: [
+      { ...ride(SIX_RIDE_SOFT), when: { energyBelow: BALLAD } },
+      { ...ride(SIX_HEAD_HAT), id: "head", when: { energyFrom: BALLAD } },
+      footSix,
+      ...quietSetUpsSix,
+    ],
+    mid: [ride(SIX_RIDE), footSix, featherSix, ...compingSix("g", 1), ...setUpsSix],
+    high: [ride(SIX_RIDE), footSix, featherSix, ...compingSix("o", 0.5), ...setUpsSix],
+  },
+  touches: [],
+  fills: {
+    length: {
+      phrase: { low: 0, mid: 2, high: 4 },
+      section: { low: 4, mid: 4, high: 8 },
+    },
+    phrase: {
+      low: unfeathered(QUIET_PHRASE),
+      mid: unfeathered(PHRASE),
+      high: unfeathered(PHRASE),
+    },
+    section: {
+      low: unfeathered(QUIET_SECTION),
+      mid: unfeathered(SECTION),
+      high: unfeathered(SECTION),
+    },
+    top: { low: unfeathered(QUIET_TOP), mid: unfeathered(TOP), high: unfeathered(TOP) },
+    keepTime: true,
+  },
+};
+
 export const jazzDrums: DrumStyle = {
   grooves: {
     // The light head on the hat, or a ballad's soft ride; no kick, no comping, phrase ends
@@ -273,6 +458,9 @@ export const jazzDrums: DrumStyle = {
     // Hot: the comping strokes all soft, and the empty bar half as likely.
     high: [ride(RIDE), foot, feather, ...comping("o", 0.5), ...setUps],
   },
+
+  // Six beats to the bar: the modal blues in six, written above.
+  meters: { "6/4": jazzDrumsInSix },
 
   // The ride keeps time, or the hat under the light head; an arrival crash takes that hand.
   timekeepers: ["ride", "closedHat"],
