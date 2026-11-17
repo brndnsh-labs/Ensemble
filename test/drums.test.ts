@@ -19,6 +19,7 @@ import {
 } from "@ensemble/engine";
 import {
   enough,
+  heldTakes,
   type Jam,
   LIBRARY,
   notesOf,
@@ -318,6 +319,78 @@ test(
     assert.ok(heads > enough(500), `only ${heads} bars of head`);
   },
 );
+
+// ── rock ────────────────────────────────────────────────────────────────────
+
+const rock = STYLES.find((style) => style.id === "rock");
+/** Rock where it plays its own parts, and rock in twelve held at each of its levels. */
+const rockPlayed = (): Jam[] => [
+  ...takes(itsOwn("rock")),
+  ...(rock ? heldTakes(rock, "12/8") : []),
+];
+
+test(
+  "rock: the time is a kick on the bar's two strong pulses and a backbeat on the pulses between them (1 and 3, 2 and 4: quarter notes in four, dotted quarters in twelve), in every bar the drummer plays time",
+  only("rock"),
+  () => {
+    let bars = 0;
+    let twelve = 0;
+    for (const { chart, options, take } of rockPlayed()) {
+      for (const { bar, kit } of kitBars(take)) {
+        if (bar.ending) continue;
+        bars++;
+        if (chart.meter === "12/8") twelve++;
+        const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
+        const strong = strongPulses(bar.meter);
+        const between = pulseStarts(bar.meter).filter((tick) => !strong.includes(tick));
+        for (const tick of strong)
+          assert.ok(strikes(kit, "kick", tick / STEP), `${where}: no kick at ${tick}`);
+        const backbeat = (tick: number) =>
+          strikes(kit, "snare", tick / STEP) || strikes(kit, "crossStick", tick / STEP);
+        assert.ok(backbeat(between[0]!), `${where}: no backbeat on 2`);
+        // A fill takes the hands off the backbeat on 4.
+        if (!bar.fill) assert.ok(backbeat(between[1]!), `${where}: no backbeat on 4`);
+      }
+    }
+    assert.ok(bars > enough(2000), `only ${bars} bars`);
+    if (LIBRARY.some((chart) => chart.meter === "12/8"))
+      assert.ok(twelve > enough(300), `only ${twelve} bars of twelve`);
+  },
+);
+
+test("rock: in twelve the cymbal is on every eighth from the working level up, all twelve in every bar of time unless a fill has the hand; and a quiet bar is thinner: the cymbal on each pulse and at most the eighth before the next, never the triplet's middle eighth, the kick on 1 and 3 and at most the eighth before a pulse, and the snare on 2 and 4 alone", {
+  skip: only("rock").skip || !LIBRARY.some((chart) => chart.meter === "12/8"),
+}, () => {
+  let working = 0;
+  let quiet = 0;
+  const CYMBALS = ["closedHat", "ride", "openHat", "crash"];
+  for (const { chart, options, take } of rockPlayed()) {
+    if (chart.meter !== "12/8") continue;
+    for (const { bar, kit, energy } of kitBars(take)) {
+      if (bar.ending || bar.fill) continue;
+      const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
+      const cymbal = new Set(CYMBALS.flatMap((voice) => [...(kit.get(voice) ?? [])]));
+      if (energy >= TIER_MID) {
+        working++;
+        for (let step = 0; step < 24; step += 2)
+          assert.ok(cymbal.has(step), `${where}: no cymbal on eighth ${step / 2 + 1}`);
+        continue;
+      }
+      quiet++;
+      // In sixteenths: a pulse is six, its eighths at 0, 2 and 4 into it.
+      for (const pulse of [0, 6, 12, 18]) {
+        assert.ok(cymbal.has(pulse), `${where}: no cymbal on pulse ${pulse / 6 + 1}`);
+        assert.ok(!cymbal.has(pulse + 2), `${where}: the triplet's middle eighth, quiet`);
+      }
+      for (const step of kit.get("kick") ?? [])
+        assert.ok(step === 0 || step === 12 || step % 6 === 4, `${where}: a kick at ${step}`);
+      for (const voice of ["snare", "crossStick"])
+        for (const step of kit.get(voice) ?? [])
+          assert.ok(step === 6 || step === 18, `${where}: the ${voice} at ${step}`);
+    }
+  }
+  assert.ok(working > 100 && quiet > 50, `only ${working} bars working and ${quiet} quiet`);
+});
 
 // ── six and twelve ──────────────────────────────────────────────────────────
 

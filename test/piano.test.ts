@@ -10,6 +10,7 @@ import {
   lastPulse,
   PPQ,
   pitchClass,
+  pulseStarts,
   render,
   scaleHas,
   tierOf,
@@ -26,6 +27,8 @@ import {
 import {
   enough,
   FULL,
+  heldTakes,
+  LIBRARY,
   notesOf,
   only,
   ownCharts,
@@ -349,6 +352,51 @@ test(
       mean(perBar.low) < mean(perBar.high),
       `quiet ${mean(perBar.low).toFixed(2)} strikes a bar, loud ${mean(perBar.high).toFixed(2)}`,
     );
+  },
+);
+
+test(
+  "rock: in twelve the piano plays the ballad's triplets: away from a soloist and from the working level up, a chord on every eighth of every bar it comps, and nothing between them; quiet, no more than a chord a pulse; and under a soloist, in four as in twelve, no more strikes in a bar than the bar has pulses (no busier than quarter notes, or a chord a dotted quarter)",
+  only("rock"),
+  () => {
+    let triplets = 0;
+    let quiet = 0;
+    let under = 0;
+    const rock = STYLES.find((style) => style.id === "rock")!;
+    const played = [
+      ...takes((jam) => jam.style.id === "rock" && written(jam)),
+      ...heldTakes(rock, "12/8"),
+      ...heldTakes(rock, "12/8", true),
+    ];
+    for (const { chart, options, take } of played) {
+      const byBar = strikesByBar(take);
+      for (const bar of take.plan.bars) {
+        if (bar.kind !== "music" || bar.ending || bar.seats.chords === null) continue;
+        const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
+        const steps = (byBar.get(bar.index) ?? []).map(
+          (strike) => (strike.tick - bar.start) / (PPQ / 4),
+        );
+        const pulses = pulseStarts(bar.meter).length;
+        if (bar.solo !== null) {
+          under++;
+          assert.ok(steps.length <= pulses, `${where}: ${steps.length} strikes under the soloist`);
+          continue;
+        }
+        if (chart.meter !== "12/8") continue;
+        for (const step of steps) assert.equal(step % 2, 0, `${where}: between the eighths`);
+        if (tierOf(bar.seats.chords) === "low") {
+          quiet++;
+          assert.ok(steps.length <= pulses, `${where}: ${steps.length} strikes, quiet`);
+          continue;
+        }
+        triplets++;
+        for (let step = 0; step < 24; step += 2)
+          assert.ok(steps.includes(step), `${where}: no chord on eighth ${step / 2 + 1}`);
+      }
+    }
+    assert.ok(under > enough(300), `only ${under} bars under a soloist`);
+    if (LIBRARY.some((chart) => chart.meter === "12/8"))
+      assert.ok(triplets > 100 && quiet > 50, `only ${triplets} bars of triplets, ${quiet} quiet`);
   },
 );
 

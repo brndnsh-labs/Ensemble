@@ -68,6 +68,7 @@ export const LIBRARY: readonly LibraryChart[] = readdirSync(libraryDir)
 export const WRITTEN: Readonly<Record<string, readonly string[]>> = {
   jazz: ["6/4"],
   blues: ["12/8"],
+  rock: ["12/8"],
 };
 
 /** A take whose chart is in 4/4 or in a meter its style has written. */
@@ -195,6 +196,27 @@ const TAKE_SPECS: readonly JamSpec[] = STYLES.flatMap((style) => [
     },
   })),
 ]);
+
+/**
+ * A style held at each of its three levels on every library chart in a meter, as a short jam
+ * on two seeds: a jam's arc takes most styles neither quiet nor hot for long. With `solo`, a
+ * jam of three passes with the soloist in each.
+ */
+export function heldTakes(style: StylePack, meter: string, solo = false): Jam[] {
+  return LIBRARY.filter((chart) => chart.meter === meter).flatMap((chart) =>
+    [0.3, 0.55, 0.85].flatMap((energy) =>
+      [1, 2].map((seed) =>
+        render1({
+          style,
+          chart,
+          options: solo
+            ? { mode: "jam", passes: 3, solo: true, energy, seed }
+            : { mode: "jam", passes: 2, energy, seed },
+        }),
+      ),
+    ),
+  );
+}
 
 /** The library's takes that pass `only`, which reads the style, chart, and options. */
 export function takes(only: (spec: JamSpec) => boolean = () => true): Jam[] {

@@ -27,6 +27,7 @@ import { bluesWritten, POCKET } from "./reading.ts";
 import {
   enough,
   FULL,
+  heldTakes,
   LIBRARY,
   notesOf,
   only,
@@ -34,6 +35,7 @@ import {
   readSmf,
   SEEDS,
   STYLES,
+  soloistTakes,
   takes,
 } from "./takes.ts";
 
@@ -656,6 +658,34 @@ test(
       assert.ok(working > 100 && quiet > 10, `only ${working} bars working and ${quiet} quiet`);
   },
 );
+
+// ── rock ────────────────────────────────────────────────────────────────────
+
+test("rock: in twelve the whole band is on the triplet's eighths: no note of the drums (their fills too), the bass, the piano or the lead guitar falls between them, so the soloist's rhythms are eighths and longer", {
+  skip: only("rock").skip || !LIBRARY.some((chart) => chart.meter === "12/8"),
+}, () => {
+  const rock = STYLES.find((style) => style.id === "rock")!;
+  const twelve = (jam: { style: { id: string }; chart: { meter: string } }) =>
+    jam.style.id === "rock" && jam.chart.meter === "12/8";
+  const played = [
+    ...takes(twelve),
+    ...soloistTakes().filter(twelve),
+    ...heldTakes(rock, "12/8"),
+    ...heldTakes(rock, "12/8", true),
+  ];
+  const seats = new Set<string>();
+  for (const { chart, options, take } of played) {
+    for (const note of notesOf(take)) {
+      seats.add(note.seat);
+      assert.equal(
+        note.tick % (PPQ / 2),
+        0,
+        `${chart.file} ${JSON.stringify(options)}: the ${note.seat} (${note.voice}) between the eighths at ${note.tick}`,
+      );
+    }
+  }
+  assert.equal(seats.size, 4, `only ${[...seats].join(", ")} heard`);
+});
 
 // ── tempo ───────────────────────────────────────────────────────────────────
 

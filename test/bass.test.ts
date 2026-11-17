@@ -18,7 +18,7 @@ import {
   tierOf,
 } from "@ensemble/engine";
 import { bluesWritten } from "./reading.ts";
-import { enough, LIBRARY, notesOf, only, STYLES, takes, written } from "./takes.ts";
+import { enough, heldTakes, LIBRARY, notesOf, only, STYLES, takes, written } from "./takes.ts";
 
 // ── the bass line ───────────────────────────────────────────────────────────
 
@@ -412,6 +412,65 @@ test(
         counted.low > enough(60) && counted.mid > enough(150) && counted.high > enough(60),
         `only ${counted.low} quiet bars, ${counted.mid} working, ${counted.high} hot`,
       );
+  },
+);
+
+// ── rock ────────────────────────────────────────────────────────────────────
+
+test(
+  "rock: the bass is the kick's when the band is quiet, a note wherever the kick is played; and in twelve it is roots on the pulses and never all twelve eighths: every note on an eighth, a note between the pulses only on the eighth before one (a pickup), from the working level a note on every pulse, and hot a pickup into every pulse",
+  only("rock"),
+  () => {
+    let quiet = 0;
+    let twelve = 0;
+    let hot = 0;
+    const rock = STYLES.find((style) => style.id === "rock")!;
+    const played = [
+      ...takes((jam) => jam.style.id === "rock" && written(jam)),
+      ...heldTakes(rock, "12/8"),
+    ];
+    for (const { chart, options, take } of played) {
+      const bass = notesOf(take, "bass");
+      const kicks = notesOf(take, "drums").filter((note) => note.voice === "kick");
+      for (const bar of take.plan.bars) {
+        if (bar.kind !== "music" || bar.seats.bass === null || bar.ending) continue;
+        if (bar.spans.some((span) => span.chord === null)) continue;
+        const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
+        const end = bar.start + bar.ticks;
+        const steps = new Set(
+          bass
+            .filter((note) => note.tick >= bar.start && note.tick < end)
+            .map((note) => (note.tick - bar.start) / (PPQ / 4)),
+        );
+        const tier = tierOf(bar.seats.bass);
+        if (tier === "low" && bar.seats.drums !== null) {
+          quiet++;
+          for (const kick of kicks) {
+            if (kick.tick < bar.start || kick.tick >= end) continue;
+            const step = (kick.tick - bar.start) / (PPQ / 4);
+            assert.ok(steps.has(step), `${where}: a kick at ${step} with no bass under it`);
+          }
+        }
+        if (chart.meter !== "12/8") continue;
+        twelve++;
+        // In sixteenths: a pulse is six, its eighths at 0, 2 and 4 into it.
+        for (const step of steps) {
+          assert.ok(step % 2 === 0, `${where}: a note between the eighths at ${step}`);
+          assert.ok(step % 6 !== 2, `${where}: a note on the triplet's middle eighth at ${step}`);
+        }
+        assert.ok(steps.size <= 8, `${where}: ${steps.size} notes in a bar`);
+        if (tier === "low") continue;
+        for (const pulse of [0, 6, 12, 18])
+          assert.ok(steps.has(pulse), `${where}: nothing on pulse ${pulse / 6 + 1}`);
+        if (tier !== "high") continue;
+        hot++;
+        for (const pickup of [4, 10, 16, 22])
+          assert.ok(steps.has(pickup), `${where}: no pickup at ${pickup}`);
+      }
+    }
+    assert.ok(quiet > enough(200), `only ${quiet} quiet bars`);
+    if (LIBRARY.some((chart) => chart.meter === "12/8"))
+      assert.ok(twelve > 200 && hot > 50, `only ${twelve} bars of twelve, ${hot} hot`);
   },
 );
 
