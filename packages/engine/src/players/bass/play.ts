@@ -4,6 +4,7 @@
 // written, so a lead-in always lands on the note it promised (BA-05 to BA-07).
 
 import { PPQ } from "../../chart/types.ts";
+import { isCompound, writtenFor } from "../../perform/meter.ts";
 import type { Player, PlayerContext, WrittenNote } from "../../perform/notes.ts";
 import { heldRng } from "../../perform/notes.ts";
 import type { PlanBar } from "../../plan/types.ts";
@@ -363,6 +364,18 @@ function soundingBefore(
 }
 
 /**
+ * The style's lead-in, in the bar it is played in. Where a style has written its line for a
+ * bar of dotted pulses, the line is in eighths and nothing is played between them, so a
+ * lead-in a sixteenth before the change is the eighth before it: the line's last note.
+ */
+function leadInIn(bass: BassStyle, bar: PlanBar): BassStyle["leadIn"] {
+  const policy = bass.leadIn;
+  if (policy.at !== "sixteenth" || !isCompound(bar.meter) || !writtenFor(bass.meters, bar.meter))
+    return policy;
+  return { ...policy, at: "eighth" };
+}
+
+/**
  * The question "how do I get from this piece into the next chord", ready to be
  * asked of any pitch the next chord's bass note might take.
  */
@@ -381,7 +394,7 @@ function approachFrom(
   decided: number | null,
 ): (pitch: number) => LeadInRequest {
   const { piece, notes, before } = from;
-  const policy = bass.leadIn;
+  const policy = leadInIn(bass, piece.bar);
   const chance = decided ?? leadInChance(bass, piece, next);
   const third =
     piece.chord && piece.scale && toneOf("3", piece.chord, piece.scale) !== null
