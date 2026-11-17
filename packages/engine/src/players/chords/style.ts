@@ -115,8 +115,9 @@ export interface ChordRegister {
  *
  * The strumming hand is a pendulum: down on the beat side of each pair of the
  * grid it strums, up on the other, so direction is read from where a stroke
- * falls and is never chosen (CH-27). The grip is held until the chord changes
- * (CH-31).
+ * falls and is never chosen (CH-27). Swinging in eighths through a bar of
+ * dotted pulses (6/8, 12/8) it goes down, down, up: the pulse's last eighth is
+ * its "and" (DR-10). The grip is held until the chord changes (CH-31).
  */
 export interface Guitar {
   readonly instrument: "guitar";

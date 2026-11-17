@@ -10,7 +10,7 @@
 // Reading the rhythms: sixteen sixteenths to the bar, grouped by beat. `x`
 // strikes a note, `-` holds it, `.` is silence.
 
-import type { SoloStyle, Way } from "@ensemble/engine";
+import type { SoloStyle, SoloTime, Way } from "@ensemble/engine";
 
 const NEW: Way = { name: "statement", make: "new", oneRhythm: false };
 const NEW_RIFFED: Way = { name: "statement", make: "new", oneRhythm: true };
@@ -34,7 +34,62 @@ const ELSE = {
   lift: 2,
 } satisfies Way;
 
+// ── in six ──────────────────────────────────────────────────────────────────
+// A bar of 6/8 is two slow pulses of three eighths: a rhythm is twelve
+// sixteenths, written in sixes, a pulse to a group. The line is sung in
+// eighths and dotted quarters: `x-----` a pulse held, `x---x-` the long-short
+// that is six-eight's own lilt ("ONE-and A"), `x-x-x-` the pulse's three
+// eighths. Every rhythm is phrased in the bar's two pulses: nothing is quicker
+// than the eighth, and nothing begun between the pulses is held across one,
+// but an end. The levels are the levels of four (the solo's arc names them),
+// a bar of six being three quarters of a bar of four.
+const acousticSoloInSix: SoloTime = {
+  levels: [
+    {
+      name: "sparse",
+      notesPerBar: 1.4,
+      span: 7,
+      cells: ["x----- x-----", "x---x- x-----", "x----- ------", "....x- x-----"],
+      shapes: [
+        { weight: 4.3, bars: "L E R R" },
+        { weight: 4.3, bars: "R L E R" },
+        { weight: 3.6, bars: "E R L E" },
+        { weight: 2.4, bars: "L L E R" },
+      ],
+    },
+    {
+      name: "medium",
+      notesPerBar: 2.6,
+      span: 9,
+      cells: ["x---x- x---x-", "x-x-x- x-----", "x----- x-x-x-", "x---x- x-x-x-", "..x-x- x-----"],
+      shapes: [
+        { weight: 6, bars: "L L E R" },
+        { weight: 3.6, bars: "E R L E" },
+        { weight: 2, bars: "L E L E" },
+      ],
+    },
+    {
+      name: "busy",
+      notesPerBar: 3.6,
+      span: 10,
+      cells: ["x-x-x- x-x-x-", "x---x- x-x-x-", "x-x-x- x---x-", "..x-x- x-x-x-"],
+      shapes: [
+        { weight: 4, bars: "L L L E" },
+        { weight: 4.8, bars: "L L E R" },
+        { weight: 2, bars: "L E L E" },
+      ],
+    },
+  ],
+  // Each lands on the first pulse and holds through the second, which is the next phrase's.
+  endings: ["x----- ------", "x---x- ------", "x-x-x- ------", "..x-x- ------"],
+  // Acoustic leads into nothing (no pickups, ST-acoustic-28); if one is asked for, the last eighth.
+  pickups: [{ weight: 1, beat: "....x-" }],
+  peak: "x----- ----..",
+};
+
 export const acousticSolo: SoloStyle = {
+  // Six-eight, written above.
+  meters: { "6/8": acousticSoloInSix },
   instrument: "steel-guitar",
   // Home a fourth over the instrument's own, above the strummed guitar (ST-acoustic-28).
   lift: 5,

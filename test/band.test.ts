@@ -686,6 +686,27 @@ test("rock: in twelve the whole band is on the triplet's eighths: no note of the
   }
   assert.equal(seats.size, 4, `only ${[...seats].join(", ")} heard`);
 });
+// ── acoustic ────────────────────────────────────────────────────────────────
+
+test(
+  "acoustic: in six the eighths are the band's smallest note, for everyone: nothing is played between them, and nothing bends them (a pulse of three eighths is not swung)",
+  only("acoustic"),
+  () => {
+    let notes = 0;
+    const six = (jam: { style: { id: string }; chart: { meter: string } }) =>
+      jam.style.id === "acoustic" && jam.chart.meter === "6/8";
+    for (const { chart, options, take } of [...takes(six), ...soloistTakes().filter(six)]) {
+      for (const note of notesOf(take)) {
+        notes++;
+        const where = `${chart.file} seed ${options.seed}: the ${note.seat} (${note.voice ?? ""}) at ${note.tick}`;
+        assert.equal(note.tick % (PPQ / 2), 0, `${where}, between the eighths`);
+        assert.ok(Math.abs(note.offset) <= POCKET, `${where}, moved ${note.offset}`);
+      }
+    }
+    if (LIBRARY.some((chart) => chart.meter === "6/8"))
+      assert.ok(notes > enough(30000), `only ${notes} notes in six`);
+  },
+);
 
 // ── tempo ───────────────────────────────────────────────────────────────────
 

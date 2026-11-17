@@ -481,6 +481,87 @@ test(
   },
 );
 
+// ── an upright in six ───────────────────────────────────────────────────────
+
+test(
+  "acoustic: in six the upright is in two: every note on an eighth and no more than four in a bar; the chord's bass note on the first pulse; when the band is quiet nothing else but a chord arriving (or, where the root lies a seventh over the next one, the step down into it on the second pulse), and from the working level the second pulse is always played, as the chord's fifth or its bass note, or a step into the next bass note",
+  only("acoustic"),
+  () => {
+    const counted = { low: 0, mid: 0, high: 0 };
+    const acoustic = STYLES.find((style) => style.id === "acoustic")!;
+    const sixes = LIBRARY.filter((chart) => chart.meter === "6/8");
+    const played = [
+      ...takes((jam) => jam.style.id === "acoustic" && jam.chart.meter === "6/8").map(
+        ({ chart, options, take }) => ({ where: `${chart.file} seed ${options.seed}`, take }),
+      ),
+      ...sixes.flatMap((chart) =>
+        [0.3, 0.55, 0.85].flatMap((energy) =>
+          [1, 3].map((seed) => ({
+            where: `${chart.file} at ${energy} seed ${seed}`,
+            take: render(chart.text, acoustic, { mode: "jam", passes: 2, energy, seed }),
+          })),
+        ),
+      ),
+    ];
+    const PULSE = PPQ * 1.5;
+    for (const { where: of, take } of played) {
+      const bass = notesOf(take, "bass");
+      const harmony = arrivals(take.plan);
+      for (const bar of take.plan.bars) {
+        if (bar.kind !== "music" || bar.ending || bar.seats.bass === null) continue;
+        if (bar.spans.some((span) => span.chord === null)) continue;
+        const end = bar.start + bar.ticks;
+        const own = bass.filter((note) => note.tick >= bar.start && note.tick < end);
+        const where = `${of} bar ${bar.index}`;
+        const sounding = (tick: number) =>
+          harmony.findLast((arrival) => arrival.tick <= tick)!.chord!;
+        const bassOf = (chord: ReturnType<typeof sounding>) => pitchClass(chord.bass ?? chord.root);
+        const landings = harmony
+          .filter((arrival) => arrival.bar === bar.index)
+          .map((arrival) => arrival.tick - bar.start);
+        const ticks = own.map((note) => note.tick - bar.start);
+        for (const tick of ticks) {
+          assert.equal(tick % (PPQ / 2), 0, `${where}: a note between the eighths`);
+        }
+        assert.ok(own.length <= 4, `${where}: ${own.length} notes in a bar`);
+        const first = own.find((note) => note.tick === bar.start);
+        assert.ok(first, `${where}: nothing on the first pulse`);
+        assert.equal(first.pitch % 12, bassOf(sounding(bar.start)), `${where}: the One`);
+        const next = harmony.find((arrival) => arrival.tick >= end && arrival.chord);
+        const into = next?.chord ? bassOf(next.chord) : -1;
+        const stepsInto = (pitch: number) =>
+          into >= 0 && [1, 2, 10, 11].includes(((pitch % 12) - into + 12) % 12);
+        const tier = tierOf(bar.seats.bass);
+        counted[tier]++;
+        if (tier === "low") {
+          for (const note of own) {
+            const tick = note.tick - bar.start;
+            assert.ok(
+              tick === 0 || landings.includes(tick) || (tick === PULSE && stepsInto(note.pitch)),
+              `${where}: quiet, a note at ${tick}`,
+            );
+          }
+          continue;
+        }
+        const second = own.find((note) => note.tick === bar.start + PULSE);
+        assert.ok(second, `${where}: nothing on the second pulse at the ${tier} level`);
+        const chord = sounding(second.tick);
+        const pc = second.pitch % 12;
+        const step = stepsInto(second.pitch);
+        assert.ok(
+          pc === (pitchClass(chord.root) + 7) % 12 || pc === bassOf(chord) || step,
+          `${where}: ${second.pitch} on the second pulse over ${chord.text}`,
+        );
+      }
+    }
+    if (sixes.length > 0)
+      assert.ok(
+        counted.low > 40 && counted.mid > enough(450) && counted.high > enough(450),
+        `only ${counted.low} quiet bars, ${counted.mid} working, ${counted.high} hot`,
+      );
+  },
+);
+
 // ── a riff ──────────────────────────────────────────────────────────────────
 
 test(

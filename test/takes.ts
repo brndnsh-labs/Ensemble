@@ -4,7 +4,7 @@
 
 import { readdirSync, readFileSync } from "node:fs";
 import type { NoteEvent, Seat, StylePack, Take, TakeOptions } from "@ensemble/engine";
-import { parse, render, tempoRange } from "@ensemble/engine";
+import { isCompound, parse, render, tempoRange } from "@ensemble/engine";
 import { STYLES as SHIPPING, styleById } from "@ensemble/styles";
 
 /**
@@ -69,6 +69,7 @@ export const WRITTEN: Readonly<Record<string, readonly string[]>> = {
   jazz: ["6/4"],
   blues: ["12/8"],
   rock: ["12/8"],
+  acoustic: ["6/8"],
 };
 
 /** A take whose chart is in 4/4 or in a meter its style has written. */
@@ -274,19 +275,39 @@ const SOLOIST_KINDS: readonly Omit<TakeOptions, "seed">[] = [
   { mode: "jam", passes: 3, solo: true, energy: 0.85, soloInstrument: "alto-sax" },
 ];
 
+/**
+ * A kind's tempo, where the chart counts dotted quarters, is held inside what the style plays
+ * there (`tempoRange`), as the app's tempo sheet holds it. 160 counted in dotted quarters is
+ * 480 eighths a minute, twice the fastest six-eight acoustic plays. Elsewhere the kinds are as
+ * they were written.
+ */
+const inPulses = (
+  style: StylePack,
+  kind: Omit<TakeOptions, "seed">,
+  chart: LibraryChart,
+): Omit<TakeOptions, "seed"> => {
+  const meter = parse(chart.text).chart.meter;
+  if (kind.tempo === undefined || !isCompound(meter)) return kind;
+  const { min, max } = tempoRange(style, meter);
+  return { ...kind, tempo: Math.min(max, Math.max(min, kind.tempo)) };
+};
+
 const SOLOIST_SPECS: readonly JamSpec[] = STYLES.flatMap((style) => [
   ...[...ownCharts(style), ...STRESS].flatMap((chart, c) =>
     SOLOIST_KINDS.flatMap((kind, k) =>
       // On a push, every other kind, a chart starting where the last left off.
       FULL || (c + k) % 2 === 0
-        ? [{ style, chart, options: { ...kind, seed: 1 + ((c + k) % 2) } }]
+        ? [{ style, chart, options: { ...inPulses(style, kind, chart), seed: 1 + ((c + k) % 2) } }]
         : [],
     ),
   ),
   ...otherCharts(style).map((chart, c) => ({
     style,
     chart,
-    options: { ...SOLOIST_KINDS[c % SOLOIST_KINDS.length]!, seed: 1 + (c % 2) },
+    options: {
+      ...inPulses(style, SOLOIST_KINDS[c % SOLOIST_KINDS.length]!, chart),
+      seed: 1 + (c % 2),
+    },
   })),
 ]);
 

@@ -6,6 +6,7 @@
 // and a scratch is the same stroke with the fretting hand let go (CH-28).
 
 import { PPQ } from "../../chart/types.ts";
+import { isCompound, onAnd } from "../../perform/meter.ts";
 import type { WrittenNote } from "../../perform/notes.ts";
 import type { Plan } from "../../plan/types.ts";
 import type { Chord } from "../../theory/chord.ts";
@@ -480,9 +481,15 @@ export function guitar(style: Guitar): InstrumentIdiom {
         const next = part[i + 1]?.strike;
         const room = next && next.tick > strike.tick ? next.tick - strike.tick : Infinity;
         const duration = Math.max(SHORTEST, Math.min(strike.duration, room));
-        // The pendulum: down on the beat side of each pair, up on the other (CH-27).
-        const inBar = strike.tick - (plan.bars[strike.bar]?.start ?? 0);
-        const upstroke = !strike.down && inBar % pair >= pair / 2;
+        // The pendulum: down on the beat side of each pair, up on the other (CH-27). A hand
+        // swinging in eighths through a pulse of three goes down, down, up: the "and" is the
+        // pulse's last eighth (DR-10, ST-acoustic-04), and the hand comes back up unheard
+        // between the first two, so every pulse is a downstroke.
+        const bar = plan.bars[strike.bar];
+        const inBar = strike.tick - (bar?.start ?? 0);
+        const dotted = grid === "eighth" && bar !== undefined && isCompound(bar.meter);
+        const upstroke =
+          !strike.down && (dotted ? onAnd(bar.meter, inBar) : inBar % pair >= pair / 2);
         const strings = voicing.strings ?? voicing.pitches.map((_, string) => string);
         // An upstroke catches only the top strings of the grip, and as many more under them
         // as it takes to sound every tone the chord is heard by (X-B-13).

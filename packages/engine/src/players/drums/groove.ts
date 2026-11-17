@@ -123,6 +123,7 @@ export function grooveBar(
   const written = writtenFor(drums.meters, bar.meter);
   const time = written ?? drums;
   const steps = written ? barSteps(bar.meter) : GROOVE_STEPS;
+  const dotted = pulses(bar.meter).some((pulse) => pulse > BEAT);
   for (const layer of time.grooves[tierOf(energy)]) {
     if (!applies(layer.when, bar, energy, reading, part)) continue;
     // One draw per decision per span: the section's kick is the same kick every bar (X-A-29).
@@ -142,7 +143,7 @@ export function grooveBar(
         }
       }
     }
-    overlay(part, choice.lines, 0, steps);
+    overlay(part, written || !dotted ? choice.lines : onThePulse(choice.lines), 0, steps);
   }
 
   // One hand, one cymbal (DR-03): the stick that opens the hat is not also closing it.
@@ -165,6 +166,30 @@ export function grooveBar(
   }
 
   return written ? part : fitMeter(part, pulses(bar.meter));
+}
+
+/**
+ * A 4/4 line as a bar of dotted pulses fits it: a stroke taken off the beat
+ * and played a sixteenth late (`-X`, a displaced backbeat) is played on the
+ * beat. A pulse of three eighths has no sixteenth to be late by, and the fit
+ * keeps only a beat's downbeat and its "and", so the stroke would be lost and
+ * the beat with it (HI-38: a rule that only takes strokes away cannot put
+ * one back).
+ */
+function onThePulse(lines: Lines): Lines {
+  const moved: Record<string, string> = {};
+  for (const [voice, text] of Object.entries(lines)) {
+    const symbols = cells(text);
+    for (let beat = 0; beat + 1 < symbols.length; beat += BEAT) {
+      const late = symbols[beat + 1]!;
+      if (symbols[beat] === TAKEN && late in LEVELS) {
+        symbols[beat] = late;
+        symbols[beat + 1] = ".";
+      }
+    }
+    moved[voice] = symbols.join("");
+  }
+  return moved as Lines;
 }
 
 function applies(
