@@ -56,7 +56,9 @@ const driving = {
 // would be all twelve here; the line is a root on each pulse instead, held
 // nearly full, and where it wants one, the pickup: the root struck again on the
 // pulse's last eighth, into the next. A section chooses where its pickups go
-// and keeps them. Quiet it is locked to the kick, as in four (ST-rock-12).
+// and keeps them, and wherever the kick takes a pickup the bass takes it too:
+// in four the eighths double every kick, so the kick's pushes are the band's
+// (ST-rock-12, ST-rock-28). Quiet it is the downbeat and the kick, as in four.
 
 /** The hot line in twelve: every pulse and its pickup, the octave on the pickups the section chose once. */
 const TWELVE_POPS: Figure[] = [
@@ -71,6 +73,7 @@ const slowDriving = {
   ...driving,
   // A pulse is held for 0.85 of it; the long half of a pulse and its pickup the same.
   length: { note: 0.85, long: 0.85, short: 0.85 },
+  followsKick: true,
 } as const;
 
 export const rockBass: BassStyle = {
