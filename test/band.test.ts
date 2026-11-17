@@ -772,6 +772,35 @@ test("neo-soul: in six and twelve the whole band is on the triplet's eighths, th
   assert.ok(pickups > 20, `only ${pickups} pickups on the sixteenth`);
 });
 
+// ── disco ───────────────────────────────────────────────────────────────────
+
+test("disco: in six and twelve the whole band is on the triplet's eighths, the drummer's fills and the soloist too, and nothing swings them: the hand that never stops and the pump keep to the eighths the floor is made of", {
+  skip:
+    only("disco").skip || !LIBRARY.some((chart) => chart.meter === "12/8" || chart.meter === "6/8"),
+}, () => {
+  const disco = STYLES.find((style) => style.id === "disco")!;
+  const compound = (jam: { style: { id: string }; chart: { meter: string } }) =>
+    jam.style.id === "disco" && (jam.chart.meter === "12/8" || jam.chart.meter === "6/8");
+  const played = [
+    ...takes(compound),
+    ...soloistTakes().filter(compound),
+    ...heldTakes(disco, "12/8"),
+    ...heldTakes(disco, "6/8"),
+  ];
+  const seats = new Set<string>();
+  for (const { chart, options, take } of played) {
+    for (const note of notesOf(take)) {
+      const bar = take.plan.bars.findLast((candidate) => candidate.start <= note.tick)!;
+      if (bar.kind !== "music" || !isCompound(bar.meter)) continue;
+      seats.add(note.seat);
+      const where = `${chart.file} ${JSON.stringify(options)}: the ${note.seat} (${note.voice ?? ""}) at ${note.tick}`;
+      assert.ok(Math.abs(note.offset) <= POCKET, `${where}, moved ${note.offset}`);
+      assert.equal((note.tick - bar.start) % (PPQ / 2), 0, `${where}, between the eighths`);
+    }
+  }
+  assert.equal(seats.size, 4, `only ${[...seats].join(", ")} heard`);
+});
+
 // ── acoustic ────────────────────────────────────────────────────────────────
 
 test(

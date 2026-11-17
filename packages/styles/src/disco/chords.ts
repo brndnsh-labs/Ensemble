@@ -115,7 +115,87 @@ const rhythm: RhythmBook = {
   candidates: 1,
 };
 
+// ── in twelve and in six ────────────────────────────────────────────────────
+// The same hand on a pulse of three eighths: the chop on each pulse's last
+// eighth, the "and", with the open hat (ST-disco-03), and the hand never
+// stopping. Only the eighths are struck: the hand still swings in sixteenths,
+// down on every eighth and back up between unheard, so in a bar of pulses the
+// strings are touched on the downstrokes alone. A bar of 12/8 is four pulses,
+// written in sixes; a bar of 6/8 is two.
+//
+// Four said in pulses (AU-97): a beat is a pulse, its "and" the pulse's last
+// eighth, and its "e" and its "a" (the light strokes leaning into the chop, or
+// out of it into the next beat) the triplet's middle eighth, the one place left
+// between the pulse and the chop. So four's push ("a-CHANK" from the "e") is the
+// middle eighth leaning into the chop; its pickup (the "a" of 1 and 3, out of
+// the chop into the backbeat) is the same lean, in the pulses before the
+// backbeats only;
+// and the Nile line keeps its accented One, its chops on the "and"s of 2 and 4,
+// and its light stroke beside each, now in front of it. Under a soloist the hand
+// keeps its figure, as in four (CH-68).
+
+/** Twelve: four's lines in pulses, every eighth a stroke from the working level up. */
+const ANDS_12 = "~.~.X. ~.~.X. ~.~.X. ~.~.X.";
+const PICKUP_12 = "~.x.X. ~.~.X. ~.x.X. ~.~.X.";
+const PUSH_12 = "~.x.X. ~.x.X. ~.x.X. ~.x.X.";
+const NILE_12 = "X.~.~. ~.x.X. ~.~.~. ~.x.X.";
+
+const rhythmInTwelve: RhythmBook = {
+  tiers: {
+    // Quiet: the scratch on the pulse and the chop on its "and" (four's eighths, `~.X.`).
+    low: {
+      ...rhythm.tiers.low,
+      figures: [line("ands", 1, "~...X. ~...X. ~...X. ~...X.")],
+      busy: { from: 8, to: 8 },
+    },
+    mid: {
+      ...rhythm.tiers.mid,
+      figures: [line("ands", 1, ANDS_12), line("nile", 1, NILE_12)],
+      busy: { from: 12, to: 12 },
+    },
+    high: {
+      ...rhythm.tiers.high,
+      figures: [line("ands", 1, ANDS_12), line("pickup", 1, PICKUP_12), line("push", 2, PUSH_12)],
+      busy: { from: 12, to: 12 },
+    },
+  },
+  hold: rhythm.hold,
+  forms: rhythm.forms,
+  candidates: rhythm.candidates,
+};
+
+/** Six: the same hand in a bar of two, the Nile line's One and its chop on the backbeat. */
+const rhythmInSix: RhythmBook = {
+  tiers: {
+    low: {
+      ...rhythm.tiers.low,
+      figures: [line("ands", 1, "~...X. ~...X.")],
+      busy: { from: 4, to: 4 },
+    },
+    mid: {
+      ...rhythm.tiers.mid,
+      figures: [line("ands", 1, "~.~.X. ~.~.X."), line("nile", 1, "X.~.~. ~.x.X.")],
+      busy: { from: 6, to: 6 },
+    },
+    high: {
+      ...rhythm.tiers.high,
+      figures: [
+        line("ands", 1, "~.~.X. ~.~.X."),
+        // The lean in the pulse before the backbeat only, as four's pickup leads into 2 and 4.
+        line("pickup", 1, "~.x.X. ~.~.X."),
+        line("push", 2, "~.x.X. ~.x.X."),
+      ],
+      busy: { from: 6, to: 6 },
+    },
+  },
+  hold: rhythm.hold,
+  forms: rhythm.forms,
+  candidates: rhythm.candidates,
+};
+
 export const discoChords: ChordStyle = {
+  // The chuck in twelve and in six, written above.
+  meters: { "12/8": rhythmInTwelve, "6/8": rhythmInSix },
   // Three strings of the stab (four for a chord too dense for three), no open strings (the hand
   // mutes by letting go, CH-23), the hand parked around the eighth fret, where the top of a
   // grip aimed at C5 is on the high E string. A sixteenth pendulum; an upstroke catches the

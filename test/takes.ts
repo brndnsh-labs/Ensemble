@@ -72,6 +72,7 @@ export const WRITTEN: Readonly<Record<string, readonly string[]>> = {
   acoustic: ["6/8"],
   neosoul: ["12/8", "6/8"],
   funk: ["6/8", "12/8"],
+  disco: ["12/8", "6/8"],
 };
 
 /** A take whose chart is in 4/4 or in a meter its style has written. */
@@ -200,9 +201,12 @@ const TAKE_SPECS: readonly JamSpec[] = STYLES.flatMap((style) => [
   })),
 ]);
 
+/** A held take's seeds: one on a push, two on the full run. Every style that writes a meter holds every chart in it at three levels, and that had become the push suite's last second. */
+const HELD_SEEDS: readonly number[] = FULL ? [1, 2] : [1];
+
 /**
  * A style held at each of its three levels on every library chart in a meter, as a short jam
- * on two seeds: a jam's arc takes most styles neither quiet nor hot for long. With `solo`, a
+ * on a seed or two: a jam's arc takes most styles neither quiet nor hot for long. With `solo`, a
  * jam of three passes with the soloist in each. With `own`, only the style's own charts in
  * the meter (the others it is handed in the library's takes).
  */
@@ -210,19 +214,23 @@ export function heldTakes(style: StylePack, meter: string, solo = false, own = f
   const charts = own ? ownCharts(style) : LIBRARY;
   return charts
     .filter((chart) => chart.meter === meter)
-    .flatMap((chart) =>
-      [0.3, 0.55, 0.85].flatMap((energy) =>
-        [1, 2].map((seed) =>
+    .flatMap((chart) => {
+      // A chart written for another style at this style's usual tempo, as the app plays it.
+      const written = parse(chart.text).chart;
+      const tempo =
+        written.styleId === style.id ? {} : { tempo: tempoRange(style, written.meter).default };
+      return [0.3, 0.55, 0.85].flatMap((energy) =>
+        HELD_SEEDS.map((seed) =>
           render1({
             style,
             chart,
             options: solo
-              ? { mode: "jam", passes: 3, solo: true, energy, seed }
-              : { mode: "jam", passes: 2, energy, seed },
+              ? { mode: "jam", passes: 3, solo: true, energy, seed, ...tempo }
+              : { mode: "jam", passes: 2, energy, seed, ...tempo },
           }),
         ),
-      ),
-    );
+      );
+    });
 }
 
 /** The library's takes that pass `only`, which reads the style, chart, and options. */
@@ -307,14 +315,14 @@ const SOLOIST_SPECS: readonly JamSpec[] = STYLES.flatMap((style) => [
         : [],
     ),
   ),
-  ...otherCharts(style).map((chart, c) => ({
-    style,
-    chart,
-    options: {
-      ...inPulses(style, SOLOIST_KINDS[c % SOLOIST_KINDS.length]!, chart),
-      seed: 1 + (c % 2),
-    },
-  })),
+  // A chart written for another style, where the kind names no tempo, is played at this style's
+  // usual tempo, as the app plays it and as the band's takes are: disco's chart in six at 116
+  // is twice the top of neo-soul's range there.
+  ...otherCharts(style).map((chart, c) => {
+    const kind = inPulses(style, SOLOIST_KINDS[c % SOLOIST_KINDS.length]!, chart);
+    const usual = tempoRange(style, parse(chart.text).chart.meter).default;
+    return { style, chart, options: { tempo: usual, ...kind, seed: 1 + (c % 2) } };
+  }),
 ]);
 
 /**

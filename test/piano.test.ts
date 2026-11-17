@@ -472,6 +472,64 @@ test(
   },
 );
 
+test(
+  'disco: in six and twelve the guitar\'s chop is on the "and": in every bar it comps, soloist or not, a chord sounds on the last eighth of each backbeat pulse (2 and 4 in twelve, the second pulse in six), and the hand touches the strings on nothing between the eighths; quiet, only on the pulses and their last eighths; from the working level up on every eighth, a chop or a scratch (the One may be left to a chord leant into, still ringing)',
+  only("disco"),
+  () => {
+    let quiet = 0;
+    let working = 0;
+    const disco = STYLES.find((style) => style.id === "disco")!;
+    const compound = (jam: { chart: { meter: string } }) =>
+      jam.chart.meter === "12/8" || jam.chart.meter === "6/8";
+    const played = [
+      ...takes((jam) => jam.style.id === "disco" && compound(jam)),
+      ...heldTakes(disco, "12/8"),
+      ...heldTakes(disco, "6/8"),
+    ];
+    const SIXTEENTH = PPQ / 4;
+    for (const { chart, options, take } of played) {
+      const chops = strikesOf(take);
+      const strokes = [...chops, ...strikesOf(take, true)];
+      for (const bar of take.plan.bars) {
+        if (bar.kind !== "music" || bar.ending || bar.seats.chords === null) continue;
+        if (bar.spans.some((span) => span.chord === null)) continue;
+        const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
+        const end = bar.start + bar.ticks;
+        const inBar = (list: readonly Strike[]) =>
+          new Set(
+            list
+              .filter((strike) => strike.tick >= bar.start && strike.tick < end)
+              .map((strike) => (strike.tick - bar.start) / SIXTEENTH),
+          );
+        const sounds = inBar(chops);
+        const touched = inBar(strokes);
+        const steps = Math.round(bar.ticks / SIXTEENTH);
+        // The backbeat pulses: every pulse that is not a strong one. In sixteenths, a pulse is six.
+        for (let pulse = 6; pulse < steps; pulse += 12)
+          assert.ok(
+            sounds.has(pulse + 4),
+            `${where}: no chop on the "and" of the pulse at ${pulse}`,
+          );
+        for (const step of touched) assert.equal(step % 2, 0, `${where}: between the eighths`);
+        if (tierOf(bar.seats.chords) === "low") {
+          quiet++;
+          for (const step of touched)
+            assert.ok(step % 6 !== 2, `${where}: quiet, and the middle eighth at ${step}`);
+          continue;
+        }
+        working++;
+        const leant = chops.some(
+          (strike) => strike.tick === bar.start - PPQ / 2 && strike.ends > bar.start + POCKET,
+        );
+        for (let step = leant ? 2 : 0; step < steps; step += 2)
+          assert.ok(touched.has(step), `${where}: the hand leaves eighth ${step / 2 + 1} out`);
+      }
+    }
+    if (LIBRARY.some((chart) => compound({ chart })))
+      assert.ok(working > 100 && quiet > 50, `only ${working} bars working and ${quiet} quiet`);
+  },
+);
+
 test("a section keeps its figure: away from a solo, every phrase opens on the same rhythm each time the section comes round at the same level", () => {
   let compared = 0;
   for (const { chart, options, take } of takes(written)) {

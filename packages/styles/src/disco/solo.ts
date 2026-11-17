@@ -8,7 +8,7 @@
 // Reading the rhythms: sixteen sixteenths to the bar, grouped by beat. `x`
 // strikes a note, `-` holds it, `.` is silence.
 
-import type { SoloStyle, Way } from "@ensemble/engine";
+import type { SoloStyle, SoloTime, Way } from "@ensemble/engine";
 
 const NEW: Way = { name: "statement", make: "new", oneRhythm: false };
 const NEW_RIFFED: Way = { name: "statement", make: "new", oneRhythm: true };
@@ -30,7 +30,129 @@ const ELSE = {
   lift: 2,
 } satisfies Way;
 
+// The phrase shapes of each level, the same in every meter.
+const SPARSE_SHAPES = [
+  { weight: 4.3, bars: "L E R R" },
+  { weight: 4.3, bars: "R L E R" },
+  { weight: 3.6, bars: "E R L E" },
+  { weight: 2.4, bars: "L L E R" },
+];
+const MEDIUM_SHAPES = [
+  { weight: 6, bars: "L L E R" },
+  { weight: 3.6, bars: "E R L E" },
+  { weight: 2, bars: "L E L E" },
+];
+const BUSY_SHAPES = [
+  { weight: 4, bars: "L L L E" },
+  { weight: 4.8, bars: "L L E R" },
+  { weight: 2, bars: "L E L E" },
+];
+
+// ── in twelve and in six ────────────────────────────────────────────────────
+// The same alto over the floor on a pulse of three eighths. A bar of 12/8 is
+// four pulses, written in sixes; a bar of 6/8 is two. Only the eighths are
+// struck. Twelve's rhythms are ST-disco-23's said in pulses (AU-97): a beat a
+// pulse, its "e" the triplet's middle eighth, its "and" the pulse's last, and
+// its "a" the last as well, or the middle where the "and" is taken; a sixteenth
+// burst of three or four is the triplet. The levels, the shapes and the endings
+// are four's. Six's are written for a bar of two from the same cells: each a
+// strong pulse and the backbeat's answer, and an ending landing in the first
+// pulse and holding through the second, which belongs to the next phrase.
+//
+// A level's notes a bar are counted for a bar of four quarter notes, and a bar of
+// twelve is six of them and a bar of six three. At disco's pulse a bar of twelve
+// is as long as a bar of four and a bar of six half of it, so each is asked for
+// four's notes a pulse: two thirds of four's figure (1.2, 2.4, 4 for 1.8, 3.6, 6).
+const rhythmsInTwelve: SoloTime = {
+  levels: [
+    {
+      name: "sparse",
+      notesPerBar: 1.2,
+      span: 7,
+      cells: [
+        "x----- ------ x---x- ------",
+        "....x- x----- -----. ......",
+        "x----- ----x- x----- ------",
+        "...... ....x- x---x- ------",
+        "x----- x----- -----. ......",
+      ],
+      shapes: SPARSE_SHAPES,
+    },
+    {
+      name: "medium",
+      notesPerBar: 2.4,
+      span: 9,
+      cells: [
+        "x-x-x- --x-x- ----x- --x---",
+        "x---x- x-x-x- ------ x---x-",
+        "....x- x-x-x- --x--- ------",
+        "x---x- ----x- x---x- ------",
+        "x---x- x---x- --x--- ------",
+      ],
+      shapes: MEDIUM_SHAPES,
+    },
+    {
+      // The triplet, where four has its sixteenth bursts.
+      name: "busy",
+      notesPerBar: 4,
+      span: 12,
+      cells: [
+        "x-x-x- x---x- x-x-x- --x---",
+        "x-x-x- x-x-x- x-x-x- x---x-",
+        "x-x-x- x-x-x- --x-x- --x---",
+        "..x-x- x-x-x- x---x- x-----",
+        "x-x-x- x-x-x- x---x- ------",
+      ],
+      shapes: BUSY_SHAPES,
+    },
+  ],
+  // Every phrase ends on a big held note, the last pulse unstruck.
+  endings: [
+    "x----- ------ ------ ------",
+    "x---x- x----- ------ ------",
+    "....x- x----- ------ ------",
+    "x...x- x----- ------ ------",
+    "x---x- ------ ------ ------",
+  ],
+  // The notes give no pickups for the solo, in any meter.
+  pickups: [],
+  peak: "x----- -----. ...... ......",
+};
+
+const rhythmsInSix: SoloTime = {
+  levels: [
+    {
+      name: "sparse",
+      notesPerBar: 1.2,
+      span: 7,
+      cells: ["x----- ------", "x---x- ------", "....x- x-----", "x----- ----x-", "x----- x-----"],
+      shapes: SPARSE_SHAPES,
+    },
+    {
+      name: "medium",
+      notesPerBar: 2.4,
+      span: 9,
+      cells: ["x-x-x- --x-x-", "x---x- x-x-x-", "....x- x-x-x-", "x---x- ----x-", "x---x- x---x-"],
+      shapes: MEDIUM_SHAPES,
+    },
+    {
+      name: "busy",
+      notesPerBar: 4,
+      span: 12,
+      cells: ["x-x-x- x---x-", "x-x-x- --x---", "x-x-x- x-x-x-", "..x-x- x-x-x-", "x---x- x-----"],
+      shapes: BUSY_SHAPES,
+    },
+  ],
+  // Each lands in the first pulse and holds through the second; none lands on the first pulse's
+  // last eighth alone, which at the top of disco's range leaves less than a breath after it.
+  endings: ["x----- ------", "x---x- ------", "..x-x- ------", "x...x- ------", "..x--- ------"],
+  pickups: [],
+  peak: "x----- ------",
+};
+
 export const discoSolo: SoloStyle = {
+  // The alto in twelve and in six, written above.
+  meters: { "12/8": rhythmsInTwelve, "6/8": rhythmsInSix },
   instrument: "alto-sax",
   // The line's home is a major third over the instrument's: over the chuck, not inside it
   // (ST-disco-22).
@@ -78,12 +200,7 @@ export const discoSolo: SoloStyle = {
         ".... ..x- x-x- ----",
         "x--- x--- ---- ....",
       ],
-      shapes: [
-        { weight: 4.3, bars: "L E R R" },
-        { weight: 4.3, bars: "R L E R" },
-        { weight: 3.6, bars: "E R L E" },
-        { weight: 2.4, bars: "L L E R" },
-      ],
+      shapes: SPARSE_SHAPES,
     },
     {
       name: "medium",
@@ -96,11 +213,7 @@ export const discoSolo: SoloStyle = {
         "x--x --x- x-x- ----",
         "x-x- x--x -x-- ----",
       ],
-      shapes: [
-        { weight: 6, bars: "L L E R" },
-        { weight: 3.6, bars: "E R L E" },
-        { weight: 2, bars: "L E L E" },
-      ],
+      shapes: MEDIUM_SHAPES,
     },
     {
       name: "busy",
@@ -113,11 +226,7 @@ export const discoSolo: SoloStyle = {
         "..xx xxxx x-x- x---",
         "x-xx xxx- x-x- ----",
       ],
-      shapes: [
-        { weight: 4, bars: "L L L E" },
-        { weight: 4.8, bars: "L L E R" },
-        { weight: 2, bars: "L E L E" },
-      ],
+      shapes: BUSY_SHAPES,
     },
   ],
   // ST-disco-23's phrase endings: every phrase ends on a big held note.

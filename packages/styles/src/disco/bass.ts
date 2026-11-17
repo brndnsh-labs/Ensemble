@@ -51,6 +51,48 @@ const pump = (options: Figure[], gap: number): Line => ({
   },
 });
 
+// ── in twelve and in six ────────────────────────────────────────────────────
+// The same bassist on a pulse of three eighths: the root on every pulse with the
+// kick, the octave on the pulse's last eighth with the open hat (ST-disco-03).
+// Four said in pulses (AU-97): a beat is a pulse, its "and" the pulse's last
+// eighth. A bar of 12/8 is four pulses, written in sixes; a bar of 6/8 is two.
+// Only the eighths are struck. The hot gallop (a sixteenth root on each "a",
+// long-short-short) has no place on the eighths, where the "a" is the "and":
+// hot, the pump takes the root on the middle eighth as well, root, root,
+// octave, a note on every eighth (as many a bar as the gallop's twelve). The
+// figures that turn over the bar (the octaves only on 2 and 4, the pump saved
+// for the back half) are said again for a bar of two, which has one backbeat.
+
+/** Twelve: four's figures said in pulses, with four's weights (ST-disco-11). */
+const QUIET_12: Figure[] = [
+  figure("pulses", 3, "R..... R..... R..... R....."),
+  figure("pulses, a pickup", 2, "R..... R..... R..... R...8."),
+];
+const WORKING_12: Figure[] = [
+  figure("the pump", 4, "R...8. R...8. R...8. R...8."),
+  figure("octaves on 2 and 4", 1, "R...R. R...8. R...R. R...8."),
+  figure("the pump in the back half", 1, "R...R. R...R. R...8. R...8."),
+];
+const HOT_12: Figure[] = [
+  figure("the pump", 2, "R...8. R...8. R...8. R...8."),
+  figure("the triplet pump", 2, "R.R.8. R.R.8. R.R.8. R.R.8."),
+];
+
+/** Six: a bar of one strong pulse and the backbeat answering it. */
+const QUIET_6: Figure[] = [
+  figure("pulses", 3, "R..... R....."),
+  figure("pulses, a pickup", 2, "R..... R...8."),
+];
+const WORKING_6: Figure[] = [
+  figure("the pump", 4, "R...8. R...8."),
+  // Four's two figures that keep the octave for the back of the bar are one in a bar of two.
+  figure("the octave on the backbeat", 2, "R...R. R...8."),
+];
+const HOT_6: Figure[] = [
+  figure("the pump", 2, "R...8. R...8."),
+  figure("the triplet pump", 2, "R.R.8. R.R.8."),
+];
+
 /** Into every kind of change the same way: the half step below the next root. */
 const BELOW = { below: 1, above: 0, fifth: 0, scale: 0 };
 
@@ -69,6 +111,12 @@ export const discoBass: BassStyle = {
     low: pump(QUIET, 3),
     mid: pump(WORKING, 2),
     high: pump(HOT, 2),
+  },
+  // The pump in twelve and in six, written above. The bounce is four's: each note 80% of the
+  // gap to the next, counted as two sixteenths at most, three when quiet.
+  meters: {
+    "12/8": { low: pump(QUIET_12, 3), mid: pump(WORKING_12, 2), high: pump(HOT_12, 2) },
+    "6/8": { low: pump(QUIET_6, 3), mid: pump(WORKING_6, 2), high: pump(HOT_6, 2) },
   },
 
   // Never when quiet. Otherwise the last bar of a phrase always leads into the next phrase's

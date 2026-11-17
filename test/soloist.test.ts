@@ -8,6 +8,7 @@ import {
   chordScale,
   chordTones,
   contextOf,
+  isCompound,
   MEASURES,
   onPulse,
   PPQ,
@@ -34,6 +35,7 @@ import {
   soloistTakes,
   stressTakes,
   takes,
+  written,
 } from "./takes.ts";
 
 // ── the soloist ─────────────────────────────────────────────────────────────
@@ -240,14 +242,18 @@ test("the soloist lands the changes: a note struck where a chord arrives is a to
   assert.ok(landings > enough(200), `only ${landings} landings`);
 });
 
-test("a solo breathes and keeps going: no silence inside it reaches three bars, and it has one top note, in its last chorus", () => {
+test("a solo breathes and keeps going: no silence inside it reaches three bars (in six-eight, where a bar is two pulses, three bars of four pulses: the same stretch of time), and it has one top note, in its last chorus", () => {
   let solos = 0;
   for (const { chart, options, take } of soloTakes()) {
     for (const { bars, notes } of solosOf(take)) {
       const where = `${chart.file} seed ${options.seed}, the solo from bar ${bars[0]!.index}`;
       assert.ok(notes.length > 0, `${where}: a solo with no notes`);
       solos++;
-      const barTicks = bars[0]!.ticks;
+      // A bar of dotted pulses shorter than four of them (6/8) is counted as a bar of four: at
+      // disco's tempo a bar of six is a second long, and three of them are no silence at all.
+      const barTicks = isCompound(bars[0]!.meter)
+        ? Math.max(bars[0]!.ticks, 4 * 1.5 * PPQ)
+        : bars[0]!.ticks;
       for (let i = 1; i < notes.length; i++) {
         const gap = notes[i]!.tick - (notes[i - 1]!.tick + notes[i - 1]!.duration);
         assert.ok(gap < barTicks * 3, `${where}: ${(gap / barTicks).toFixed(1)} bars of silence`);
@@ -755,7 +761,11 @@ test(
   only("jazz"),
   () => {
     let chromatic = 0;
-    for (const { chart, options, take } of soloTakes()) {
+    // Where jazz has written its soloist: in a bar of dotted pulses it has not written (6/8,
+    // 12/8) the line is the fit's, and is not jazz's own until it is written there.
+    const own = (jam: Parameters<typeof written>[0]) =>
+      written(jam) || !isCompound(parse(jam.chart.text).chart.meter);
+    for (const { chart, options, take } of soloTakes().filter(own)) {
       const harmony = harmonyOf(take);
       const solo = notesOf(take, "solo");
       const has = (arrival: (typeof harmony)[number] | undefined, pitch: number) => {
