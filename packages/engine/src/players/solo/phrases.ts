@@ -11,7 +11,7 @@
 
 import { swing } from "../../perform/feel.ts";
 import { cells, STEP } from "../../perform/grid.ts";
-import { onPulse } from "../../perform/meter.ts";
+import { isCompound, lastPulse, onPulse } from "../../perform/meter.ts";
 import type { Rng } from "../../rng.ts";
 import type { ToneRole } from "../../theory/chord.ts";
 import { pitchClass } from "../../theory/pitch.ts";
@@ -132,6 +132,11 @@ function lineBars(world: World, slot: Slot, bars: readonly BarPlan[]): LaidBar[]
       const bend = (at: number) => (bar.meter.unit === 4 ? swing(at, world.feel) : at);
       const room = (spot: Spot) => bend(bar.ticks) - bend(spot.tick - bar.start + EIGHTH);
       while (spots.length > 1 && room(spots.at(-1)!) < breath) spots.pop();
+      // A bar of dotted pulses shorter than the rhythm (a 4/4 ending in six-eight) would strike
+      // in its last pulse, which belongs to the next phrase, as a written ending never does.
+      const last = bar.ticks - lastPulse(bar.meter);
+      if (isCompound(bar.meter))
+        while (spots.length > 1 && spots.at(-1)!.tick - bar.start >= last) spots.pop();
     }
     return { spots, again: plan.again, stab: plan.stab, tied: false };
   });
