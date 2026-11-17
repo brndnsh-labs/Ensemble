@@ -1325,8 +1325,10 @@ button:active:not(:disabled),
     max(env(safe-area-inset-right), calc((100% - 64rem) / 2 - var(--gutter)));
 }
 
-/* A chart's name, in the chart's own face, on a line of its own under the way back. */
+/* A chart's name, in the chart's own face, on a line of its own under the way back. A long
+   one runs to a second line before it is cut; one that fits on a line is the height it was. */
 .chart-title {
+  display: -webkit-box;
   margin: 0;
   padding: 0 var(--gutter);
   overflow: hidden;
@@ -1335,8 +1337,9 @@ button:active:not(:disabled),
   font-stretch: 62%;
   font-weight: 720;
   line-height: 1.12;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 /* Edit and More: words at the end of the row, not boxes. */
