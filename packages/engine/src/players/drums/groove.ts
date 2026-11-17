@@ -9,7 +9,7 @@ import type { PlayerContext } from "../../perform/notes.ts";
 import { heldRng } from "../../perform/notes.ts";
 import type { Plan, PlanBar } from "../../plan/types.ts";
 import { tierOf } from "../../style/types.ts";
-import type { DrumVoice } from "./kit.ts";
+import { type DrumVoice, GHOST_BELOW } from "./kit.ts";
 import type { DrumStyle, DrumTime, GrooveOption, Lines, When } from "./style.ts";
 
 /** One bar of the kit: for each piece, its written level at every sixteenth (0 is a rest). */
@@ -241,5 +241,26 @@ function fitMeter(groove: BarPart, bar: readonly number[]): BarPart {
     }
     start += pulse;
   });
+  return bar.every((pulse) => pulse > BEAT) ? notBusy(part, bar) : part;
+}
+
+/**
+ * A fitted bar of dotted pulses keeps the kick and the snare to half its
+ * eighths (AU-96, EAR-11): where a 4/4 kick's "and" and a turn's both land in
+ * a bar of six beside the backbeat, the kick's strokes off the pulses go, the
+ * earliest first, until the bar is no busier than that. A bar already within
+ * it is left as it was.
+ */
+function notBusy(part: BarPart, bar: readonly number[]): BarPart {
+  const kick = part.kick;
+  if (!kick) return part;
+  const eighths = kick.length / 2;
+  const snare = part.snare ?? [];
+  const struck = () =>
+    kick.filter((level, step) => level > 0 || (snare[step] ?? 0) >= GHOST_BELOW).length;
+  const starts = new Set(bar.map((_, i) => bar.slice(0, i).reduce((sum, p) => sum + p, 0)));
+  for (let step = 0; step < kick.length && struck() > eighths / 2; step++) {
+    if (kick[step]! > 0 && !starts.has(step) && (snare[step] ?? 0) < GHOST_BELOW) kick[step] = 0;
+  }
   return part;
 }
