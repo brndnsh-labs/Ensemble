@@ -42,7 +42,7 @@ A chart is a header followed by one or more sections.
 |---|---|---|
 | `title` | free text | `Untitled` |
 | `key` | root plus optional `m` for minor: `C`, `Bb`, `F#m` | see below |
-| `tempo` | beats per minute, integer | from the style |
+| `tempo` | pulses per minute, integer: see below | from the style |
 | `meter` | `n/d`, with `d` one of 2, 4, 8 | `4/4` |
 | `style` | a style pack id | chosen in the app |
 
@@ -50,6 +50,13 @@ A chart is a header followed by one or more sections.
 - A line in the header that is neither `name: value` nor chords (a title typed without `title:`, `tempo 120` without its colon) is an error on that line. The header continues after it.
 - **Key.** Required if the chart uses numerals (an error on each numeral otherwise). If absent in a chart of absolute chords, the parser warns and uses the root of the first chord as the tonic, major unless that chord has a minor third. Endings and numeral display depend on the key, so charts should state it.
 - Only major and minor keys in version 1. No modes.
+- **Tempo.** The figure counts the pulse the meter is felt in, as a metronome mark does.
+  - In 3/8, 6/8, 9/8 and 12/8, where the eighths go in threes, the pulse is the dotted quarter. `meter: 12/8` with `tempo: 60` is 60 dotted quarters a minute: four to the bar, a bar every four seconds.
+  - In every meter over 4 (3/4, 4/4, 5/4, 6/4) it is the quarter note. `meter: 6/4` with `tempo: 138` is 138 quarter notes a minute, six to the bar.
+  - In the other meters over 8 (5/8, 7/8) the pulses are uneven, two eighths or three, and the figure counts the quarter note, the short pulse: 7/8 at 120 is 4/4 at 120 with an eighth missing.
+  - In a meter over 2 (2/2, 3/2) it counts the quarter note too. The band plays a bar of 2/2 as four quarter notes.
+  - A chart has one tempo. It counts the pulse of the header's meter; a section in another meter keeps the eighth note at the same speed.
+- **Meter.** Six can be written two ways, and they are different music. `6/8` is two slow beats to the bar, three eighths in each. `6/4` is six beats to the bar, a waltz twice. Write the one that is counted, and the tempo counts the same thing.
 
 ### 3.2 Sections
 
@@ -121,6 +128,7 @@ One rule: **the tokens in a bar divide it into equal slots.**
 | 4/4 | 1, 2, 4, 8, 16 |
 | 3/4 | 1, 3, 6, 12 |
 | 6/8 | 1, 2, 3, 6, 12 |
+| 6/4 | 1, 2, 3, 6, 12 |
 | 12/8 | 1, 2, 3, 4, 6, 12, 24 |
 | 5/4 | 1, 5, 10 |
 
@@ -319,6 +327,17 @@ key: G
 meter: 3/4
 
 | G | Em | C . D | G |
+```
+
+**A slow blues in twelve, 60 dotted quarters a minute, its turnaround a chord a beat:**
+
+```
+title: Slow blues sketch
+key: G
+tempo: 60
+meter: 12/8
+
+| G7 | C7 | G7 G7/B C7 C#dim7 | G7/D D7 |
 ```
 
 **Intro, looping body, and a written ending:**
