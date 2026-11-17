@@ -10,7 +10,14 @@
 // o soft, g ghost, "-" the stroke taken away. The notes' RM, the rim, is the
 // cross-stick; TH and TL are the high and the floor tom.
 
-import { type DrumStyle, type FillShape, type GrooveOption, TIER_MID } from "@ensemble/engine";
+import {
+  type DrumStyle,
+  type DrumTime,
+  type FillShape,
+  type GrooveLayer,
+  type GrooveOption,
+  TIER_MID,
+} from "@ensemble/engine";
 
 // ── the time ────────────────────────────────────────────────────────────────
 
@@ -108,7 +115,252 @@ function both(weight: number, shape: { two: FillShape["lines"]; four: FillShape[
   ];
 }
 
+// ── in twelve and in six ────────────────────────────────────────────────────
+// Twelve is the reggae shuffle: the one drop with its hat on the triplet, the
+// slow count's four beats each a pulse of three eighths. It is four's drummer
+// said in pulses (AU-97): a beat is a pulse, its "and" the pulse's last eighth;
+// four's straight eighths on the hat (`x.o.`) are the shuffle's long-short
+// (`x...o.`), and its shuffled sixteenths, whose "a" picks up the next beat
+// (`x.oo`), are the whole triplet (`x.o.o.`). The drop is on the third pulse,
+// the bar's secondary downbeat (ST-reggae-04). Only the eighths are struck: the
+// trace of swing on four's sixteenths has none to move here.
+//
+// Six is a bar of two: the One, empty, and the drop answering it on the second
+// pulse, where the backbeat of a bar of two is (ST-reggae-04: the drop lands on
+// the secondary downbeat when a bar has one, else on its backbeat pulses). Its
+// hat is twelve's first half (`half`); the drop, the answers, the riddims and
+// the fills are written for six. Between them the kick and the snare never take
+// more than half of a bar's eighths (AU-96, EAR-11).
+//
+// Reading the grids: a pulse to a group of six sixteenths, "1 . & . a ."; only
+// the first, third and fifth character of a group (the pulse's three eighths)
+// is ever struck.
+
+/** The first half of a line written for twelve: the same beat in a bar of six. */
+const half = (line: string) => line.split(" ").slice(0, 2).join(" ");
+
+const TWELVE_SOFT_DROP = {
+  closedHat: "o...g. o...g. o...g. o...g.",
+  kick: "...... ...... o..... ......",
+  crossStick: "...... ...... x..... ......",
+};
+const TWELVE_ONE_DROP = {
+  kick: "...... ...... X..... ......",
+  crossStick: "...... ...... X..... ......",
+};
+/** The shuffle's long-short (55), or the whole triplet, whose last eighth picks up the next pulse (45). */
+const TWELVE_HATS: GrooveOption[] = [
+  { weight: 55, lines: { closedHat: "x...o. x...o. x...o. x...o." } },
+  { weight: 45, lines: { closedHat: "x.o.o. x.o.o. x.o.o. x.o.o." } },
+];
+const TWELVE_LIFT = {
+  openHat: "...... ...... ...... ....x.",
+  closedHat: "...... ...... ...... ....-.",
+};
+const TWELVE_RIDDIMS: GrooveOption[] = [
+  {
+    // Steppers: the kick on every pulse, the hat on the pulses, the open hat on every last eighth.
+    weight: 1,
+    lines: {
+      kick: "x..... x..... x..... x.....",
+      snare: "...... ...... X..... ......",
+      closedHat: "x..... x..... x..... x.....",
+      openHat: "....x. ....x. ....x. ....x.",
+    },
+  },
+  {
+    // Rockers: the kick on 1 and 3, the hat's triplets.
+    weight: 1,
+    lines: {
+      kick: "x..... ...... x..... ......",
+      snare: "...... ...... X..... ......",
+      closedHat: "x.o.o. x.o.o. x.o.o. x.o.o.",
+    },
+  },
+];
+/** Four's answers said in pulses: the pickup into the empty One, the drop echoed on its last eighth, the lift. */
+const twelveAnswers = (hand: "crossStick" | "snare"): GrooveOption[] => [
+  { weight: 2, lines: { [hand]: "...... ...... ...... ....o." } },
+  { weight: 2, lines: { [hand]: "...... ...... ....o. ......" } },
+  { weight: 1, lines: TWELVE_LIFT },
+];
+
+const SIX_SOFT_DROP = {
+  closedHat: half(TWELVE_SOFT_DROP.closedHat),
+  kick: "...... o.....",
+  crossStick: "...... x.....",
+};
+const SIX_ONE_DROP = { kick: "...... X.....", crossStick: "...... X....." };
+const SIX_HATS: GrooveOption[] = TWELVE_HATS.map((hat) => ({
+  weight: hat.weight,
+  lines: { closedHat: half(hat.lines.closedHat!) },
+}));
+const SIX_LIFT = { openHat: "...... ....x.", closedHat: "...... ....-." };
+/**
+ * In a bar of two the steppers' kick on every pulse and the rockers' on 1 and 3 are the same
+ * two kicks, the One and the drop: the riddims differ by the hat.
+ */
+const SIX_RIDDIMS: GrooveOption[] = [
+  {
+    weight: 1,
+    lines: {
+      kick: "x..... x.....",
+      snare: "...... X.....",
+      closedHat: "x..... x.....",
+      openHat: "....x. ....x.",
+    },
+  },
+  {
+    weight: 1,
+    lines: {
+      kick: "x..... x.....",
+      snare: "...... X.....",
+      closedHat: half(TWELVE_RIDDIMS[1]!.lines.closedHat!),
+    },
+  },
+];
+/**
+ * In six the "and" of 3 and the "and" of 4 are one eighth, the drop's last: the pickup into
+ * the empty One there (four's two answers on it), or the lift.
+ */
+const sixAnswers = (hand: "crossStick" | "snare"): GrooveOption[] => [
+  { weight: 4, lines: { [hand]: "...... ....o." } },
+  { weight: 1, lines: SIX_LIFT },
+];
+
+/** Four's tiers, with a compound bar's lines. */
+function compoundGrooves(beat: {
+  softDrop: GrooveOption["lines"];
+  oneDrop: GrooveOption["lines"];
+  hats: GrooveOption[];
+  lift: GrooveOption["lines"];
+  riddims: GrooveOption[];
+  answers: (hand: "crossStick" | "snare") => GrooveOption[];
+}): DrumTime["grooves"] {
+  const answer = (hand: "crossStick" | "snare"): GrooveLayer => ({
+    id: "answer",
+    hold: "section",
+    when: { phraseBars: ANSWER_BARS },
+    audible: true,
+    options: beat.answers(hand),
+  });
+  return {
+    low: [{ id: "time", hold: "section", options: [{ weight: 1, lines: beat.softDrop }] }],
+    mid: [
+      { id: "hat", hold: "section", options: beat.hats },
+      { id: "drop", hold: "section", options: [{ weight: 1, lines: beat.oneDrop }] },
+      {
+        id: "lift",
+        hold: "section",
+        options: [
+          { weight: 60, lines: {} },
+          { weight: 40, lines: beat.lift },
+        ],
+      },
+      answer("crossStick"),
+    ],
+    high: [{ id: "riddim", hold: "song", options: beat.riddims }, answer("snare")],
+  };
+}
+
+// Fills in twelve and six: four's shapes in eighths, short and late, each ending on the
+// bar's last eighth. Four's two sixteenths are two eighths, the last two of the bar; its
+// beat is the last pulse. In six the fills stay in the last two eighths, so that the drop on
+// the second pulse is always played.
+
+/** The two lengths of a shape: the last two eighths, and the last pulse. */
+interface CompoundShape {
+  readonly two: FillShape["lines"];
+  readonly pulse: FillShape["lines"];
+}
+
+const RIM_PICKUP_IN_PULSES: CompoundShape = {
+  two: { crossStick: "o.X." },
+  pulse: { crossStick: "o.x.X." },
+};
+const THE_DROP_IN_PULSES: CompoundShape = {
+  two: { crossStick: "..X." },
+  pulse: { crossStick: "....X.", kick: "....x." },
+};
+const TOM_PICKUP_IN_PULSES: CompoundShape = {
+  two: { highTom: "o...", lowTom: "..X." },
+  pulse: { crossStick: "x.....", highTom: "..o...", lowTom: "....X." },
+};
+const SNARE_DRAG_IN_PULSES: CompoundShape = {
+  two: { snare: "o.X." },
+  pulse: { snare: "g.o.X." },
+};
+/** Four's roll of four sixteenths is the pulse's three eighths. */
+const RIM_ROLL_IN_PULSES: CompoundShape = {
+  two: { crossStick: "x.X." },
+  pulse: { crossStick: "o.x.X." },
+};
+
+/** A shape at one weight: in twelve both its lengths, in six the last two eighths. */
+const twelveFill = (weight: number, shape: CompoundShape): FillShape[] => [
+  { weight, lines: shape.two },
+  { weight, lines: shape.pulse },
+];
+const sixFill = (weight: number, shape: CompoundShape): FillShape[] => [
+  { weight, lines: shape.two },
+];
+
+function compoundFills(
+  at: (weight: number, shape: CompoundShape) => FillShape[],
+  length: DrumTime["fills"]["length"],
+): DrumTime["fills"] {
+  return {
+    length,
+    phrase: [...at(3, RIM_PICKUP_IN_PULSES), ...at(2, THE_DROP_IN_PULSES)],
+    section: [
+      ...at(2, TOM_PICKUP_IN_PULSES),
+      ...at(2, SNARE_DRAG_IN_PULSES),
+      ...at(1, RIM_ROLL_IN_PULSES),
+      ...at(1, RIM_PICKUP_IN_PULSES),
+    ],
+    top: [...at(3, TOM_PICKUP_IN_PULSES), ...at(1, SNARE_DRAG_IN_PULSES)],
+  };
+}
+
+const reggaeDrumsInTwelve: DrumTime = {
+  grooves: compoundGrooves({
+    softDrop: TWELVE_SOFT_DROP,
+    oneDrop: TWELVE_ONE_DROP,
+    hats: TWELVE_HATS,
+    lift: TWELVE_LIFT,
+    riddims: TWELVE_RIDDIMS,
+    answers: twelveAnswers,
+  }),
+  touches: [],
+  // Four's lengths in eighths: a phrase none quiet, two eighths, a pulse hot; a section two
+  // eighths quiet, a pulse from the working level up.
+  fills: compoundFills(twelveFill, {
+    phrase: { low: 0, mid: 4, high: 6 },
+    section: { low: 4, mid: 6, high: 6 },
+  }),
+};
+
+const reggaeDrumsInSix: DrumTime = {
+  grooves: compoundGrooves({
+    softDrop: SIX_SOFT_DROP,
+    oneDrop: SIX_ONE_DROP,
+    hats: SIX_HATS,
+    lift: SIX_LIFT,
+    riddims: SIX_RIDDIMS,
+    answers: sixAnswers,
+  }),
+  touches: [],
+  // The last two eighths at most: a pulse would be the drop's.
+  fills: compoundFills(sixFill, {
+    phrase: { low: 0, mid: 4, high: 4 },
+    section: { low: 4, mid: 4, high: 4 },
+  }),
+};
+
 export const reggaeDrums: DrumStyle = {
+  // The shuffle in twelve and the bar of two in six, written above.
+  meters: { "12/8": reggaeDrumsInTwelve, "6/8": reggaeDrumsInSix },
+
   grooves: {
     // No lift, no pickups, no answer bars (ST-reggae-06).
     low: [{ id: "time", hold: "section", options: [{ weight: 1, lines: SOFT_DROP }] }],
