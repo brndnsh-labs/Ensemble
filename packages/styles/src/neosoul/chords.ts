@@ -148,7 +148,116 @@ const rhythm: RhythmBook = {
   candidates: 1,
 };
 
+// ── in twelve and in six ────────────────────────────────────────────────────
+// The same hands in the soul ballad: chords held for pulses and laid in, never
+// the ballad pianist's triplets; the lazy re-strikes lean into a pulse from its
+// last eighth, or lay the chord in late on the triplet's middle eighth, as four's
+// lean from the "a" and the "e" (ST-neosoul-22). A bar of 12/8 is four slow
+// pulses of three eighths, written in sixes; a bar of 6/8 is two. Twelve's
+// figures are four's said in pulses (a beat a pulse, its "e" the middle eighth,
+// its "and" and its "a" the last); six's are written for a bar of two, the
+// re-strike leaning into the backbeat or into the One. The touch, the holds and
+// the hands under a soloist are four's.
+
+const rhythmInTwelve: RhythmBook = {
+  tiers: {
+    low: {
+      draw: "quiet",
+      articulation: TOUCH,
+      figures: [
+        { name: "held", weight: 3, grid: "x----- ------ ------ ----.." },
+        { name: "held, the and of 3", weight: 2, grid: "x----- ------ --..o- ------" },
+        { name: "the e of 1, held", weight: 1, grid: "..o--- ------ ------ ----.." },
+      ],
+      answers: [],
+      busy: { from: 1, to: 1.5 },
+      arrival: { level: 72, steps: 24 },
+    },
+    mid: {
+      draw: "working",
+      articulation: TOUCH,
+      figures: [
+        { name: "the a of 2, the and of 4", weight: 3, grid: "x----- --..o- ------ --..o-" },
+        {
+          name: "the e of 1, the and of 3, the and of 4",
+          weight: 2,
+          grid: "..o--- ------ --..o- --..o-",
+        },
+        { name: "the and of 2, the e of 4", weight: 2, grid: "x----- --..o- ------ ..o---" },
+      ],
+      answers: [],
+      busy: { from: 2.5, to: 3 },
+      arrival: { level: 72, steps: 6 },
+    },
+    high: {
+      draw: "hot",
+      articulation: TOUCH,
+      figures: [
+        { name: "the as and the ands", weight: 2, grid: "x---o- ----o- ----o- ----o-" },
+        { name: "the e of 1, then the ands", weight: 2, grid: "..o--- ----o- ----o- --o---" },
+        {
+          name: "the a of 2, the and of 3, the a of 4",
+          weight: 1,
+          grid: "x----- --..o- ----o- --..o-",
+        },
+      ],
+      answers: [],
+      busy: { from: 3.5, to: 5 },
+      arrival: { level: 72, steps: 6 },
+    },
+  },
+  hold: 0.95,
+  forms: [{ weight: 1, bars: "a a a a" }],
+  candidates: 1,
+};
+
+const rhythmInSix: RhythmBook = {
+  tiers: {
+    low: {
+      draw: "quiet",
+      articulation: TOUCH,
+      figures: [
+        { name: "held", weight: 3, grid: "x----- ----.." },
+        { name: "held, leaning into the backbeat", weight: 2, grid: "x-..o- ------" },
+        { name: "the e of 1, held", weight: 1, grid: "..o--- ----.." },
+      ],
+      answers: [],
+      busy: { from: 1, to: 1.5 },
+      arrival: { level: 72, steps: 12 },
+    },
+    mid: {
+      draw: "working",
+      articulation: TOUCH,
+      figures: [
+        { name: "the One, and late after the backbeat", weight: 3, grid: "x----- ..o---" },
+        { name: "the e of 1, leaning into the One", weight: 2, grid: "..o--- --..o-" },
+        { name: "leaning into the backbeat", weight: 2, grid: "x-..o- ------" },
+      ],
+      answers: [],
+      busy: { from: 1.5, to: 2 },
+      arrival: { level: 72, steps: 6 },
+    },
+    high: {
+      draw: "hot",
+      articulation: TOUCH,
+      figures: [
+        { name: "leaning into both pulses", weight: 2, grid: "x---o- ----o-" },
+        { name: "the e of 1, then late and leaning", weight: 2, grid: "..o--- ..o-o-" },
+        { name: "the One, then late and leaning", weight: 1, grid: "x----- ..o-o-" },
+      ],
+      answers: [],
+      busy: { from: 2, to: 3 },
+      arrival: { level: 72, steps: 6 },
+    },
+  },
+  hold: 0.95,
+  forms: [{ weight: 1, bars: "a a a a" }],
+  candidates: 1,
+};
+
 export const neosoulChords: ChordStyle = {
+  // The soul ballad in twelve and in six, written above.
+  meters: { "12/8": rhythmInTwelve, "6/8": rhythmInSix },
   idiom: "keys",
   kinds: { spread, closed },
   voicing: { low: "spread", mid: "spread", high: "spread" },
