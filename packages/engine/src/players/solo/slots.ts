@@ -3,9 +3,11 @@
 // (how busy, how high). Nothing here is drawn by chance, so the critic can
 // read a finished take the same way the soloist read the plan.
 
+import type { Meter } from "../../chart/types.ts";
 import { PPQ } from "../../chart/types.ts";
 import type { Arrival } from "../../perform/harmony.ts";
 import { arrivals } from "../../perform/harmony.ts";
+import { writtenFor } from "../../perform/meter.ts";
 import type { Plan, PlanBar } from "../../plan/types.ts";
 import type { FeelStyle, StylePack } from "../../style/types.ts";
 import { tierOf } from "../../style/types.ts";
@@ -39,6 +41,41 @@ export interface Slot {
   readonly high: number;
   /** The solo's one top note may be this high and no higher (SO-07). */
   readonly top: number;
+}
+
+const inMeter = new WeakMap<SoloStyle, Map<string, SoloStyle>>();
+
+/**
+ * The soloist's style as it is in a bar of a meter: with what it has written
+ * for that meter in place of its 4/4 rhythms, or as it stands where it has
+ * written nothing.
+ */
+export function soloIn(solo: SoloStyle, meter: Meter): SoloStyle {
+  const written = writtenFor(solo.meters, meter);
+  if (!written) return solo;
+  let known = inMeter.get(solo);
+  if (!known) {
+    known = new Map();
+    inMeter.set(solo, known);
+  }
+  const name = `${meter.beats}/${meter.unit}`;
+  let style = known.get(name);
+  if (!style) {
+    style = {
+      ...solo,
+      levels: written.levels,
+      endings: written.endings,
+      habits: { ...solo.habits, pickup: { ...solo.habits.pickup, figures: written.pickups } },
+      arc: { ...solo.arc, peak: { ...solo.arc.peak, ending: written.peak } },
+    };
+    known.set(name, style);
+  }
+  return style;
+}
+
+/** A level's place among the style's, sparsest first, by its name: the same level in every meter. */
+export function levelIndex(solo: SoloStyle, level: Density): number {
+  return solo.levels.findIndex((other) => other.name === level.name);
 }
 
 /** Everything about a take that the soloist, and anyone reading its solo, works from. */
@@ -99,7 +136,7 @@ export function worldOf(
     instrument,
     harmony,
     slots: slotsOf(plan, solo, instrument),
-    ticksPerSecond: (plan.tempo * PPQ) / 60,
+    ticksPerSecond: (plan.quarters * PPQ) / 60,
     bass,
     arrivalAt,
     poolOf: poolOfArrival,
@@ -137,13 +174,12 @@ function slotsOf(plan: Plan, solo: SoloStyle, instrument: SoloInstrument): Slot[
     phrases.at(-1)!.push(bar);
   }
 
-  const levels = solo.levels;
   const levelNamed = (name: string) =>
     Math.max(
       0,
-      levels.findIndex((level) => level.name === name),
+      solo.levels.findIndex((level) => level.name === name),
     );
-  const barSeconds = (bar: PlanBar) => (bar.ticks / PPQ) * (60 / plan.tempo);
+  const barSeconds = (bar: PlanBar) => (bar.ticks / PPQ) * (60 / plan.quarters);
   const home = instrument.home + solo.lift;
   const top = Math.min(instrument.range[1] - 1, home + solo.arc.peak.above);
 
@@ -190,6 +226,8 @@ function slotsOf(plan: Plan, solo: SoloStyle, instrument: SoloInstrument): Slot[
     const byTempo = seconds > solo.tempo.slowBar ? 1 : seconds < solo.tempo.fastBar ? -1 : 0;
     const shift = Math.max(-1, Math.min(1, byEnergy + byTempo));
     const base = levelNamed(peak ? solo.arc.peak.density : stage.density);
+    // The level's rhythms are the ones written for the phrase's meter, where there are any.
+    const levels = soloIn(solo, bars[0]!.meter).levels;
     const level =
       levels[Math.max(0, Math.min(levels.length - 1, base + (peak ? Math.max(0, shift) : shift)))]!;
 

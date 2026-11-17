@@ -13,7 +13,7 @@ import type { BassPick } from "./critique.ts";
 import { byBassCritic } from "./critique.ts";
 import { finalNotes, strikeBefore } from "./ending.ts";
 import type { Piece } from "./form.ts";
-import { pieces, tierAt } from "./form.ts";
+import { lineAt, pieces, tierAt } from "./form.ts";
 import type { LeadIn, LeadInRequest } from "./leadin.ts";
 import { applyLeadIn, leadIn, leadInChance, OCTAVE } from "./leadin.ts";
 import type { LineNote } from "./line.ts";
@@ -56,7 +56,7 @@ export function bassPart(context: PlayerContext, pick?: BassPick): WrittenNote[]
   const written: WrittenNote[] = [];
   form.forEach((piece, i) => {
     // The look-ahead pass is read, never played.
-    if (!piece.lookahead) written.push(...write(parts[i]!, piece, bass.lines[tierAt(piece)]));
+    if (!piece.lookahead) written.push(...write(parts[i]!, piece, lineAt(bass, piece)));
   });
   return written;
 }
@@ -135,7 +135,7 @@ export function performer(
     turn(i) {
       const piece = form[i]!;
       if (!sounds(form, i) || piece.ending !== null) return null;
-      return turnOf(bass.lines[tierAt(piece)], tierAt(piece), piece.bar, rng);
+      return turnOf(lineAt(bass, piece), tierAt(piece), piece.bar, rng);
     },
 
     arrive(i, state, parts, into) {
@@ -155,7 +155,7 @@ export function performer(
 
       // A walked line is not reshaped to lead in: it is walked here, now that the place
       // it is going is known. The approach is the walk's own last note.
-      const walked = moving ? bass.lines[tierAt(moving)].walked : undefined;
+      const walked = moving ? lineAt(bass, moving).walked : undefined;
       if (moving && walked) {
         const from = moving.struck ? state.root : (before ?? state.root);
         const tones = notes.filter((note) => !note.echo).length;
@@ -180,7 +180,7 @@ export function performer(
           landing: { tick: piece.start, pitch: target, chord: piece.chord!, key: piece.bar.key },
           line: walked,
           kinds: bass.leadIn.kinds,
-          ceiling: bass.lines[tierAt(moving)].ceiling,
+          ceiling: lineAt(bass, moving).ceiling,
           home: anchor,
           pull: bass.register.pull,
           rng: stride,
@@ -213,7 +213,7 @@ export function performer(
                   chord: piece.chord!,
                   key: piece.bar.key,
                 },
-                ceiling: bass.lines[tierAt(moving)].ceiling,
+                ceiling: lineAt(bass, moving).ceiling,
               },
               bass.walks,
               into.walk,
@@ -272,10 +272,10 @@ export function performer(
         });
       } else if (piece.ending === "before" && ending) {
         // Caught at the line's own weight, and never louder than the final note.
-        const weight = Math.min(bass.lines[tier].velocity.arrival, bass.ending.velocity);
+        const weight = Math.min(lineAt(bass, piece).velocity.arrival, bass.ending.velocity);
         parts[i] = strikeBefore(piece, ending, state.root, weight);
       } else {
-        const line = bass.lines[tier];
+        const line = lineAt(bass, piece);
         const sequence = remember(sequences, i, () =>
           sequenceFor(line.tones, piece.chord!, piece.scale!),
         );
@@ -382,11 +382,10 @@ function approachFrom(
 ): (pitch: number) => LeadInRequest {
   const { piece, notes, before } = from;
   const policy = bass.leadIn;
-  const tier = tierAt(piece);
   const chance = decided ?? leadInChance(bass, piece, next);
   const third =
     piece.chord && piece.scale && toneOf("3", piece.chord, piece.scale) !== null
-      ? tonePitch("3", piece.chord, piece.scale, from.root, bass.lines[tier].ceiling)
+      ? tonePitch("3", piece.chord, piece.scale, from.root, lineAt(bass, piece).ceiling)
       : null;
   // The coin belongs to this change's place in the music, never to how many came before it.
   const place = heldRng(rng, "lead-in", policy.hold, piece.bar).fork(

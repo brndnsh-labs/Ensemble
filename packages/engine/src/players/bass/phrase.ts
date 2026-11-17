@@ -18,7 +18,7 @@ import type { Rng } from "../../rng.ts";
 import { mod12 } from "../../theory/pitch.ts";
 import type { BassCandidate, BassPick, WalkPlace } from "./critique.ts";
 import type { Piece } from "./form.ts";
-import { tierAt } from "./form.ts";
+import { lineAt, linesIn, tierAt } from "./form.ts";
 import { leadInChance } from "./leadin.ts";
 import type { LineNote, ShapeChoice } from "./line.ts";
 import type { BassStyle, Figure, LineShape, ToneSequence, Walk } from "./style.ts";
@@ -117,7 +117,8 @@ export function playPhrases(
   let state = player.arrive(0, { line: null, root: 0 }, parts, AS_IT_FALLS).state;
 
   const policy = bass.phrase;
-  const varies = [bass.lines.low, bass.lines.mid, bass.lines.high].some((line) =>
+  const lines = linesIn(bass, form);
+  const varies = lines.some((line) =>
     line.tones.some((sequence) => (sequence.others?.length ?? 0) > 0),
   );
   const walks = bass.walks;
@@ -128,7 +129,6 @@ export function playPhrases(
       (chance) => chance > 0,
     );
   // A walked line is a new line every time it is drawn, and a riff may turn: both are choices.
-  const lines = [bass.lines.low, bass.lines.mid, bass.lines.high];
   const walked = lines.some((line) => line.walked !== undefined);
   const turning = lines.some(
     (line) => (line.turns?.offer ?? 0) > 0 && line.turns!.options.some((turn) => turn.weight > 0),
@@ -342,15 +342,15 @@ function plansFor(
   phrase.forEach((i, k) => {
     const { chord, scale } = form[i]!;
     if (!chord || !scale) return;
-    const sequence = sequenceFor(bass.lines[tierAt(form[i]!)].tones, chord, scale);
+    const sequence = sequenceFor(lineAt(bass, form[i]!).tones, chord, scale);
     if ((sequence.others?.length ?? 0) > 0) answerable[stay[k]!] = true;
   });
   // Changes inside the phrase a walk could go into.
   const inner = phrase.filter((i, k) => k > 0 && form[i]!.struck && form[i]!.chord !== null);
   const held = heldRng(rng, "bass-plans", "phrase", first.bar);
   // Every plan walks a walked line its own way, so no two of them are one plan.
-  const strides = phrase.some((i) => bass.lines[tierAt(form[i]!)].walked !== undefined);
-  const turns = bass.lines[tierAt(last)].turns;
+  const strides = phrase.some((i) => lineAt(bass, form[i]!).walked !== undefined);
+  const turns = lineAt(bass, last).turns;
   const plans: Plan[] = [];
   const seen = new Set<string>();
   // More are drawn than are weighed, since two plans often play the same notes.
@@ -378,7 +378,7 @@ function plansFor(
     if (k > 0) {
       for (const i of inner) {
         // A walk approaches every change itself: there is no lead-in to decide.
-        if (bass.lines[tierAt(form[i - 1]!)].walked) continue;
+        if (lineAt(bass, form[i - 1]!).walked) continue;
         const chance = leadInChance(bass, form[i - 1]!, form[i]!);
         leads.set(i, draw.fork("lead", i).chance(chance) ? 1 : 0);
       }

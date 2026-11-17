@@ -8,6 +8,7 @@
 
 import { PPQ } from "../../chart/types.ts";
 import { cells, STEP } from "../../perform/grid.ts";
+import { onPulse } from "../../perform/meter.ts";
 import type { PlanBar } from "../../plan/types.ts";
 import type { Rng } from "../../rng.ts";
 import type { ToneRole } from "../../theory/chord.ts";
@@ -112,7 +113,7 @@ export function contourOf(
 export const placeOf = (bar: PlanBar, tick: number): string =>
   `${bar.section.occurrence}/${bar.barInSection}/${tick - bar.start}`;
 
-const onBeat = (spot: Spot) => (spot.tick - spot.bar.start) % PPQ === 0;
+const onBeat = (spot: Spot) => onPulse(spot.bar.meter, spot.tick - spot.bar.start);
 const long = (spot: Spot) => spot.hold > EIGHTH;
 /** A note the chord does not allow where it would be heard as more than passing. */
 const wrong = (spot: Spot, pitch: number) =>

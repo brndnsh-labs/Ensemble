@@ -75,7 +75,7 @@ export interface Take {
 
 /** The roadmap of a performance, without playing it. */
 export function plan(chart: Chart, style: StylePack, options: PlanOptions): Plan {
-  return planBars(expand(chart), chart.tempo, style, options);
+  return planBars(expand(chart), chart.tempo, chart.meter, style, options);
 }
 
 /**
@@ -95,7 +95,7 @@ export function render(text: string, style: StylePack, options: TakeOptions): Ta
     ...(before.open ? { passes: Math.max(before.passes ?? 1, Math.floor(endAfter) + 1) } : {}),
   });
   const told = whole(text, style, options);
-  const join = toldAt - (JOIN_LEAD * told.plan.tempo * PPQ) / 60;
+  const join = toldAt - (JOIN_LEAD * told.plan.quarters * PPQ) / 60;
   const time = (event: PerformanceEvent) =>
     event.kind === "note" ? event.tick + event.offset : event.tick;
   return {

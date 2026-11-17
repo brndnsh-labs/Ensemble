@@ -218,7 +218,8 @@ export interface Place {
   readonly beat: number;
 }
 
-export const ticksAt = (plan: Plan, seconds: number): number => (seconds * plan.tempo * PPQ) / 60;
+export const ticksAt = (plan: Plan, seconds: number): number =>
+  (seconds * plan.quarters * PPQ) / 60;
 
 /** The bar and beat sounding at a second of the performance. Undefined before it starts and after it ends. */
 export function placeAt(plan: Plan, seconds: number): Place | undefined {

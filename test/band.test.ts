@@ -264,7 +264,7 @@ test("every take is a valid MIDI file: one track per playing seat after the temp
     const names = file.tracks.map((track) => track.name);
     assert.deepEqual(names.slice(0, 3), ["Ensemble", "Drums", "Bass"], chart.file);
     assert.equal(file.tracks[0]!.tempos.length, 1, "one tempo: the band is metronomic");
-    assert.equal(file.tracks[0]!.tempos[0], take.plan.tempo);
+    assert.equal(file.tracks[0]!.tempos[0], Math.round(take.plan.quarters));
     const drums = file.tracks[1]!;
     assert.ok(drums.channels.size === 1 && drums.channels.has(9), "drums on channel 10");
     for (const track of file.tracks.slice(1)) {
@@ -751,5 +751,5 @@ function musicSeconds(roadmap: Plan): number {
   const ticks = roadmap.bars
     .filter((bar) => bar.kind === "music")
     .reduce((sum, bar) => sum + bar.ticks, 0);
-  return (ticks / PPQ) * (60 / roadmap.tempo);
+  return (ticks / PPQ) * (60 / roadmap.quarters);
 }

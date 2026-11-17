@@ -10,7 +10,7 @@ import type { Scored } from "../../critic/choose.ts";
 import { score } from "../../critic/choose.ts";
 import { swing } from "../../perform/feel.ts";
 import { cells, STEP } from "../../perform/grid.ts";
-import { pulseTicks } from "../../perform/meter.ts";
+import { onAnd, pulseTicks } from "../../perform/meter.ts";
 import type { Player, PlayerContext, WrittenNote } from "../../perform/notes.ts";
 import { heldRng } from "../../perform/notes.ts";
 import type { PitchMove } from "../../perform/pitch.ts";
@@ -252,7 +252,7 @@ function realise(world: World, phrase: Phrase, accent: number): SoloNote[] {
     const next = all[i + 1];
     const before = all[i - 1];
     let level = (slot.peak ? touch.peak : touch.level) + touch.perSemitone * (pitch - home);
-    if (spot.hold <= EIGHTH && (tick - bar.start) % PPQ === EIGHTH) level += touch.offbeat;
+    if (spot.hold <= EIGHTH && onAnd(bar.meter, tick - bar.start)) level += touch.offbeat;
     if (before && next && pitch < before.pitch && pitch < next.pitch) level -= touch.valley;
     if (lead) level -= touch.pickup;
     const velocity = Math.round(Math.min(touch.ceiling, Math.max(touch.floor, level)));

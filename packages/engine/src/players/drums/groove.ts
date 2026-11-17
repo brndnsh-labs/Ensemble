@@ -4,13 +4,13 @@
 import type { Meter } from "../../chart/types.ts";
 import { cells, LEVELS, STEP } from "../../perform/grid.ts";
 import { arrivals } from "../../perform/harmony.ts";
-import { pulseTicks } from "../../perform/meter.ts";
+import { barSteps, pulseTicks, writtenFor } from "../../perform/meter.ts";
 import type { PlayerContext } from "../../perform/notes.ts";
 import { heldRng } from "../../perform/notes.ts";
 import type { Plan, PlanBar } from "../../plan/types.ts";
 import { tierOf } from "../../style/types.ts";
 import type { DrumVoice } from "./kit.ts";
-import type { DrumStyle, GrooveOption, Lines, When } from "./style.ts";
+import type { DrumStyle, DrumTime, GrooveOption, Lines, When } from "./style.ts";
 
 /** One bar of the kit: for each piece, its written level at every sixteenth (0 is a rest). */
 export type BarPart = Partial<Record<DrumVoice, number[]>>;
@@ -105,6 +105,11 @@ export function pulses(meter: Meter): number[] {
   return pulseTicks(meter).map((ticks) => ticks / STEP);
 }
 
+/** What the drummer has for a bar: the part written for its meter, or the 4/4 one to be fitted. */
+export function timeOf(drums: DrumStyle, bar: PlanBar): DrumTime {
+  return writtenFor(drums.meters, bar.meter) ?? drums;
+}
+
 /** The bar of time the drummer plays under this bar, before any fill or crash. */
 export function grooveBar(
   drums: DrumStyle,
@@ -114,7 +119,11 @@ export function grooveBar(
   rng: PlayerContext["rng"],
 ): BarPart {
   const part: BarPart = {};
-  for (const layer of drums.grooves[tierOf(energy)]) {
+  // A part written for the bar's meter is the bar; the 4/4 part is fitted to it.
+  const written = writtenFor(drums.meters, bar.meter);
+  const time = written ?? drums;
+  const steps = written ? barSteps(bar.meter) : GROOVE_STEPS;
+  for (const layer of time.grooves[tierOf(energy)]) {
     if (!applies(layer.when, bar, energy, reading, part)) continue;
     // One draw per decision per span: the section's kick is the same kick every bar (X-A-29).
     const options = layer.options.filter((option) => option.weight > 0);
@@ -133,7 +142,7 @@ export function grooveBar(
         }
       }
     }
-    overlay(part, choice.lines, 0, GROOVE_STEPS);
+    overlay(part, choice.lines, 0, steps);
   }
 
   // One hand, one cymbal (DR-03): the stick that opens the hat is not also closing it.
@@ -145,7 +154,7 @@ export function grooveBar(
     });
   }
 
-  for (const touch of drums.touches) {
+  for (const touch of time.touches) {
     for (const voice of touch.voices) {
       const line = part[voice];
       if (!line) continue;
@@ -155,7 +164,7 @@ export function grooveBar(
     }
   }
 
-  return fitMeter(part, pulses(bar.meter));
+  return written ? part : fitMeter(part, pulses(bar.meter));
 }
 
 function applies(

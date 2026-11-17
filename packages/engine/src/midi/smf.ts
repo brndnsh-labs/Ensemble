@@ -17,6 +17,8 @@ export type SmfMeta =
       readonly type: "timeSignature";
       readonly beats: number;
       readonly unit: number;
+      /** MIDI clocks (24 to a quarter note) between metronome clicks. Left out: a quarter note. */
+      readonly click?: number;
     }
   | { readonly tick: number; readonly type: "marker" | "text"; readonly text: string };
 
@@ -168,7 +170,7 @@ function metaBytes(event: SmfMeta): number[] {
     }
     case "timeSignature":
       // Numerator, denominator as a power of two, MIDI clocks per click, 32nds per quarter.
-      return meta(0x58, [event.beats, Math.round(Math.log2(event.unit)), 24, 8]);
+      return meta(0x58, [event.beats, Math.round(Math.log2(event.unit)), event.click ?? 24, 8]);
     case "marker":
       return meta(0x06, utf8(event.text));
     case "text":

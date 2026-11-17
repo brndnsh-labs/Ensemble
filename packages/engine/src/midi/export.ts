@@ -2,6 +2,7 @@
 // signature, section markers, and chord symbols, exactly as played.
 
 import { PPQ } from "../chart/types.ts";
+import { tempoPulse } from "../perform/meter.ts";
 import type { PerformanceEvent } from "../perform/notes.ts";
 import { CURVE_STEP, pitchCurve } from "../perform/pitch.ts";
 import type { Plan } from "../plan/types.ts";
@@ -29,7 +30,8 @@ export function toMidi(
   events: readonly PerformanceEvent[],
   style: StylePack,
 ): Uint8Array {
-  const conductor: SmfMeta[] = [{ tick: 0, type: "tempo", bpm: plan.tempo }];
+  // A MIDI file's tempo is quarter notes a minute, whatever the pulse the figure counts.
+  const conductor: SmfMeta[] = [{ tick: 0, type: "tempo", bpm: plan.quarters }];
   let meter = "";
   for (const bar of plan.bars) {
     const signature = `${bar.meter.beats}/${bar.meter.unit}`;
@@ -40,6 +42,8 @@ export function toMidi(
       type: "timeSignature",
       beats: bar.meter.beats,
       unit: bar.meter.unit,
+      // The metronome clicks the pulse the tempo counts: 24 MIDI clocks to a quarter note.
+      click: Math.round(24 * tempoPulse(bar.meter)),
     });
   }
 
@@ -50,7 +54,7 @@ export function toMidi(
     chords: [],
     solo: [],
   };
-  const secondsPerTick = 60 / (plan.tempo * PPQ);
+  const secondsPerTick = 60 / (plan.quarters * PPQ);
   let soloProgram: number | undefined;
   for (const event of events) {
     if (event.kind === "marker") {

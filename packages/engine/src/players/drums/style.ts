@@ -5,6 +5,7 @@
 // taken off, a stroke the layers above wrote that this one takes away.
 
 import type { LevelSymbol } from "../../perform/grid.ts";
+import type { MeterName } from "../../perform/meter.ts";
 import type { Hold, PerTier } from "../../style/types.ts";
 import type { DrumVoice } from "./kit.ts";
 
@@ -58,7 +59,11 @@ export interface When {
 export interface GrooveOption {
   /** Relative weight in the draw. Zero never wins. */
   readonly weight: number;
-  /** One bar of 4/4, sixteen steps a line. No lines at all is the choice to add nothing. */
+  /**
+   * One bar, a step a sixteenth: sixteen to a line in 4/4, and in a part
+   * written for another meter as many as its bar has (24 in 12/8 and 6/4). No
+   * lines at all is the choice to add nothing.
+   */
   readonly lines: Lines;
 }
 
@@ -88,7 +93,7 @@ export interface GrooveLayer {
 /** A touch laid over the written time: these strokes are played at a fraction of their level. */
 export interface Touch {
   readonly voices: readonly DrumVoice[];
-  /** Sixteenths of the 4/4 bar, from 0. Left out, every stroke of those voices. */
+  /** Sixteenths of the bar the grooves are written for, from 0. Left out, every stroke of those voices. */
   readonly steps?: readonly number[];
   readonly scale: number;
 }
@@ -142,17 +147,34 @@ export interface DrumFills {
   readonly keepTime?: boolean;
 }
 
-export interface DrumStyle {
+/**
+ * What the drummer writes as a bar: the time, the touches laid over it, and
+ * the fills. A style writes it for 4/4, and may write it again for another
+ * meter (`DrumStyle.meters`), every line then as long as that meter's bar.
+ */
+export interface DrumTime {
   /**
    * The time, as a different part for each tier. The layers are laid down in
    * order, each adding its strokes to the bar; where two write the same piece
    * on the same sixteenth, the later one wins.
    *
-   * A bar that is not 4/4 is built from this bar's beats, one per pulse
-   * (DR-10): beat 1 on the downbeat, beat 2 on backbeat pulses, beat 3 on
-   * other strong pulses, beat 4 on the last pulse.
+   * A bar of a meter nothing is written for is built from the 4/4 bar's beats,
+   * one per pulse (DR-10): beat 1 on the downbeat, beat 2 on backbeat pulses,
+   * beat 3 on other strong pulses, beat 4 on the last pulse.
    */
   readonly grooves: PerTier<readonly GrooveLayer[]>;
+  /** Touches laid over the groove after it is built (not over fills or the ending). */
+  readonly touches: readonly Touch[];
+  readonly fills: DrumFills;
+}
+
+export interface DrumStyle extends DrumTime {
+  /**
+   * The same three things written for a bar of another meter, by the meter's
+   * name as a chart writes it: `"12/8"`, `"6/4"`. A bar of a meter written
+   * here is played from it as it stands; any other is fitted from the 4/4 bar.
+   */
+  readonly meters?: Readonly<Partial<Record<MeterName, DrumTime>>>;
   /**
    * The cymbals that keep time. An arrival crash takes the place of their
    * stroke on beat 1 (DR-03, DR-20). A style that rides the crash lists it here.
@@ -165,9 +187,6 @@ export interface DrumStyle {
    * the One at the low level). Left out, every arrival is crashed (CO-41).
    */
   readonly crashFrom?: number;
-  /** Touches laid over the groove after it is built (not over fills or the ending). */
-  readonly touches: readonly Touch[];
-  readonly fills: DrumFills;
   readonly ending: {
     /** What the kit strikes where the final chord lands, and how hard. Nothing else is played. */
     readonly strike: Strike;

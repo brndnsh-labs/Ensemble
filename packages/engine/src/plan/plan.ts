@@ -4,8 +4,16 @@
 
 import { runsOf } from "../chart/expand.ts";
 import type { ArrangementLine } from "../chart/model.ts";
-import type { ChartChord, ChordSpan, ExpandedChart, FlatBar, SourceRange } from "../chart/types.ts";
+import type {
+  ChartChord,
+  ChordSpan,
+  ExpandedChart,
+  FlatBar,
+  Meter,
+  SourceRange,
+} from "../chart/types.ts";
 import { PPQ } from "../chart/types.ts";
+import { tempoPulse } from "../perform/meter.ts";
 import type { Seat, StylePack } from "../style/types.ts";
 import { LEVEL_ENERGY, SEATS, TIER_HIGH, TIER_MID, tierOf } from "../style/types.ts";
 import { chordFamily, chordToString, makeQuality } from "../theory/chord.ts";
@@ -33,14 +41,18 @@ interface Run {
 export function planBars(
   expanded: ExpandedChart,
   chartTempo: number | null,
+  /** The chart's own meter: the tempo counts its pulse. */
+  meter: Meter,
   style: StylePack,
   options: PlanOptions,
 ): Plan {
   const tempo = clampTempo(options.tempo ?? chartTempo ?? style.tempo.default);
+  // A tick is a fraction of a quarter note, so time is kept in quarter notes a minute.
+  const quarters = tempo * tempoPulse(meter);
   // The jam as it set out: how many passes, or none in particular. The arc and the solos are
   // shaped by this even when the band is told to finish early, so that what was played stands.
   const open = options.mode === "jam" && options.open === true;
-  const planned = countPasses(expanded, tempo, options);
+  const planned = countPasses(expanded, quarters, options);
   const told =
     options.mode === "jam" &&
     options.endAfter !== undefined &&
@@ -57,7 +69,16 @@ export function planBars(
   const played = runs.filter((run) => ends || run.pass < passes);
   const playedBars = played.reduce((sum, run) => sum + run.bars.length, 0);
   if (playedBars === 0) {
-    return { mode: options.mode, tempo, bars: [], lookahead: [], passes: 0, open: !ends, ticks: 0 };
+    return {
+      mode: options.mode,
+      tempo,
+      quarters,
+      bars: [],
+      lookahead: [],
+      passes: 0,
+      open: !ends,
+      ticks: 0,
+    };
   }
 
   const oneSection = runs.filter((run) => run.part === "body" && run.pass === 0).length === 1;
@@ -277,6 +298,7 @@ export function planBars(
   return {
     mode: options.mode,
     tempo,
+    quarters,
     bars: result,
     lookahead,
     passes: options.mode === "jam" ? passes : 1,
@@ -346,12 +368,12 @@ function passOffset(runs: readonly Run[], run: Run): number {
   return bars;
 }
 
-function countPasses(expanded: ExpandedChart, tempo: number, options: PlanOptions): number {
+function countPasses(expanded: ExpandedChart, quarters: number, options: PlanOptions): number {
   if (options.mode === "song") return 1;
   if (options.passes !== undefined) return Math.max(1, Math.floor(options.passes));
   if (options.open) return 1;
   const secondsOf = (bars: readonly FlatBar[]) =>
-    bars.reduce((sum, bar) => sum + bar.ticks, 0) * (60 / tempo / PPQ);
+    bars.reduce((sum, bar) => sum + bar.ticks, 0) * (60 / quarters / PPQ);
   const body = secondsOf(chorusOf(expanded, options).bars);
   if (body <= 0) return 1;
   const fixed =

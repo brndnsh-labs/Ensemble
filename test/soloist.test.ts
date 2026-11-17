@@ -209,7 +209,7 @@ test("the soloist lands the changes: a note struck where a chord arrives is a to
     const solo = notesOf(take, "solo");
     // A soloist the style lays back is late everywhere, the change included, and the comp with
     // it: a note is held across a change by what it has left once that lay-back is set aside.
-    const laidBack = (Math.max(0, style.feel.lean.solo) / 1000) * (take.plan.tempo / 60) * PPQ;
+    const laidBack = (Math.max(0, style.feel.lean.solo) / 1000) * (take.plan.quarters / 60) * PPQ;
     for (const arrival of harmonyOf(take)) {
       const chord = arrival.chord;
       if (!chord || !arrival.changed) continue;
@@ -407,13 +407,13 @@ test("a horn breathes: the alto never plays eight seconds without half a second 
           tempo,
           soloInstrument: "alto-sax",
         });
-        horn(take, tempo, `${chart.file} at ${tempo}`);
+        horn(take, take.plan.quarters, `${chart.file} at ${tempo}`);
       }
     }
   }
   for (const { chart, options, take } of soloistTakes()) {
     if (options.soloInstrument !== "alto-sax") continue;
-    horn(take, take.plan.tempo, `${chart.file} ${JSON.stringify(options)}`);
+    horn(take, take.plan.quarters, `${chart.file} ${JSON.stringify(options)}`);
   }
   // Very slow, over eight chords a bar: a note cut at a change of chord on an "and" leaves a
   // breath on paper that swing takes back.
@@ -461,7 +461,7 @@ test("a guitar bends only into a note a phrase lands on (one struck where the ch
     const harmony = harmonyOf(take);
     const notes = notesOf(take, "solo");
     const bars = take.plan.bars;
-    const perSecond = (take.plan.tempo * PPQ) / 60;
+    const perSecond = (take.plan.quarters * PPQ) / 60;
     const { habits, space, touch } = style.solo;
     let [at, b] = [0, 0];
     const top = Math.max(...notes.map((note) => note.pitch));

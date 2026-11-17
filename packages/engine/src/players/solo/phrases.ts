@@ -9,9 +9,9 @@
 // first idea of the solo, the idea this chorus opened on, the note the last
 // phrase came to rest on, and whether it ended with a bar of air.
 
-import { PPQ } from "../../chart/types.ts";
 import { swing } from "../../perform/feel.ts";
 import { cells, STEP } from "../../perform/grid.ts";
+import { onPulse } from "../../perform/meter.ts";
 import type { Rng } from "../../rng.ts";
 import type { ToneRole } from "../../theory/chord.ts";
 import { pitchClass } from "../../theory/pitch.ts";
@@ -19,6 +19,7 @@ import { climb, EIGHTH, isChordTone, landing, onlyPasses } from "./harmony.ts";
 import type { LineBar, Spot } from "./line.ts";
 import { contourOf, settled, spotsOf, writeBends, writeLine } from "./line.ts";
 import type { Slot, World } from "./slots.ts";
+import { levelIndex, soloIn } from "./slots.ts";
 import type { Cell, Contour, Idea, Role, Way } from "./style.ts";
 import { CONTOURS } from "./style.ts";
 
@@ -172,7 +173,9 @@ export function phrasesFor(
   memory: Memory,
   rng: Rng,
 ): Phrase[] {
-  const { solo, instrument } = world;
+  const { instrument } = world;
+  // The rhythms are those written for the phrase's meter, where the style has written any.
+  const solo = soloIn(world.solo, slot.bars[0]!.meter);
   const length = slot.bars.length;
   const final = slot.bars[length - 1]!.ending !== null;
   const barSeconds = slot.bars[0]!.ticks / world.ticksPerSecond;
@@ -282,7 +285,7 @@ export function phrasesFor(
 
   /** A shape for this slot that leaves no more air than the style allows (SO-10). */
   const drawShape = (draw: Rng, lines = 1): Part[] => {
-    const at = solo.levels.indexOf(slot.level);
+    const at = levelIndex(solo, slot.level);
     const roomier = !slot.peak && at > 0 && draw.fork("room").chance(solo.space.roomier);
     const shapes = slot.peak
       ? [{ weight: 1, bars: peak.shape }]
@@ -576,7 +579,7 @@ export function phrasesFor(
   const played = motif ? motif.line.length / motif.slot.bars.length : 0;
   const outgrown =
     motif !== null &&
-    (solo.levels.indexOf(slot.level) - solo.levels.indexOf(motif.slot.level) >= levels ||
+    (levelIndex(solo, slot.level) - levelIndex(solo, motif.slot.level) >= levels ||
       (thin !== undefined && played < thin * slot.level.notesPerBar));
   if (!slot.peak && outgrown && !ways.some((way) => way.make === "new")) {
     all.push(...offer(book.outgrown.ways));
@@ -609,10 +612,12 @@ export function phrasesFor(
  */
 /** A note that says another chord, where it would be heard as more than passing: on a beat or held. */
 const wrong = (spot: Spot, pitch: number): boolean =>
-  ((spot.tick - spot.bar.start) % PPQ === 0 || spot.hold > EIGHTH) && onlyPasses(spot.pool, pitch);
+  (onPulse(spot.bar.meter, spot.tick - spot.bar.start) || spot.hold > EIGHTH) &&
+  onlyPasses(spot.pool, pitch);
 
 function withPickup(world: World, phrase: Phrase, memory: Memory, rng: Rng): Phrase {
-  const { solo, plan } = world;
+  const { plan } = world;
+  const solo = soloIn(world.solo, phrase.slot.bars[0]!.meter);
   const { perRank, reach } = solo.landing;
   const habit = solo.habits.pickup;
   if (habit.figures.length === 0) return phrase;
@@ -664,7 +669,7 @@ function withPickup(world: World, phrase: Phrase, memory: Memory, rng: Rng): Phr
       spots.map((spot, i) => {
         const pitch = climb(spot.pool, first, direction * (spots.length - i));
         const further = climb(spot.pool, first, direction * (spots.length - i + 1));
-        const beat = (spot.tick - spot.bar.start) % PPQ === 0;
+        const beat = onPulse(spot.bar.meter, spot.tick - spot.bar.start);
         if (leans && i === spots.length - 1 && !beat && spot.hold <= EIGHTH && !spot.lands) {
           return { spot, pitch: first - 1, lead: true };
         }

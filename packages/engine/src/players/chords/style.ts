@@ -4,6 +4,7 @@
 // engine fits that kind to the chord and leads it from the strike before; the
 // idiom turns each voiced strike into the notes the instrument plays.
 
+import type { MeterName } from "../../perform/meter.ts";
 import type { PerTier, Tier } from "../../style/types.ts";
 import type { ChordFamily } from "../../theory/chord.ts";
 
@@ -266,7 +267,8 @@ export type Articulation = Readonly<Record<string, Attack>>;
 
 /**
  * One bar of comping rhythm, written whole (X-A-31). A character per
- * sixteenth of a 4/4 bar, spaces ignored:
+ * sixteenth, spaces ignored: sixteen for a bar of 4/4, and in a book written
+ * for another meter as many as its bar has:
  *
  * - a symbol of the articulation (`x`, `X`, `o`): the hand comes down. A symbol
  *   whose attack is muted is a scratch: the stroke with the notes deadened
@@ -457,6 +459,14 @@ export interface ChordStyle {
    * or a voicing audition with no rhythm in the way.
    */
   readonly rhythm: RhythmBook | null;
+  /**
+   * A rhythm book written for a bar of another meter, by the meter's name as a
+   * chart writes it (`"12/8"`, `"6/4"`): its figures are as long as that
+   * meter's bar. A bar of a meter written here is comped from it; any other
+   * plays the plain rhythm (CH-54). The instrument, its voicings and its
+   * register are the same hand in every meter.
+   */
+  readonly meters?: Readonly<Partial<Record<MeterName, RhythmBook>>>;
   readonly anticipation: Anticipation;
   /**
    * How the seat listens to a soloist. Null for a seat that does not: it plays
