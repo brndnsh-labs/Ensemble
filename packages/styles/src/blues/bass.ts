@@ -221,6 +221,22 @@ const boxTouch = {
   velocity: { arrival: 100, strong: 94, weak: 88, restrike: 70, approach: 88 },
 } as const;
 
+// ── in twelve ───────────────────────────────────────────────────────────────
+// The slow blues. A bar of 12/8 is four slow beats of three eighths: a figure
+// is twenty-four sixteenths, written in sixes. The line is the box still, a
+// tone a beat, each a dotted quarter held nearly full; where it lopes, the
+// tone is struck again on the beat's last eighth, the shuffle's "da-DUM" at
+// the speed of a slow blues. The walks into a change are the box's own, a step
+// a beat. Quiet, it is in two: the bass note and its fifth, a half bar each.
+
+const slowTouch = {
+  otherMeters: "pulses",
+  ceiling: 55,
+  // A slow note is held: nearly its whole beat, and the long half of a lope to its pickup.
+  length: { note: 0.9, long: 0.95, short: 0.6 },
+  velocity: { arrival: 100, strong: 94, weak: 88, restrike: 72, approach: 88 },
+} as const;
+
 export const bluesBass: BassStyle = {
   // The line lives where a bass guitar's does: roots from the open E up to G2, the third
   // fret of the top two strings' octave, so a blues in A is played from the open A string
@@ -270,6 +286,43 @@ export const bluesBass: BassStyle = {
       tones: box,
       figures: { hold: "song", options: [{ weight: 1, grid: "x-o- x-o- x-o- x-o-" }] },
       ...boxTouch,
+    },
+  },
+
+  meters: {
+    "12/8": {
+      // Quiet: in two, the bass note and its fifth, each half the bar.
+      low: {
+        tones: [{ when: { slash: true }, bars: [["R", "R"]] }, { bars: [["R", "5"]] }],
+        figures: {
+          hold: "song",
+          options: [{ weight: 1, grid: "x----- ------ x----- ------" }],
+        },
+        otherMeters: "downbeat",
+        ceiling: 45,
+        length: { note: 0.92, long: 0.92, short: 0.4 },
+        velocity: { arrival: 98, strong: 88, weak: 88, restrike: 70, approach: 84 },
+      },
+      // The box, a tone a beat. A section chooses how much it lopes and keeps it: not at
+      // all, into the One only, or into 3 and the One.
+      mid: {
+        tones: box,
+        figures: {
+          hold: "section",
+          options: [
+            { weight: 2, grid: "x----- x----- x----- x-----" },
+            { weight: 3, grid: "x----- x----- x----- x---o-" },
+            { weight: 2, grid: "x----- x---o- x----- x---o-" },
+          ],
+        },
+        ...slowTouch,
+      },
+      // Hot: every beat lopes.
+      high: {
+        tones: box,
+        figures: { hold: "song", options: [{ weight: 1, grid: "x---o- x---o- x---o- x---o-" }] },
+        ...slowTouch,
+      },
     },
   },
 

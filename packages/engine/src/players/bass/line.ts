@@ -15,7 +15,7 @@ import type { Tier } from "../../style/types.ts";
 import type { Piece } from "./form.ts";
 import { pulses } from "./form.ts";
 import type { BassLine, Figure, LineShape, Tone, ToneSequence } from "./style.ts";
-import { DEAD_NOTE, FIGURE_STEPS, RIFF_TONES } from "./style.ts";
+import { DEAD_NOTE, RIFF_TONES } from "./style.ts";
 import { isChordTone, LOW_E, remember, sequenceFor, tonePitch } from "./tones.ts";
 
 /** Which of a sequence's shapes a piece plays. Given nothing, the first. */
@@ -96,9 +96,9 @@ function strokesOf(grid: readonly string[], from = 0, figure?: Figure): Onset[] 
 }
 
 /** A bar's strokes with a turn laid over its end: the figure plays up to the turn and no further. */
-function turned(notes: readonly Onset[], turn: Figure): Onset[] {
+function turned(notes: readonly Onset[], turn: Figure, bar: PlanBar): Onset[] {
   const grid = cells(turn.grid);
-  const from = (FIGURE_STEPS - grid.length) * STEP;
+  const from = bar.ticks - grid.length * STEP;
   const kept = notes
     .filter((onset) => onset.tick < from)
     .map((onset) => ({ ...onset, space: Math.min(onset.space, from - onset.tick) }));
@@ -110,7 +110,7 @@ type Onsets = { readonly notes: readonly Onset[]; readonly plain: boolean };
 /** A bar's onsets, worked out once for each line and bar of a take (its generator). */
 const ONSETS = new WeakMap<Rng, WeakMap<BassLine, Map<number, Onsets>>>();
 
-/** Where this bar's notes fall, and whether the bar is played plainly (any meter but 4/4, BA-16). */
+/** Where this bar's notes fall, and whether the bar is played plainly (a meter the line is not written for, BA-16). */
 function onsets(line: BassLine, tier: Tier, bar: PlanBar, rng: Rng): Onsets {
   const byLine = remember(ONSETS, rng, () => new WeakMap<BassLine, Map<number, Onsets>>());
   const byBar = remember(byLine, line, () => new Map<number, Onsets>());
@@ -119,11 +119,12 @@ function onsets(line: BassLine, tier: Tier, bar: PlanBar, rng: Rng): Onsets {
 
 function onsetsOf(line: BassLine, tier: Tier, bar: PlanBar, rng: Rng): Onsets {
   const beats = pulses(bar);
-  const common = beats.length === 4 && beats.every((beat) => beat === PPQ);
+  // A figure is a bar: the line is written for this bar if its figures are as long as it is.
+  const steps = Math.round(bar.ticks / STEP);
   const figures = line.figures.options.filter(
-    (figure) => figure.weight > 0 && cells(figure.grid).length === FIGURE_STEPS,
+    (figure) => figure.weight > 0 && cells(figure.grid).length === steps,
   );
-  if (common && figures.length > 0) {
+  if (figures.length > 0) {
     // The figure is chosen whole and kept: a section keeps its lope (X-A-29, X-A-31).
     const held = heldRng(rng, `figure:${line.figures.draw ?? tier}`, line.figures.hold, bar);
     const figure = held.weighted(figures, (option) => option.weight);
@@ -188,7 +189,8 @@ export function lineOf(
   const from = piece.start - bar.start;
   const to = piece.end - bar.start;
   const figure = onsets(line, tier, bar, rng);
-  const strokes = played?.turn && !figure.plain ? turned(figure.notes, played.turn) : figure.notes;
+  const strokes =
+    played?.turn && !figure.plain ? turned(figure.notes, played.turn, bar) : figure.notes;
   let inside: Onset[] = strokes
     .filter((onset) => onset.tick >= from && onset.tick < to)
     .map((onset) => ({ ...onset, space: Math.min(onset.space, to - onset.tick) }));

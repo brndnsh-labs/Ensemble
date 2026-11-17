@@ -1,0 +1,12 @@
+title: Footprints
+key: Cm
+tempo: 168
+meter: 6/4
+style: jazz
+
+// A minor blues in six: six beats to the bar. Four bars of the one, two of
+// the four, two of the one, then four chords falling home, two to a bar.
+[A]
+| Cm7          | %         | %   | % |
+| Fm7          | %         | Cm7 | % |
+| F#m7b5 F7#11 | E7#9 A7#9 | Cm7 | % |

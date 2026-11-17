@@ -7,6 +7,7 @@
 import { PPQ } from "../../chart/types.ts";
 import { choose } from "../../critic/choose.ts";
 import type { Feature } from "../../critic/types.ts";
+import { lastPulse, onPulse } from "../../perform/meter.ts";
 import type { PlanBar } from "../../plan/types.ts";
 import { mod12 } from "../../theory/pitch.ts";
 import { isChordTone, ranked } from "./harmony.ts";
@@ -39,7 +40,8 @@ export interface SoloCandidate extends Heard {
 export const body = (heard: Heard): Sounding[] =>
   heard.notes.filter((note) => note.tick >= heard.slot.bars[0]!.start);
 
-const inLastBeat = (note: Sounding) => note.tick - note.bar.start >= note.bar.ticks - PPQ;
+const inLastBeat = (note: Sounding) =>
+  note.tick - note.bar.start >= note.bar.ticks - lastPulse(note.bar.meter);
 
 /**
  * The idea itself: a phrase's notes without any pickup, into it or inside it.
@@ -97,7 +99,7 @@ export function closest(heard: Heard, earlier: readonly Heard[]): number | null 
   return earlier.length === 0 ? null : Math.max(...earlier.map((other) => likeness(heard, other)));
 }
 
-const beat = (note: Sounding) => (note.tick - note.bar.start) % PPQ === 0;
+const beat = (note: Sounding) => onPulse(note.bar.meter, note.tick - note.bar.start);
 /** Longer than a swung eighth on the beat: a note that is held. */
 const held = (note: Sounding) => note.ends - note.tick >= PPQ * 0.75;
 
@@ -356,7 +358,7 @@ export function phrasesOf(world: World, notes: readonly Sounding[]): Heard[] {
     const lastBar = slot.bars.at(-1)!;
     const leadsIn =
       note.bar === lastBar &&
-      note.tick >= lastBar.start + lastBar.ticks - PPQ &&
+      note.tick >= lastBar.start + lastBar.ticks - lastPulse(lastBar.meter) &&
       !lastBar.ending &&
       next !== undefined &&
       next.bars[0]!.index === lastBar.index + 1 &&

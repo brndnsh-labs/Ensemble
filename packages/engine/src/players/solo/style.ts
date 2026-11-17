@@ -6,12 +6,14 @@
 // (landings first, then the line between them), offers several whole phrases
 // for each slot, and lets the critic pick.
 
+import type { MeterName } from "../../perform/meter.ts";
 import type { ChordFamily, ToneRole } from "../../theory/chord.ts";
 import type { ScaleName } from "../../theory/scale.ts";
 
 /**
  * One bar of rhythm on the sixteenth grid, a character per sixteenth (spaces
- * ignored): `x` a note struck, `-` that note held, `.` silence. The grid is
+ * ignored; sixteen in 4/4, and in rhythms written for another meter as many
+ * as its bar has): `x` a note struck, `-` that note held, `.` silence. The grid is
  * straight; the style's swing bends it afterwards. Under a hard triplet swing
  * the third character of a beat is the triplet's last note and the second its
  * middle one, so `xxx-` on a beat is a triplet.
@@ -144,7 +146,33 @@ export interface Pickup {
   readonly beat: Cell;
 }
 
+/**
+ * What the soloist writes as a bar, written for a meter other than 4/4: every
+ * rhythm as long as that meter's bar, and a pickup as long as its last pulse.
+ */
+export interface SoloTime {
+  /**
+   * The style's levels again, in the same order and under the same names (the
+   * solo's arc names them), with this meter's rhythms and phrase shapes.
+   */
+  readonly levels: readonly Density[];
+  /** The rhythms an end bar may take: each finishes on a long note and leaves its last pulse unstruck. */
+  readonly endings: readonly Cell[];
+  /** The ways of leading into a phrase from the last pulse of the bar before. */
+  readonly pickups: readonly Pickup[];
+  /** The bar the solo's top note is held in. */
+  readonly peak: Cell;
+}
+
 export interface SoloStyle {
+  /**
+   * The soloist's rhythms written for a bar of another meter, by the meter's
+   * name as a chart writes it (`"12/8"`, `"6/4"`). In a bar of a meter written
+   * here the soloist plays them; in any other it plays as much of a 4/4 rhythm
+   * as the bar has room for. Its notes, its line and its habits are the same
+   * player's in every meter.
+   */
+  readonly meters?: Readonly<Partial<Record<MeterName, SoloTime>>>;
   /** The instrument the soloist plays unless the player asks for another: a name from the instrument list. */
   readonly instrument: string;
   /** Semitones this style lifts the instrument's home, to sit over the comp and not in it (SO-07). */

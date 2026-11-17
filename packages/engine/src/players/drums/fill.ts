@@ -7,7 +7,7 @@ import { heldRng } from "../../perform/notes.ts";
 import type { Plan, PlanBar } from "../../plan/types.ts";
 import { type PerTier, type Tier, tierOf } from "../../style/types.ts";
 import type { BarPart } from "./groove.ts";
-import { levels, lineOf, pulses } from "./groove.ts";
+import { levels, lineOf, pulses, timeOf } from "./groove.ts";
 import type { DrumVoice } from "./kit.ts";
 import type { DrumStyle, FillShape, FillShapes } from "./style.ts";
 
@@ -108,14 +108,15 @@ function candidates(drums: DrumStyle, bar: PlanBar): Candidate[] {
   const beats = pulses(bar.meter);
   const barSteps = beats.reduce((sum, pulse) => sum + pulse, 0);
 
-  let wanted = drums.fills.length[mark.boundary][mark.tier];
+  const fills = timeOf(drums, bar).fills;
+  let wanted = fills.length[mark.boundary][mark.tier];
   // The first beat of a fill bar always keeps time (DR-13, CO-44).
   wanted = Math.min(wanted, barSteps - (beats[0] ?? barSteps));
   if (wanted <= 0) return [];
 
   // The bigger the boundary, the bigger the gesture (DR-15).
   const own = tierOf(bar.seats.drums ?? bar.energy);
-  const vocabulary = shapesFor(mark.top ? drums.fills.top : drums.fills[mark.boundary], own)
+  const vocabulary = shapesFor(mark.top ? fills.top : fills[mark.boundary], own)
     .filter((shape) => shape.weight > 0)
     .map((shape) => ({ shape, lines: writtenLines(shape) }))
     .map((entry) => ({

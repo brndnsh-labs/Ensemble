@@ -1,0 +1,13 @@
+title: Slow Blues
+key: G
+tempo: 60
+meter: 12/8
+style: blues
+
+// Twelve bars in twelve-eight: four slow beats to the bar, three eighths in
+// each. The quick change in bar two, and a turnaround that walks up through
+// the four, a chord a beat, and comes to rest on the five.
+[A]
+| G7 | C7 | G7                | %       |
+| C7 | %  | G7                | %       |
+| D7 | C7 | G7 G7/B C7 C#dim7 | G7/D D7 |

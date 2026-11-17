@@ -2,11 +2,13 @@
 // this reads it the way the comper will and says what he could not play.
 
 import { cells } from "../../perform/grid.ts";
+import { barSteps } from "../../perform/meter.ts";
+import { readMeter } from "../../style/meters.ts";
 import type { Tier } from "../../style/types.ts";
 import type { ChordFamily } from "../../theory/chord.ts";
 import { FIGURE_STEPS, HELD } from "./figure.ts";
 import { OPEN_STRINGS, TOP_FRET } from "./guitar.ts";
-import type { Articulation, Attack, ChordStyle, Voice } from "./style.ts";
+import type { Articulation, Attack, ChordStyle, RhythmBook, Voice } from "./style.ts";
 import { INSTRUMENTS, PICK_PLACES, VOICE_TONES } from "./style.ts";
 
 const TIERS: readonly Tier[] = ["low", "mid", "high"];
@@ -45,17 +47,21 @@ export function validateChordStyle(chords: ChordStyle): string[] {
   );
   const guitar = typeof chords.idiom === "string" ? null : chords.idiom;
   // Every symbol the book writes that is a scratch, whichever tier or figure writes it.
-  const scratches = TIERS.some((tier) => {
-    const vocabulary = chords.rhythm?.tiers[tier];
-    if (!vocabulary) return false;
-    const written: (Articulation | undefined)[] = [
-      vocabulary.articulation,
-      ...[...vocabulary.figures, ...vocabulary.answers].map((figure) => figure.articulation),
-    ];
-    return written.some((articulation) =>
-      Object.values(articulation ?? {}).some((attack) => attack.muted),
-    );
-  });
+  const books = [chords.rhythm, ...Object.values(chords.meters ?? {})].filter(
+    (book): book is RhythmBook => !!book,
+  );
+  const scratches = books.some((book) =>
+    TIERS.some((tier) => {
+      const vocabulary = book.tiers[tier];
+      const written: (Articulation | undefined)[] = [
+        vocabulary.articulation,
+        ...[...vocabulary.figures, ...vocabulary.answers].map((figure) => figure.articulation),
+      ];
+      return written.some((articulation) =>
+        Object.values(articulation ?? {}).some((attack) => attack.muted),
+      );
+    }),
+  );
   /** A plucked attack is a guitar's, names one or two places of the grip, and is not a scratch. */
   const plucks = (attack: Attack, where: string) => {
     if (attack.pluck === undefined) return;
@@ -205,13 +211,15 @@ export function validateChordStyle(chords: ChordStyle): string[] {
     `anticipation: "${chords.anticipation.otherwise}" is not what a strike before a change does when the hand does not lean in.`,
   );
 
-  const book = chords.rhythm;
+  // The bar the book being checked is written for, and what its problems are filed under.
+  let figureSteps = FIGURE_STEPS;
+  let label = "rhythm";
   /** A grid read as a bar of comping: its length, its symbols, and what it holds. */
   const readGrid = (grid: string, articulation: Articulation, at: string) => {
     const symbols = cells(grid);
     say(
-      symbols.length === FIGURE_STEPS,
-      `${at}: ${symbols.length} steps; a figure is one bar of ${FIGURE_STEPS} sixteenths.`,
+      symbols.length === figureSteps,
+      `${at}: ${symbols.length} steps; a figure is one bar of ${figureSteps} sixteenths.`,
     );
     // A bar of rest is written all silence; anything else that never comes down is a mistake.
     say(
@@ -232,35 +240,35 @@ export function validateChordStyle(chords: ChordStyle): string[] {
       );
     });
   };
-  if (book) {
+  const checkBook = (book: RhythmBook) => {
     say(
       book.hold > 0 && book.hold <= 1,
-      `rhythm: a hold of ${book.hold} is not a share of a chord's length; write more than 0, up to 1.`,
+      `${label}: a hold of ${book.hold} is not a share of a chord's length; write more than 0, up to 1.`,
     );
     say(
       Number.isInteger(book.candidates) && book.candidates >= 1,
-      "rhythm: the comper weighs at least one plan for a phrase.",
+      `${label}: the comper weighs at least one plan for a phrase.`,
     );
-    say(book.forms.length > 0, "rhythm: there are no phrase forms.");
+    say(book.forms.length > 0, `${label}: there are no phrase forms.`);
     for (const form of book.forms) {
       const letters = cells(form.bars);
       say(
         letters.length === 4 && letters.every((letter) => "abc".includes(letter)),
-        `rhythm, form "${form.bars}": a form is four bars of a, b and c.`,
+        `${label}, form "${form.bars}": a form is four bars of a, b and c.`,
       );
       say(
         letters[0] === "a",
-        `rhythm, form "${form.bars}": a phrase opens on the section's figure, a.`,
+        `${label}, form "${form.bars}": a phrase opens on the section's figure, a.`,
       );
-      say(form.weight >= 0, `rhythm, form "${form.bars}": a weight cannot be negative.`);
+      say(form.weight >= 0, `${label}, form "${form.bars}": a weight cannot be negative.`);
     }
     say(
       book.forms.some((form) => form.weight > 0),
-      "rhythm: no phrase form has a weight above zero.",
+      `${label}: no phrase form has a weight above zero.`,
     );
     for (const tier of TIERS) {
       const vocabulary = book.tiers[tier];
-      const where = `rhythm (${tier})`;
+      const where = `${label} (${tier})`;
       for (const [symbol, attack] of Object.entries(vocabulary.articulation)) {
         level(attack.level, `${where}, "${symbol}"`);
         plucks(attack, `${where}, "${symbol}"`);
@@ -344,6 +352,17 @@ export function validateChordStyle(chords: ChordStyle): string[] {
         say(!(rest && figure.groove), `${where}, "${figure.name}": a bar of rest is not a groove.`);
       }
     }
+  };
+  if (chords.rhythm) checkBook(chords.rhythm);
+  for (const [name, book] of Object.entries(chords.meters ?? {})) {
+    const meter = readMeter(name);
+    if (!meter || !book) {
+      problems.push(`meters: "${name}" is not a meter a chart can write, or is 4/4.`);
+      continue;
+    }
+    figureSteps = barSteps(meter);
+    label = `rhythm in ${name}`;
+    checkBook(book);
   }
 
   const listening = chords.listening;

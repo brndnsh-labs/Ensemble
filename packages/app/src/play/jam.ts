@@ -18,6 +18,7 @@ import {
   PPQ,
   parse,
   planBar,
+  pulseStarts,
   RECIPE_VERSION,
   render,
   seatChoice,
@@ -214,11 +215,12 @@ export interface Place {
   readonly bar: PlanBar;
   /** Which of the bar's chord spans is sounding. */
   readonly span: number;
-  /** The beat of the bar, from 0. */
+  /** The beat of the bar, from 0: its pulse, as the tempo counts them. */
   readonly beat: number;
 }
 
-export const ticksAt = (plan: Plan, seconds: number): number => (seconds * plan.tempo * PPQ) / 60;
+export const ticksAt = (plan: Plan, seconds: number): number =>
+  (seconds * plan.quarters * PPQ) / 60;
 
 /** The bar and beat sounding at a second of the performance. Undefined before it starts and after it ends. */
 export function placeAt(plan: Plan, seconds: number): Place | undefined {
@@ -237,8 +239,9 @@ export function placeAt(plan: Plan, seconds: number): Place | undefined {
     0,
     bar.spans.findLastIndex((s) => s.start <= into),
   );
-  const beatTicks = (PPQ * 4) / bar.meter.unit;
-  return { bar, span, beat: Math.floor(into / beatTicks) };
+  // The beat is the pulse the band counts, not the meter's written unit: four to a bar of 12/8.
+  const beat = pulseStarts(bar.meter).findLastIndex((start) => start <= into);
+  return { bar, span, beat: Math.max(0, beat) };
 }
 
 /** The next change of chord after a place: its bar, and where in that bar it falls (0 to 1). */

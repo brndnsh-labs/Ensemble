@@ -458,7 +458,7 @@ export function guitar(style: Guitar): InstrumentIdiom {
       const { grid, up, lighter, roll } = style.strum;
       const pair = grid === "eighth" ? PPQ : PPQ / 2;
       // The roll is a time, not a share of the beat: the same at every tempo (CH-29).
-      const ticksPerMs = (plan.tempo * PPQ) / 60_000;
+      const ticksPerMs = (plan.quarters * PPQ) / 60_000;
       const plucks = plucked(part);
       part.forEach(({ strike, voicing }, i) => {
         // A plucked stroke: each string sounds by itself, and rings on under the hand.

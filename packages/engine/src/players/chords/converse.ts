@@ -19,6 +19,7 @@
 
 import { PPQ } from "../../chart/types.ts";
 import { STEP } from "../../perform/grid.ts";
+import { pulseTicks } from "../../perform/meter.ts";
 import type { PlanBar } from "../../plan/types.ts";
 import { EIGHTH } from "./bar.ts";
 import type { Breath, LineNote } from "./line.ts";
@@ -111,7 +112,8 @@ export function layOut(strikes: readonly Strike[], line: readonly LineNote[]): S
 /**
  * The phrase answering the soloist's breaths (CH-71). What the hand already
  * plays inside a breath is played harder by the style's lift. A breath it
- * leaves empty gets one stab, on the first "and" that is:
+ * leaves empty gets one stab, on the first "and" (the eighth before a pulse)
+ * that is:
  *
  * - at least an eighth after the soloist lets go, and done before it comes back in;
  * - a quarter note clear of every other strike (an "and" straight after a
@@ -163,7 +165,11 @@ function stabIn(
     if (barEnd <= breath.from || bar.start >= breath.to) continue;
     const own = harmony.own(bar);
     const kind = placed.find((strike) => strike.bar === bar.index)?.kind ?? harmony.kind(bar);
-    for (let tick = bar.start + EIGHTH; tick < barEnd; tick += PPQ) {
+    let pulseEnd = bar.start;
+    for (const pulse of pulseTicks(bar.meter)) {
+      // The "and": the last eighth of the pulse.
+      pulseEnd += pulse;
+      const tick = pulseEnd - EIGHTH;
       if (tick < breath.from + EIGHTH || tick >= breath.to) continue;
       // Not in the eighth before the soloist comes back in: the stab would still be sounding
       // as the line enters, and an answer that steps on the next phrase is not an answer.

@@ -1,7 +1,9 @@
 // Checks a solo style's meaning. The compiler has already checked its shape;
 // this reads it the way the soloist will and says what it could not play.
 
-import { cells } from "../../perform/grid.ts";
+import { cells, STEP } from "../../perform/grid.ts";
+import { barSteps, pulseTicks } from "../../perform/meter.ts";
+import { readMeter } from "../../style/meters.ts";
 import { SOLO_INSTRUMENTS } from "./instruments.ts";
 import type { Cell, Role, SoloStyle, Way } from "./style.ts";
 import { CONTOURS, ROLES } from "./style.ts";
@@ -256,5 +258,53 @@ export function validateSoloStyle(solo: SoloStyle): string[] {
   }
   say(touch.floor <= touch.ceiling, "touch: the floor is above the ceiling.");
   say(touch.legato > 0 && touch.legato <= 1, "touch: legato is a share of a note's space.");
+  // What is written for another meter: the same levels, every rhythm as long as its bar.
+  for (const [name, written] of Object.entries(solo.meters ?? {})) {
+    const meter = readMeter(name);
+    if (!meter || !written) {
+      say(false, `meters: "${name}" is not a meter a chart can write, or is 4/4.`);
+      continue;
+    }
+    const steps = barSteps(meter);
+    const pulse = Math.round(pulseTicks(meter).at(-1)! / STEP);
+    const where = `in ${name}`;
+    say(
+      written.levels.map((level) => level.name).join() === names.join(),
+      `${where}: its levels are not the style's own (${names.join(", ")}), in their order.`,
+    );
+    for (const level of written.levels) {
+      const at = `${where}, level "${level.name}"`;
+      say(level.notesPerBar > 0, `${at}: notes a bar must be more than none.`);
+      say(level.span >= 3 && level.span <= 24, `${at}: a span of ${level.span} semitones.`);
+      say(level.cells.length > 0, `${at}: has no rhythms.`);
+      for (const cell of level.cells) rhythm(cell, at, steps);
+      say(
+        level.shapes.some((shape) => shape.weight > 0),
+        `${at}: has no shape with a weight.`,
+      );
+      for (const shape of level.shapes) {
+        const letters = cells(shape.bars);
+        say(
+          letters.length === 4 && letters.every((letter) => "LER".includes(letter)),
+          `${at}: shape "${shape.bars}" is not four bars of L, E and R.`,
+        );
+        say(letters.includes("E"), `${at}: shape "${shape.bars}" never lands (no E).`);
+        say(shape.weight >= 0, `${at}: shape "${shape.bars}" has a negative weight.`);
+      }
+    }
+    say(written.endings.length > 0, `${where}, endings: there are none.`);
+    for (const cell of [...written.endings, written.peak]) {
+      const symbols = rhythm(cell, `${where}, endings`, steps);
+      say(
+        !symbols.slice(steps - pulse).includes("x"),
+        `${where}, endings: "${cell}" strikes a note in the last beat, which belongs to the next phrase.`,
+      );
+      const last = symbols.lastIndexOf("x");
+      const held = symbols.slice(last + 1).filter((symbol) => symbol === "-").length + 1;
+      say(held >= 4, `${where}, endings: "${cell}" does not finish on a long note.`);
+    }
+    for (const figure of written.pickups) rhythm(figure.beat, `${where}, pickup`, pulse);
+  }
+
   return problems;
 }

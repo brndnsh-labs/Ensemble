@@ -29,7 +29,7 @@ export interface TimedNote {
 
 /** Seconds from the start of the performance to a tick. */
 export function secondsAt(plan: Plan, tick: number): number {
-  return (tick / PPQ) * (60 / plan.tempo);
+  return (tick / PPQ) * (60 / plan.quarters);
 }
 
 /** Every note of a performance in clock time, in the order they start. */

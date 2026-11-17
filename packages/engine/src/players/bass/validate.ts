@@ -2,6 +2,8 @@
 // this reads it the way the bassist will and says what he could not play.
 
 import { cells, STEP } from "../../perform/grid.ts";
+import { barSteps, pulseTicks } from "../../perform/meter.ts";
+import { readMeter } from "../../style/meters.ts";
 import type { Hold, Tier } from "../../style/types.ts";
 import { SHORTEST } from "./line.ts";
 import type { BassLine, BassStyle, ChordCondition, Figure, RootMotion, Tone } from "./style.ts";
@@ -63,15 +65,34 @@ export function validateBassStyle(bass: BassStyle): string[] {
     problems.push("register: the anchor's range is written upside down.");
   hold(register.anchor.hold, "register anchor");
 
-  const draws = new Map<string, string>();
-  for (const tier of TIERS) {
-    const line = bass.lines[tier];
-    checkLine(line, `${tier} line`);
-    if (line.ceiling < register.highest)
-      problems.push(
-        `${tier} line: the ceiling ${line.ceiling} is under the highest root ${register.highest}.`,
-      );
+  // The bar the lines being checked are written for: its sixteenths, and a pulse of it.
+  let figureSteps = FIGURE_STEPS;
+  let pulseSteps = 4;
+  let draws = new Map<string, string>();
+  const checkLines = (lines: BassStyle["lines"], label: string) => {
+    for (const tier of TIERS) {
+      const line = lines[tier];
+      checkLine(line, `${label}${tier} line`);
+      if (line.ceiling < register.highest)
+        problems.push(
+          `${label}${tier} line: the ceiling ${line.ceiling} is under the highest root ${register.highest}.`,
+        );
+    }
+  };
+  checkLines(bass.lines, "");
+  for (const [name, lines] of Object.entries(bass.meters ?? {})) {
+    const meter = readMeter(name);
+    if (!meter || !lines) {
+      problems.push(`meters: "${name}" is not a meter a chart can write, or is 4/4.`);
+      continue;
+    }
+    figureSteps = barSteps(meter);
+    pulseSteps = Math.round(pulseTicks(meter)[0]! / STEP);
+    draws = new Map();
+    checkLines(lines, `in ${name}, `);
   }
+  figureSteps = FIGURE_STEPS;
+  pulseSteps = 4;
 
   /** A figure's or a turn's grid, symbol by symbol. Returns its cells. */
   function checkGrid(figure: Figure, line: BassLine, at: string): string[] {
@@ -169,8 +190,12 @@ export function validateBassStyle(bass: BassStyle): string[] {
     figures.forEach((figure, i) => {
       const at = `${where}, figure ${figure.name ?? i + 1} "${figure.grid}"`;
       const grid = checkGrid(figure, line, at);
-      if (grid.length !== FIGURE_STEPS)
-        problems.push(`${at}: it has ${grid.length} steps; a bar of 4/4 is ${FIGURE_STEPS}.`);
+      if (grid.length !== figureSteps)
+        problems.push(
+          figureSteps === FIGURE_STEPS
+            ? `${at}: it has ${grid.length} steps; a bar of 4/4 is ${FIGURE_STEPS}.`
+            : `${at}: it has ${grid.length} steps; a bar of this meter is ${figureSteps}.`,
+        );
     });
 
     // Turns: a beat or two laid over the end of the bar.
@@ -185,9 +210,9 @@ export function validateBassStyle(bass: BassStyle): string[] {
       turns.options.forEach((turn, i) => {
         const at = `${where}, turn ${turn.name ?? i + 1} "${turn.grid}"`;
         const grid = checkGrid(turn, line, at);
-        if (grid.length !== 4 && grid.length !== 8)
+        if (grid.length !== pulseSteps && grid.length !== 2 * pulseSteps)
           problems.push(
-            `${at}: it has ${grid.length} steps; a turn is one beat or two, 4 sixteenths or 8.`,
+            `${at}: it has ${grid.length} steps; a turn is one beat or two, ${pulseSteps} sixteenths or ${2 * pulseSteps}.`,
           );
       });
     }

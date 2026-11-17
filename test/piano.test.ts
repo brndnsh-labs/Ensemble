@@ -7,6 +7,7 @@ import type { PlanBar, Take } from "@ensemble/engine";
 import {
   chordFamily,
   chordTones,
+  lastPulse,
   PPQ,
   pitchClass,
   render,
@@ -14,7 +15,7 @@ import {
   tierOf,
 } from "@ensemble/engine";
 import {
-  blues,
+  bluesWritten,
   chordsUnder,
   harmonyOf,
   POCKET,
@@ -32,6 +33,7 @@ import {
   STYLES,
   stressTakes,
   takes,
+  written,
 } from "./takes.ts";
 
 test("the piano stays in its register: nothing under the style's floor, nothing above E6, in every take", () => {
@@ -317,11 +319,11 @@ test("the piano stays in its part of the keyboard: the top of its chords never w
 });
 
 test(
-  "blues: the piano comps on beats and their offbeats only, and a quiet band's piano is sparser than a loud one's",
+  "blues: the piano comps on the eighths only (in four the beats and their offbeats, in twelve the triplet's three), and a quiet band's piano is sparser than a loud one's",
   only("blues"),
   () => {
     const perBar = { low: [] as number[], high: [] as number[] };
-    for (const { chart, options, take } of takes(blues)) {
+    for (const { chart, options, take } of takes(bluesWritten)) {
       const byBar = strikesByBar(take);
       for (const bar of take.plan.bars) {
         if (bar.kind !== "music" || bar.ending || bar.seats.chords === null) continue;
@@ -352,7 +354,7 @@ test(
 
 test("a section keeps its figure: away from a solo, every phrase opens on the same rhythm each time the section comes round at the same level", () => {
   let compared = 0;
-  for (const { chart, options, take } of takes((jam) => jam.chart.meter === "4/4")) {
+  for (const { chart, options, take } of takes(written)) {
     const byBar = strikesByBar(take);
     const openings = new Map<string, string>();
     for (const bar of take.plan.bars) {
@@ -368,7 +370,7 @@ test("a section keeps its figure: away from a solo, every phrase opens on the sa
       // harmony (a pushed chord is not struck again; the beat before a push is cleared for it).
       const rhythm = (byBar.get(bar.index) ?? [])
         .map((strike) => strike.tick - bar.start)
-        .filter((tick) => tick >= PPQ / 2 && tick < bar.ticks - PPQ)
+        .filter((tick) => tick >= PPQ / 2 && tick < bar.ticks - lastPulse(bar.meter))
         .join(" ");
       const key = `${bar.section.identity} ${tierOf(bar.seats.chords)}`;
       const known = openings.get(key);

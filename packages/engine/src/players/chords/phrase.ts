@@ -17,6 +17,7 @@
 import { cells } from "../../perform/grid.ts";
 import type { Arrival } from "../../perform/harmony.ts";
 import { sameChord } from "../../perform/harmony.ts";
+import { writtenFor } from "../../perform/meter.ts";
 import type { PlayerContext } from "../../perform/notes.ts";
 import { heldRng } from "../../perform/notes.ts";
 import type { PlanBar } from "../../plan/types.ts";
@@ -35,18 +36,25 @@ import { stretches } from "./plain.ts";
 import type { BarRhythm } from "./rhythm.ts";
 import { barRhythm } from "./rhythm.ts";
 import type { Strike } from "./strike.ts";
-import type { ChordStyle, CompFigure, RhythmTier } from "./style.ts";
+import type { ChordStyle, CompFigure, RhythmBook, RhythmTier } from "./style.ts";
 
-/** Whether the seat comps in a bar: music in 4/4 that it plays in, short of the ending bar. */
+/** The rhythm book a bar is comped from: the style's in 4/4, or the one written for the bar's meter. */
+export function bookFor(chords: ChordStyle, bar: PlanBar): RhythmBook | null {
+  if (bar.meter.beats === 4 && bar.meter.unit === 4) return chords.rhythm;
+  return writtenFor(chords.meters, bar.meter) ?? null;
+}
+
+/**
+ * Whether the seat comps in a bar: music it plays in, in a meter it has a
+ * book for, short of the ending bar.
+ */
 export function comps(bar: PlanBar | undefined, chords: ChordStyle): bar is PlanBar {
   return (
     bar !== undefined &&
-    chords.rhythm !== null &&
     bar.kind === "music" &&
     bar.seats.chords !== null &&
     !bar.ending &&
-    bar.meter.beats === 4 &&
-    bar.meter.unit === 4
+    bookFor(chords, bar) !== null
   );
 }
 
@@ -87,8 +95,9 @@ export function compStrikes(
 ): Strike[] {
   const { plan, style, rng, heard } = context;
   const chords = style.chords;
-  const book = chords.rhythm;
-  if (!book) return [];
+  if (!chords.rhythm && !chords.meters) return [];
+  // Every bar asked about here is one the seat comps in, so it has a book.
+  const bookOf = (bar: PlanBar) => bookFor(chords, bar)!;
 
   // The level the hand reads its book at: the band's, but under a soloist no higher than
   // the style lets a listening hand go.
@@ -102,8 +111,13 @@ export function compStrikes(
   const own = once((bar) => stretches(bar, harmony, 0));
 
   // The book is read once: each figure's strokes, each form's letters.
-  const read = new Map<string, FigureStroke[]>();
-  const strokes = (figure: CompFigure, tier: Tier) => {
+  const reads = new Map<RhythmBook, Map<string, FigureStroke[]>>();
+  const strokes = (figure: CompFigure, tier: Tier, book: RhythmBook) => {
+    let read = reads.get(book);
+    if (!read) {
+      read = new Map();
+      reads.set(book, read);
+    }
     const key = `${tier}/${figure.name}`;
     let known = read.get(key);
     if (!known) {
@@ -112,11 +126,19 @@ export function compStrikes(
     }
     return known;
   };
-  const forms = book.forms.map((form) => ({ weight: form.weight, letters: cells(form.bars) }));
+  const letters = new Map<RhythmBook, { weight: number; letters: string[] }[]>();
+  const formsOf = (book: RhythmBook) => {
+    let known = letters.get(book);
+    if (!known) {
+      known = book.forms.map((form) => ({ weight: form.weight, letters: cells(form.bars) }));
+      letters.set(book, known);
+    }
+    return known;
+  };
 
   // The section's own figure at this level: the same every time the section returns.
   const home = once((bar): CompFigure => {
-    const tier = book.tiers[tierAt(bar)];
+    const tier = bookOf(bar).tiers[tierAt(bar)];
     return heldRng(rng, `figure:${tier.draw}`, "section", bar).weighted(
       tier.figures,
       (figure) => figure.weight,
@@ -125,7 +147,7 @@ export function compStrikes(
 
   // The two figures that answer it, this time through the section. A groove has none.
   const answers = once((bar): readonly CompFigure[] => {
-    const tier = book.tiers[tierAt(bar)];
+    const tier = bookOf(bar).tiers[tierAt(bar)];
     const pool = [...tier.figures, ...tier.answers].filter(
       (figure) => figure !== home(bar) && !figure.groove && figure.weight > 0,
     );
@@ -174,7 +196,7 @@ export function compStrikes(
     const able =
       last.end - last.start > EIGHTH &&
       (!figure.groove ||
-        strokes(figure, tier).some(
+        strokes(figure, tier, bookOf(bar)).some(
           (stroke) => stroke.at >= reach && !stroke.muted && !stroke.pluck,
         ));
     return able && heldRng(rng, "push", "bar", bar).chance(chords.anticipation.barline[tier]);
@@ -209,6 +231,7 @@ export function compStrikes(
     figures: readonly CompFigure[],
   ): Strike[] =>
     bars.flatMap((bar) => {
+      const book = bookOf(bar);
       const figure = asPlayed(bar, figures[bar.phrase.bar]!);
       const next = planBar(plan, bar.index + 1);
       const to = changeAfter(bar);
@@ -218,7 +241,8 @@ export function compStrikes(
         // known before that phrase is chosen.
         const top = next.phrase.bar === 0;
         const into = asPlayed(next, top ? home(next) : figures[next.phrase.bar]!);
-        carry = landing(book, into, strokes(into, top ? tierAt(next) : tier), to);
+        const ahead = bookOf(next);
+        carry = landing(ahead, into, strokes(into, top ? tierAt(next) : tier, ahead), to);
       }
       const key = `${bar.index} ${figure.name} ${carry}`;
       let strikes = laid.get(key);
@@ -227,7 +251,7 @@ export function compStrikes(
           bar,
           tier,
           figure,
-          strokes: strokes(figure, tier),
+          strokes: strokes(figure, tier, book),
           own: own(bar),
           pushedInto: pushedInto(bar),
           ahead: to && { arrival: to.arrival, push: pushAfter(bar), carry },
@@ -261,7 +285,7 @@ export function compStrikes(
     if (!b || !c) return [ended(new Array<CompFigure>(length).fill(a))];
     // Every form, with either answer in the first answer's seat.
     const written = new Map<string, { weight: number; figures: CompFigure[] }>();
-    for (const form of forms) {
+    for (const form of formsOf(bookOf(first))) {
       for (const [x, y] of [
         [b, c],
         [c, b],
@@ -277,7 +301,7 @@ export function compStrikes(
     const left = [...written.values()];
     const drawn: CompFigure[][] = [];
     const held = heldRng(rng, "plans", "phrase", first);
-    while (drawn.length < book.candidates && left.length > 0) {
+    while (drawn.length < bookOf(first).candidates && left.length > 0) {
       const next = held.fork(drawn.length).weighted(left, (option) => option.weight);
       left.splice(left.indexOf(next), 1);
       drawn.push(next.figures);
@@ -293,6 +317,7 @@ export function compStrikes(
         bar.start,
         before !== undefined && changeAfter(before) !== null,
         changeAfter(bar) !== null,
+        bar.meter,
       );
     });
 
@@ -311,12 +336,12 @@ export function compStrikes(
   // conversation and not a groove, each plan is also offered played around the line.
   const listening = chords.listening;
   const line = listening ? lineOf(heard) : [];
-  const harmonyOf: PhraseHarmony = {
+  const harmonyOf = (book: RhythmBook): PhraseHarmony => ({
     own,
     changesAfter: (bar) => changeAfter(bar) !== null,
     hold: book.hold,
     kind: (bar) => chords.voicing[tierAt(bar)],
-  };
+  });
   const hearing = (bars: readonly PlanBar[], played: readonly Strike[]): Hearing | null =>
     listening && line.length > 0 && bars.some((bar) => bar.solo !== null) && !home(bars[0]!).groove
       ? hear(bars, plan.bars, line, listening, played)
@@ -327,6 +352,7 @@ export function compStrikes(
   const played = new Map<string, readonly BarRhythm[]>();
   for (const bars of phrases) {
     const tier = tierAt(bars[0]!);
+    const book = bookOf(bars[0]!);
     const place = `${bars[0]!.section.identity}/${bars[0]!.phrase.index}`;
     const heardHere = hearing(bars, strikes);
     const candidates = plans(bars[0]!).flatMap((figures): PhraseCandidate[] => {
@@ -341,7 +367,7 @@ export function compStrikes(
         heard,
         hearing: heardHere,
       };
-      return waysOf(struck, bars, heardHere, listening, harmonyOf).map((way) => ({
+      return waysOf(struck, bars, heardHere, listening, harmonyOf(book)).map((way) => ({
         ...plan,
         way: way.name,
         strikes: way.strikes,

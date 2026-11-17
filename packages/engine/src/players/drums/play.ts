@@ -11,7 +11,7 @@ import type { Player, WrittenNote } from "../../perform/notes.ts";
 import type { EndingMark, PlanBar } from "../../plan/types.ts";
 import { applyFill, chooseFills } from "./fill.ts";
 import type { BarPart } from "./groove.ts";
-import { grooveBar, harmonyByBar, lineOf, pulses } from "./groove.ts";
+import { grooveBar, harmonyByBar, lineOf, pulses, timeOf } from "./groove.ts";
 import { ARRIVAL_CRASH, ARRIVAL_KICK, type DrumVoice, KIT, voiceName } from "./kit.ts";
 import type { DrumStyle, Strike } from "./style.ts";
 
@@ -27,7 +27,6 @@ export const playDrums: Player = ({ plan, style, rng }) => {
   const drums = style.drums;
   const fills = chooseFills(plan, drums, rng);
   const harmony = harmonyByBar(plan);
-  const under = drums.fills.keepTime ? drums.timekeepers : [];
   const notes: WrittenNote[] = [];
 
   for (const bar of plan.bars) {
@@ -53,7 +52,10 @@ export const playDrums: Player = ({ plan, style, rng }) => {
     }
 
     const steps = pulses(bar.meter).reduce((sum, pulse) => sum + pulse, 0);
-    if (fill) applyFill(part, fill, steps, under);
+    // In a style whose fills keep time, the cymbal plays on under them (ST-jazz-15).
+    if (fill) {
+      applyFill(part, fill, steps, timeOf(drums, bar).fills.keepTime ? drums.timekeepers : []);
+    }
     if (bar.crash) crashOnOne(part, drums, steps);
 
     for (const [voice, line] of Object.entries(part) as [DrumVoice, number[]][]) {

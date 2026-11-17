@@ -169,6 +169,90 @@ const rhythm: RhythmBook = {
   candidates: 8,
 };
 
+// ── in six ──────────────────────────────────────────────────────────────────
+// A bar of 6/4, six beats in two threes: twenty-four sixteenths, grouped by
+// beat. The comp of a waltz in six is built on its two strong beats, 1 and 4,
+// and the eighth before each (the "and" of 3, the "and" of 6), with the
+// waltz's own dotted-quarter cell (1 and the "and" of 2) for colour: one to
+// four chords a bar, most of them on a strong beat or leaning into one
+// (AU-94; the old band struck four bars in five on sixteenths, "thick mush").
+// None of this comes from the notes, which have no book for six: it is the
+// 4/4 book's cells laid over two threes.
+
+const rhythmInSix: RhythmBook = {
+  tiers: {
+    // Quiet: the chord laid in and held, on one strong beat or both.
+    low: {
+      draw: "quiet",
+      articulation: STAB,
+      figures: [
+        { name: "one, held", weight: 3, grid: "x--- ---- ---- ---- ---- ----" },
+        { name: "one and four, held", weight: 3, grid: "x--- ---- ---- x--- ---- ----" },
+        // Beat 1, then the second three pushed: the "and" of 3, held.
+        { name: "one, and four pushed", weight: 2, grid: "x... .... ..X- ---- ---- ----" },
+      ],
+      answers: [
+        // A bar left to the bass and the cymbal (ST-jazz-28).
+        { name: "rest", weight: 3, grid: ".... .... .... .... .... ...." },
+        { name: "four, held", weight: 2, grid: ".... .... .... x--- ---- ----" },
+        { name: "one, short", weight: 1, grid: "x... .... .... .... .... ...." },
+      ],
+      busy: { from: 1, to: 1.5 },
+      arrival: { level: 74, steps: 24 },
+    },
+
+    // The working level: two or three stabs, on the strong beats and around them.
+    mid: {
+      draw: "working",
+      articulation: STAB,
+      figures: [
+        // The waltz's cell and the second strong beat: 1, the "and" of 2, 4 held.
+        { name: "waltz, and four", weight: 3, grid: "x... ..X. .... x--- ---- ...." },
+        // The two strong beats.
+        { name: "one and four", weight: 3, grid: "x... .... .... X... .... ...." },
+        // Beat 1, and the second three pushed and held.
+        { name: "one, and four pushed", weight: 2, grid: "x... .... ..X- ---- ---- ...." },
+        // Round the strong beats: the "and" of 1, beat 3, and the "and" of 4 held.
+        { name: "round the beats", weight: 1, grid: "..X. .... x... ..X- ---- ...." },
+      ],
+      answers: [
+        { name: "four, held", weight: 3, grid: ".... .... .... x--- ---- ----" },
+        { name: "one, held", weight: 2, grid: "x--- ---- ---- ---- ---- ----" },
+        // The waltz's cell alone, the "and" of 2 held through the bar's middle.
+        { name: "waltz, held", weight: 2, grid: "x... ..X- ---- ---- .... ...." },
+        // Both strong beats pushed.
+        { name: "both pushed", weight: 1, grid: ".... .... ..X. .... .... ..X." },
+      ],
+      busy: { from: 2, to: 3 },
+      arrival: { level: 78, steps: 4 },
+    },
+
+    // Hot, with the band to itself: the same cells with one more stab, leaning into a
+    // strong beat.
+    high: {
+      draw: "working",
+      articulation: { ...STAB, o: { level: 84, steps: 1.5 } },
+      figures: [
+        { name: "waltz, and four", weight: 3, grid: "x... ..X. .... x... .... ..o." },
+        { name: "one and four", weight: 3, grid: "x... .... ..o. X... .... ...." },
+        { name: "one, and four pushed", weight: 2, grid: "x... .... ..X- ---- ..o. ...." },
+        { name: "round the beats", weight: 1, grid: "..X. .... x... ..X. .... x..." },
+      ],
+      answers: [
+        { name: "four, and its waltz", weight: 3, grid: ".... .... .... x... ..X. ...." },
+        { name: "waltz, held", weight: 2, grid: "x... ..X- ---- ---- .... ...." },
+        { name: "one held, and four pushed", weight: 2, grid: "x--- ---- ..o. .... .... ...." },
+        { name: "both pushed", weight: 1, grid: ".... .... ..X. .... .... ..X." },
+      ],
+      busy: { from: 2.5, to: 3.5 },
+      arrival: { level: 80, steps: 4 },
+    },
+  },
+  hold: rhythm.hold,
+  forms: rhythm.forms,
+  candidates: rhythm.candidates,
+};
+
 export const jazzChords: ChordStyle = {
   idiom: "keys",
   kinds: { rootless },
@@ -180,6 +264,7 @@ export const jazzChords: ChordStyle = {
   // The pad, for a meter the book is not written in (CH-54): the jazz waltz.
   plain: { length: 0.95, velocity: { beat: 74, offbeat: 80, restrike: 60 } },
   rhythm,
+  meters: { "6/4": rhythmInSix },
   // The hand leans into a change at the barline a quarter of the time when quiet, more as the
   // band gets louder (ST-jazz-41, CH-39: the added "and" of 4 at 25%, 40%, 45%). A change
   // inside the bar is always played early by a strike in the eighth before it, which ties

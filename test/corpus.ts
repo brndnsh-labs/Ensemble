@@ -1923,6 +1923,19 @@ const moreExamples: Row[] = [
     header: { title: "Waltz sketch", key: "G", meter: "3/4" },
   },
   {
+    name: "a slow blues in twelve, a chord a beat in its turnaround (spec 10)",
+    text: chart`
+      title: Slow blues sketch
+      key: G
+      tempo: 60
+      meter: 12/8
+
+      | G7 | C7 | G7 G7/B C7 C#dim7 | G7/D D7 |
+    `,
+    bars: "G7:2880 | C7:2880 | G7:720 G7/B:720 C7:720 C#dim7:720 | G7/D:1440 D7:1440",
+    header: { title: "Slow blues sketch", key: "G", tempo: 60, meter: "12/8" },
+  },
+  {
     name: "an intro, a looping body, and a written ending (spec 10)",
     text: chart`
       title: Two-chord groove

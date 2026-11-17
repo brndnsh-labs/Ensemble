@@ -10,10 +10,12 @@ import {
   chordTones,
   contextOf,
   MEASURES,
+  onPulse,
   PPQ,
   parse,
   pitchClass,
   plan,
+  pulseTicks,
   render,
   SOLO_INSTRUMENTS,
   swing,
@@ -209,7 +211,7 @@ test("the soloist lands the changes: a note struck where a chord arrives is a to
     const solo = notesOf(take, "solo");
     // A soloist the style lays back is late everywhere, the change included, and the comp with
     // it: a note is held across a change by what it has left once that lay-back is set aside.
-    const laidBack = (Math.max(0, style.feel.lean.solo) / 1000) * (take.plan.tempo / 60) * PPQ;
+    const laidBack = (Math.max(0, style.feel.lean.solo) / 1000) * (take.plan.quarters / 60) * PPQ;
     for (const arrival of harmonyOf(take)) {
       const chord = arrival.chord;
       if (!chord || !arrival.changed) continue;
@@ -331,8 +333,8 @@ test("the soloist plays no wrong note on a beat or held: nothing a half step ove
       while (harmony[at + 1] && harmony[at + 1]!.tick <= note.tick) at++;
       while (bars[bar + 1] && bars[bar + 1]!.start <= note.tick) bar++;
       const measure = bars[bar]!;
-      if (measure.meter.unit !== 4) continue;
-      const onBeat = (note.tick - measure.start) % PPQ === 0;
+      // A beat is the bar's pulse: a quarter note, or in six-eight and twelve-eight a dotted one.
+      const onBeat = onPulse(measure.meter, note.tick - measure.start);
       if (!onBeat && note.duration < PPQ * 0.75) continue;
       // A note struck in the eighth before a change and held over it is the new chord's
       // (X-B-07); one struck where its own chord arrives is that chord's, however soon the
@@ -407,13 +409,13 @@ test("a horn breathes: the alto never plays eight seconds without half a second 
           tempo,
           soloInstrument: "alto-sax",
         });
-        horn(take, tempo, `${chart.file} at ${tempo}`);
+        horn(take, take.plan.quarters, `${chart.file} at ${tempo}`);
       }
     }
   }
   for (const { chart, options, take } of soloistTakes()) {
     if (options.soloInstrument !== "alto-sax") continue;
-    horn(take, take.plan.tempo, `${chart.file} ${JSON.stringify(options)}`);
+    horn(take, take.plan.quarters, `${chart.file} ${JSON.stringify(options)}`);
   }
   // Very slow, over eight chords a bar: a note cut at a change of chord on an "and" leaves a
   // breath on paper that swing takes back.
@@ -461,7 +463,7 @@ test("a guitar bends only into a note a phrase lands on (one struck where the ch
     const harmony = harmonyOf(take);
     const notes = notesOf(take, "solo");
     const bars = take.plan.bars;
-    const perSecond = (take.plan.tempo * PPQ) / 60;
+    const perSecond = (take.plan.quarters * PPQ) / 60;
     const { habits, space, touch } = style.solo;
     let [at, b] = [0, 0];
     const top = Math.max(...notes.map((note) => note.pitch));
@@ -723,8 +725,9 @@ test("under a solo the piano leaves the soloist its note: a voice held on the so
             const to = Math.min(ends, note.tick + note.offset + note.duration);
             return sum + Math.max(0, to - from);
           }, 0);
-        // A beat on paper; the feel moves both ends of both notes, so a quarter more as heard.
-        if (shared < PPQ * 1.25) continue;
+        // A beat on paper (the bar's pulse: a dotted quarter in twelve-eight); the feel moves
+        // both ends of both notes, so a quarter more as heard.
+        if (shared < pulseTicks(bar.meter)[0]! * 1.25) continue;
         const needed = chordsUnder(take, strike).some(({ chord }) => {
           const interval = (pitch - pitchClass(chord.root) + 120) % 12;
           const altered = { b5: 6, "#5": 8, b9: 1, "#9": 3, "#11": 6, b13: 8 } as const;
@@ -801,10 +804,9 @@ test(
         const coming = harmony[at + 1];
         if (coming && coming.tick - note.tick <= PPQ / 2 && has(coming, note.pitch)) return;
         const bar = take.plan.bars.findLast((candidate) => candidate.start <= note.tick)!;
-        if (bar.meter.unit !== 4) return;
         chromatic++;
         const where = `${chart.file} seed ${options.seed} bar ${bar.index}: ${note.pitch} over ${harmony[at]!.chord!.text}`;
-        assert.notEqual((note.tick - bar.start) % PPQ, 0, `${where}: on a beat`);
+        assert.ok(!onPulse(bar.meter, note.tick - bar.start), `${where}: on a beat`);
         const next = solo[i + 1];
         assert.ok(
           next && next.tick - note.tick <= PPQ / 2,

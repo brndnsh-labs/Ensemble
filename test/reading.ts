@@ -3,13 +3,17 @@
 
 import type { Take } from "@ensemble/engine";
 import { arrivals, chordScale, contextOf, MUTED, PICKED, PPQ } from "@ensemble/engine";
-import { type Jam, notesOf } from "./takes.ts";
+import { type Jam, notesOf, written } from "./takes.ts";
 
 /** Ticks of slack for where a note sounds: the largest lean plus human placement. */
 export const POCKET = 40;
 
 export const blues = (jam: Pick<Jam, "style" | "chart">) =>
   jam.style.id === "blues" && jam.chart.meter === "4/4";
+
+/** The blues wherever it plays from its own parts: in four, and in twelve. */
+export const bluesWritten = (jam: Pick<Jam, "style" | "chart">) =>
+  jam.style.id === "blues" && written(jam);
 
 export interface Strike {
   readonly tick: number;

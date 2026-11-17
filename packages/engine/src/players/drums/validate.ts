@@ -1,25 +1,53 @@
 // Checks a drum style's meaning. The compiler has already checked its shape;
 // this reads it the way the drummer will and says what he could not play.
 
-import { cells, LEVELS } from "../../perform/grid.ts";
+import { cells, LEVELS, STEP } from "../../perform/grid.ts";
+import { barSteps, pulseTicks } from "../../perform/meter.ts";
+import { readMeter } from "../../style/meters.ts";
 import type { Tier } from "../../style/types.ts";
 import { shapesFor } from "./fill.ts";
 import { TAKEN } from "./groove.ts";
 import { KIT } from "./kit.ts";
-import type { DrumStyle, FillShape, Lines, Strike } from "./style.ts";
+import type { DrumStyle, DrumTime, FillShape, Lines, Strike } from "./style.ts";
 
 const TIERS: readonly Tier[] = ["low", "mid", "high"];
-/** A groove line is one bar of 4/4. */
-const GROOVE_STEPS = 16;
-/** No fill is longer than a 4/4 bar less its first beat (CO-44). */
-const LONGEST_FILL = 12;
+const FOUR_FOUR = { beats: 4, unit: 4 } as const;
 
 /** Every problem in a drum style, in words. An empty list means the data is sound. */
 export function validateDrumStyle(drums: DrumStyle): string[] {
   const problems: string[] = [];
-  const voice = (name: string, where: string) => {
-    if (!(name in KIT)) problems.push(`${where}: "${name}" is not a piece of the kit.`);
+  for (const name of drums.timekeepers) voiceOf(name, "timekeepers", problems);
+  problems.push(...validateTime(drums, FOUR_FOUR));
+  for (const [name, time] of Object.entries(drums.meters ?? {})) {
+    const meter = readMeter(name);
+    if (!meter) problems.push(`meters: "${name}" is not a meter a chart can write, or is 4/4.`);
+    else if (time)
+      problems.push(...validateTime(time, meter).map((problem) => `in ${name}, ${problem}`));
+  }
+  const strike = (written: Strike, where: string): void => {
+    for (const [name, symbol] of Object.entries(written)) {
+      voiceOf(name, where, problems);
+      if (!(symbol in LEVELS))
+        problems.push(`${where}: the ${name} is written "${symbol}"; write X, x, o or g.`);
+    }
   };
+  strike(drums.ending.strike, "ending strike");
+  if (drums.ending.button) strike(drums.ending.button, "ending button");
+  return [...new Set(problems)];
+}
+
+function voiceOf(name: string, where: string, problems: string[]): void {
+  if (!(name in KIT)) problems.push(`${where}: "${name}" is not a piece of the kit.`);
+}
+
+/** The problems in what is written as a bar: the grooves, the touches, the fills, for a bar of one meter. */
+function validateTime(drums: DrumTime, meter: { beats: number; unit: 2 | 4 | 8 }): string[] {
+  const problems: string[] = [];
+  /** A groove line is one bar of the meter. */
+  const GROOVE_STEPS = barSteps(meter);
+  /** No fill is longer than the bar less its first pulse (CO-44). */
+  const LONGEST_FILL = GROOVE_STEPS - Math.round(pulseTicks(meter)[0]! / STEP);
+  const voice = (name: string, where: string) => voiceOf(name, where, problems);
   /**
    * Checks each line's piece and symbols, and returns the lines' lengths. Only a
    * groove line may take a stroke away: a fill replaces the time anyway.
@@ -39,13 +67,6 @@ export function validateDrumStyle(drums: DrumStyle): string[] {
       }
       return symbols.length;
     });
-  const strike = (written: Strike, where: string): void => {
-    for (const [name, symbol] of Object.entries(written)) {
-      voice(name, where);
-      if (!(symbol in LEVELS))
-        problems.push(`${where}: the ${name} is written "${symbol}"; write X, x, o or g.`);
-    }
-  };
   const weights = (list: readonly { readonly weight: number }[], where: string): void => {
     if (list.length === 0) problems.push(`${where}: there is nothing to choose from.`);
     else if (list.some((item) => !(item.weight >= 0)))
@@ -82,7 +103,6 @@ export function validateDrumStyle(drums: DrumStyle): string[] {
     }
   }
 
-  for (const name of drums.timekeepers) voice(name, "timekeepers");
   drums.touches.forEach((touch, i) => {
     const where = `touch ${i + 1}`;
     for (const name of touch.voices) voice(name, where);
@@ -158,8 +178,5 @@ export function validateDrumStyle(drums: DrumStyle): string[] {
     }
   }
 
-  strike(drums.ending.strike, "ending strike");
-  if (drums.ending.button) strike(drums.ending.button, "ending button");
-
-  return [...new Set(problems)];
+  return problems;
 }

@@ -7,11 +7,15 @@ import { test } from "node:test";
 import type { Plan, PlanBar, PlanOptions, Take } from "@ensemble/engine";
 import {
   arrangedLines,
+  isCompound,
   PPQ,
   parse,
   pitchClass,
   plan,
+  pulseStarts,
   render,
+  seconds,
+  strongPulses,
   tierOf,
   toMidi,
   validateStyle,
@@ -19,8 +23,19 @@ import {
 } from "@ensemble/engine";
 import { styleIds } from "@ensemble/styles";
 import { corpus } from "./corpus.ts";
-import { blues, POCKET } from "./reading.ts";
-import { FULL, LIBRARY, notesOf, only, ownCharts, readSmf, SEEDS, STYLES, takes } from "./takes.ts";
+import { bluesWritten, POCKET } from "./reading.ts";
+import {
+  enough,
+  FULL,
+  LIBRARY,
+  notesOf,
+  only,
+  ownCharts,
+  readSmf,
+  SEEDS,
+  STYLES,
+  takes,
+} from "./takes.ts";
 
 test("every style that ships is sound data", () => {
   for (const style of STYLES) assert.deepEqual(validateStyle(style), [], style.id);
@@ -264,7 +279,12 @@ test("every take is a valid MIDI file: one track per playing seat after the temp
     const names = file.tracks.map((track) => track.name);
     assert.deepEqual(names.slice(0, 3), ["Ensemble", "Drums", "Bass"], chart.file);
     assert.equal(file.tracks[0]!.tempos.length, 1, "one tempo: the band is metronomic");
-    assert.equal(file.tracks[0]!.tempos[0], take.plan.tempo);
+    // A dotted pulse can make the quarter notes a half (95 a minute in 12/8 is 142.5): the file
+    // holds it as microseconds, so it is read back to within one of the figure.
+    assert.ok(
+      Math.abs(file.tracks[0]!.tempos[0]! - take.plan.quarters) < 1,
+      `${chart.file}: ${file.tracks[0]!.tempos[0]} in the file, ${take.plan.quarters} played`,
+    );
     const drums = file.tracks[1]!;
     assert.ok(drums.channels.size === 1 && drums.channels.has(9), "drums on channel 10");
     for (const track of file.tracks.slice(1)) {
@@ -513,53 +533,160 @@ Outro    2 1 - - .
 
 // ── blues ───────────────────────────────────────────────────────────────────
 
-test("blues: the offbeat eighth is the last note of a triplet, for everyone", only("blues"), () => {
-  for (const { chart, take } of takes(blues)) {
-    for (const note of notesOf(take)) {
-      const inBeat = note.tick % PPQ;
-      if (inBeat !== PPQ / 2) continue;
-      // Written on the "and", it sounds two thirds of the way through the beat.
-      const lands = inBeat + note.offset;
-      assert.ok(Math.abs(lands - (PPQ * 2) / 3) <= POCKET, `${chart.file}: an "and" at ${lands}`);
-    }
-  }
-});
-
 test(
-  "blues: the time is kick on 1 and 3 and a backbeat on 2 and 4, in every bar the drummer plays time",
+  'blues: the offbeat eighth is the last note of a triplet, for everyone: in four the written "and" is swung there, and in twelve it is the pulse\'s last eighth and is played where it is written',
   only("blues"),
   () => {
-    for (const { chart, options, take } of takes(blues)) {
+    for (const { chart, take } of takes(bluesWritten)) {
+      const twelve = chart.meter !== "4/4";
+      for (const note of notesOf(take)) {
+        if (twelve) {
+          // A dotted pulse is its own triplet: nothing bends it.
+          assert.ok(
+            Math.abs(note.offset) <= POCKET,
+            `${chart.file}: an eighth moved ${note.offset}`,
+          );
+          continue;
+        }
+        const inBeat = note.tick % PPQ;
+        if (inBeat !== PPQ / 2) continue;
+        // Written on the "and", it sounds two thirds of the way through the beat.
+        const lands = inBeat + note.offset;
+        assert.ok(Math.abs(lands - (PPQ * 2) / 3) <= POCKET, `${chart.file}: an "and" at ${lands}`);
+      }
+    }
+  },
+);
+
+test(
+  "blues: the time is a kick on the bar's two strong pulses and a backbeat on the pulses between them (1 and 3, 2 and 4: quarter notes in four, dotted quarters in twelve), in every bar the drummer plays time",
+  only("blues"),
+  () => {
+    let twelve = 0;
+    for (const { chart, options, take } of takes(bluesWritten)) {
       const drums = notesOf(take, "drums");
       for (const bar of take.plan.bars) {
         // A bar the arrangement lays the drummer out of is not a bar he plays time in.
         if (bar.kind !== "music" || bar.ending || bar.seats.drums === null) continue;
-        const at = (beat: number, ...voices: string[]) =>
-          drums.some(
-            (note) => note.tick === bar.start + beat * PPQ && voices.includes(note.voice ?? ""),
-          );
+        if (chart.meter !== "4/4") twelve++;
+        const at = (tick: number, ...voices: string[]) =>
+          drums.some((note) => note.tick === bar.start + tick && voices.includes(note.voice ?? ""));
         const where = `${chart.file} seed ${options.seed} bar ${bar.index}`;
-        assert.ok(at(0, "kick"), `${where}: no kick on 1`);
-        assert.ok(at(2, "kick"), `${where}: no kick on 3`);
-        assert.ok(at(1, "snare", "crossStick"), `${where}: no backbeat on 2`);
+        const strong = strongPulses(bar.meter);
+        const between = pulseStarts(bar.meter).filter((tick) => !strong.includes(tick));
+        for (const tick of strong) assert.ok(at(tick, "kick"), `${where}: no kick at ${tick}`);
+        assert.ok(at(between[0]!, "snare", "crossStick"), `${where}: no backbeat on 2`);
         // A long fill takes the hands off the backbeat on 4; a short one never does.
-        if (!bar.fill) assert.ok(at(3, "snare", "crossStick"), `${where}: no backbeat on 4`);
+        if (!bar.fill)
+          assert.ok(at(between[1]!, "snare", "crossStick"), `${where}: no backbeat on 4`);
+      }
+    }
+    if (LIBRARY.some((chart) => chart.meter === "12/8"))
+      assert.ok(twelve > enough(300), `only ${twelve} bars of twelve`);
+  },
+);
+
+test(
+  "blues: nothing is ever played between the notes of the triplet, where it would flam: in four nothing on the last sixteenth of a beat, and in twelve nothing off the eighths",
+  only("blues"),
+  () => {
+    for (const { chart, take } of takes(bluesWritten)) {
+      for (const note of notesOf(take)) {
+        if (chart.meter === "4/4")
+          assert.notEqual(note.tick % PPQ, (PPQ * 3) / 4, `${chart.file}: ${note.seat} on an "a"`);
+        else
+          assert.equal(
+            note.tick % (PPQ / 2),
+            0,
+            `${chart.file}: ${note.seat} (${note.voice}) between the eighths at ${note.tick}`,
+          );
       }
     }
   },
 );
 
 test(
-  "blues: nothing is ever played on the last sixteenth of a beat, which would flam against the triplet",
+  "blues: in twelve the cymbal plays the triplets: from the working level up, all three eighths of every pulse in every bar of time, unless a fill or a crash has that hand; and when the band is quiet it plays the pulses and leaves the triplet's middle note out",
   only("blues"),
   () => {
-    for (const { chart, take } of takes(blues)) {
-      for (const note of notesOf(take)) {
-        assert.notEqual(note.tick % PPQ, (PPQ * 3) / 4, `${chart.file}: ${note.seat} on an "a"`);
+    let working = 0;
+    let quiet = 0;
+    const blues = STYLES.find((style) => style.id === "blues")!;
+    const twelve = LIBRARY.filter((chart) => chart.meter === "12/8");
+    // Every take of the library's, and the same charts held quiet, working and hot.
+    const played = [
+      ...takes((jam) => jam.style.id === "blues" && jam.chart.meter === "12/8"),
+      ...twelve.flatMap((chart) =>
+        [0.3, 0.55, 0.85].map((energy) => {
+          const options = { mode: "jam", passes: 2, energy, seed: 2 } as const;
+          return { chart, options, take: render(chart.text, blues, options) };
+        }),
+      ),
+    ];
+    for (const { chart, options, take } of played) {
+      const drums = notesOf(take, "drums");
+      for (const bar of take.plan.bars) {
+        if (bar.kind !== "music" || bar.ending || bar.seats.drums === null || bar.fill) continue;
+        const cymbal = new Set(
+          drums
+            .filter(
+              (note) =>
+                note.tick >= bar.start &&
+                note.tick < bar.start + bar.ticks &&
+                ["closedHat", "ride", "openHat", "crash"].includes(note.voice ?? ""),
+            )
+            .map((note) => (note.tick - bar.start) / (PPQ / 2)),
+        );
+        const where = `${chart.file} seed ${options.seed} bar ${bar.index}`;
+        if (tierOf(bar.seats.drums) === "low") {
+          quiet++;
+          for (const pulse of [0, 3, 6, 9]) {
+            assert.ok(cymbal.has(pulse), `${where}: no cymbal on pulse ${pulse / 3 + 1}`);
+            assert.ok(!cymbal.has(pulse + 1), `${where}: the triplet's middle note, quiet`);
+          }
+        } else {
+          working++;
+          for (let eighth = 0; eighth < 12; eighth++) {
+            assert.ok(cymbal.has(eighth), `${where}: no cymbal on eighth ${eighth + 1}`);
+          }
+        }
       }
     }
+    if (twelve.length > 0)
+      assert.ok(working > 100 && quiet > 10, `only ${working} bars working and ${quiet} quiet`);
   },
 );
+
+// ── tempo ───────────────────────────────────────────────────────────────────
+
+test("the tempo counts the pulse: at 60 a bar of 4/4 lasts four seconds and so does a bar of 12/8 (four dotted quarters), a bar of 6/8 two, a bar of 6/4 six, and a bar of 7/8 three and a half (its quarter is counted); the MIDI file says the same speed in quarter notes", () => {
+  const style = STYLES[0]!;
+  for (const [meter, barSeconds] of [
+    ["4/4", 4],
+    ["3/4", 3],
+    ["12/8", 4],
+    ["6/8", 2],
+    ["9/8", 3],
+    ["6/4", 6],
+    ["7/8", 3.5],
+    ["2/2", 4],
+  ] as const) {
+    const text = `key: C\ntempo: 60\nmeter: ${meter}\n| C | F | G | C |\n`;
+    const options = { mode: "song", countIn: false } as const;
+    const roadmap = plan(parse(text).chart, style, options);
+    // Four bars, and the bar the last chord rings in.
+    const bars = roadmap.bars.length;
+    assert.equal(roadmap.tempo, 60, `${meter}: the figure is the chart's`);
+    assert.ok(
+      Math.abs(seconds(roadmap) - bars * barSeconds) < 1e-9,
+      `${meter}: ${bars} bars last ${seconds(roadmap)} s, not ${bars * barSeconds}`,
+    );
+    const take = render(text, style, { ...options, seed: 1 });
+    const file = readSmf(toMidi(take.plan, take.events, style));
+    const pulse = isCompound(parse(text).chart.meter) ? 1.5 : 1;
+    assert.equal(file.tracks[0]!.tempos[0], 60 * pulse, `${meter}: the file's quarter notes`);
+  }
+});
 
 test("an arrival is one crash with a kick under it, and the cymbal that keeps time gives way to it (in a bar the drummer plays)", () => {
   for (const { chart, options, take } of takes()) {
@@ -751,5 +878,5 @@ function musicSeconds(roadmap: Plan): number {
   const ticks = roadmap.bars
     .filter((bar) => bar.kind === "music")
     .reduce((sum, bar) => sum + bar.ticks, 0);
-  return (ticks / PPQ) * (60 / roadmap.tempo);
+  return (ticks / PPQ) * (60 / roadmap.quarters);
 }

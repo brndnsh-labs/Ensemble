@@ -8,7 +8,7 @@ import type { Key } from "../theory/pitch.ts";
 
 export interface PlanOptions {
   readonly mode: "song" | "jam";
-  /** Overrides the chart's tempo, which overrides the style's default. */
+  /** Overrides the chart's tempo, which overrides the style's default. Pulses a minute, as `Plan.tempo`. */
   readonly tempo?: number;
   /**
    * Jam mode: how many times through the form. Wins over `minutes`. A vamp
@@ -153,7 +153,17 @@ export interface PlanBar {
 
 export interface Plan {
   readonly mode: "song" | "jam";
+  /**
+   * The tempo as a musician reads it: pulses a minute, in the pulse of the
+   * chart's meter (a dotted quarter in 6/8 and 12/8, a quarter in 4/4 and 6/4).
+   */
   readonly tempo: number;
+  /**
+   * Quarter notes a minute: what a tick is timed by, since a tick is a 480th
+   * of a quarter note in every meter. The tempo itself wherever the pulse is a
+   * quarter; half as much again where it is a dotted quarter.
+   */
+  readonly quarters: number;
   /** Every bar that is played, in order. */
   readonly bars: readonly PlanBar[];
   /**
@@ -174,5 +184,5 @@ export function planBar(plan: Plan, index: number): PlanBar | undefined {
 }
 
 export function seconds(plan: Plan): number {
-  return (plan.ticks / 480) * (60 / plan.tempo);
+  return (plan.ticks / 480) * (60 / plan.quarters);
 }

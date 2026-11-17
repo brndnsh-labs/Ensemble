@@ -32,6 +32,25 @@ function chosenStyle(): StylePack {
   return styleById(styleSelect.value) ?? STYLES[0]!;
 }
 
+/**
+ * A style without what it has written for meters other than 4/4: the band as it plays a
+ * bar nobody wrote, fitted from its 4/4 parts. Asked for with `fit=1`, to hear a written
+ * meter beside what it replaced.
+ */
+function fitted(style: StylePack): StylePack {
+  const plain = <T extends { meters?: unknown }>(seat: T): T => {
+    const { meters: _, ...rest } = seat;
+    return rest as T;
+  };
+  return {
+    ...style,
+    drums: plain(style.drums),
+    bass: plain(style.bass),
+    chords: plain(style.chords),
+    solo: plain(style.solo),
+  };
+}
+
 /** A chart's style is in its file name: start there. */
 function followChart(): void {
   const style = STYLES.find((s) => chartSelect.value.startsWith(s.id));
@@ -50,8 +69,9 @@ interface Performance {
 }
 
 async function perform(): Promise<Performance> {
-  const style = chosenStyle();
-  const text = await (await fetch(`/library/${chartSelect.value}`)).text();
+  const style = params.has("fit") ? fitted(chosenStyle()) : chosenStyle();
+  // `chartAt` names a chart that is not in the library, by its path on this server.
+  const text = await (await fetch(params.get("chartAt") ?? `/library/${chartSelect.value}`)).text();
   const soloInstrument = $<HTMLSelectElement>("solo").value;
   const take = render(text, style, {
     mode: "jam",

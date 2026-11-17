@@ -57,6 +57,43 @@ const walking: Line = {
   velocity: { arrival: 98, strong: 86, weak: 90, restrike: 70, approach: 90 },
 };
 
+// ── in six ──────────────────────────────────────────────────────────────────
+// A bar of 6/4, six beats in two threes. A waltz bass does not walk every
+// beat: it plays the two strong beats, 1 and 4, and a pickup or two, and only
+// a hot band has it nearly walking (AU-93: about three notes a bar up to the
+// hot level, about five in it; a note on every beat all night is running).
+// The pitches are walked as in four: the chord's bass note where it lands,
+// chord tones on the strong beats and on any note held a half note, an
+// approach on the last beat where the figure has a note there.
+
+/** The lilt of a waltz in each half: long, short. Beats 1, 3, 4 and 6, or three of them. */
+const lilt: Line = {
+  ...walking,
+  figures: {
+    hold: "section",
+    options: [
+      { name: "long-short twice", weight: 3, grid: "x--- ---- x--- x--- ---- x---" },
+      { name: "long-short, long", weight: 2, grid: "x--- ---- x--- x--- ---- ----" },
+      { name: "long, long-short", weight: 2, grid: "x--- ---- ---- x--- ---- x---" },
+    ],
+  },
+  // Leaned on where a chord lands and on the strong beats; the pickups lighter.
+  velocity: { arrival: 98, strong: 92, weak: 86, restrike: 70, approach: 88 },
+};
+
+/** Hot: the first beat held, then walking; or walking through the first three; or all six. */
+const nearlyWalking: Line = {
+  ...lilt,
+  figures: {
+    hold: "section",
+    options: [
+      { name: "one, then three to six", weight: 3, grid: "x--- ---- x--- x--- x--- x---" },
+      { name: "one to four, and six", weight: 2, grid: "x--- x--- x--- x--- ---- x---" },
+      { name: "all six", weight: 1, grid: "x--- x--- x--- x--- x--- x---" },
+    ],
+  },
+};
+
 export const jazzBass: BassStyle = {
   // E1 up to A2 for a root, home on D2: each root goes nearest the line, pulled 35% of the
   // way back home (ST-jazz-18). The notes let a root sit as high as E3; a line that started
@@ -86,6 +123,23 @@ export const jazzBass: BassStyle = {
     },
     mid: walking,
     high: walking,
+  },
+
+  meters: {
+    "6/4": {
+      // Quiet, and under the head: in two, a dotted half on each strong beat, the bass note
+      // and its fifth. Beat 6 becomes an approach when the lead-in's coin says so.
+      low: {
+        tones: [{ when: { slash: true }, bars: [["R", "R"]] }, { bars: [["R", "5"]] }],
+        figures: { hold: "song", options: [{ weight: 1, grid: "x--- ---- ---- x--- ---- ----" }] },
+        otherMeters: "downbeat",
+        ceiling: 45,
+        length: { note: 0.92, long: 0.92, short: 0.4 },
+        velocity: { arrival: 96, strong: 88, weak: 86, restrike: 70, approach: 84 },
+      },
+      mid: lilt,
+      high: nearlyWalking,
+    },
   },
 
   leadIn: {

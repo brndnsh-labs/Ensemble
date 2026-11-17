@@ -59,6 +59,21 @@ export const LIBRARY: readonly LibraryChart[] = readdirSync(libraryDir)
     return { file, text, meter: `${meter.beats}/${meter.unit}` };
   });
 
+/**
+ * The meters a style has written a band for besides 4/4 (DECISIONS.md, "the band in six and
+ * twelve"). A style's own rules, and the rules that hold wherever a band plays from its
+ * own parts, are held in these as they are in 4/4. In any other meter a style plays a bar it
+ * makes up from its 4/4 parts, and only the rules that hold of any bar are asked of it.
+ */
+export const WRITTEN: Readonly<Record<string, readonly string[]>> = {
+  jazz: ["6/4"],
+  blues: ["12/8"],
+};
+
+/** A take whose chart is in 4/4 or in a meter its style has written. */
+export const written = (jam: Pick<JamSpec, "style" | "chart">): boolean =>
+  jam.chart.meter === "4/4" || (WRITTEN[jam.style.id] ?? []).includes(jam.chart.meter);
+
 /** What a take is made from, before it is rendered. */
 export interface JamSpec {
   readonly style: StylePack;

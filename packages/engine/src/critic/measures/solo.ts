@@ -12,6 +12,7 @@ import { score } from "../../critic/choose.ts";
 import { STEP } from "../../perform/grid.ts";
 import type { Arrival } from "../../perform/harmony.ts";
 import { contextOf } from "../../perform/harmony.ts";
+import { onPulse } from "../../perform/meter.ts";
 import type { NoteEvent } from "../../perform/notes.ts";
 import type { Heard, SoloCandidate, Sounding } from "../../players/solo/critique.ts";
 import {
@@ -241,7 +242,9 @@ export const soloMeasures: readonly Measure[] = [
     "share",
     "Most notes on a beat are chord tones (a note picked blind from this pool would be one about half the time).",
     (reading) => {
-      const on = reading.notes.filter((note) => (note.tick - note.bar.start) % PPQ === 0);
+      const on = reading.notes.filter((note) =>
+        onPulse(note.bar.meter, note.tick - note.bar.start),
+      );
       const tones = on.filter((note) => isTone(reading.world.arrivalAt(note.tick), note.pitch));
       return share(tones.length, on.length);
     },
@@ -461,7 +464,9 @@ export const soloMeasures: readonly Measure[] = [
       const deserved = phrases.filter((phrase) => {
         const notes = body(phrase);
         const top = notes.reduce((high, note) => (note.pitch > high.pitch ? note : high));
-        return (top.tick - top.bar.start) % PPQ === 0 || top.ends - top.tick >= PPQ * 0.75;
+        return (
+          onPulse(top.bar.meter, top.tick - top.bar.start) || top.ends - top.tick >= PPQ * 0.75
+        );
       });
       return share(deserved.length, phrases.length);
     },

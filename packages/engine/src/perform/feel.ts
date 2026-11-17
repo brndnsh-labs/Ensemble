@@ -51,7 +51,7 @@ export function applyFeel(
   style: StylePack,
   rng: Rng,
 ): NoteEvent[] {
-  const ticksPerMs = (plan.tempo * PPQ) / 60_000;
+  const ticksPerMs = (plan.quarters * PPQ) / 60_000;
   const human = Math.min(100, Math.max(0, style.feel.humanize)) / 100;
 
   return notes.map((note) => {

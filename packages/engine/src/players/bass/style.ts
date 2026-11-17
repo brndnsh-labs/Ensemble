@@ -4,6 +4,7 @@
 // itself (a riff), or tones that are walked. The engine fits the tones to each
 // chord, places the roots, and leads into the changes.
 
+import type { MeterName } from "../../perform/meter.ts";
 import type { Hold, PerTier } from "../../style/types.ts";
 import type { ChordFamily } from "../../theory/chord.ts";
 
@@ -100,7 +101,8 @@ export interface ToneSequence extends LineShape {
 }
 
 /**
- * One bar of 4/4 rhythm, a character per sixteenth (spaces ignored):
+ * One bar of rhythm, a character per sixteenth (spaces ignored): sixteen in
+ * 4/4, and in a line written for another meter as many as its bar has.
  *
  * - `x` the next tone of the sequence
  * - `o` the same tone struck again (the short note of a long-short)
@@ -486,6 +488,15 @@ export interface BassStyle {
   readonly register: RegisterPolicy;
   /** The part for each tier. The change of part at a tier line is the audible change of section (X-A-07). */
   readonly lines: PerTier<BassLine>;
+  /**
+   * The part for each tier written for a bar of another meter, by the meter's
+   * name as a chart writes it (`"12/8"`, `"6/4"`): its figures and its turns
+   * are as long as that meter's bar. A bar of a meter written here is played
+   * from it; any other plays the 4/4 lines plainly (`BassLine.otherMeters`).
+   * Where roots sit, how changes are led into and how a phrase is chosen are
+   * the bassist's in every meter.
+   */
+  readonly meters?: Readonly<Partial<Record<MeterName, PerTier<BassLine>>>>;
   readonly leadIn: LeadInPolicy;
   /** Walks into a change. Without them the bass leads in with one note at most. */
   readonly walks?: WalkPolicy;
