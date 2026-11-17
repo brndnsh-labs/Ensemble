@@ -1879,3 +1879,13 @@ An Opus build from `prompts/meter-acoustic-6-8.md`, merged over rock in twelve. 
 ## rock in twelve and acoustic in six, heard (stage 6)
 
 Brandon, 2026-11-16, after `out/meter-study-3-rock/` and `out/meter-study-3-acoustic/`: "great work, you can take those down". Both stand, rock's tempo range in twelve with them.
+
+## gate 6 has begun; every style is to be written for compound time; odd meters later (stage 6)
+
+Brandon, 2026-11-16: "i'd say the week has already started - i've been playing along with the app while you've been working, and it seriously sounds incredible". **Gate 6 ("play over it for a week") runs from today.** What he trips on in the week is collected, not guessed at.
+
+"we should probably handle the other styles in compound time as well, and in the future, we should support other odd time signatures fully across genres (even if it's not idiomatic). the band should be smart enough to figure it out".
+
+- **Now**: funk, disco, reggae and neo-soul are each written for 6/8 and 12/8 (`prompts/meter-compound-style.md`, one Opus build a style, two at a time). A style's second compound meter may be spread from its first in its own data where that is how the music goes (the design's word: half a bar of twelve is not a bar of six for anything but the drums' basic beat). After them, the four styles that have one compound meter get the other (jazz in 6/8 and 12/8, the blues and rock in 6/8, acoustic in 12/8).
+- **Later, a design of its own (Fable)**: every style in every meter a chart can write (5/4, 7/8, 9/8, 7/4 and the rest), not by a part written for each but by the band working it out from what the style has written for a quarter pulse and for a dotted pulse and how the bar groups. The fit is the start of that and is not yet good enough to be the answer. Not started.
+- **The push suite's time is its slowest style's**: the styles run side by side, and rock (17 s alone, with its bars of twelve held at three levels) sets it. A style's own tests should stay under about 14 s alone.

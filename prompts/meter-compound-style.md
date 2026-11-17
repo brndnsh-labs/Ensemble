@@ -1,0 +1,50 @@
+# Build: one style in 6/8 and 12/8 (stage 6, during gate 6)
+
+**The style this brief is for is named in the message that sent you here** (one of funk, disco, reggae, neo-soul), with the name of your clone and branch.
+
+You are working on Ensemble, a backing band in a browser: a chord chart goes in, and a generated band (drums, bass, a chord instrument, a soloist) plays it in one of eight styles. Each style's parts are data, written for 4/4. A design lets a seat write its bar again for another meter (`meters: { "12/8": ... }` on the drums, the bass, the chords and the soloist). Jazz is written for 6/4, the blues and rock for 12/8, acoustic for 6/8; the owner has heard all four and passed them. Your style in 6/8 and 12/8 still makes a bar up from its 4/4 parts by a general rule ("the fit"). This brief writes your style for both.
+
+## The owner's words
+
+Brandon is a bassist and guitarist. He plays along with the app daily.
+
+- 2026-11-16: "we should probably handle the other styles in compound time as well, and in the future, we should support other odd time signatures fully across genres (even if it's not idiomatic). the band should be smart enough to figure it out".
+- Of the fit: "we definitely aren't capturing a 6/8 feel very well".
+- Of the previous version of this app: "drums feel too busy in 6/8, especially obvious on rock; the genre-specific drum energy pushes too hard depending on genre."
+- The tempo figure counts the felt pulse: the dotted quarter in 6/8 and 12/8.
+
+A style in a meter it is not known for is still asked for. Where your style has a tradition in compound time (a neo-soul ballad in six, a reggae shuffle), write that. Where it has none, write what a band of that style's players would play if handed the chart: the style's own sounds, roles and touch (who keeps time, where the backbeat is, how the bass sits with the kick, what the chord instrument's hand does), on a pulse of three eighths. Say in `DECISIONS.md` which it was and what you took it from.
+
+## Read first
+
+`CLAUDE.md`; `docs/BRIEF.md`; `docs/TESTING.md` (binding); `docs/CHART_FORMAT.md` (meters, tempo); in `DECISIONS.md`: "the band in six and twelve" (the design; its last part is a worked example), "rock in twelve" and "acoustic in 6/8" with their "checked and merged" sections (two builds exactly like yours, and what was found in them), "six and twelve heard; a style's tempo range in a meter", "gate 6 has begun", and the section on your style itself; `docs/MUSIC_NOTES.md` and in `docs/music-notes/` everything that names your style, a meter, a pulse or compound time. The notes are what was heard and measured in the previous version, not a design to copy; the old code is off limits. Then your style's folder under `packages/styles/src/` whole, and the written examples: `rock/` and `blues/` (12/8), `acoustic/` (6/8), with the properties that hold them in `test/` (`WRITTEN` and `heldTakes` in `test/takes.ts`).
+
+## What to build
+
+- **12/8**: four slow pulses of three eighths. **6/8**: two. Nothing swung; nothing between the eighths unless your style's own feel lives there and you can say why (then a property says where).
+- All four seats in each meter, at the three levels (quiet, working, hot): the drums' time, backbeat, variations and fills; the bass's line; the chord instrument's figures, with what it does under a soloist; the soloist's rhythms. Quiet is thinner than loud; the kick and snare between them never take more than half the eighths (an every-style property already holds that).
+- **The two meters are two bars, not one cut in half**: a bar of six has one strong pulse and one answering it; a bar of twelve has room for a line that turns over four. Where one really is the other spread out (the drums' basic beat often is), derive it in your style's own file and say so; where it is not, write it.
+- **Two charts**, one in each meter, in `library/`, named `<style id>-<what it is>.chart`, titled without a key, with changes and a form worth practising over (not a vamp that differs from an existing chart only by its meter). Changes and form only: no named tune.
+- **Tempo**: `tempoRange(style, meter)` gives two thirds of your style's 4/4 range in a dotted-pulse meter unless the style says otherwise in `tempo.meters`. Say what your style's range should be in each meter and write it where the default is wrong.
+
+## What holds it
+
+- **A property comes before the data that satisfies it.** Restate your style's own properties that are held only in 4/4 so they mean something in pulses, add your style to `WRITTEN` in `test/takes.ts`, and add the few that say this feel is being played and not the fit; run them against the fit first and report which fail.
+- **Styles are data.** If the style cannot say what it plays without an engine change, the engine is missing a concept: add the smallest one, say so in `DECISIONS.md`, and nothing in 4/4, 3/4 or 6/4, and nothing another style has written for 6/8 or 12/8, may change by it. A change to the fit changes what every unwritten style plays: make one only for a failure you can show, as narrow as the failure.
+- **Nothing that exists changes**: every golden take byte for byte (`test/goldens/`); every scorecard on the charts that exist now (rewrite each to a scratch file and compare, before you add a chart and again after your last engine change). Then accept your style's scorecard with the new charts and give the headline numbers for each new chart alone.
+- **Time.** Budgets, none raised: `pnpm check` 20 s (now 17.8), `pnpm test:full` 60 (46.9), `pnpm score` 120 (about 61), `pnpm smoke` 60. The styles' tests run side by side, so the suite's time is its slowest style's (rock, about 17 s alone). **Your style's own tests, alone (`ENSEMBLE_STYLES=<id> node --test --test-isolation=none test/*.test.ts`), must stay under 14 s on a push**: report that figure before and after. Run timed things alone; other builders are using the machine, so time the starting commit beside yours when the load is up.
+- Run your style on every chart, and every style on your two new charts as if each were its own (every kind of take, six seeds, the soloist's kinds), as the rock and acoustic builders did. Report any failure exactly (property, style, chart, seed, message). A failure in another style on your charts is a finding: fix it if it is small and clear and changes nothing that exists; otherwise report it. A new chart shifts which borrowed chart each style is handed, so an older fault may surface in a style you did not touch: say so, and do not paper over it.
+
+## For his ear
+
+You cannot hear, and neither can the engineer who checks this. Make the page he will judge from, `out/meter-study-4-<style id>/` (not committed), in the manner of `out/meter-study-3-rock/` (copied into your clone, with the script that made it in its `src/`; the audition page takes `fit=1` and `energy=`): for each of your two charts, the same take before (the fit) and after (written), the whole band, the drums and bass alone, and with the soloist, at the quiet and the working level, each bar's grid printed. Say in your report what the grids and the properties show; say nothing about how it sounds.
+
+## Where you are
+
+A clone of the repo under `/home/brandon/code/ensemble2/.work/`, on a branch of the same name (both given in the message that sent you here), dependencies installed. Work only inside it. Do not touch `/home/brandon/code/ensemble2` outside your clone, do not look at `/home/brandon/code/ensemble` (the old version: off limits), do not push, fetch or deploy, make no network requests, add no dependency. Other builders are at work in other clones on other styles: stay out of their styles' folders, charts and scorecards; you will each add a line to `WRITTEN` in `test/takes.ts` and a section to `DECISIONS.md`, which the engineer will merge. Commit on the branch in a few sensible commits (properties; the parts, a seat at a time; the charts; the scorecard and decisions), each message ending with a `Co-Authored-By` line naming your own model and the `Claude-Session` line the last commit in `git log` ends with.
+
+`pnpm render:audio` and the study script render through headless Chrome. Never `pkill -f`. Never `pgrep -f` in a wait loop. Never wrap node in `timeout`. Stop a server by its port (`fuser -k <port>/tcp`). In zsh do not name a loop variable `path`. Foreground `sleep` is blocked. Leave no shell or server running when you finish.
+
+## Decisions and the report
+
+Where this brief leaves something open, decide, and write each decision in a new section at the end of `DECISIONS.md` ("<style> in six and twelve") with a line of why. Do not invent a design where the brief and the notes run out: build the rest and say what you left. Your final message is read by the engineer who will check and merge the branch and put the page in front of the owner. It should say: for each meter, what each seat plays at each level, from the grids; where the second meter was derived from the first and where it was written; what tradition or reasoning each feel was taken from; the properties restated and added, what each holds, and which failed against the fit; any engine change and why; the tempo ranges; the two charts (form, key, tempo, bar by bar); that the goldens and existing scorecards are unchanged, and the new charts' numbers; the every-style results; your style's own test time before and after and the timings against the budgets; the commits; what you could not verify; anything you saw that is wrong and did not fix.
