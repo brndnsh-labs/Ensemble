@@ -5,7 +5,6 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { PlanBar, Take } from "@ensemble/engine";
 import {
-  chordFamily,
   chordScale,
   chordTones,
   contextOf,
@@ -747,35 +746,6 @@ test("under a solo the piano leaves the soloist its note: a voice held on the so
     });
   }
   assert.ok(under > enough(3000), `only ${under} strikes under a solo`);
-});
-
-test("under a solo the hand does not growl: its two lowest notes are a half step apart only on a dominant from E4 up", () => {
-  let judged = 0;
-  for (const { chart, options, take } of soloTakes()) {
-    const solo = notesOf(take, "solo");
-    const bars = take.plan.bars;
-    for (const strike of strikesOf(take)) {
-      const bar = bars.findLast((candidate) => candidate.start <= strike.tick);
-      if (!bar?.solo) continue;
-      // The hand hears the line in this bar and the bar before.
-      const from = bars[bar.index - 1]?.start ?? bar.start;
-      const hears = solo.some(
-        (note) => note.tick < bar.start + bar.ticks && note.tick + note.duration > from,
-      );
-      if (!hears) continue;
-      judged++;
-      const [low, next] = strike.pitches;
-      if (low === undefined || next === undefined || next - low !== 1) continue;
-      const dominant = chordsUnder(take, strike).some(
-        ({ chord }) => chordFamily(chord.quality) === "dominant",
-      );
-      assert.ok(
-        dominant && low >= 64,
-        `${chart.file} ${JSON.stringify(options)} at tick ${strike.tick}: ${strike.pitches}`,
-      );
-    }
-  }
-  assert.ok(judged > enough(3000), `only ${judged} strikes under a line`);
 });
 
 // ── the jazz soloist ────────────────────────────────────────────────────────

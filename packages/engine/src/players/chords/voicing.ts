@@ -322,16 +322,24 @@ export function voiceStrikes(
         const recipe = recipeFor(kind, chord, scale);
         const stacks =
           kind.position === "spread" ? [recipe.voices, ...(recipe.also ?? [])] : [recipe.voices];
-        way = {
-          family: chordFamily(chord.quality),
-          voicings: stacks.flatMap((voices) =>
-            idiom.candidates(
-              fitRecipe({ voices }, chord, scale),
-              root,
-              chords.register,
-              kind.position,
-            ),
+        const family = chordFamily(chord.quality);
+        const every = stacks.flatMap((voices) =>
+          idiom.candidates(
+            fitRecipe({ voices }, chord, scale),
+            root,
+            chords.register,
+            kind.position,
           ),
+        );
+        // A half step on the bottom of the hand is a growl, and it is never taken while
+        // anything else will do (Q-03, KF-B-29), under the line or not (CH-66, KF-B-37): the
+        // minor-second cost cannot tell it from the half step a four-note hand covers (the 9th
+        // under the 3rd of C E F A, Dm9 with its 7th on the bottom), and led smoothly from
+        // the chord before, the hand took E F A C.
+        const clean = every.filter((voicing) => !growls(voicing, family));
+        way = {
+          family,
+          voicings: clean.length > 0 ? clean : every,
           led: new Map(),
           root,
           needed: new Set(identity(chord, scale).map((tone) => tone.interval)),
@@ -355,13 +363,9 @@ export function voiceStrikes(
       idiom.holds && way === held && previous ? previous : away ? undefined : way.led.get(previous);
     held = way;
     if (next === undefined) {
-      // Under the line the hand is pressed down, toward where a half step on the bottom is a
-      // growl: there it is never taken while anything else will do (CH-66, KF-B-37).
-      const clean = line ? way.voicings.filter((voicing) => !growls(voicing, way.family)) : [];
-      const offered = clean.length > 0 ? clean : way.voicings;
       const { family } = way;
       const from: Voicing | null = previous;
-      const candidates: VoicingCandidate[] = offered.map((voicing) => ({
+      const candidates: VoicingCandidate[] = way.voicings.map((voicing) => ({
         voicing: idiom.placed?.(voicing, from) ?? voicing,
         previous,
         register: chords.register,
@@ -386,6 +390,7 @@ export function voiceStrikes(
 /** One chord in one kind: every way to play it, and where each hand position is led to. */
 interface Way {
   readonly family: ChordFamily;
+  /** Every way to play it, leaving out the ones that growl wherever there is another. */
   readonly voicings: readonly Voicing[];
   /** From the voicing in hand (null: the first strike) to the one chosen; null when there is none. */
   readonly led: Map<Voicing | null, Voicing | null>;
