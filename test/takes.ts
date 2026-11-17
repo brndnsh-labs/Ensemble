@@ -72,6 +72,7 @@ export const WRITTEN: Readonly<Record<string, readonly string[]>> = {
   acoustic: ["6/8"],
   neosoul: ["12/8", "6/8"],
   funk: ["6/8", "12/8"],
+  reggae: ["6/8", "12/8"],
 };
 
 /** A take whose chart is in 4/4 or in a meter its style has written. */

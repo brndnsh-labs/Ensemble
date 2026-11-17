@@ -13,13 +13,24 @@ import {
   isCompound,
   PPQ,
   pitchClass,
+  pulseStarts,
   render,
   scaleHas,
   strongPulses,
   tierOf,
 } from "@ensemble/engine";
 import { bluesWritten } from "./reading.ts";
-import { enough, heldTakes, LIBRARY, notesOf, only, STYLES, takes, written } from "./takes.ts";
+import {
+  enough,
+  heldTakes,
+  LIBRARY,
+  notesOf,
+  only,
+  ownCharts,
+  STYLES,
+  takes,
+  written,
+} from "./takes.ts";
 
 // ── the bass line ───────────────────────────────────────────────────────────
 
@@ -762,5 +773,58 @@ test(
     }
     if (LIBRARY.some((chart) => chart.meter === "6/8" || chart.meter === "12/8"))
       assert.ok(working > 100 && quiet > 50, `only ${working} bars working and ${quiet} quiet`);
+  },
+);
+
+// ── a reggae riff in six and twelve ─────────────────────────────────────────
+
+test(
+  "reggae: in six and twelve the bass plays the section's riff, with holes in it, and not the pulses: every note starts on an eighth; from the working level up every bar of one chord has a note between the pulses; and in twelve no bar strikes all four pulses, but where the drummer's kick takes the One and the bass goes with it (ST-reggae-12, ST-reggae-13)",
+  only("reggae"),
+  () => {
+    const reggae = STYLES.find((style) => style.id === "reggae")!;
+    const played = [
+      ...takes((jam) => jam.style.id === "reggae" && written(jam)),
+      ...heldTakes(reggae, "6/8", false, true),
+      ...heldTakes(reggae, "12/8", false, true),
+    ];
+    let working = 0;
+    let twelve = 0;
+    for (const { chart, options, take } of played) {
+      if (chart.meter !== "6/8" && chart.meter !== "12/8") continue;
+      const bass = notesOf(take, "bass");
+      const kicks = new Set(
+        notesOf(take, "drums")
+          .filter((note) => note.voice === "kick")
+          .map((note) => note.tick),
+      );
+      for (const bar of take.plan.bars) {
+        if (bar.kind !== "music" || bar.ending || bar.seats.bass === null) continue;
+        if (!isCompound(bar.meter)) continue;
+        const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
+        const ticks = bass
+          .filter((note) => note.tick >= bar.start && note.tick < bar.start + bar.ticks)
+          .map((note) => note.tick - bar.start);
+        for (const tick of ticks) assert.equal(tick % (PPQ / 2), 0, `${where}: a note at ${tick}`);
+        const pulses = pulseStarts(bar.meter);
+        const oneChord = bar.spans.length === 1 && bar.spans[0]!.chord !== null;
+        if (oneChord && tierOf(bar.seats.bass) !== "low") {
+          working++;
+          assert.ok(
+            ticks.some((tick) => !pulses.includes(tick)),
+            `${where}: only the pulses (${ticks})`,
+          );
+        }
+        if (pulses.length === 4 && !kicks.has(bar.start)) {
+          twelve++;
+          assert.ok(
+            pulses.some((tick) => !ticks.includes(tick)),
+            `${where}: every pulse struck (${ticks})`,
+          );
+        }
+      }
+    }
+    if (ownCharts(reggae).some((chart) => chart.meter === "6/8" || chart.meter === "12/8"))
+      assert.ok(working > 200 && twelve > 200, `only ${working} working bars, ${twelve} of twelve`);
   },
 );
