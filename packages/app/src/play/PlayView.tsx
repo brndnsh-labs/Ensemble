@@ -104,7 +104,7 @@ export function PlayView(props: Props) {
   const chosen = choices.soloInstrument;
   const soloInstrument =
     chosen !== undefined && chosen in SOLO_INSTRUMENTS ? chosen : style.solo.instrument;
-  // The pencil: down where the address says so, for a chart of the player's own. Done takes it up
+  // The pencil: down where the address says so, for a chart of the player's own. Stop editing takes it up
   // in the press, before the address has caught up with the browser's history.
   const [asked, setAsked] = useState(props.mode);
   const [leaving, setLeaving] = useState(false);
@@ -113,7 +113,7 @@ export function PlayView(props: Props) {
     setLeaving(false);
   }
   const editing = props.mode === "edit" && entry.own && !leaving;
-  /** The mode was entered from this screen with Edit: Done goes back to that entry of the history, rather than piling up another. */
+  /** The mode was entered from this screen with Edit: Stop editing goes back to that entry of the history, rather than piling up another. */
   const pushed = useRef(false);
   const editor = useEditor({
     entry,
@@ -351,13 +351,14 @@ export function PlayView(props: Props) {
         place={placeOf(entry.chart)}
         side={
           entry.own ? (
-            // One button, in one place: Edit, and Done while the pencil is down.
+            // One button, in one place: Edit, and Stop editing while the pencil is down. Not Done:
+            // that is the dock's word on a phone's keyboard, for closing the bar being typed.
             <button
               type="button"
               className={`edit-link edit-toggle${editing ? " done" : ""}`}
               onClick={editing ? leave : enter}
             >
-              {editing ? "Done" : "Edit"}
+              {editing ? "Stop editing" : "Edit"}
             </button>
           ) : (
             // A built-in stays as it ships; the player changes a copy of their own.

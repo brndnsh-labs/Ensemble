@@ -2036,9 +2036,10 @@ button:active:not(:disabled),
 
 /* ── The chart with a pencil ─────────────────────────────────────────────── */
 
-/* Edit is a word at the end of the row; with the pencil down it reads Done, filled, the one
-   thing in the row that is switched on. The fill is a fingertip's width of ink inside a
-   fingertip-tall button, so the row does not change height. */
+/* Edit is a word at the end of the row; with the pencil down it reads Stop editing, filled,
+   the one thing in the row that is switched on (Done is the word of the dock on a phone's
+   keyboard). The fill is a fingertip's width of ink inside a fingertip-tall button, so the
+   row does not change height. */
 .edit-toggle.done {
   padding: 0 10px;
   background: linear-gradient(var(--ink), var(--ink)) center / 100% 34px no-repeat;

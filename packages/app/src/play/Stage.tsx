@@ -57,7 +57,7 @@ interface Props {
   readonly place: Place;
   readonly reading: Reading;
   readonly read: (reading: Reading) => void;
-  /** At the end of the top row, before More: Edit (Done with the pencil down), or the way to a take's chart. */
+  /** At the end of the top row, before More: Edit (Stop editing with the pencil down), or the way to a take's chart. */
   readonly side?: ReactNode;
   /** Under the name: what is played, in a line. */
   readonly sentence: ReactNode;
