@@ -1,0 +1,13 @@
+title: All Blues
+key: G
+tempo: 138
+meter: 6/4
+style: jazz
+
+// A twelve-bar blues in six: six beats to the bar, a waltz twice. Four bars
+// of the one, two of the four, two of the one, then the five with its
+// half-step neighbour above it, and home.
+[A]
+| G7   | %          | %  | % |
+| C7   | %          | G7 | % |
+| D7#9 | Eb7#9 D7#9 | G7 | % |
