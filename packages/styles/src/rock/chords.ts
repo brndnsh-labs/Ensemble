@@ -64,7 +64,76 @@ const rhythm: RhythmBook = {
   candidates: 1,
 };
 
+// ── in twelve ───────────────────────────────────────────────────────────────
+// The rock ballad. A bar of 12/8 is four slow pulses of three eighths: a figure
+// is twenty-four sixteenths, written in sixes, and only a pulse's three eighths
+// are struck. From the working level up the right hand plays the ballad's
+// triplets, the chord on every eighth, the pulse leaned on; quiet, a pad, or a
+// chord a pulse. Under a soloist the triplets are a chord a pulse: the hand plays
+// no busier than one strike to a pulse, as its quarter notes are in four.
+
+/** A chord a pulse: the triplets under a soloist. */
+const PULSES = "x..... x..... x..... x.....";
+
+const rhythmInTwelve: RhythmBook = {
+  tiers: {
+    // Quiet: the held chord where it arrives, struck again softly over a barline, or a chord
+    // on each pulse, held to the next.
+    low: {
+      draw: "quiet",
+      articulation: { x: { level: 80, steps: 24 } },
+      figures: [
+        { name: "held", weight: 1, grid: "x----- ------ ------ ------" },
+        { name: "a chord a pulse", weight: 1, grid: "x----- x----- x----- x-----" },
+      ],
+      answers: [],
+      busy: { from: 1, to: 4 },
+      arrival: { level: 80, steps: 24 },
+      restrike: 64,
+    },
+    // The working level: the triplets, each eighth let go before the next, 88 on the pulse
+    // and 70 between. A groove.
+    mid: {
+      draw: "working",
+      articulation: { x: { level: 88, steps: 1.7 }, o: { level: 70, steps: 1.7 } },
+      figures: [
+        {
+          name: "triplets",
+          weight: 1,
+          grid: "x.o.o. x.o.o. x.o.o. x.o.o.",
+          groove: true,
+          soloing: PULSES,
+        },
+      ],
+      answers: [],
+      busy: { from: 12, to: 12 },
+      arrival: { level: 88, steps: 1.7 },
+    },
+    // Hot: the same triplets, harder, at the pump's 92 and 76.
+    high: {
+      draw: "hot",
+      articulation: { x: { level: 92, steps: 1.7 }, o: { level: 76, steps: 1.7 } },
+      figures: [
+        {
+          name: "triplets",
+          weight: 1,
+          grid: "x.o.o. x.o.o. x.o.o. x.o.o.",
+          groove: true,
+          soloing: PULSES,
+        },
+      ],
+      answers: [],
+      busy: { from: 12, to: 12 },
+      arrival: { level: 92, steps: 1.7 },
+    },
+  },
+  hold: rhythm.hold,
+  forms: rhythm.forms,
+  candidates: rhythm.candidates,
+};
+
 export const rockChords: ChordStyle = {
+  meters: { "12/8": rhythmInTwelve },
   idiom: "keys",
   kinds: { close },
   voicing: { low: "close", mid: "close", high: "close" },
