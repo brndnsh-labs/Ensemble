@@ -50,7 +50,66 @@ const driving = {
   velocity: DRIVING,
 } as const;
 
+// ── in twelve ───────────────────────────────────────────────────────────────
+// The rock ballad. A bar of 12/8 is four slow pulses of three eighths: a figure
+// is twenty-four sixteenths, written in sixes. The eighths that drive in four
+// would be all twelve here; the line is a root on each pulse instead, held
+// nearly full, and where it wants one, the pickup: the root struck again on the
+// pulse's last eighth, into the next. A section chooses where its pickups go
+// and keeps them. Quiet it is locked to the kick, as in four (ST-rock-12).
+
+/** The hot line in twelve: every pulse and its pickup, the octave on the pickups the section chose once. */
+const TWELVE_POPS: Figure[] = [
+  { name: "pickups", weight: 1, grid: "R---R- R---R- R---R- R---R-" },
+  { name: "pop into 3", weight: 1, grid: "R---R- R---8- R---R- R---R-" },
+  { name: "pop into the One", weight: 1, grid: "R---R- R---R- R---R- R---8-" },
+  { name: "pops into 3 and the One", weight: 1, grid: "R---R- R---8- R---R- R---8-" },
+  { name: "pop into 4", weight: 1, grid: "R---R- R---R- R---8- R---R-" },
+];
+
+const slowDriving = {
+  ...driving,
+  // A pulse is held for 0.85 of it; the long half of a pulse and its pickup the same.
+  length: { note: 0.85, long: 0.85, short: 0.85 },
+} as const;
+
 export const rockBass: BassStyle = {
+  meters: {
+    "12/8": {
+      // Quiet: the downbeat, and wherever the kick plays.
+      low: {
+        tones: [{ bars: [["R"]] }],
+        figures: {
+          hold: "song",
+          options: [{ weight: 1, grid: "x----- ------ ------ ------" }],
+        },
+        followsKick: true,
+        otherMeters: "downbeat",
+        ceiling: 52,
+        length: { note: 0.95, long: 0.95, short: 0.95, gap: 24 },
+        velocity: { arrival: 98, strong: 92, weak: 92, off: 86, restrike: 86, approach: 84 },
+      },
+      // The working level: a root on every pulse; a section takes a pickup into the One, into
+      // 3 and the One, or none.
+      mid: {
+        ...slowDriving,
+        figures: {
+          hold: "section",
+          options: [
+            { weight: 2, grid: "x----- x----- x----- x-----" },
+            { weight: 2, grid: "x----- x----- x----- x---o-" },
+            { weight: 1, grid: "x----- x---o- x----- x---o-" },
+          ],
+        },
+      },
+      // Hot: a pickup into every pulse, with the section's octave pops.
+      high: {
+        ...slowDriving,
+        figures: { hold: "section", options: TWELVE_POPS },
+      },
+    },
+  },
+
   // One octave a section: the home is drawn between C2 and E2 and every root goes nearest it
   // (ST-rock-16). Nothing above E2, so the line stays where the blues and funk lines were
   // brought down to after gate 3: a home of E2 would otherwise put a tune in A on A2.
