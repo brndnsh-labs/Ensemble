@@ -1,0 +1,21 @@
+title: Slow Dance
+key: Eb
+tempo: 66
+meter: 12/8
+style: rock
+
+// The fifties slow dance in twelve-eight: four slow beats to the bar, three
+// eighths in each. Thirty-two bars, AABA. The A is the doo-wop round, I vi IV
+// V, closing on a turnaround that goes round it again a chord a beat. The
+// bridge goes to the four, home, then the five of five into the five.
+[A]
+| Eb | Cm | Ab     | Bb7          |
+| Eb | Cm | Ab Bb7 | Eb Cm Ab Bb7 |
+
+[A]
+
+[Bridge]
+| Ab | % | Eb | %   |
+| F7 | % | Bb | Bb7 |
+
+[A]

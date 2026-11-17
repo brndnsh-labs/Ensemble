@@ -12,8 +12,16 @@ import { rockSolo } from "./solo.ts";
 export const rock: StylePack = {
   id: "rock",
   name: "Rock",
-  // ST-rock-01: 85 (a pop ballad) to 140 (50s rock), 120 most of all.
-  tempo: { default: 120, min: 80, max: 160 },
+  // ST-rock-01: 85 (a pop ballad) to 140 (50s rock), 120 most of all. In twelve, dotted
+  // quarters: two thirds of that range would make the usual ballad 80 and the slowest 53,
+  // where the slow dance and the rock ballad in twelve-eight live lower, so the usual is 66
+  // and the floor 48. The ceiling stays two thirds of four's: eighths no quicker than there.
+  tempo: {
+    default: 120,
+    min: 80,
+    max: 160,
+    meters: { "12/8": { default: 66, min: 48, max: 107 } },
+  },
   feel: {
     // Straight eighths. The bass on the drummer, the chords a hair behind, the lead a little
     // more (ST-rock-02).
