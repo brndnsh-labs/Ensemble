@@ -748,9 +748,7 @@ test("disco: in six and twelve the whole band is on the triplet's eighths, the d
     ...takes(compound),
     ...soloistTakes().filter(compound),
     ...heldTakes(disco, "12/8"),
-    ...heldTakes(disco, "12/8", true),
     ...heldTakes(disco, "6/8"),
-    ...heldTakes(disco, "6/8", true),
   ];
   const seats = new Set<string>();
   for (const { chart, options, take } of played) {

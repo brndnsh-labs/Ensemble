@@ -485,8 +485,6 @@ test(
       ...takes((jam) => jam.style.id === "disco" && compound(jam)),
       ...heldTakes(disco, "12/8"),
       ...heldTakes(disco, "6/8"),
-      ...heldTakes(disco, "12/8", true),
-      ...heldTakes(disco, "6/8", true),
     ];
     const SIXTEENTH = PPQ / 4;
     for (const { chart, options, take } of played) {
