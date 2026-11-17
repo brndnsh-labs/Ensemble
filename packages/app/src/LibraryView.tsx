@@ -7,10 +7,12 @@
 
 import { keyToString } from "@ensemble/engine";
 import { STYLES, styleById } from "@ensemble/styles";
+import { useLayoutEffect, useRef } from "react";
 import { LIBRARY, showing, YOURS } from "./address.ts";
 import { NewCharts } from "./HomeView.tsx";
 import type { LibraryChart } from "./library.ts";
 import { LIBRARY as BUILT_IN } from "./library.ts";
+import { useSwitches } from "./motion/switches.ts";
 import { PosterName, usePosterWidths } from "./PosterName.tsx";
 import { byTitle, count, lineUp, saysOf, writtenFor } from "./posters.ts";
 import { Charts } from "./rows.tsx";
@@ -44,6 +46,28 @@ export function Library({ show, find, own, play }: Props) {
   const style = styleShown(show, find);
   const yours = !searching && show === YOURS;
 
+  // The motion study's pivot (6): the place shown is at the row's left edge, the next peeking in at the right.
+  const pivot = useSwitches().on.pivot;
+  const strip = useRef<HTMLElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the place shown changes with `show`, and is read from the page
+  useLayoutEffect(() => {
+    const row = strip.current;
+    if (!pivot || !row) return;
+    const place = () => {
+      const here = row.querySelector<HTMLElement>("[aria-current]");
+      if (!here) return;
+      const pad = Number.parseFloat(getComputedStyle(row).paddingLeft) || 0;
+      row.scrollLeft += here.getBoundingClientRect().left - row.getBoundingClientRect().left - pad;
+    };
+    place();
+    // Once the type's own letters are in, the words have their real widths.
+    let current = true;
+    void document.fonts.ready.then(() => current && place());
+    return () => {
+      current = false;
+    };
+  }, [pivot, show]);
+
   if (searching) {
     const found = all.filter((entry) => matches(entry, words)).sort(byTitle);
     return (
@@ -72,8 +96,8 @@ export function Library({ show, find, own, play }: Props) {
     );
   }
 
-  const strip = (
-    <nav className="shows" aria-label="Show">
+  const places = (
+    <nav className="shows" aria-label="Show" ref={strip}>
       <a className="shows-all" href={LIBRARY} aria-current={!style && !yours ? "page" : undefined}>
         All
       </a>
@@ -100,7 +124,7 @@ export function Library({ show, find, own, play }: Props) {
     return (
       <>
         <header className="style-head">
-          {strip}
+          {places}
           <div className="style-poster">
             <PosterName heading name={style.name} width={width(style.name)} />
           </div>
@@ -120,7 +144,7 @@ export function Library({ show, find, own, play }: Props) {
   if (yours)
     return (
       <main className="library-main">
-        {strip}
+        {places}
         <header className="showing">
           <h1>Your charts</h1>
           <p className="note">
@@ -136,7 +160,7 @@ export function Library({ show, find, own, play }: Props) {
 
   return (
     <main className="library-main">
-      {strip}
+      {places}
       <header className="showing">
         <h1>All charts</h1>
         <p className="note">

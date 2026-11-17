@@ -3,11 +3,13 @@
 // (`address.ts`), so the browser's back button works and a chart can be
 // bookmarked.
 
-import { useEffect, useState, useSyncExternalStore } from "react";
-import { address, go, routeOf, subscribeAddress } from "./address.ts";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { address, cameBack, go, routeOf, subscribeAddress } from "./address.ts";
 import { Browse } from "./Browse.tsx";
 import { CreditsView } from "./CreditsView.tsx";
 import { findChart, ownCharts, subscribeCharts } from "./charts.ts";
+import { screenOf, stage, turn } from "./motion/moves.ts";
+import { MotionPage } from "./motion/Switchboard.tsx";
 import type { Saving } from "./offline.ts";
 import { saveInstruments } from "./offline.ts";
 import { PlayView } from "./play/PlayView.tsx";
@@ -17,6 +19,24 @@ import { recentlyPlayed, subscribeRecent } from "./recent.ts";
 import type { Settings } from "./settings.ts";
 import { loadSettings, saveSettings } from "./settings.ts";
 import { chartFor, findTake, keptTakes, subscribeTakes } from "./takes.ts";
+
+/**
+ * The motion study: a screen arrived at is turned in (4) and its pieces are
+ * staged (2, 9), before its first frame. A search being typed is not arrived at.
+ */
+function useArrival(route: ReturnType<typeof routeOf>): void {
+  const screen = screenOf(route);
+  const was = useRef<ReturnType<typeof screenOf>>(undefined);
+  useLayoutEffect(() => {
+    if (!screen || screen.key === was.current?.key) return;
+    const before = was.current;
+    was.current = screen;
+    const root = document.getElementById("app")?.firstElementChild;
+    if (!(root instanceof HTMLElement)) return;
+    if (before) turn(root, cameBack() || screen.depth < before.depth);
+    stage(root);
+  });
+}
 
 const PACKS_URL = `${import.meta.env.BASE_URL}packs/`;
 const rig = new Rig(PACKS_URL);
@@ -47,6 +67,8 @@ export function App() {
   };
 
   const route = routeOf(hash);
+  useArrival(route);
+  if (route.screen === "motion") return <MotionPage />;
   if (route.screen === "credits") return <CreditsView packsUrl={PACKS_URL} />;
   if (route.screen === "take") {
     const take = findTake(route.id);
