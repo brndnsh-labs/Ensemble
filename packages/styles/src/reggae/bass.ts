@@ -27,19 +27,55 @@ const RIFFS = [
   { name: "the drop", grid: ".... .... R--- ----", weights: [2, 0, 0] },
 ] as const;
 
+// ── in twelve and in six ────────────────────────────────────────────────────
+// Reading the grids: a pulse to a group of six sixteenths; a note starts only on
+// a pulse's three eighths (the first, third and fifth character).
+//
+// Twelve is the shuffle under the one drop, and its riffs are four's said in
+// pulses, by four's names and weights (AU-97): a beat is a pulse, an "and" or an
+// "a" the pulse's last eighth, so the hole on the One, the octave on the drop
+// and the walk down after it are where four has them.
+
+/** Four's five riffs in twelve, in the same order. */
+const RIFFS_IN_TWELVE = [
+  "....R- R-..5- 8----- 5-..3.",
+  "R----- ...... R-..5- 8-..5.",
+  "....R- ....3- R----- 5-..6-",
+  "R----- ------ R----- ....5-",
+  "...... ...... R----- ------",
+] as const;
+
+/**
+ * Six is a bar of two, the One and the drop on the second pulse, and its riffs are written
+ * for it with four's ideas and weights: up to the octave on the drop from the One's last
+ * eighth; the One and an answer after the drop; a third into the drop from the One's middle;
+ * the heavy halves, each pulse a root, a fifth leading on; just the drop.
+ */
+const RIFFS_IN_SIX = [
+  "....R- 8---5-",
+  "R---.. R-..5-",
+  "..R-3- R---5-",
+  "R----- R---5-",
+  "...... R-----",
+] as const;
+
 /** A riff drawn for each section at each tier, by that tier's weights. */
-const riffs = (tier: 0 | 1 | 2): Line["figures"] => ({
+const riffs = (tier: 0 | 1 | 2, grids?: readonly string[]): Line["figures"] => ({
   hold: "section",
   options: RIFFS.map(
-    (riff): Figure => ({ name: riff.name, weight: riff.weights[tier], grid: riff.grid }),
+    (riff, i): Figure => ({
+      name: riff.name,
+      weight: riff.weights[tier],
+      grid: grids?.[i] ?? riff.grid,
+    }),
   ),
 });
 
-const line = (tier: 0 | 1 | 2): Line => ({
+const line = (tier: 0 | 1 | 2, grids?: readonly string[]): Line => ({
   // In any other meter, the root on each pulse with the fifth leading on: the notes give
   // nothing for the bass there (ST-reggae-04).
   tones: [{ bars: [["R", "5"]] }],
-  figures: riffs(tier),
+  figures: riffs(tier, grids),
   otherMeters: "pulses",
   // Deep (ST-reggae-15): nothing over C3, an octave over the anchor's top. A riff's octave over
   // a root above C2 is played on the root: from D3 or E3 on the drop the line could not get
@@ -92,7 +128,16 @@ const leadIn: LeadInPolicy = {
   },
 };
 
+/** The same bassist's lines in a compound bar: the riffs for the meter, the rest as four's. */
+const linesIn = (grids: readonly string[]): BassStyle["lines"] => ({
+  low: line(0, grids),
+  mid: line(1, grids),
+  high: line(2, grids),
+});
+
 export const reggaeBass: BassStyle = {
+  // The shuffle in twelve and the bar of two in six, written above.
+  meters: { "12/8": linesIn(RIFFS_IN_TWELVE), "6/8": linesIn(RIFFS_IN_SIX) },
   // Deep: every root nearest an anchor drawn for each section between A1 and C2 (ST-reggae-15).
   register: {
     lowest: 28,
