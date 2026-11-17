@@ -418,7 +418,7 @@ test(
 // ── rock ────────────────────────────────────────────────────────────────────
 
 test(
-  "rock: the bass is the kick's when the band is quiet, a note wherever the kick is played; and in twelve it is roots on the pulses and never all twelve eighths: every note on an eighth, a note between the pulses only on the eighth before one (a pickup), from the working level a note on every pulse, and hot a pickup into every pulse",
+  "rock: the bass is the kick's, a note wherever the kick is played at every level (quiet the line follows it; in four the eighths cover it, and in twelve the kick's pickups are the bass's too); and in twelve it is roots on the pulses and never all twelve eighths: every note on an eighth, a note between the pulses only on the eighth before one (a pickup), from the working level a note on every pulse, and hot a pickup into every pulse",
   only("rock"),
   () => {
     let quiet = 0;
@@ -443,8 +443,8 @@ test(
             .map((note) => (note.tick - bar.start) / (PPQ / 4)),
         );
         const tier = tierOf(bar.seats.bass);
-        if (tier === "low" && bar.seats.drums !== null) {
-          quiet++;
+        if (bar.seats.drums !== null) {
+          if (tier === "low") quiet++;
           for (const kick of kicks) {
             if (kick.tick < bar.start || kick.tick >= end) continue;
             const step = (kick.tick - bar.start) / (PPQ / 4);
