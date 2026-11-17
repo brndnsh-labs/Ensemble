@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App.tsx";
+import { installMotion } from "./motion.ts";
 import { keepOffline } from "./offline.ts";
 import "./style.css";
 
@@ -15,3 +16,11 @@ createRoot(document.getElementById("app")!).render(
 document.addEventListener("touchstart", () => {}, { passive: true });
 
 keepOffline();
+installMotion();
+
+// The motion study's switches were kept here; the study is over, and the browser need not keep them.
+try {
+  localStorage.removeItem("ensemble.motion-study.1");
+} catch {
+  // Storage refused: there is nothing kept to take away.
+}

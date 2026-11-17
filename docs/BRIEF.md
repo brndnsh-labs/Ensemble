@@ -192,7 +192,7 @@ A static, installable PWA that works offline. No server.
 - **Arrangement grid** (later stage). Sections as columns, players as rows, each cell off or an intensity level, with a per-section energy value that sets defaults. This is the editor for layer two.
 - **Takes.** Save a seed, replay it, export it.
 
-The chart display follows the long-standing lead-sheet grid convention. Give the app its own visual identity; do not imitate another product's look.
+The chart display follows the long-standing lead-sheet grid convention. Give the app its own visual identity; do not imitate another product's look. Motion is short and eased out, says where a thing came from, never delays a press, and is off where the device asks for less.
 
 **Storage:** charts are stored as text in the browser, with import and export as plain files.
 

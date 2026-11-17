@@ -3,11 +3,12 @@
 // (`address.ts`), so the browser's back button works and a chart can be
 // bookmarked.
 
-import { useEffect, useState, useSyncExternalStore } from "react";
-import { address, go, routeOf, subscribeAddress } from "./address.ts";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { address, cameBack, go, routeOf, subscribeAddress } from "./address.ts";
 import { Browse } from "./Browse.tsx";
 import { CreditsView } from "./CreditsView.tsx";
 import { findChart, ownCharts, subscribeCharts } from "./charts.ts";
+import { arrived, screenOf } from "./motion.ts";
 import type { Saving } from "./offline.ts";
 import { saveInstruments } from "./offline.ts";
 import { PlayView } from "./play/PlayView.tsx";
@@ -17,6 +18,24 @@ import { recentlyPlayed, subscribeRecent } from "./recent.ts";
 import type { Settings } from "./settings.ts";
 import { loadSettings, saveSettings } from "./settings.ts";
 import { chartFor, findTake, keptTakes, subscribeTakes } from "./takes.ts";
+
+/**
+ * A screen arrived at moves in before its first frame (`motion.ts`): turned in
+ * from the side it came from, unless it is the first, and its pieces staged.
+ * A search being typed is not arrived at.
+ */
+function useArrival(route: ReturnType<typeof routeOf>): void {
+  const screen = screenOf(route);
+  const was = useRef<ReturnType<typeof screenOf>>(undefined);
+  useLayoutEffect(() => {
+    if (!screen || screen.key === was.current?.key) return;
+    const before = was.current;
+    was.current = screen;
+    const root = document.getElementById("app")?.firstElementChild;
+    if (!(root instanceof HTMLElement)) return;
+    arrived(root, route, before && (cameBack() || screen.depth < before.depth));
+  });
+}
 
 const PACKS_URL = `${import.meta.env.BASE_URL}packs/`;
 const rig = new Rig(PACKS_URL);
@@ -47,6 +66,7 @@ export function App() {
   };
 
   const route = routeOf(hash);
+  useArrival(route);
   if (route.screen === "credits") return <CreditsView packsUrl={PACKS_URL} />;
   if (route.screen === "take") {
     const take = findTake(route.id);

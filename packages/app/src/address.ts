@@ -70,7 +70,20 @@ let returned = false;
 /** The address shown before this one. */
 let before = "";
 let current = location.hash;
+/** The address the screens are drawn for: `current`, except while a view transition captures the old screen (`motion.ts`). */
+let shown = current;
 let entries = 0;
+
+/**
+ * A hold on an arrival (`motion.ts`): given the way the screens are told, it
+ * may tell them itself, from inside a view transition, and say so.
+ */
+type Arrival = (from: string, to: string, show: () => void) => boolean;
+let arrival: Arrival | undefined;
+
+export function onArrival(take: Arrival): void {
+  arrival = take;
+}
 
 /** A history entry the app has seen carries a mark; one it has not is new. */
 const marked = (): boolean =>
@@ -89,7 +102,12 @@ function arrive(at: string, byHistory: boolean): void {
   before = current;
   current = at;
   returned = byHistory;
-  for (const listener of listeners) listener();
+  const show = () => {
+    shown = current;
+    for (const listener of listeners) listener();
+  };
+  if (arrival?.(before, at, show)) return;
+  show();
 }
 
 // The page's own scrolling is put back by the screens themselves, each to where it was left.
@@ -108,7 +126,7 @@ export function subscribeAddress(listener: () => void): () => void {
   return () => listeners.delete(listener);
 }
 
-export const address = (): string => current;
+export const address = (): string => shown;
 
 /** True when this address was come back to through the browser's history. */
 export const cameBack = (): boolean => returned;

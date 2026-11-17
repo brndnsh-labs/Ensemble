@@ -3,6 +3,7 @@
 // screen into the library showing what was found, and the box, the caret and
 // the phone's keyboard stay where the typing is.
 
+import type { CSSProperties } from "react";
 import { useLayoutEffect, useRef, useState } from "react";
 import type { Route } from "./address.ts";
 import { address, cameBack, cameFrom, finding, go, HOME, LIBRARY, swap, TAKES } from "./address.ts";
@@ -10,6 +11,7 @@ import { HomeCharts, HomeTakes } from "./HomeView.tsx";
 import { Library, styleShown } from "./LibraryView.tsx";
 import type { LibraryChart } from "./library.ts";
 import type { Saving } from "./offline.ts";
+import { posterWidth, useLettersIn } from "./PosterName.tsx";
 import type { Played } from "./recent.ts";
 import { inkOf } from "./rows.tsx";
 import type { ChartChoices } from "./settings.ts";
@@ -106,6 +108,7 @@ function Finder({ text, home }: { text: string; home: boolean }) {
 
 export function Browse({ route, play, own, takes, recent, choices, saving }: Props) {
   const home = route.screen === "home";
+  const lettersIn = useLettersIn();
   useScrollKept(home);
   const style = home ? undefined : styleShown(route.show, route.find);
 
@@ -130,7 +133,17 @@ export function Browse({ route, play, own, takes, recent, choices, saving }: Pro
       <div className="browse-top">
         {home ? (
           <header className="masthead">
-            <h1 className="wordmark">Ensemble</h1>
+            {/* On a phone the name is as wide as the page, once its letters are in to be measured. */}
+            <h1
+              className={lettersIn ? "wordmark fitted" : "wordmark"}
+              style={
+                lettersIn
+                  ? ({ "--w": posterWidth("Ensemble").toFixed(3) } as CSSProperties)
+                  : undefined
+              }
+            >
+              Ensemble
+            </h1>
             {/* Charts and Takes: two views of this one screen, said where its name is. */}
             <nav className="views" aria-label="Show">
               <a className="tab" href={HOME} aria-current={route.takes ? undefined : "page"}>

@@ -31,12 +31,8 @@ function widthOf(name: string): number {
   return width;
 }
 
-/**
- * Each name's width in ems. Until the type's own letters are in the browser
- * the widths are a guess, so a name is never set in the wrong letters at a
- * size worked out for the right ones; then they are measured, and kept.
- */
-export function usePosterWidths(): (name: string) => number {
+/** Whether the poster face's own letters are in the browser, so that a size worked out for them holds. */
+export function useLettersIn(): boolean {
   const [ready, setReady] = useState(() => arrived || document.fonts.check(FACE));
   useEffect(() => {
     if (ready) {
@@ -57,6 +53,19 @@ export function usePosterWidths(): (name: string) => number {
       current = false;
     };
   }, [ready]);
+  return ready;
+}
+
+/** A name's width in ems in the poster face, measured once its letters are in (`useLettersIn`). */
+export const posterWidth = (name: string): number => widthOf(name);
+
+/**
+ * Each name's width in ems. Until the type's own letters are in the browser
+ * the widths are a guess, so a name is never set in the wrong letters at a
+ * size worked out for the right ones; then they are measured, and kept.
+ */
+export function usePosterWidths(): (name: string) => number {
+  const ready = useLettersIn();
   return (name) => (ready ? widthOf(name) : name.length * ABOUT);
 }
 

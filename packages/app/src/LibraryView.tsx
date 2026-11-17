@@ -7,6 +7,7 @@
 
 import { keyToString } from "@ensemble/engine";
 import { STYLES, styleById } from "@ensemble/styles";
+import { useLayoutEffect, useRef } from "react";
 import { LIBRARY, showing, YOURS } from "./address.ts";
 import { NewCharts } from "./HomeView.tsx";
 import type { LibraryChart } from "./library.ts";
@@ -44,6 +45,27 @@ export function Library({ show, find, own, play }: Props) {
   const style = styleShown(show, find);
   const yours = !searching && show === YOURS;
 
+  // The places are one row that scrolls sideways: the place shown is put at its left edge, the next peeking in at the right.
+  const strip = useRef<HTMLElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the place shown changes with `show`, and is read from the page
+  useLayoutEffect(() => {
+    const row = strip.current;
+    if (!row) return;
+    const place = () => {
+      const here = row.querySelector<HTMLElement>("[aria-current]");
+      if (!here) return;
+      const pad = Number.parseFloat(getComputedStyle(row).paddingLeft) || 0;
+      row.scrollLeft += here.getBoundingClientRect().left - row.getBoundingClientRect().left - pad;
+    };
+    place();
+    // Once the type's own letters are in, the words have their real widths.
+    let current = true;
+    void document.fonts.ready.then(() => current && place());
+    return () => {
+      current = false;
+    };
+  }, [show]);
+
   if (searching) {
     const found = all.filter((entry) => matches(entry, words)).sort(byTitle);
     return (
@@ -72,8 +94,8 @@ export function Library({ show, find, own, play }: Props) {
     );
   }
 
-  const strip = (
-    <nav className="shows" aria-label="Show">
+  const places = (
+    <nav className="shows" aria-label="Show" ref={strip}>
       <a className="shows-all" href={LIBRARY} aria-current={!style && !yours ? "page" : undefined}>
         All
       </a>
@@ -100,7 +122,7 @@ export function Library({ show, find, own, play }: Props) {
     return (
       <>
         <header className="style-head">
-          {strip}
+          {places}
           <div className="style-poster">
             <PosterName heading name={style.name} width={width(style.name)} />
           </div>
@@ -120,7 +142,7 @@ export function Library({ show, find, own, play }: Props) {
   if (yours)
     return (
       <main className="library-main">
-        {strip}
+        {places}
         <header className="showing">
           <h1>Your charts</h1>
           <p className="note">
@@ -136,7 +158,7 @@ export function Library({ show, find, own, play }: Props) {
 
   return (
     <main className="library-main">
-      {strip}
+      {places}
       <header className="showing">
         <h1>All charts</h1>
         <p className="note">
