@@ -659,6 +659,35 @@ test(
   },
 );
 
+// ── funk ────────────────────────────────────────────────────────────────────
+
+test(
+  "funk: in six and twelve the eighths are the band's smallest note, for everyone, the fills and the soloist too: nothing is struck between them, and the trace of swing that funk puts on its sixteenths does not move them (a pulse of three eighths is not swung)",
+  only("funk"),
+  () => {
+    const funk = STYLES.find((style) => style.id === "funk")!;
+    const compound = (jam: { style: { id: string }; chart: { meter: string } }) =>
+      jam.style.id === "funk" && (jam.chart.meter === "6/8" || jam.chart.meter === "12/8");
+    const played = [
+      ...takes(compound),
+      ...soloistTakes().filter(compound),
+      ...heldTakes(funk, "6/8", true),
+      ...heldTakes(funk, "12/8", true),
+    ];
+    const seats = new Set<string>();
+    for (const { chart, options, take } of played) {
+      for (const note of notesOf(take)) {
+        seats.add(note.seat);
+        const where = `${chart.file} ${JSON.stringify(options)}: the ${note.seat} (${note.voice ?? ""}) at ${note.tick}`;
+        assert.equal(note.tick % (PPQ / 2), 0, `${where}, between the eighths`);
+        assert.ok(Math.abs(note.offset) <= POCKET, `${where}, moved ${note.offset}`);
+      }
+    }
+    if (LIBRARY.some((chart) => chart.meter === "6/8" || chart.meter === "12/8"))
+      assert.equal(seats.size, 4, `only ${[...seats].join(", ")} heard`);
+  },
+);
+
 // ── rock ────────────────────────────────────────────────────────────────────
 
 test("rock: in twelve the whole band is on the triplet's eighths: no note of the drums (their fills too), the bass, the piano or the lead guitar falls between them, so the soloist's rhythms are eighths and longer", {

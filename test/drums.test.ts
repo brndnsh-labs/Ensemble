@@ -62,30 +62,48 @@ const TOMS = ["highTom", "midTom", "lowTom"];
 
 // ── funk ────────────────────────────────────────────────────────────────────
 
+/** The meters funk has written besides four. */
+const inSixOrTwelve = (meter: string) => meter === "6/8" || meter === "12/8";
+const funk = STYLES.find((style) => style.id === "funk");
+/** Funk where it plays its own parts, and funk in six and in twelve held at each of its levels. */
+const funkPlayed = (): Jam[] => [
+  ...takes(itsOwn("funk")),
+  ...(funk ? [...heldTakes(funk, "6/8"), ...heldTakes(funk, "12/8")] : []),
+];
+
 test(
-  "funk: the kick is on the One of every bar and stays off 2 and 4, the snare cracks 2 and 4, and nobody goes near the toms or the ride",
+  "funk: the kick is on the One of every bar and stays off the backbeat, the snare cracks the backbeat (2 and 4: quarter notes in four, dotted quarters in twelve; in six the second pulse), and nobody goes near the toms or the ride",
   only("funk"),
   () => {
     let bars = 0;
-    for (const { chart, options, take } of takes(in44("funk"))) {
+    let twelveOrSix = 0;
+    for (const { chart, options, take } of funkPlayed()) {
       for (const { bar, kit } of kitBars(take)) {
-        const where = `${chart.file} seed ${options.seed} bar ${bar.index}`;
+        const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
         for (const voice of [...TOMS, "ride", "rideBell"]) {
           assert.ok(!kit.has(voice), `${where}: the ${voice}`);
         }
         // The last bar is one hit where the final chord lands, wherever that is.
         if (bar.ending) continue;
         bars++;
+        if (isCompound(bar.meter)) twelveOrSix++;
+        const strong = strongPulses(bar.meter);
+        const backbeats = pulseStarts(bar.meter).filter((tick) => !strong.includes(tick));
         assert.ok(strikes(kit, "kick", 0), `${where}: no kick on the One`);
-        assert.ok(strikes(kit, "snare", 4), `${where}: no backbeat on 2`);
-        assert.ok(!strikes(kit, "kick", 4), `${where}: a kick on 2`);
-        // A fill is a beat long at most, and beat 4 is its to play.
-        if (bar.fill) continue;
-        assert.ok(strikes(kit, "snare", 12), `${where}: no backbeat on 4`);
-        assert.ok(!strikes(kit, "kick", 12), `${where}: a kick on 4`);
+        backbeats.forEach((tick, i) => {
+          // A fill is a beat long at most, and the last backbeat is its to play.
+          if (bar.fill && i === backbeats.length - 1) return;
+          assert.ok(strikes(kit, "snare", tick / STEP), `${where}: no backbeat at ${tick}`);
+          assert.ok(
+            !strikes(kit, "kick", tick / STEP),
+            `${where}: a kick on the backbeat at ${tick}`,
+          );
+        });
       }
     }
     assert.ok(bars > enough(2000), `only ${bars} bars`);
+    if (LIBRARY.some((chart) => inSixOrTwelve(chart.meter)))
+      assert.ok(twelveOrSix > 100, `only ${twelveOrSix} bars of six and twelve`);
   },
 );
 
@@ -94,11 +112,14 @@ test(
   only("funk"),
   () => {
     let answers = 0;
-    for (const { chart, options, take } of takes(in44("funk"))) {
+    for (const { chart, options, take } of funkPlayed()) {
       const played = kitBars(take);
-      const backHalf = (kit: Kit) =>
+      const backHalf = (kit: Kit, bar: PlanBar) =>
         [...kit]
-          .map(([voice, steps]) => `${voice}:${[...steps].filter((s) => s >= 8).sort()}`)
+          .map(
+            ([voice, steps]) =>
+              `${voice}:${[...steps].filter((s) => s * STEP >= bar.ticks / 2).sort()}`,
+          )
           .sort()
           .join(" ");
       const turns = new Map<string, string>();
@@ -108,10 +129,10 @@ test(
         // The bar it answers: the bar before, in time, at the same level.
         if (before.bar.fill || before.bar.index !== bar.index - 1) continue;
         if (tierOf(before.energy) !== tierOf(energy)) continue;
-        const where = `${chart.file} seed ${options.seed} bar ${bar.index}`;
-        const turn = backHalf(kit);
+        const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
+        const turn = backHalf(kit, bar);
         answers++;
-        assert.notEqual(turn, backHalf(before.kit), `${where}: the bar before, again`);
+        assert.notEqual(turn, backHalf(before.kit, before.bar), `${where}: the bar before, again`);
         const key = `${bar.section.occurrence} ${tierOf(energy)}`;
         const known = turns.get(key);
         if (known === undefined) turns.set(key, turn);
@@ -119,6 +140,50 @@ test(
       }
     }
     assert.ok(answers > enough(600), `only ${answers} answer bars`);
+  },
+);
+
+test(
+  "funk: in six and twelve the hat keeps the eighths and the kick is off the pulse: from the working level up the hat is on every eighth of a bar of time, ghosts round the backbeat; quiet it is on each pulse and at most the eighth before the next, never the triplet's middle eighth, and no ghosts; and every bar has a kick on an eighth that is not a pulse",
+  only("funk"),
+  () => {
+    let working = 0;
+    let quiet = 0;
+    const HATS = ["closedHat", "openHat"];
+    for (const { chart, options, take } of funkPlayed()) {
+      if (!inSixOrTwelve(chart.meter)) continue;
+      for (const { bar, kit, energy } of kitBars(take)) {
+        if (bar.ending || bar.fill || !isCompound(bar.meter)) continue;
+        const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
+        const steps = bar.ticks / STEP;
+        const hat = new Set(HATS.flatMap((voice) => [...(kit.get(voice) ?? [])]));
+        const kicks = [...(kit.get("kick") ?? [])];
+        assert.ok(
+          kicks.some((step) => step % 6 !== 0),
+          `${where}: every kick on a pulse (${kicks})`,
+        );
+        if (energy >= TIER_MID) {
+          working++;
+          for (let step = 0; step < steps; step += 2)
+            assert.ok(
+              hat.has(step) || (step === 0 && bar.crash),
+              `${where}: no hat on eighth ${step / 2 + 1}`,
+            );
+          continue;
+        }
+        quiet++;
+        assert.ok(!kit.has("ghostSnare"), `${where}: a ghost, quiet`);
+        for (let pulse = 0; pulse < steps; pulse += 6) {
+          assert.ok(
+            hat.has(pulse) || (pulse === 0 && bar.crash),
+            `${where}: no hat on the pulse at ${pulse}`,
+          );
+          assert.ok(!hat.has(pulse + 2), `${where}: the triplet's middle eighth, quiet`);
+        }
+      }
+    }
+    if (LIBRARY.some((chart) => inSixOrTwelve(chart.meter)))
+      assert.ok(working > 100 && quiet > 50, `only ${working} bars working and ${quiet} quiet`);
   },
 );
 

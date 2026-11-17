@@ -10,6 +10,7 @@ import {
   chordTones,
   contextOf,
   DEAD_VOICE,
+  isCompound,
   PPQ,
   pitchClass,
   render,
@@ -564,16 +565,22 @@ test(
 
 // ── a riff ──────────────────────────────────────────────────────────────────
 
+const funk = STYLES.find((style) => style.id === "funk");
+/** Funk where it plays its own parts, and funk in six and in twelve held at each of its levels. */
+const funkPlayed = () => [
+  ...takes((jam) => jam.style.id === "funk" && written(jam)),
+  ...(funk ? [...heldTakes(funk, "6/8"), ...heldTakes(funk, "12/8")] : []),
+];
+
 test(
-  "funk: the bass is on the One and under the kick: a sounded note on beat 1 of every bar that has a chord there, a note or a dead note wherever the bass drum is played, every note on the sixteenths, none ringing past two and a half sixteenths, and a dead note never on the One, on a change, or when the band is quiet",
+  "funk: the bass is on the One and under the kick: a sounded note on beat 1 of every bar that has a chord there, a note or a dead note wherever the bass drum is played, every note on the sixteenths (in six and twelve on the eighths), none ringing past two and a half sixteenths, and a dead note never on the One, on a change, or when the band is quiet",
   only("funk"),
   () => {
     let bars = 0;
     let kicks = 0;
     let dead = 0;
-    for (const { chart, options, take } of takes(
-      (jam) => jam.style.id === "funk" && jam.chart.meter === "4/4",
-    )) {
+    let compound = 0;
+    for (const { chart, options, take } of funkPlayed()) {
       const bass = notesOf(take, "bass");
       const sounded = new Set(
         bass.filter((note) => note.voice !== DEAD_VOICE).map((note) => note.tick),
@@ -582,9 +589,10 @@ test(
       const changes = new Set(arrivals(take.plan).map((arrival) => arrival.tick));
       for (const bar of take.plan.bars) {
         if (bar.kind !== "music" || bar.seats.bass === null || bar.ending) continue;
-        const where = `${chart.file} seed ${options.seed} bar ${bar.index}`;
+        const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
         if (bar.spans[0]?.chord && bar.spans[0].start === 0) {
           bars++;
+          if (isCompound(bar.meter)) compound++;
           assert.ok(sounded.has(bar.start), `${where}: nothing on the One`);
         }
       }
@@ -597,13 +605,18 @@ test(
         // A dead note under the kick is the same thump: the hand is there.
         assert.ok(
           struck.has(kick.tick),
-          `${chart.file} seed ${options.seed} bar ${bar.index} tick ${kick.tick - bar.start}: a kick (${kick.velocity}) with no bass under it`,
+          `${chart.file} ${JSON.stringify(options)} bar ${bar.index} tick ${kick.tick - bar.start}: a kick (${kick.velocity}) with no bass under it`,
         );
       }
       for (const note of bass) {
         const bar = take.plan.bars.findLast((candidate) => candidate.start <= note.tick)!;
-        const where = `${chart.file} seed ${options.seed} bar ${bar.index}`;
-        assert.equal((note.tick - bar.start) % (PPQ / 4), 0, `${where}: off the sixteenths`);
+        const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
+        const grid = isCompound(bar.meter) ? PPQ / 2 : PPQ / 4;
+        assert.equal(
+          (note.tick - bar.start) % grid,
+          0,
+          `${where}: off the grid at ${note.tick - bar.start}`,
+        );
         if (bar.ending) continue;
         // Two and a quarter as written; the trace of swing on the sixteenths can add a little.
         assert.ok(note.duration <= (PPQ / 4) * 2.5, `${where}: a note of ${note.duration}`);
@@ -622,29 +635,28 @@ test(
       bars > enough(3000) && kicks > enough(8000) && dead > enough(1500),
       `only ${bars} bars, ${kicks} kicks, ${dead} dead notes`,
     );
+    if (LIBRARY.some((chart) => chart.meter === "6/8" || chart.meter === "12/8"))
+      assert.ok(compound > 100, `only ${compound} bars of six and twelve`);
   },
 );
 
 test(
-  "funk: the riff is the section's: in one time through a section at one level, every bar opens on the same rhythm for its first two beats, unless the chord changes inside them",
+  "funk: the riff is the section's: in one time through a section at one level, every bar opens on the same rhythm for the first half of the bar (its first two beats; in twelve its first two pulses, in six its first), unless the chord changes inside it",
   only("funk"),
   () => {
     let compared = 0;
-    for (const { chart, options, take } of takes(
-      (jam) => jam.style.id === "funk" && jam.chart.meter === "4/4",
-    )) {
+    for (const { chart, options, take } of funkPlayed()) {
       const bass = notesOf(take, "bass");
       const harmony = arrivals(take.plan);
       const riffs = new Map<string, string>();
       for (const bar of take.plan.bars) {
         if (bar.kind !== "music" || bar.seats.bass === null || bar.ending) continue;
         if (bar.spans.some((span) => span.chord === null)) continue;
-        const inside = harmony.some(
-          (arrival) => arrival.tick > bar.start && arrival.tick < bar.start + 2 * PPQ,
-        );
+        const half = bar.start + bar.ticks / 2;
+        const inside = harmony.some((arrival) => arrival.tick > bar.start && arrival.tick < half);
         if (inside) continue;
         const rhythm = bass
-          .filter((note) => note.tick >= bar.start && note.tick < bar.start + 2 * PPQ)
+          .filter((note) => note.tick >= bar.start && note.tick < half)
           .map(
             (note) =>
               `${(note.tick - bar.start) / (PPQ / 4)}${note.voice === DEAD_VOICE ? "x" : ""}`,
@@ -658,11 +670,46 @@ test(
           assert.equal(
             rhythm,
             known,
-            `${chart.file} seed ${options.seed} bar ${bar.index}: another riff`,
+            `${chart.file} ${JSON.stringify(options)} bar ${bar.index}: another riff`,
           );
         }
       }
     }
     assert.ok(compared > enough(3000), `only ${compared} bars compared`);
+  },
+);
+
+test(
+  "funk: in six and twelve the bass plays the section's riff, not the kick's roots: from the working level up every bar with one chord has more in it than roots (an octave pop, the fifth, the seventh or a dead note), and quiet it is roots alone",
+  only("funk"),
+  () => {
+    let working = 0;
+    let quiet = 0;
+    for (const { chart, options, take } of funkPlayed()) {
+      if (chart.meter !== "6/8" && chart.meter !== "12/8") continue;
+      const bass = notesOf(take, "bass");
+      for (const bar of take.plan.bars) {
+        if (bar.kind !== "music" || bar.seats.bass === null || bar.ending || bar.spans.length !== 1)
+          continue;
+        const chord = bar.spans[0]!.chord;
+        if (!chord || !isCompound(bar.meter)) continue;
+        const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
+        const root = pitchClass(chord.bass ?? chord.root);
+        const notes = bass.filter((n) => n.tick >= bar.start && n.tick < bar.start + bar.ticks);
+        const lowest = Math.min(...notes.map((n) => n.pitch));
+        const more = notes.some(
+          (n) => n.voice === DEAD_VOICE || n.pitch % 12 !== root || n.pitch > lowest,
+        );
+        if (tierOf(bar.seats.bass) === "low") {
+          quiet++;
+          assert.ok(!more, `${where}: quiet, and more than roots`);
+        } else {
+          working++;
+          assert.ok(more, `${where}: roots alone at ${bar.seats.bass.toFixed(2)}`);
+        }
+      }
+    }
+    if (LIBRARY.some((chart) => chart.meter === "6/8" || chart.meter === "12/8"))
+      assert.ok(working > 100 && quiet > 50, `only ${working} bars working and ${quiet} quiet`);
   },
 );
