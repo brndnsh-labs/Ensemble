@@ -12,7 +12,7 @@ echo "Voicings alone: the piano holds each chord (no comping rhythm):"
 node scripts/pads.ts library/blues-12-bar-a.chart "$out/pads-12-bar-a.mid"
 node scripts/pads.ts library/blues-jazz-f.chart "$out/pads-jazz-blues-f.mid"
 node scripts/pads.ts library/blues-minor-am.chart "$out/pads-minor-blues-am.mid"
-node scripts/pads.ts library/blues-slow-g.chart "$out/pads-slow-blues-g.mid"
+node scripts/pads.ts library/blues-intro-outro-d.chart "$out/pads-quick-change-d.mid"
 
 echo "One level held throughout, to hear each level's comping on its own (two seeds each):"
 for seed in 1 2; do
@@ -37,11 +37,11 @@ node packages/cli/src/main.ts render library/blues-12-bar-a.chart --passes 3 --s
 
 echo "A 3-minute timed jam, two seeds:"
 for seed in 1 2; do
-  render library/blues-quick-change-e.chart --minutes 3 --seed "$seed" --out "$out/timed-3min-quick-change-e-seed${seed}.mid"
+  render library/blues-intro-outro-d.chart --key E --tempo 108 --minutes 3 --seed "$seed" --out "$out/timed-3min-quick-change-e-seed${seed}.mid"
 done
 
 echo "Other forms: mid-bar changes, a minor blues, a slow blues, an intro and a written ending:"
 render library/blues-jazz-f.chart --passes 3 --seed 1 --out "$out/jazz-blues-f-seed1.mid"
 render library/blues-minor-am.chart --passes 3 --seed 1 --out "$out/minor-blues-am-seed1.mid"
-render library/blues-slow-g.chart --passes 2 --seed 1 --out "$out/slow-blues-g-seed1.mid"
+render library/blues-12-bar-a.chart --key G --tempo 66 --passes 2 --seed 1 --out "$out/slow-blues-g-seed1.mid"
 render library/blues-intro-outro-d.chart --passes 2 --seed 1 --out "$out/intro-and-tag-d-seed1.mid"

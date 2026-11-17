@@ -1,0 +1,24 @@
+title: Stella by Starlight
+key: Bb
+tempo: 120
+style: jazz
+
+// Thirty-two bars, ABCD, nothing repeated. It opens on a half-diminished
+// chord a tritone from home and is not in B-flat until the ninth bar; the
+// two-fives are minor as often as major, and the last line falls in minor
+// two-fives to the tonic.
+[A]
+| Em7b5 | A7b9 | Cm7    | F7  |
+| Fm7   | Bb7  | Ebmaj7 | Ab7 |
+
+[B]
+| Bbmaj7 | Em7b5 A7 | Dm7   | Bbm7 Eb7 |
+| Fmaj7  | Em7b5 A7 | Am7b5 | D7b9     |
+
+[C]
+| G7#5 | % | Cm7    | % |
+| Ab7  | % | Bbmaj7 | % |
+
+[D]
+| Em7b5 | A7b9 | Dm7b5  | G7b9 |
+| Cm7b5 | F7   | Bbmaj7 | %    |

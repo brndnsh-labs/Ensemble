@@ -1,0 +1,14 @@
+title: Summertime
+key: Am
+tempo: 100
+style: jazz
+
+// Sixteen bars in a minor key: the tonic rocking against its five, the
+// four, a minor two-five, the tonic again with the four made a dominant,
+// and a last line that goes by the relative major to the tonic in bar
+// fifteen, then turns round on the minor two-five.
+[A]
+| Am6       | E7     | Am6   | %        |
+| Dm7       | %      | Bm7b5 | E7       |
+| Am6       | E7     | Am6   | D7       |
+| Cmaj7 Am7 | Dm7 E7 | Am6   | Bm7b5 E7 |

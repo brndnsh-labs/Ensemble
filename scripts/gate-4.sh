@@ -42,9 +42,9 @@ for seed in 1 2 3; do
 done
 take "2-jazz-two-five-one-c" library/jazz-two-five-one-c.chart --passes 5 --solo --seed 4
 take "2-jazz-minor-two-five-cm" library/jazz-minor-two-five-cm.chart --passes 5 --solo --seed 5
-take "2-jazz-falling-fifths-gm" library/jazz-falling-fifths-gm.chart --passes 5 --solo --seed 6
-take "2-jazz-modal-dm" library/jazz-modal-dm.chart --passes 5 --solo --seed 7
-take "2-jazz-ballad-eb" library/jazz-ballad-eb.chart --passes 3 --solo --seed 8
+take "2-jazz-autumn-leaves" library/standard-autumn-leaves.chart --passes 5 --solo --seed 6
+take "2-jazz-so-what" library/standard-so-what.chart --passes 5 --solo --seed 7
+take "2-jazz-body-and-soul" library/standard-body-and-soul.chart --passes 3 --solo --seed 8
 take "2-jazz-waltz-f" library/jazz-waltz-f.chart --passes 5 --solo --seed 9
 take "2-jazz-rhythm-changes-bb-no-solo" library/jazz-rhythm-changes-bb.chart --passes 3 --seed 10
 take "2-jazz-rhythm-changes-bb-vibes" library/jazz-rhythm-changes-bb.chart --passes 5 --solo-instrument vibraphone --seed 1
@@ -65,6 +65,6 @@ echo "4. The blues again: gate 3's seeds 2 and 4 (seed 1 is the first file of se
 for seed in 2 4; do
   take "4-blues-12-bar-a-seed-$seed" library/blues-12-bar-a.chart --passes 5 --solo --seed "$seed"
 done
-take "4-blues-slow-g" library/blues-slow-g.chart --passes 4 --solo --seed 1
+take "4-blues-slow-g" library/blues-12-bar-a.chart --key G --tempo 66 --passes 4 --solo --seed 1
 take "4-blues-minor-am" library/blues-minor-am.chart --passes 5 --solo --seed 1
-take "4-blues-quick-change-e-timed-4min" library/blues-quick-change-e.chart --minutes 4 --solo --seed 1
+take "4-blues-quick-change-e-timed-4min" library/blues-intro-outro-d.chart --key E --tempo 108 --minutes 4 --solo --seed 1

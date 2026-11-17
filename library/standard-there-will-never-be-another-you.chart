@@ -1,0 +1,22 @@
+title: There Will Never Be Another You
+key: Eb
+tempo: 160
+style: jazz
+
+// Thirty-two bars, ABAC. The A goes from the one to the minor six by its
+// minor two-five, then makes the one a dominant on the way to the four; B
+// and C both start on the four and the flat seven, and C comes home by the
+// two-five from the sharp four, A half-diminished, down through G, C, F, B-flat.
+[A]
+| Ebmaj7 | % | Dm7b5 | G7  |
+| Cm7    | % | Bbm7  | Eb7 |
+
+[B]
+| Abmaj7 | Db7 | Ebmaj7 | Cm7 |
+| F7     | %   | Fm7    | Bb7 |
+
+[A]
+
+[C]
+| Abmaj7 | Db7     | Ebmaj7 | Am7b5 D7 |
+| Gm7 C7 | Fm7 Bb7 | Ebmaj7 | Fm7 Bb7  |

@@ -1667,6 +1667,34 @@ const transposition: Row[] = [
     ],
     thereAndBack: ["Db", "D", "Eb", "E", "F", "F#", "Gb", "G", "Ab", "A", "Bb", "B"],
   },
+  {
+    // Was the library's "12-Bar Blues in Numerals" (numerals are a setting in the app, so the
+    // chart left the library); this keeps what it proved there.
+    name: "there and back: a whole chart written in numerals moves to every key by its key line alone, and comes home",
+    text: chart`
+      title: 12-Bar Blues in Numerals
+      key: Bb
+      tempo: 120
+      style: blues
+
+      [A]
+      | I7  | IV7 | I7 | %  |
+      | IV7 | %   | I7 | %  |
+      | V7  | IV7 | I7 | V7 |
+    `,
+    bars: [
+      "Bb7:1920 | Eb7:1920 | Bb7:1920 | Bb7:1920",
+      "Eb7:1920 | Eb7:1920 | Bb7:1920 | Bb7:1920",
+      "F7:1920 | Eb7:1920 | Bb7:1920 | F7:1920",
+    ],
+    numerals: "I7 | IV7 | I7 | I7 | IV7 | IV7 | I7 | I7 | V7 | IV7 | I7 | V7",
+    transposed: {
+      to: "E",
+      print:
+        "title: 12-Bar Blues in Numerals\nkey: E\ntempo: 120\nstyle: blues\n\n[A]\n| I7  | IV7 | I7 | %  |\n| IV7 | %   | I7 | %  |\n| V7  | IV7 | I7 | V7 |\n",
+    },
+    thereAndBack: ["Db", "D", "Eb", "E", "F", "F#", "Gb", "G", "Ab", "A", "Bb", "B"],
+  },
 ];
 
 // ── 9. Canonical printing ───────────────────────────────────────────────────

@@ -23,7 +23,7 @@ done
 
 echo "A 3-minute timed jam, three seeds:"
 for seed in 1 2 3; do
-  render library/blues-quick-change-e.chart --minutes 3 --seed "$seed" --out "$out/timed-3min-quick-change-e-seed${seed}.mid"
+  render library/blues-intro-outro-d.chart --key E --tempo 108 --minutes 3 --seed "$seed" --out "$out/timed-3min-quick-change-e-seed${seed}.mid"
 done
 
 echo "One level held throughout, to hear each part of the band's vocabulary on its own:"

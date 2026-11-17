@@ -1,0 +1,13 @@
+title: Giant Steps
+key: B
+tempo: 240
+style: jazz
+
+// Sixteen bars through three keys a major third apart: B, G and E-flat.
+// Two chords a bar for most of it, each new key reached by its own five or
+// two-five, as fast as the band goes.
+[A]
+| Bmaj7 D7  | Gmaj7 Bb7  | Ebmaj7 | Am7 D7   |
+| Gmaj7 Bb7 | Ebmaj7 F#7 | Bmaj7  | Fm7 Bb7  |
+| Ebmaj7    | Am7 D7     | Gmaj7  | C#m7 F#7 |
+| Bmaj7     | Fm7 Bb7    | Ebmaj7 | C#m7 F#7 |

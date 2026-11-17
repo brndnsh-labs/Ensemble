@@ -1,0 +1,25 @@
+title: Have You Met Miss Jones
+key: F
+tempo: 132
+style: jazz
+
+// Thirty-two bars, AABA. The A sections are a chord a bar round F, with a
+// diminished chord passing up to the two; the first A turns back to the top,
+// the second goes to the four, the last comes home. The bridge moves by
+// major thirds: B-flat, G-flat, D, G-flat, each reached by its own two-five,
+// and a two-five home.
+[A]
+| Fmaj7 | F#dim7 | Gm7 | C7 |
+| Am7   | Dm7    | Gm7 | C7 |
+
+[A2]
+| Fmaj7 | F#dim7 | Gm7 | C7 |
+| Am7   | Dm7    | Cm7 | F7 |
+
+[B]
+| Bbmaj7 | Abm7 Db7 | Gbmaj7 | Em7 A7 |
+| Dmaj7  | Abm7 Db7 | Gbmaj7 | Gm7 C7 |
+
+[A3]
+| Fmaj7  | F#dim7 | Gm7   | C7     |
+| Am7 D7 | Gm7 C7 | Fmaj7 | Gm7 C7 |

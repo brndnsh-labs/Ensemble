@@ -1,0 +1,22 @@
+title: Body and Soul
+key: Db
+tempo: 66
+style: jazz
+
+// Thirty-two bars, AABA, slow. The A sections are D-flat seen from its two,
+// E-flat minor, with a chord on every half bar and a minor two-five to the
+// four on the way. The bridge goes up a half step to D for four bars, then
+// down a step to C, and its last bar falls C7, B7, Bb7 back to the two.
+[A]
+| Ebm7 Bb7        | Ebm7 Ab7 | Dbmaj7 Gb7 | Fm7 Edim7  |
+| Ebm7 . Cm7b5 F7 | Bbm7 Eb7 | Ebm7 Ab7   | Dbmaj7 Bb7 |
+
+[A2]
+| Ebm7 Bb7        | Ebm7 Ab7 | Dbmaj7 Gb7 | Fm7 Edim7       |
+| Ebm7 . Cm7b5 F7 | Bbm7 Eb7 | Ebm7 Ab7   | Dbmaj7 . Em7 A7 |
+
+[B]
+| Dmaj7 Em7 | Dmaj7/F# . Gm7 C7 | F#m7 Bm7 | Em7 A7 Dmaj7 . |
+| Dm7 G7    | Cmaj7 Ebdim7      | Dm7 G7   | C7 . B7 Bb7    |
+
+[A]
