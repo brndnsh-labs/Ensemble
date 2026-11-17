@@ -1875,3 +1875,7 @@ An Opus build from `prompts/meter-acoustic-6-8.md`, merged over rock in twelve. 
 - **On a quiet machine, merged**: `pnpm check` 17.8 s of 20; `pnpm test:full` 46.9 s of 60; `pnpm score` no movement in any of the eight. **The push suite has two seconds left**: the next thing that adds takes has to take some away, or consolidate.
 - **Left by the builder**: the soloist in six is sparse (23% of solo bars empty; a bar at 66 is 1.8 s, which the soloist reads as a fast bar); a quiet upright adds a step down into a root a seventh below in 6 of 282 bars, where the notes say never; chords leant into early can bunch several bars running; the page's "before" clips are the fit as it now is, with the two fit changes above.
 - Acoustic's tempo in 6/8 is the default two thirds: 48 to 80, usually 63.
+
+## rock in twelve and acoustic in six, heard (stage 6)
+
+Brandon, 2026-11-16, after `out/meter-study-3-rock/` and `out/meter-study-3-acoustic/`: "great work, you can take those down". Both stand, rock's tempo range in twelve with them.
