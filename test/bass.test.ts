@@ -680,7 +680,7 @@ test(
 );
 
 test(
-  "funk: in six and twelve the bass plays the section's riff, not the kick's roots: from the working level up every bar with one chord has more in it than roots (an octave pop, the fifth, the seventh or a dead note), and quiet it is roots alone",
+  "funk: in six and twelve the bass plays the section's riff, not the kick's roots: from the working level up every bar with one chord has more in it than roots (an octave pop, the fifth, the seventh or a dead note), and quiet it is roots alone, but for the note on the last eighth, which may lead into the next chord",
   only("funk"),
   () => {
     let working = 0;
@@ -695,7 +695,10 @@ test(
         if (!chord || !isCompound(bar.meter)) continue;
         const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
         const root = pitchClass(chord.bass ?? chord.root);
-        const notes = bass.filter((n) => n.tick >= bar.start && n.tick < bar.start + bar.ticks);
+        // The last eighth may lead into the next chord by step, at any level (BA-07).
+        const notes = bass.filter(
+          (n) => n.tick >= bar.start && n.tick < bar.start + bar.ticks - PPQ / 2,
+        );
         const lowest = Math.min(...notes.map((n) => n.pitch));
         const more = notes.some(
           (n) => n.voice === DEAD_VOICE || n.pitch % 12 !== root || n.pitch > lowest,
