@@ -106,9 +106,9 @@ const KINDS: readonly Omit<TakeOptions, "seed">[] = [
 ];
 
 /**
- * How many charts written for other styles each style is handed: a dozen on a push, and twice
- * that on the full run, which held the floors of the blues' properties when the library lost
- * three blues charts that differed only by a setting (DECISIONS.md, the library's standards).
+ * How many charts written for other styles each style is handed: a dozen on a push, and every
+ * one of them on the full run, which held the floors of the blues' properties when the library
+ * lost three blues charts that differed only by a setting (DECISIONS.md, the library's standards).
  */
 const BORROWED = FULL ? Number.POSITIVE_INFINITY : 12;
 

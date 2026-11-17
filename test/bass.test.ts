@@ -347,10 +347,10 @@ test(
           if (!before || !from || from.index < bar.index - 1 || !walking(from)) continue;
           assert.notEqual(note.pitch, before.pitch, `${where}: ${note.pitch} twice running`);
           if (changes.get(note.tick) !== note.pitch % 12) continue;
-          // LEFT FOR THE ENGINEER (DECISIONS.md, the library's standards): Body and Soul's
-          // bridge has C7 for one beat and then F#m7, so the root on the beat and the step into
-          // the change cannot both hold there. Held out of this one check, and only this chart.
-          if (chart.file === "standard-body-and-soul.chart") continue;
+          // Where the note before is itself a root on a change (chords a beat apart, as in Body
+          // and Soul's bridge: C7 for a beat, then F#m7), the root on its chord and the step
+          // into the next cannot both hold. The root wins; the step is not asked for there.
+          if (changes.get(before.tick) === before.pitch % 12) continue;
           approaches++;
           const by = Math.abs(note.pitch - before.pitch);
           assert.ok(
