@@ -31,13 +31,15 @@ const LINES = [
   { name: "dead-note chatter", grid: "R-.m R--- ..5- m7-.", weights: [0, 0, 2] },
 ] as const;
 
+type Written = readonly { name: string; grid: string; weights: readonly number[] }[];
+
 /** A line drawn for each section at each tier, by that tier's weights. */
-const lines = (tier: 0 | 1 | 2): Line["figures"] => ({
+const lines = (tier: 0 | 1 | 2, list: Written): Line["figures"] => ({
   hold: "section",
-  options: LINES.map(
+  options: list.map(
     (line): Figure => ({
       name: line.name,
-      weight: line.weights[tier],
+      weight: line.weights[tier]!,
       grid: line.grid,
       near: true,
       seventh: "own",
@@ -45,10 +47,51 @@ const lines = (tier: 0 | 1 | 2): Line["figures"] => ({
   ),
 });
 
-const line = (tier: 0 | 1 | 2): Line => ({
+// ── in twelve and in six ────────────────────────────────────────────────────
+// The soul ballad's bass, played by the same bassist: deep, late, the rests
+// written as carefully as the notes. A bar of 12/8 is four slow pulses of three
+// eighths, written in sixes, a pulse to a group; a bar of 6/8 is two. The lines
+// of four said in pulses: a beat is a pulse, its "e" the triplet's middle
+// eighth, its "and" and its "a" the pulse's last eighth. In twelve they are the
+// five lines of four, each turning over the bar's four pulses as it turns over
+// four beats; six has its own five, a bar of one strong pulse and one answering
+// it, where the late note sits after the backbeat or leans into the One. The
+// lead-in is the bassist's in every meter: the half step from below on the last
+// sixteenth before a change (ST-neosoul-17), the one note anyone plays between
+// the eighths, as it is the one sixteenth pickup of four.
+
+/** The five lines of four in twelve, with their weights low, mid, high (ST-neosoul-13). */
+const TWELVE_LINES = [
+  // A long root and a fifth on the "and" of 4, leaning into the One.
+  { name: "long root", grid: "R----- ------ ------ ....5-", weights: [3, 1, 0] },
+  // Two pulses of root, a breath, the fifth on the "a" of 3, the seventh after 4.
+  { name: "half note and a breath", grid: "R----- ------ ....5- --7-..", weights: [2, 3, 1] },
+  // The lazy re-strike leaning into 3, the fifth on the "and" of 3, the seventh into the One.
+  { name: "lazy re-strike", grid: "R----- --..R- ----5- ....7-", weights: [0, 3, 2] },
+  // The hammer-on to the 2nd on the "a" of 1; the octave on the "a" of 3 falling to the fifth.
+  { name: "hammer-on", grid: "R---2- --..R- ....8- --5-..", weights: [0, 1, 3] },
+  // Dead-note chatter round the backbeat.
+  { name: "dead-note chatter", grid: "R-..m. R----- ....5- m.7-..", weights: [0, 0, 2] },
+] as const;
+
+/** Five lines for a bar of six: the root held over the backbeat, the late note after it. */
+const SIX_LINES = [
+  // The root, and the fifth leaning into the One.
+  { name: "long root", grid: "R----- ....5-", weights: [3, 1, 0] },
+  // The root, a breath, the fifth late after the backbeat and the seventh into the One.
+  { name: "root and a breath", grid: "R---.. ..5-7-", weights: [2, 3, 1] },
+  // The lazy re-strike leaning into the backbeat, the fifth into the One.
+  { name: "lazy re-strike", grid: "R-..R- ----5-", weights: [0, 3, 2] },
+  // The hammer-on to the 2nd into the backbeat; the octave late after it falling to the fifth.
+  { name: "hammer-on", grid: "R---2- ..8-5-", weights: [0, 1, 3] },
+  // A dead note into the backbeat, the root late after it, the seventh into the One.
+  { name: "dead-note chatter", grid: "R-..m. ..R-7-", weights: [0, 0, 2] },
+] as const;
+
+const line = (tier: 0 | 1 | 2, list: Written = LINES): Line => ({
   // In any other meter, the root on each pulse with the fifth leading on (ST-neosoul-05).
   tones: [{ bars: [["R", "5"]] }],
-  figures: lines(tier),
+  figures: lines(tier, list),
   otherMeters: "pulses",
   // An octave over the highest root.
   ceiling: 53,
@@ -104,6 +147,11 @@ export const neosoulBass: BassStyle = {
     pull: 1,
   },
   lines: { low: line(0), mid: line(1), high: line(2) },
+  // The soul ballad in twelve and in six, written above.
+  meters: {
+    "12/8": { low: line(0, TWELVE_LINES), mid: line(1, TWELVE_LINES), high: line(2, TWELVE_LINES) },
+    "6/8": { low: line(0, SIX_LINES), mid: line(1, SIX_LINES), high: line(2, SIX_LINES) },
+  },
   leadIn,
   // The soft ending plays the last note at four fifths of this (ST-neosoul-40).
   ending: { velocity: 96 },
