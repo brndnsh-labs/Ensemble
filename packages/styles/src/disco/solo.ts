@@ -143,8 +143,9 @@ const rhythmsInSix: SoloTime = {
       shapes: BUSY_SHAPES,
     },
   ],
-  // Each lands in the first pulse and holds through the second.
-  endings: ["x----- ------", "x---x- ------", "..x-x- ------", "x...x- ------", "....x- ------"],
+  // Each lands in the first pulse and holds through the second; none lands on the first pulse's
+  // last eighth alone, which at the top of disco's range leaves less than a breath after it.
+  endings: ["x----- ------", "x---x- ------", "..x-x- ------", "x...x- ------", "..x--- ------"],
   pickups: [],
   peak: "x----- ------",
 };
