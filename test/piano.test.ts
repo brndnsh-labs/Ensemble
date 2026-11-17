@@ -37,6 +37,7 @@ import {
   ownCharts,
   SEEDS,
   STYLES,
+  soloistTakes,
   stressTakes,
   takes,
   WRITTEN,
@@ -140,6 +141,29 @@ test("every chord the chart writes is struck: the piano plays each one within an
       );
     });
   }
+});
+
+test("the hand does not growl: a chord's two lowest notes are a half step apart only on a dominant from E4 up, in every take, under a solo or not", () => {
+  // A half step on the bottom of the hand is a fault on any chord but a dominant, and on a
+  // dominant below E4 (Q-03, SU-B-10): a minor 9th under its 3rd at the bottom of Dm9 (E F A C)
+  // is a cluster where the 7th on the bottom (C E F A) is the chord. Hard under a soloist,
+  // where the hand is pressed down; and no voicing on the way into or out of a solo needs it.
+  let judged = 0;
+  for (const { chart, options, take } of [...takes(), ...stressTakes(), ...soloistTakes()]) {
+    for (const strike of strikesOf(take)) {
+      judged++;
+      const [low, next] = strike.pitches;
+      if (low === undefined || next === undefined || next - low !== 1) continue;
+      const dominant = chordsUnder(take, strike).some(
+        ({ chord }) => chordFamily(chord.quality) === "dominant",
+      );
+      assert.ok(
+        dominant && low >= 64,
+        `${chart.file} ${JSON.stringify(options)} at tick ${strike.tick}: ${strike.pitches}`,
+      );
+    }
+  }
+  assert.ok(judged > enough(20000), `only ${judged} strikes`);
 });
 
 test("one hand, one chord: a strike has stopped sounding before the next one starts", () => {
