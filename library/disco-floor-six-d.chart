@@ -1,0 +1,26 @@
+title: Disco in Six
+key: D
+tempo: 116
+meter: 6/8
+style: disco
+
+// The floor in six-eight: two pulses to the bar, three eighths in each, at the
+// dancer's speed, so a bar is a second long and most chords last two. Thirty-two
+// bars. The verse goes from the one to its two-five, then down to the six and a
+// two-five a pulse each; the second verse turns through the three and the five
+// of two. The chorus opens on the four, steps down through the three to the six,
+// goes to the two and rests on the suspended five, goes round again by the five
+// of two, and comes home by the two-five.
+[Verse]
+| Dmaj9 | % | Em7 | A13     |
+| Dmaj9 | % | Bm9 | Em7 A13 |
+
+[Verse 2]
+| Dmaj9 | %  | Em7 | A13 |
+| F#m7  | B7 | Em7 | A13 |
+
+[Chorus]
+| Gmaj9 | %   | F#m7   | Bm9 |
+| Em7   | %   | A9sus4 | A13 |
+| Gmaj9 | %   | F#m7   | B7  |
+| Em7   | A13 | Dmaj9  | A13 |

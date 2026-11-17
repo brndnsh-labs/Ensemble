@@ -1,0 +1,19 @@
+title: Disco Shuffle in Twelve
+key: Gm
+tempo: 112
+meter: 12/8
+style: disco
+
+// The floor in twelve-eight: four pulses to the bar, three eighths in each, at
+// the dancer's speed. Sixteen bars, a verse and a chorus. The verse rocks
+// between the one and the four, goes to the six, and comes home by the minor
+// two-five. The chorus opens on the six and the seven, finds the one by the
+// minor five, then takes a two-five to the relative major, steps from it to
+// the six, and turns round by the minor two-five again.
+[Verse]
+| Gm9    | Cm9        | Gm9 | Cm9 |
+| Ebmaj7 | Am7b5 D7b9 | Gm9 | %   |
+
+[Chorus]
+| Ebmaj7 | F9 | Dm7           | Gm9        |
+| Cm9    | F9 | Bbmaj7 Ebmaj7 | Am7b5 D7b9 |
