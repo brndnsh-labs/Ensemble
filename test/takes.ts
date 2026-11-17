@@ -106,11 +106,11 @@ const KINDS: readonly Omit<TakeOptions, "seed">[] = [
 ];
 
 /**
- * How many charts written for other styles each style is handed: a dozen on a push, and every
+ * How many charts written for other styles each style is handed: twenty on a push, and every
  * one of them on the full run, which held the floors of the blues' properties when the library
  * lost three blues charts that differed only by a setting (DECISIONS.md, the library's standards).
  */
-const BORROWED = FULL ? Number.POSITIVE_INFINITY : 12;
+const BORROWED = FULL ? Number.POSITIVE_INFINITY : 20;
 
 /**
  * A style's own charts: the ones written for it, named for it. Any band can be handed any
@@ -168,10 +168,16 @@ const TAKE_SPECS: readonly JamSpec[] = STYLES.flatMap((style) => [
           },
         ],
   ),
+  // A chart written for another style is played at this style's usual tempo, as the app
+  // plays it (`tempoFor` in the app's `play/jam.ts`): Cherokee is 240 as jazz and 85 as neo-soul.
   ...otherCharts(style).map((chart, c) => ({
     style,
     chart,
-    options: { ...KINDS[c % KINDS.length]!, seed: SEEDS[c % SEEDS.length]! },
+    options: {
+      ...KINDS[c % KINDS.length]!,
+      seed: SEEDS[c % SEEDS.length]!,
+      tempo: style.tempo.default,
+    },
   })),
 ]);
 
