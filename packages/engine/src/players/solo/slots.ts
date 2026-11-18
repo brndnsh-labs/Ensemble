@@ -5,6 +5,7 @@
 
 import type { Meter } from "../../chart/types.ts";
 import { PPQ } from "../../chart/types.ts";
+import { cells, STEP } from "../../perform/grid.ts";
 import type { Arrival } from "../../perform/harmony.ts";
 import { arrivals } from "../../perform/harmony.ts";
 import { pulseTicks, writtenFor } from "../../perform/meter.ts";
@@ -12,9 +13,49 @@ import type { Plan, PlanBar } from "../../plan/types.ts";
 import type { FeelStyle, StylePack } from "../../style/types.ts";
 import { tierOf } from "../../style/types.ts";
 import type { Pool } from "./harmony.ts";
-import { EIGHTH, poolOf } from "./harmony.ts";
+import { EIGHTH, isChordTone, poolOf } from "./harmony.ts";
 import { SOLO_INSTRUMENTS } from "./instruments.ts";
 import type { Density, SoloInstrument, SoloStyle } from "./style.ts";
+
+/** What a bar of a phrase is: a line bar, an end bar, a rest, or the final note of the take. */
+export type Part = "L" | "E" | "R" | "F";
+
+/** A four-bar shape on a phrase of another length: line bars added at the front, or bars cut from it (SO-09). */
+export function fitShape(shape: string, length: number): Part[] {
+  let letters = cells(shape) as Part[];
+  while (letters.length < length) {
+    letters = length - letters.length >= 2 ? ["L", "E", ...letters] : ["L", ...letters];
+  }
+  letters = letters.slice(letters.length - length);
+  if (!letters.includes("E")) letters[letters.length - 1] = "E";
+  return letters;
+}
+
+/**
+ * How many line bars in a row a phrase may play before it has to land. A phrase is
+ * as long as the style has patience for, in seconds, so at a slow tempo it is fewer
+ * bars (KF-B-12); and a horn has to get the line and the bar it lands in out of one
+ * breath.
+ */
+export function lungsOf(
+  solo: SoloStyle,
+  instrument: SoloInstrument,
+  slot: Pick<Slot, "bars">,
+  ticksPerSecond: number,
+): number {
+  const barSeconds = slot.bars[0]!.ticks / ticksPerSecond;
+  const patient = Math.floor((solo.space.patience + solo.space.breath) / barSeconds);
+  const air = instrument.breath
+    ? Math.floor((instrument.breath.lungs + instrument.breath.takes) / barSeconds - 1)
+    : slot.bars.length;
+  return Math.max(1, Math.min(patient, air));
+}
+
+/** A phrase that no shape fits: as many line bars as one breath carries and an end bar, over and over. */
+export function breathed(length: number, lungs: number): Part[] {
+  const unit = Math.min(lungs, Math.max(1, length - 1)) + 1;
+  return Array.from({ length }, (_, i): Part => ((length - 1 - i) % unit === 0 ? "E" : "L"));
+}
 
 /** One phrase of a solo: the bars of the form's phrase that the soloist has. */
 export interface Slot {
@@ -77,10 +118,11 @@ export function soloIn(solo: SoloStyle, meter: Meter): SoloStyle {
 
 /**
  * The most the player's setting at its top asks of any style: levels lifted, and
- * the share of its room given up. Each is past every style's own, so the top of
- * the setting is busier than the middle in every style.
+ * the share of its room given up: every phrase a level busier than its arc asks,
+ * and four fifths of its room given up. A style's own is less, so the top of the
+ * setting is busier than its middle in every style.
  */
-export const MOST_BUSY = { lift: 1.5, room: 0.8 } as const;
+export const MOST_BUSY = { lift: 1, room: 0.8 } as const;
 
 /**
  * How much busier than its arc the soloist plays in a take: the style's own at
@@ -102,9 +144,11 @@ export function busyOf(plan: Plan, solo: SoloStyle): { lift: number; room: numbe
  * Where a phrase stands among the phrases of its solo for a part of a lift, 0
  * to 1: the n-th phrase's place on the golden-ratio sequence, which spreads
  * any share of them evenly through the solo, and keeps every phrase lifted at
- * a smaller share lifted at a larger one.
+ * a smaller share lifted at a larger one. The first phrase that can be lifted
+ * (mostly the solo's opening, its sparsest) stands just under the middle: a
+ * lift of half a level or more takes it, a lift of less leaves it.
  */
-const RANK = (n: number): number => ((n + 1) * 0.6180339887498949) % 1;
+const RANK = (n: number): number => (0.45 + n * 0.6180339887498949) % 1;
 
 /** A level's place among the style's, sparsest first, by its name: the same level in every meter. */
 export function levelIndex(solo: SoloStyle, level: Density): number {
@@ -162,33 +206,91 @@ export function worldOf(
     const found = harmony[low];
     return found && found.tick <= tick ? found : undefined;
   };
+  const poolFor = (tick: number, hold: number) => {
+    const here = arrivalAt(tick);
+    const next = here && harmony[here.index + 1];
+    // A note struck where a chord arrives is that chord's, however soon the next one comes.
+    const leans =
+      next !== undefined &&
+      here?.tick !== tick &&
+      next.changed &&
+      next.chord !== null &&
+      next.tick - tick <= EIGHTH &&
+      tick + hold > next.tick;
+    // Nothing is struck under N.C., whatever is coming (X-B-18).
+    if (!here?.chord) return { pool: null, leans: false };
+    return { pool: poolOfArrival(leans ? next : here), leans };
+  };
   return {
     plan,
     solo,
     feel: style.feel,
     instrument,
     harmony,
-    slots: slotsOf(plan, solo, instrument),
+    slots: withinReach(
+      slotsOf(plan, solo, instrument),
+      solo,
+      instrument,
+      (plan.quarters * PPQ) / 60,
+      poolFor,
+    ),
     ticksPerSecond: (plan.quarters * PPQ) / 60,
     bass,
     arrivalAt,
     poolOf: poolOfArrival,
-    poolFor(tick, hold) {
-      const here = arrivalAt(tick);
-      const next = here && harmony[here.index + 1];
-      // A note struck where a chord arrives is that chord's, however soon the next one comes.
-      const leans =
-        next !== undefined &&
-        here?.tick !== tick &&
-        next.changed &&
-        next.chord !== null &&
-        next.tick - tick <= EIGHTH &&
-        tick + hold > next.tick;
-      // Nothing is struck under N.C., whatever is coming (X-B-18).
-      if (!here?.chord) return { pool: null, leans: false };
-      return { pool: poolOfArrival(leans ? next : here), leans };
-    },
+    poolFor,
   };
+}
+
+/**
+ * Each solo's top note as it can be played: the highest tone of the chord the
+ * climb ends on that is no higher than the top the arc allows. Where that
+ * chord has nothing so high, the top is lower, and so is every other phrase's
+ * ceiling, so that nothing else in the solo comes within `clear` of the top
+ * note it will in fact play (SO-07).
+ */
+function withinReach(
+  slots: readonly Slot[],
+  solo: SoloStyle,
+  instrument: SoloInstrument,
+  ticksPerSecond: number,
+  poolFor: (tick: number, hold: number) => { readonly pool: Pool | null },
+): Slot[] {
+  const tops = new Map<number, number>();
+  for (const slot of slots) {
+    // A top note is climbed to, not the tune's last note (which comes to rest).
+    if (!slot.peak || slot.bars.at(-1)!.ending !== null) continue;
+    // Where the climb ends: on its shape's last end bar, or where the shape is longer than
+    // one breath carries, on the phrase's last bar, as the soloist will play it.
+    const shape = fitShape(solo.arc.peak.shape, slot.bars.length);
+    const lungs = lungsOf(soloIn(solo, slot.bars[0]!.meter), instrument, slot, ticksPerSecond);
+    const run = Math.max(
+      ...shape
+        .join("")
+        .split(/[^L]/)
+        .map((line) => line.length),
+    );
+    const at = (run <= lungs ? shape : breathed(slot.bars.length, lungs)).lastIndexOf("E");
+    const bar = slot.bars[at];
+    if (!bar) continue;
+    const held = cells(soloIn(solo, bar.meter).arc.peak.ending);
+    const struck = held.lastIndexOf("x");
+    if (struck < 0) continue;
+    let length = 1;
+    while (held[struck + length] === "-") length++;
+    const { pool } = poolFor(bar.start + struck * STEP, length * STEP);
+    const reach = pool?.ladder
+      .filter((pitch) => isChordTone(pool, pitch) && pitch <= slot.top)
+      .at(-1);
+    if (reach !== undefined && reach < slot.top) tops.set(slot.solo, reach);
+  }
+  return slots.map((slot) => {
+    const top = tops.get(slot.solo);
+    if (top === undefined) return slot;
+    const high = slot.peak ? top : Math.min(slot.high, top - solo.arc.peak.clear);
+    const low = Math.max(instrument.range[0], Math.min(slot.low, high - 12));
+    return { ...slot, top, high, low };
+  });
 }
 
 /** The slots of every solo in the plan, in the order they are played. */
@@ -239,7 +341,7 @@ function slotsOf(plan: Plan, solo: SoloStyle, instrument: SoloInstrument): Slot[
 
   const slots: Slot[] = [];
   let soloIndex = -1;
-  /** The phrase's place in its solo, from 0. */
+  /** How many phrases of this solo so far a part of a step could have lifted. */
   let ordinal = 0;
   phrases.forEach((bars, i) => {
     const mark = bars[0]!.solo!;
@@ -274,11 +376,16 @@ function slotsOf(plan: Plan, solo: SoloStyle, instrument: SoloInstrument): Slot[
     const busiest = levels.length - 1;
     const asked = Math.max(0, Math.min(busiest, base + (peak ? Math.max(0, shift) : shift)));
     // Busier as the style and the player ask: whole steps, and a share of the phrases a
-    // step more. The opening is never lifted to the busiest level (SO-05).
-    const steps =
-      Math.floor(busy.lift) + (RANK(ordinal++) < busy.lift - Math.floor(busy.lift) ? 1 : 0);
-    const lifted = Math.min(busiest, asked + steps);
-    const level = levels[opening ? Math.min(lifted, Math.max(asked, busiest - 1)) : lifted]!;
+    // step more. The opening is lifted no higher than the arc's next stretch asks, nor to
+    // the busiest level, so a solo still opens lower than it ends (SO-05). The share is of
+    // the phrases a step can lift, so that none of it is spent on a phrase already as busy
+    // as the style plays.
+    const next = levelNamed(stages[Math.min(1, stages.length - 1)]!.density);
+    const ceiling = opening ? Math.max(asked, Math.min(busiest - 1, next)) : busiest;
+    const whole = Math.min(ceiling, asked + Math.floor(busy.lift));
+    const part = busy.lift - Math.floor(busy.lift);
+    const more = whole < ceiling && part > 0 && RANK(ordinal++) < part ? 1 : 0;
+    const level = levels[whole + more]!;
 
     const centre = home + stage.register;
     const high = peak ? top : Math.min(top - solo.arc.peak.clear, centre + level.span / 2 + 3);

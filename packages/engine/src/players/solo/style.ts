@@ -346,14 +346,15 @@ export interface SoloStyle {
     /**
      * Levels above what the arc, the band's energy and the tempo ask, in
      * steps: 0.5 lifts every other phrase of a solo a level, 1 every phrase.
-     * The first stretch of a solo is never lifted to the busiest level, so a
-     * solo still opens lower than it ends (SO-05).
+     * The first stretch of a solo is lifted no higher than the arc's second
+     * asks, nor to the busiest level, so a solo still opens lower than it ends
+     * (SO-05).
      */
     readonly lift: number;
     /**
      * The share of its room it gives up, 0 to 1: of the chance of a roomier
      * shape (`space.roomier`), and of the weight of a shape for each bar of
-     * rest in it. From a half, the first phrase of a solo leaves no more empty
+     * rest in it. From a fifth, the first phrase of a solo leaves no more empty
      * bars than any other (SO-10).
      */
     readonly room: number;
