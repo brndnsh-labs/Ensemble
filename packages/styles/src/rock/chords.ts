@@ -132,8 +132,55 @@ const rhythmInTwelve: RhythmBook = {
   candidates: rhythm.candidates,
 };
 
+// ── in six ──────────────────────────────────────────────────────────────────
+// The rock ballad in six-eight: twelve's book for a bar of two. The triplets
+// and the chord a pulse are twelve's first half; the held chord rings the bar.
+
+const rhythmInSix: RhythmBook = {
+  tiers: {
+    low: {
+      ...rhythmInTwelve.tiers.low,
+      figures: [
+        { name: "held", weight: 1, grid: "x----- ------" },
+        { name: "a chord a pulse", weight: 1, grid: "x----- x-----" },
+      ],
+      busy: { from: 1, to: 2 },
+      arrival: { level: 80, steps: 12 },
+    },
+    mid: {
+      ...rhythmInTwelve.tiers.mid,
+      figures: [
+        {
+          name: "triplets",
+          weight: 1,
+          grid: "x.o.o. x.o.o.",
+          groove: true,
+          soloing: "x..... x.....",
+        },
+      ],
+      busy: { from: 6, to: 6 },
+    },
+    high: {
+      ...rhythmInTwelve.tiers.high,
+      figures: [
+        {
+          name: "triplets",
+          weight: 1,
+          grid: "x.o.o. x.o.o.",
+          groove: true,
+          soloing: "x..... x.....",
+        },
+      ],
+      busy: { from: 6, to: 6 },
+    },
+  },
+  hold: rhythm.hold,
+  forms: rhythm.forms,
+  candidates: rhythm.candidates,
+};
+
 export const rockChords: ChordStyle = {
-  meters: { "12/8": rhythmInTwelve },
+  meters: { "12/8": rhythmInTwelve, "6/8": rhythmInSix },
   idiom: "keys",
   kinds: { close },
   voicing: { low: "close", mid: "close", high: "close" },

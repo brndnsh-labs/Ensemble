@@ -110,8 +110,49 @@ const rockSoloInTwelve: SoloTime = {
   peak: "x----- ------ ...... ......",
 };
 
+// ── in six ──────────────────────────────────────────────────────────────────
+// The rock ballad in six-eight. A rhythm is twelve sixteenths, written in sixes:
+// twelve's cells (a pulse held, the pulse and its last eighth, the triplet) said
+// for a bar of one strong pulse and one answering it. The levels are four's by
+// name and notes a bar (the critic asks a bar of six three quarters of them). An
+// ending lands in the first pulse and leaves the second unstruck; a pickup is a
+// pulse at most.
+const rockSoloInSix: SoloTime = {
+  levels: [
+    {
+      name: "sparse",
+      notesPerBar: 1.6,
+      span: 6,
+      cells: ["x----- x-----", "x----- ----x-", "...... x-----", "x----- ------"],
+      shapes: rockSoloInTwelve.levels[0]!.shapes,
+    },
+    {
+      name: "medium",
+      notesPerBar: 3.5,
+      span: 9,
+      cells: ["x---x- x-----", "x----- x---x-", "....x- x-----", "x---x- x---x-"],
+      shapes: rockSoloInTwelve.levels[1]!.shapes,
+    },
+    {
+      // The triplet at the peak, where four has its sixteenth bursts.
+      name: "busy",
+      notesPerBar: 6,
+      span: 12,
+      cells: ["x---x- x-x-x-", "x-x-x- x---x-", "x---x- x---x-", "x-x-x- x-----"],
+      shapes: rockSoloInTwelve.levels[2]!.shapes,
+    },
+  ],
+  endings: ["x----- ------", "x---x- ------", "....x- ------"],
+  // Twelve's from the last pulse: the last eighth, and three eighths up into the One.
+  pickups: [
+    { weight: 1, cell: "....x-" },
+    { weight: 2, cell: "x-x-x-" },
+  ],
+  peak: "x----- ----..",
+};
+
 export const rockSolo: SoloStyle = {
-  meters: { "12/8": rockSoloInTwelve },
+  meters: { "12/8": rockSoloInTwelve, "6/8": rockSoloInSix },
   instrument: "driven-guitar",
   lift: 0,
 

@@ -3,7 +3,7 @@
 // written "and" into the last note of a triplet, which is what makes the lope
 // a shuffle.
 
-import type { BassStyle } from "@ensemble/engine";
+import type { BassStyle, LineShape } from "@ensemble/engine";
 
 type Line = BassStyle["lines"]["mid"];
 
@@ -237,6 +237,33 @@ const slowTouch = {
   velocity: { arrival: 100, strong: 94, weak: 88, restrike: 72, approach: 88 },
 } as const;
 
+// ── in six ──────────────────────────────────────────────────────────────────
+// The blues counted in two. A bar of 6/8 is two slow beats of three eighths:
+// a figure is twelve sixteenths, written in sixes. The line is twelve's at the
+// same speed, a tone a beat, so a bar of six holds half a bar of the box: the
+// box's two bars of four tones are four bars of two (`inTwos`), up in the
+// first two bars on a chord and down in the next two. Where it lopes, the tone
+// is struck again on the beat's last eighth, as in twelve. Quiet it is in two
+// as twelve is, the bass note and its fifth a half bar of twelve each, which in
+// six is a bar each. The box's bar-long walks are four notes and a bar of six
+// has two, so in six the line leads into a change by its last beat alone.
+
+/** Each bar of a line's tones said in two bars of half as many. */
+const halves = (bars: LineShape["bars"]): LineShape["bars"] =>
+  bars.flatMap((bar) =>
+    bar.length > 1 ? [bar.slice(0, bar.length / 2), bar.slice(bar.length / 2)] : [bar],
+  );
+const inTwos = (tones: Line["tones"]): Line["tones"] =>
+  tones.map((set) => ({
+    ...set,
+    bars: halves(set.bars),
+    ...(set.others
+      ? { others: set.others.map((other) => ({ ...other, bars: halves(other.bars) })) }
+      : {}),
+  }));
+
+const boxInSix = inTwos(box);
+
 export const bluesBass: BassStyle = {
   // The line lives where a bass guitar's does: roots from the open E up to G2, the third
   // fret of the top two strings' octave, so a blues in A is played from the open A string
@@ -321,6 +348,37 @@ export const bluesBass: BassStyle = {
       high: {
         tones: box,
         figures: { hold: "song", options: [{ weight: 1, grid: "x---o- x---o- x---o- x---o-" }] },
+        ...slowTouch,
+      },
+    },
+    "6/8": {
+      // Quiet: in two, the bass note held a bar and its fifth the next bar on the chord.
+      low: {
+        tones: [{ when: { slash: true }, bars: [["R"]] }, { bars: [["R"], ["5"]] }],
+        figures: { hold: "song", options: [{ weight: 1, grid: "x----- ------" }] },
+        otherMeters: "downbeat",
+        ceiling: 45,
+        length: { note: 0.92, long: 0.92, short: 0.4 },
+        velocity: { arrival: 98, strong: 88, weak: 88, restrike: 70, approach: 84 },
+      },
+      // The box, a tone a beat. A section chooses how much it lopes and keeps it: not at all,
+      // into the One, or into the backbeat.
+      mid: {
+        tones: boxInSix,
+        figures: {
+          hold: "section",
+          options: [
+            { weight: 2, grid: "x----- x-----" },
+            { weight: 3, grid: "x----- x---o-" },
+            { weight: 2, grid: "x---o- x-----" },
+          ],
+        },
+        ...slowTouch,
+      },
+      // Hot: both beats lope.
+      high: {
+        tones: boxInSix,
+        figures: { hold: "song", options: [{ weight: 1, grid: "x---o- x---o-" }] },
         ...slowTouch,
       },
     },

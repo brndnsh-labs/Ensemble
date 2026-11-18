@@ -127,8 +127,67 @@ const bluesSoloInTwelve: SoloTime = {
   peak: "x----- ------ ------ ......",
 };
 
+// ── in six ──────────────────────────────────────────────────────────────────
+// The blues counted in two. A bar of 6/8 is two slow beats of three eighths: a
+// rhythm is twelve sixteenths, written in sixes, the same long-short, triplet
+// and held beat as twelve's, phrased in a bar of one strong beat and one
+// answering it. The levels are four's and twelve's by name and by notes a bar
+// (the critic asks a bar of six three quarters of a bar of four's); nothing is
+// quicker than the eighth. An ending lands in the first beat and holds through
+// the second, which is the next phrase's; a pickup is a beat at most.
+const bluesSoloInSix: SoloTime = {
+  levels: [
+    {
+      name: "sparse",
+      notesPerBar: 2,
+      span: 6,
+      cells: ["x---x- ------", "....x- x-----", "x----- ----..", "...... x-----"],
+      shapes: bluesSoloInTwelve.levels[0]!.shapes,
+    },
+    {
+      name: "medium",
+      notesPerBar: 3.5,
+      span: 9,
+      cells: [
+        "x---x- x-----",
+        "....x- x-----",
+        "x-x-x- x-----",
+        "x----- x---x-",
+        // This one runs over the barline into the next bar.
+        "....x- ----x-",
+      ],
+      shapes: bluesSoloInTwelve.levels[1]!.shapes,
+    },
+    {
+      // The triplet and the long-short by turns.
+      name: "busy",
+      notesPerBar: 5,
+      span: 12,
+      cells: ["x-x-x- x---x-", "x---x- x-x-x-", "....x- x-x-x-", "x---x- x---x-"],
+      shapes: bluesSoloInTwelve.levels[2]!.shapes,
+    },
+    {
+      // Triplets throughout.
+      name: "flying",
+      notesPerBar: 6.5,
+      span: 12,
+      cells: ["x-x-x- x-x-x-", "x-x-x- x---x-", "x---x- x-x-x-", "....x- x-x-x-"],
+      shapes: bluesSoloInTwelve.levels[3]!.shapes,
+    },
+  ],
+  // Each lands in the first beat and leaves the second unstruck.
+  endings: ["x----- ------", "x---x- ------", "x-x-x- ------", "....x- ------"],
+  // Twelve's from its last beat: the last eighth, the long-short, the triplet.
+  pickups: [
+    { weight: 1, cell: "....x-" },
+    { weight: 1, cell: "x---x-" },
+    { weight: 1, cell: "x-x-x-" },
+  ],
+  peak: "x----- ----..",
+};
+
 export const bluesSolo: SoloStyle = {
-  meters: { "12/8": bluesSoloInTwelve },
+  meters: { "12/8": bluesSoloInTwelve, "6/8": bluesSoloInSix },
   // The player's to change. Vibes are the default because every sampler has a good set.
   instrument: "vibraphone",
   lift: 0,

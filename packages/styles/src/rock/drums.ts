@@ -378,9 +378,230 @@ const rockDrumsInTwelve: DrumTime = {
   },
 };
 
+// ── in six ──────────────────────────────────────────────────────────────────
+// The rock ballad in six-eight, the heavy two. A bar of 6/8 is two slow pulses
+// of three eighths: twelve sixteenths, written in sixes. It is one strong pulse
+// and one answering it, not half a bar of twelve: there is no beat 3, so the kick
+// has the One and the backbeat the second pulse (SU-D-14). The cymbal and the
+// backbeat are twelve's first half (`halfOf`): the basic beat is the same bar cut.
+// The kicks, the turns and the fills are written for a bar of two, and held to
+// what the notes heard as too busy in six on rock (EAR-11, AU-96): the kick and
+// the snare never on more than three of the six eighths, a turn that moves the
+// kick's pickup rather than add one, fills of an eighth, two, or a pulse at most.
+
+/** The first half of a line written for twelve: the same beat in a bar of six. */
+const halfOf = (line: string) => line.split(" ").slice(0, 2).join(" ");
+
+/**
+ * Three kicks, each with the One and at most one pickup: none, the "and" of 1 into the
+ * backbeat, or the bar's last eighth into the next One. Twelve's weights for its pickups into
+ * 4 and into the One; its pickup into 3 has no bar of six to be in.
+ */
+const SIX_KICKS = [
+  { lines: { kick: "x..... ......" }, weights: [6, 3, 1] },
+  { lines: { kick: "x...x. ......" }, weights: [2, 4, 4] },
+  { lines: { kick: "x..... ....x." }, weights: [1, 3, 4] },
+] as const;
+
+/** The section's kicks at a tier: quiet, a kick off the pulse is soft, as in four and twelve. */
+function sixKicks(tier: 0 | 1 | 2): GrooveOption[] {
+  return SIX_KICKS.map((kick) => ({
+    weight: kick.weights[tier],
+    lines:
+      tier === 0
+        ? {
+            kick: kick.lines.kick.replace(/\S/g, (c, at) => (c === "x" && at % 7 !== 0 ? "o" : c)),
+          }
+        : kick.lines,
+  }));
+}
+
+const SIX_BACKBEAT = { snare: halfOf(TWELVE_BACKBEAT.snare) };
+
+/**
+ * The turns, in an answer bar: four's "and" of 4 and "and" of 3 are the bar's last eighth and
+ * the first pulse's last. In a bar of two the kick's pickup is moved, never added, so the kick
+ * and the snare stay on half the eighths: where the section's kick already has the turn's
+ * eighth, the next turn that would be heard is played.
+ */
+const SIX_QUIET_TURNS: GrooveOption[] = [
+  { weight: 2, lines: { kick: "....-. ....o." } },
+  { weight: 1, lines: { kick: "....o. ....-." } },
+];
+const SIX_KICK_LAST = { weight: 3, lines: { kick: "....-. ....x." } };
+const SIX_KICK_FIRST_AND = { weight: 2, lines: { kick: "....x. ....-." } };
+const SIX_OPEN_LAST = { weight: 2, lines: { openHat: "...... ....o." } };
+/** The snare answering its own backbeat on the last eighth, the kick giving its pickups up. */
+const SIX_SNARE_LAST = { weight: 1, lines: { snare: "...... ....o.", kick: "....-. ....-." } };
+const SIX_HAT_TURNS: GrooveOption[] = [
+  SIX_KICK_LAST,
+  SIX_KICK_FIRST_AND,
+  SIX_OPEN_LAST,
+  SIX_SNARE_LAST,
+];
+const SIX_RIDE_TURNS: GrooveOption[] = [SIX_KICK_LAST, SIX_KICK_FIRST_AND, SIX_SNARE_LAST];
+
+// Fills in six: an eighth, the bar's last two eighths, or the last pulse; each ends on the
+// bar's last eighth, the last stroke the loudest. A fill of a pulse is the backbeat's pulse,
+// so it starts on the snare there (DR-46): a bar of six never loses its backbeat.
+const SIX_TOM_RUN = {
+  two: { lowTom: "X." },
+  four: { midTom: "x...", lowTom: "..X." },
+  six: { snare: "x.....", midTom: "..o...", lowTom: "....X." },
+};
+const SIX_EIGHTH_RUN = {
+  two: { highTom: "X." },
+  four: { highTom: "x...", lowTom: "..X." },
+  six: { snare: "x.....", highTom: "..o...", lowTom: "....X." },
+};
+const SIX_SNARE_BUILD = {
+  two: { snare: "X." },
+  four: { snare: "o.X." },
+  six: { snare: "x.o.X." },
+};
+const SIX_FLOOR_UNISON = {
+  two: { snare: "X.", lowTom: "X." },
+  four: { snare: "x.X.", lowTom: "x.X." },
+  six: { snare: "x...X.", lowTom: "x...X." },
+};
+/** The pickup: the snare into the One, or its last two eighths. */
+const SIX_PICKUP = { two: { snare: "X." }, four: { snare: "o.X." } };
+
+type SixShape = {
+  two: FillShape["lines"];
+  four: FillShape["lines"];
+  six?: FillShape["lines"];
+};
+
+/** Every length of a shape in six at one weight. */
+function everyInSix(weight: number, shape: SixShape): FillShape[] {
+  return [shape.two, shape.four, ...(shape.six ? [shape.six] : [])].map((lines) => ({
+    weight,
+    lines,
+  }));
+}
+
+const rockDrumsInSix: DrumTime = {
+  grooves: {
+    low: [
+      {
+        id: "time",
+        hold: "section",
+        options: [{ weight: 1, lines: { closedHat: halfOf("o...g. o...g. o...g. o...g.") } }],
+      },
+      { id: "kick", hold: "section", options: sixKicks(0) },
+      {
+        id: "snare",
+        hold: "section",
+        when: { energyFrom: 0.3 },
+        options: [{ weight: 1, lines: { snare: "...... x....." } }],
+      },
+      {
+        id: "rim",
+        hold: "section",
+        when: { energyBelow: 0.3 },
+        options: [{ weight: 1, lines: { crossStick: "...... x....." } }],
+      },
+      {
+        id: "turn",
+        hold: "section",
+        when: { phraseBars: ANSWER_BARS },
+        audible: true,
+        options: SIX_QUIET_TURNS,
+      },
+    ],
+    mid: [
+      {
+        id: "time",
+        hold: "section",
+        options: [{ weight: 1, lines: { closedHat: halfOf("x.o.o. x.o.o. x.o.o. x.o.o.") } }],
+      },
+      { id: "kick", hold: "section", options: sixKicks(1) },
+      { id: "snare", hold: "section", options: [{ weight: 1, lines: SIX_BACKBEAT }] },
+      {
+        id: "turn",
+        hold: "section",
+        when: { phraseBars: ANSWER_BARS, playing: "closedHat" },
+        audible: true,
+        options: SIX_HAT_TURNS,
+      },
+    ],
+    high: [
+      {
+        id: "time",
+        hold: "section",
+        options: [
+          {
+            weight: 1,
+            lines: {
+              ride: halfOf("x.o.o. x.o.o. x.o.o. x.o.o."),
+              pedalHat: "...... x.....",
+            },
+          },
+          { weight: 1, lines: { closedHat: halfOf("x.x.x. x.x.x. x.x.x. x.x.x.") } },
+        ],
+      },
+      { id: "kick", hold: "section", options: sixKicks(2) },
+      { id: "snare", hold: "section", options: [{ weight: 1, lines: SIX_BACKBEAT }] },
+      {
+        id: "turn",
+        hold: "section",
+        when: { phraseBars: ANSWER_BARS, playing: "closedHat" },
+        audible: true,
+        options: SIX_HAT_TURNS,
+      },
+      {
+        id: "turn-on-the-ride",
+        hold: "section",
+        when: { phraseBars: ANSWER_BARS, playing: "ride" },
+        audible: true,
+        options: SIX_RIDE_TURNS,
+      },
+    ],
+  },
+
+  touches: [],
+
+  fills: {
+    // ST-rock-08's steps, in a bar of two: a phrase an eighth quiet, two eighths above; a
+    // section two eighths quiet, the last pulse above.
+    length: {
+      phrase: { low: 2, mid: 4, high: 4 },
+      section: { low: 4, mid: 6, high: 6 },
+    },
+    phrase: {
+      low: [
+        ...everyInSix(3, SIX_PICKUP),
+        ...everyInSix(2, SIX_SNARE_BUILD),
+        ...everyInSix(1, SIX_TOM_RUN),
+      ],
+      mid: [
+        ...everyInSix(3, SIX_PICKUP),
+        ...everyInSix(2, SIX_SNARE_BUILD),
+        ...everyInSix(1, SIX_TOM_RUN),
+      ],
+      high: [
+        ...everyInSix(3, SIX_PICKUP),
+        ...everyInSix(2, SIX_SNARE_BUILD),
+        ...everyInSix(1, SIX_TOM_RUN),
+      ],
+    },
+    section: [
+      ...everyInSix(3, SIX_TOM_RUN),
+      ...everyInSix(2, SIX_SNARE_BUILD),
+      ...everyInSix(2, SIX_FLOOR_UNISON),
+    ],
+    top: [
+      ...everyInSix(3, SIX_EIGHTH_RUN),
+      ...everyInSix(2, SIX_FLOOR_UNISON),
+      ...everyInSix(1, SIX_TOM_RUN),
+    ],
+  },
+};
+
 export const rockDrums: DrumStyle = {
-  // The rock ballad in twelve-eight, written above.
-  meters: { "12/8": rockDrumsInTwelve },
+  // The rock ballad in twelve-eight and in six-eight, written above.
+  meters: { "12/8": rockDrumsInTwelve, "6/8": rockDrumsInSix },
 
   grooves: {
     // Quiet: a soft hat with its "and"s ghosted, the backbeat, mostly the plain kick, and the

@@ -1,0 +1,15 @@
+title: Gospel Blues in Six
+key: Eb
+tempo: 60
+meter: 6/8
+style: blues
+
+// The blues counted in two, as a gospel blues ballad is: two slow beats to
+// the bar, three eighths in each. Sixteen bars: the quick change; the four
+// going minor, then the six, into the two; the two and the five said twice,
+// the second time into a turnaround of a chord a beat.
+[A]
+| Eb7 | Ab7  | Eb7     | %       |
+| Ab7 | Abm6 | Eb7     | C7      |
+| Fm7 | Bb7  | Eb7     | C7      |
+| Fm7 | Bb7  | Eb7 Ab7 | Eb7 Bb7 |
