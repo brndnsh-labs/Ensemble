@@ -280,9 +280,148 @@ const acousticDrumsInSix: DrumTime = {
   },
 };
 
+// ── in twelve ───────────────────────────────────────────────────────────────
+// A bar of 12/8 is four slow pulses of three eighths, the slow folk ballad's
+// bar: twenty-four sixteenths, written in sixes, a pulse to a group, and only
+// its three eighths are ever struck. Nothing swings. Four's drummer said in
+// pulses (AU-97), each beat of four a pulse: the kick on 1 with a soft one on
+// 3, the backbeat (a cross-stick, a brush tap, the snare when hot) on 2 and 4,
+// the answers on the foot and the hat on a pulse's last eighth, which is "the
+// and" (ST-acoustic-04 to -09). What is six's and not four's: the eighths on the
+// shaker or the hat are all three of each pulse, the pulse leaned on (six's
+// `o.g.g.`, four times), and nothing is quicker than the eighth, so the brushes
+// are the shaker's eighths and hot has no shimmer. The fills are six's: a
+// pickup of an eighth or two before the barline, the same in any bar of
+// dotted pulses.
+
+/** Six's line, said twice: where a bar of twelve is a bar of six spread out. */
+const twice = (line: string) => `${line} ${line}`;
+
+const TWELVE_SHAKER = twice(SIX_SHAKER);
+const TWELVE_SOFT_KICK = "o..... ...... ...... ......";
+/** The backbeat on 2 and 4: six's on its second pulse, twice. */
+const TWELVE_STICK = twice(SIX_STICK);
+
+/** Quiet, as four's: half-time (the cross-stick on 3), the cross-stick on 2 and 4, or the shaker alone. Never a snare. */
+const TWELVE_QUIET: GrooveOption[] = [
+  {
+    weight: 2,
+    lines: {
+      kick: TWELVE_SOFT_KICK,
+      crossStick: "...... ...... x..... ......",
+      shaker: TWELVE_SHAKER,
+    },
+  },
+  { weight: 2, lines: { kick: TWELVE_SOFT_KICK, crossStick: TWELVE_STICK } },
+  { weight: 1, lines: { kick: TWELVE_SOFT_KICK, shaker: TWELVE_SHAKER } },
+];
+
+/** Four's kicks in pulses: 1 leaned on and 3 breathing, a soft pickup into 3 or into the next One one section in five each. */
+const TWELVE_KICKS: GrooveOption[] = [
+  { weight: 3, lines: { kick: "x..... ...... o..... ......" } },
+  { weight: 1, lines: { kick: "x..... ....o. o..... ......" } },
+  { weight: 1, lines: { kick: "x..... ...... o..... ....o." } },
+];
+
+/** The working hands, as four's: the brushes in 35% of sections, else the cross-stick over the eighths on the hat or the shaker. */
+const TWELVE_HANDS: GrooveOption[] = [
+  {
+    weight: 35,
+    lines: {
+      shaker: TWELVE_SHAKER,
+      snare: twice("...... o....."),
+      pedalHat: twice("...... o....."),
+    },
+  },
+  { weight: 32.5, lines: { crossStick: TWELVE_STICK, closedHat: twice("o.g.g. o.g.g.") } },
+  { weight: 32.5, lines: { crossStick: TWELVE_STICK, shaker: TWELVE_SHAKER } },
+];
+
+/** Hot: the snare on 2 and 4, the hat on every eighth; in 40% of sections it opens softly on the bar's last eighth. */
+const TWELVE_HOT = { snare: twice(SIX_HOT.snare) };
+const TWELVE_HOT_HATS: GrooveOption[] = [
+  { weight: 60, lines: { closedHat: twice("x.o.o. x.o.o.") } },
+  {
+    weight: 40,
+    lines: { closedHat: "x.o.o. x.o.o. x.o.o. x.o...", openHat: "...... ...... ...... ....o." },
+  },
+];
+
+// The answers, as four's: a soft kick on the "and" of 3 or of 4 (a pulse's last eighth), the hat
+// breathing open on the "and" of 4 where it keeps time, hot a ghost on the snare into the One.
+const TWELVE_KICK_AND_OF_FOUR = { kick: "...... ...... ...... ....o." };
+const TWELVE_KICK_AND_OF_THREE = { kick: "...... ...... ....o. ......" };
+const TWELVE_HAT_BREATH = {
+  openHat: "...... ...... ...... ....o.",
+  closedHat: "...... ...... ...... ....-.",
+};
+const TWELVE_QUIET_ANSWERS: GrooveOption[] = [
+  { weight: 1, lines: TWELVE_KICK_AND_OF_THREE },
+  { weight: 1, lines: TWELVE_KICK_AND_OF_FOUR },
+];
+const TWELVE_FOOT_ANSWERS: GrooveOption[] = [
+  { weight: 2, lines: TWELVE_KICK_AND_OF_FOUR },
+  { weight: 1, lines: TWELVE_KICK_AND_OF_THREE },
+];
+const TWELVE_HAT_ANSWERS: GrooveOption[] = [
+  ...TWELVE_FOOT_ANSWERS,
+  { weight: 1, lines: TWELVE_HAT_BREATH },
+];
+const TWELVE_HOT_ANSWERS: GrooveOption[] = [
+  ...TWELVE_HAT_ANSWERS,
+  { weight: 1, lines: { snare: "...... ...... ...... ....g." } },
+];
+
+const acousticDrumsInTwelve: DrumTime = {
+  grooves: {
+    low: [
+      { id: "quiet", hold: "section", options: TWELVE_QUIET },
+      {
+        id: "answer",
+        hold: "section",
+        when: { phraseBars: ANSWER_BARS },
+        options: TWELVE_QUIET_ANSWERS,
+      },
+    ],
+    mid: [
+      { id: "kick", hold: "section", options: TWELVE_KICKS },
+      { id: "hands", hold: "section", options: TWELVE_HANDS },
+      {
+        id: "answer",
+        hold: "section",
+        when: { phraseBars: ANSWER_BARS, playing: "closedHat" },
+        audible: true,
+        options: TWELVE_HAT_ANSWERS,
+      },
+      {
+        id: "foot",
+        hold: "section",
+        when: { phraseBars: ANSWER_BARS, playing: "shaker" },
+        audible: true,
+        options: TWELVE_FOOT_ANSWERS,
+      },
+    ],
+    high: [
+      { id: "kick", hold: "section", options: TWELVE_KICKS },
+      { id: "backbeat", hold: "section", options: [{ weight: 1, lines: TWELVE_HOT }] },
+      { id: "hat", hold: "section", options: TWELVE_HOT_HATS },
+      {
+        id: "answer",
+        hold: "section",
+        when: { phraseBars: ANSWER_BARS },
+        audible: true,
+        options: TWELVE_HOT_ANSWERS,
+      },
+    ],
+  },
+  touches: [],
+  // Six's pickups: so many sixteenths before the barline, on the eighths, whatever the bar.
+  fills: acousticDrumsInSix.fills,
+};
+
 export const acousticDrums: DrumStyle = {
-  // Six-eight, written above.
-  meters: { "6/8": acousticDrumsInSix },
+  // Six-eight and twelve-eight, written above.
+  meters: { "6/8": acousticDrumsInSix, "12/8": acousticDrumsInTwelve },
 
   grooves: {
     low: [
