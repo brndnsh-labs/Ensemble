@@ -377,7 +377,7 @@ export const bluesSolo: SoloStyle = {
   // Busier than its arc: six tenths of its phrases a level up, and three tenths of its room
   // given up. The blues is call and answer with air between (space 0.3, SO-11), so less of its
   // room than jazz's. To move the default, change these two numbers.
-  busier: { lift: 0.6, room: 0.3 },
+  busier: { lift: 0.5, room: 0.3 },
 
   habits: {
     riff: 0.35,

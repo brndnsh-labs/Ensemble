@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { PlanBar, Take } from "@ensemble/engine";
+import type { PlanBar, Seat, Take } from "@ensemble/engine";
 import {
   chordScale,
   chordTones,
@@ -101,6 +101,60 @@ test("the soloist is off unless asked for; asked for, it rests through the intro
         );
       }
     }
+  }
+});
+
+test("the soloist from the top: asked for in a jam, it has the lead from the first pass in every style, and its solos are those of a jam a pass longer, moved up past the band's pass (an open jam made longer keeps them); a song, and a chart with a section written for the solo, are played as they are without it", () => {
+  const turns = (bars: readonly PlanBar[]) => {
+    const byPass = new Map<number, string>();
+    for (const bar of bars) {
+      if (bar.kind === "music" && bar.section.role === "body") {
+        byPass.set(bar.pass, JSON.stringify(bar.solo));
+      }
+    }
+    return [...byPass.values()];
+  };
+  const soloSection =
+    "title: Solo\nkey: C\n\n[A]\n| C | F | G | C |\n\n[Solo]\n| C | F | G | C |\n";
+  for (const style of STYLES) {
+    for (const chart of ownCharts(style)) {
+      const written = parse(chart.text).chart;
+      for (const passes of [1, 2, 3, 4, 6, 9]) {
+        const where = `${style.id}, ${chart.file}, ${passes} passes`;
+        const top = plan(written, style, { mode: "jam", passes, solo: true, soloFromTop: true });
+        const first = top.bars.filter((bar) => bar.kind === "music" && bar.pass === 0);
+        assert.ok(
+          first.filter((bar) => bar.section.role === "body").every((bar) => bar.solo !== null),
+          `${where}: the first pass is not the soloist's`,
+        );
+        const longer = plan(written, style, { mode: "jam", passes: passes + 1, solo: true });
+        assert.deepEqual(turns(top.bars), turns(longer.bars).slice(1), `${where}: the solos`);
+        const open = (n: number) =>
+          turns(
+            plan(written, style, {
+              mode: "jam",
+              open: true,
+              passes: n,
+              solo: true,
+              soloFromTop: true,
+            }).bars,
+          );
+        assert.deepEqual(open(passes + 1).slice(0, passes), open(passes), `${where}: open`);
+      }
+      const song = { mode: "song", solo: true } as const;
+      assert.deepEqual(
+        plan(written, style, { ...song, soloFromTop: true }),
+        plan(written, style, song),
+        `${style.id}, ${chart.file}: as a song`,
+      );
+    }
+    const sectioned = parse(soloSection).chart;
+    const jam = { mode: "jam", passes: 4, solo: true } as const;
+    assert.deepEqual(
+      plan(sectioned, style, { ...jam, soloFromTop: true }),
+      plan(sectioned, style, jam),
+      `${style.id}: a chart with a Solo section`,
+    );
   }
 });
 
@@ -303,7 +357,7 @@ function leadOf(take: Take): { lead: number; notes: number; sounding: number } {
  * played when it was first written and what it plays now (`scripts/solo-density.ts`).
  */
 const PLAYS: Readonly<Record<string, { readonly perSecond: number; readonly sounding: number }>> = {
-  blues: { perSecond: 1.65, sounding: 0.715 },
+  blues: { perSecond: 1.65, sounding: 0.705 },
   funk: { perSecond: 1.69, sounding: 0.37 },
   jazz: { perSecond: 2.45, sounding: 0.64 },
   rock: { perSecond: 1.77, sounding: 0.715 },
@@ -342,6 +396,164 @@ test("the soloist is not sparse: over a style's own charts at their own tempo, w
       sounding >= floor.sounding,
       `${style.id}: sounding through ${sounding.toFixed(3)} of the lead, under ${floor.sounding}`,
     );
+  }
+});
+
+// ── how busy, as the player sets it ─────────────────────────────────────────
+
+/** The player's setting for how busy the soloist is, at each quarter of its travel. */
+const SETTINGS = [0, 0.25, 0.5, 0.75, 1] as const;
+
+/**
+ * A style's own charts (six at most) as one solo of three choruses from the top, on three
+ * seeds, at each setting: the bass and the soloist only, since the soloist hears the bass and nothing else
+ * (what it plays is the same note for note with the band all there), which is a third of
+ * what a whole take costs.
+ */
+const settled = new Map<string, Take[][]>();
+function atSettings(style: Jam["style"]): Take[][] {
+  let found = settled.get(style.id);
+  if (!found) {
+    found = ownCharts(style)
+      .slice(0, 6)
+      .flatMap((chart) =>
+        [1, 2, 3].map((seed) =>
+          SETTINGS.map((setting) =>
+            render(chart.text, style, {
+              mode: "jam",
+              passes: 3,
+              solo: true,
+              soloFromTop: true,
+              seed,
+              without: ["drums", "chords"],
+              ...(setting === 0.5 ? {} : { soloDensity: setting }),
+            }),
+          ),
+        ),
+      );
+    settled.set(style.id, found);
+  }
+  return found;
+}
+
+test("the player's setting moves the soloist all the way along: over a style's own charts, notes a second and the share of the lead it sounds never go down from 0 to a quarter, a half, three quarters and 1, and at 1 it plays a tenth more notes a second than at 0 or more", () => {
+  for (const style of STYLES) {
+    const sums = SETTINGS.map(() => ({ lead: 0, notes: 0, sounding: 0 }));
+    for (const takes of atSettings(style)) {
+      takes.forEach((take, i) => {
+        const played = leadOf(take);
+        sums[i]!.lead += played.lead;
+        sums[i]!.notes += played.notes;
+        sums[i]!.sounding += played.sounding;
+      });
+    }
+    const perSecond = sums.map((sum) => sum.notes / sum.lead);
+    const sounding = sums.map((sum) => sum.sounding / sum.lead);
+    const said = `${style.id}: ${perSecond.map((n) => n.toFixed(2)).join(", ")} notes a second; sounding ${sounding.map((n) => n.toFixed(3)).join(", ")}`;
+    for (let i = 1; i < SETTINGS.length; i++) {
+      assert.ok(perSecond[i]! >= perSecond[i - 1]!, `${said}: fewer notes at ${SETTINGS[i]}`);
+      assert.ok(sounding[i]! >= sounding[i - 1]!, `${said}: less sounding at ${SETTINGS[i]}`);
+    }
+    assert.ok(perSecond.at(-1)! >= perSecond[0]! * 1.1, `${said}: the ends are too close`);
+  }
+});
+
+/** The first of a style's own charts and its first in another meter, the whole band, at the ends of the setting, in the middle, and with it left out. */
+const banded = new Map<string, { chart: string; takes: Take[] }[]>();
+function bandAt(style: Jam["style"]): { chart: string; takes: Take[] }[] {
+  let found = banded.get(style.id);
+  if (!found) {
+    const own = ownCharts(style);
+    const charts = [own.find((chart) => chart.meter === "4/4"), own.find((c) => c.meter !== "4/4")];
+    found = charts
+      .filter((chart) => chart !== undefined)
+      .map((chart, c) => {
+        const options = {
+          mode: "jam",
+          passes: 3,
+          solo: true,
+          soloFromTop: true,
+          seed: 1 + c,
+        } as const;
+        return {
+          chart: chart.file,
+          takes: [undefined, 0, 0.5, 1].map((setting) =>
+            render(
+              chart.text,
+              style,
+              setting === undefined ? options : { ...options, soloDensity: setting },
+            ),
+          ),
+        };
+      });
+    banded.set(style.id, found);
+  }
+  return found;
+}
+
+test("the setting at its middle is the style's own: a take with it at 0.5 is the take with it left out, note for note", () => {
+  for (const style of STYLES) {
+    for (const { chart, takes } of bandAt(style)) {
+      assert.deepEqual(takes[2]!.events, takes[0]!.events, `${style.id}, ${chart}`);
+    }
+  }
+});
+
+test("the setting is the soloist's alone: at every setting the drums and the bass play the same notes, and so does a comp that does not listen to the soloist", () => {
+  for (const style of STYLES) {
+    const seats: Seat[] = [
+      "drums",
+      "bass",
+      ...(style.chords.listening === null ? (["chords"] as const) : []),
+    ];
+    for (const { chart, takes } of bandAt(style)) {
+      for (const seat of seats) {
+        const band = takes.map((take) => notesOf(take, seat));
+        for (let i = 1; i < band.length; i++) {
+          assert.deepEqual(band[i], band[0], `${style.id}, ${chart}: the ${seat}`);
+        }
+      }
+    }
+  }
+});
+
+test("tempo is felt in the pulse: at the same pulse the soloist plays as many notes a pulse in six-eight, in three and in 6/4 as in four, nine tenths as many at least, at each style's working level", () => {
+  const chart = (meter: string) =>
+    `title: Pulse\nkey: C\ntempo: 70\nmeter: ${meter}\n\n[A]\n| C7 | F7 | C7 | C7 |\n| F7 | F7 | C7 | C7 |\n| G7 | F7 | C7 | G7 |\n`;
+  for (const style of STYLES) {
+    const perPulse = (meter: string) => {
+      let [notes, pulses] = [0, 0];
+      for (const seed of [1, 2]) {
+        const take = render(chart(meter), style, {
+          mode: "jam",
+          passes: 3,
+          solo: true,
+          soloFromTop: true,
+          energy: 0.55,
+          seed,
+          // The soloist hears the bass and nothing else: the rest of the band is not needed here.
+          without: ["drums", "chords"],
+        });
+        const lead = take.plan.bars.filter((bar) => bar.kind === "music" && bar.solo);
+        pulses += lead.reduce((sum, bar) => sum + pulseTicks(bar.meter).length, 0);
+        const end = lead.at(-1)!.start + lead.at(-1)!.ticks;
+        notes += notesOf(take, "solo").filter(
+          (note) => note.tick >= lead[0]!.start && note.tick < end,
+        ).length;
+      }
+      return notes / pulses;
+    };
+    const four = perPulse("4/4");
+    // A bar of six beats is played from the style's own rhythms only where it has written them:
+    // a rhythm of four in a bar of six leaves two beats of it empty, whatever the tempo.
+    const meters = ["6/8", "3/4", ...(style.solo.meters?.["6/4"] ? ["6/4"] : [])];
+    for (const meter of meters) {
+      const here = perPulse(meter);
+      assert.ok(
+        here >= four * 0.9,
+        `${style.id}: ${here.toFixed(2)} notes a pulse in ${meter}, ${four.toFixed(2)} in 4/4`,
+      );
+    }
   }
 });
 

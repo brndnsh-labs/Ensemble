@@ -95,8 +95,12 @@ export function planBars(
     options.mode === "jam" ? chorusOf(expanded, options).bars.length : 1,
   );
 
-  // The soloist has the lead from the first pass, where the player asked for it in a jam.
-  const top = options.mode === "jam" && options.soloFromTop === true;
+  // The soloist has the lead from the first pass, where the player asked for it in a jam, and
+  // where the chart does not say where it solos itself, in a section named for it.
+  const top =
+    options.mode === "jam" &&
+    options.soloFromTop === true &&
+    !runs.some((run) => sectionIdentity(run.bars[0]!.sectionLabel).startsWith("solo"));
   const climax = soloClimax(options, planned, open, top);
   const breath = climax === undefined ? undefined : soloBreath(climax, planned, open, top);
   const rise = (pass: number) =>

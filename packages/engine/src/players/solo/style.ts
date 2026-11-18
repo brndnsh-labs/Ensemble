@@ -354,7 +354,7 @@ export interface SoloStyle {
     /**
      * The share of its room it gives up, 0 to 1: of the chance of a roomier
      * shape (`space.roomier`), and of the weight of a shape for each bar of
-     * rest in it. From a fifth, the first phrase of a solo leaves no more empty
+     * rest in it. From a tenth, the first phrase of a solo leaves no more empty
      * bars than any other (SO-10).
      */
     readonly room: number;

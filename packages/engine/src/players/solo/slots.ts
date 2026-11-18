@@ -78,6 +78,8 @@ export interface Slot {
   readonly level: Density;
   /** The share of its room the soloist gives up here, 0 to 1 (`SoloStyle.busier.room`). */
   readonly room: number;
+  /** The level the arc, the band's energy and the tempo ask, before the player's setting lifts it. */
+  readonly asked: Density;
   /** The pitch the phrase sits around, and the lowest and highest it may reach (SO-12). */
   readonly centre: number;
   readonly low: number;
@@ -148,7 +150,7 @@ export function busyOf(plan: Plan, solo: SoloStyle): { lift: number; room: numbe
  * (mostly the solo's opening, its sparsest) stands just under the middle: a
  * lift of half a level or more takes it, a lift of less leaves it.
  */
-const RANK = (n: number): number => (0.45 + n * 0.6180339887498949) % 1;
+const RANK = (n: number): number => (0.6 + n * 0.6180339887498949) % 1;
 
 /** A level's place among the style's, sparsest first, by its name: the same level in every meter. */
 export function levelIndex(solo: SoloStyle, level: Density): number {
@@ -402,6 +404,7 @@ function slotsOf(plan: Plan, solo: SoloStyle, instrument: SoloInstrument): Slot[
       last,
       level,
       room: busy.room,
+      asked: levels[asked]!,
       centre,
       low: Math.round(low),
       high: Math.round(high),
