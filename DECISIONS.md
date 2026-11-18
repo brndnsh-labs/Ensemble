@@ -2336,3 +2336,8 @@ An Opus build from `prompts/solo-density.md` (in the builder's clone, `.work/den
 - **At the ends of the setting only**: "a comp that listens makes room" fails at 1 in the blues, rock and jazz, and with `soloFromTop` in rock. The suite does not play those, so nothing fails; the comp was not in the brief. Left.
 - **The major seventh over a dominant tonic in six was the property's fault**, not the soloist's (an A struck an eighth before F9 and held into it is F9's third). Closed.
 - **The app's two settings go to the test site with this** ("the soloist's settings in the app").
+
+## the busier soloist, heard: the defaults and the slider's range stand (stage 6, 2026-11-17)
+
+- **Brandon, after the page `out/solo-density/`**: "great work"; then, of the defaults and of the slider's travel, "i agree with your defaults, the range seems really good". Each style's `busier.lift` and `busier.room` stay as built.
+- **Double time is not owed for the slider's sake.** It stays on the list of what the soloist lacks, for the solo's build (which is flatter than it was), not for range.
