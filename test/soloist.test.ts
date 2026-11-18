@@ -357,9 +357,9 @@ function leadOf(take: Take): { lead: number; notes: number; sounding: number } {
  * played when it was first written and what it plays now (`scripts/solo-density.ts`).
  */
 const PLAYS: Readonly<Record<string, { readonly perSecond: number; readonly sounding: number }>> = {
-  blues: { perSecond: 1.65, sounding: 0.705 },
+  blues: { perSecond: 1.65, sounding: 0.695 },
   funk: { perSecond: 1.69, sounding: 0.37 },
-  jazz: { perSecond: 2.45, sounding: 0.64 },
+  jazz: { perSecond: 2.45, sounding: 0.63 },
   rock: { perSecond: 1.77, sounding: 0.715 },
   disco: { perSecond: 2.23, sounding: 0.66 },
   neosoul: { perSecond: 1.14, sounding: 0.58 },
@@ -634,8 +634,11 @@ test("the soloist plays no wrong note on a beat or held: nothing a half step ove
         next?.changed &&
         harmony[at]!.tick !== note.tick &&
         next.tick - note.tick <= PPQ / 2 &&
-        // By more than swing lengthens an eighth on the beat: the change swings with it.
-        note.tick + note.duration > next.tick + PPQ / 4;
+        // By more than swing lengthens an eighth on the beat: the change swings with it. A bar
+        // of dotted pulses is not swung, so there any of it held over is held over: an A struck
+        // an eighth before an F9 in six and held into it is the F9's third, not a B-flat nine's
+        // major seventh.
+        note.tick + note.duration > next.tick + (measure.meter.unit === 4 ? PPQ / 4 : 0);
       const arrival = leans ? next : harmony[at]!;
       const chord = arrival.chord;
       if (!chord) continue;

@@ -259,9 +259,16 @@ function withinReach(
   poolFor: (tick: number, hold: number) => { readonly pool: Pool | null },
 ): Slot[] {
   const tops = new Map<number, number>();
+  // The climb is the same phrase of the form in whichever chorus it comes, so it is read
+  // from the solo's first chorus: known as the solo starts, and the same however long the
+  // solo turns out to be (a jam told to finish, an open jam made longer).
+  const firstChorus = new Map<number, number>();
   for (const slot of slots) {
+    if (!firstChorus.has(slot.solo)) firstChorus.set(slot.solo, slot.chorus);
+    const climbs = Math.max(0, slot.count - 1 - solo.arc.peak.fromEnd);
+    if (slot.chorus !== firstChorus.get(slot.solo) || slot.index !== climbs) continue;
     // A top note is climbed to, not the tune's last note (which comes to rest).
-    if (!slot.peak || slot.bars.at(-1)!.ending !== null) continue;
+    if (tops.has(slot.solo) || slot.bars.at(-1)!.ending !== null) continue;
     // Where the climb ends: on its shape's last end bar, or where the shape is longer than
     // one breath carries, on the phrase's last bar, as the soloist will play it.
     const shape = fitShape(solo.arc.peak.shape, slot.bars.length);
@@ -284,11 +291,11 @@ function withinReach(
     const reach = pool?.ladder
       .filter((pitch) => isChordTone(pool, pitch) && pitch <= slot.top)
       .at(-1);
-    if (reach !== undefined && reach < slot.top) tops.set(slot.solo, reach);
+    tops.set(slot.solo, reach !== undefined && reach < slot.top ? reach : slot.top);
   }
   return slots.map((slot) => {
     const top = tops.get(slot.solo);
-    if (top === undefined) return slot;
+    if (top === undefined || top === slot.top) return slot;
     const high = slot.peak ? top : Math.min(slot.high, top - solo.arc.peak.clear);
     const low = Math.max(instrument.range[0], Math.min(slot.low, high - 12));
     return { ...slot, top, high, low };
