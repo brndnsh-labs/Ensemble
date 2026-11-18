@@ -434,6 +434,69 @@ test(
   },
 );
 
+test("jazz: in six and twelve the bass plays the pulses, and the triplet's last eighth as a pickup into one: every note on a pulse or on a pulse's last eighth (or where a chord lands), never the middle one; the strong pulses always; quiet it is in two (twelve: a note on 1 and 3 and at most a lead-in on 4; six: one on each pulse) with no pickups; from the working level a note on every pulse, never the same pitch twice running; and hot a pickup in every bar of one chord", {
+  skip: only("jazz").skip || !LIBRARY.some((c) => c.meter === "6/8" || c.meter === "12/8"),
+}, () => {
+  const counted = { low: 0, mid: 0, high: 0 };
+  const jazz = STYLES.find((style) => style.id === "jazz")!;
+  const compound = (jam: { style: { id: string }; chart: { meter: string } }) =>
+    jam.style.id === "jazz" && (jam.chart.meter === "6/8" || jam.chart.meter === "12/8");
+  for (const { chart, options, take } of [
+    ...takes(compound),
+    ...heldTakes(jazz, "6/8", false, true),
+    ...heldTakes(jazz, "12/8", false, true),
+  ]) {
+    const bass = notesOf(take, "bass");
+    const harmony = arrivals(take.plan);
+    let at = 0;
+    for (const bar of take.plan.bars) {
+      const own: typeof bass = [];
+      while (at < bass.length && bass[at]!.tick < bar.start + bar.ticks) own.push(bass[at++]!);
+      if (bar.kind !== "music" || bar.ending || bar.seats.bass === null) continue;
+      if (!isCompound(bar.meter) || bar.spans.some((span) => span.chord === null)) continue;
+      const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
+      const landings = harmony
+        .filter((arrival) => arrival.bar === bar.index)
+        .map((arrival) => arrival.tick - bar.start);
+      const pulses = pulseStarts(bar.meter);
+      const ticks = own.map((note) => note.tick - bar.start);
+      // A dotted pulse is three eighths: its last eighth is an eighth before the next pulse.
+      const pickup = (tick: number) => tick % (PPQ * 1.5) === PPQ;
+      for (const tick of ticks) {
+        assert.ok(
+          pulses.includes(tick) || pickup(tick) || landings.includes(tick),
+          `${where}: a note at ${tick}, off the pulse and not a pickup`,
+        );
+      }
+      for (const strong of strongPulses(bar.meter))
+        assert.ok(ticks.includes(strong), `${where}: nothing on the strong pulse at ${strong}`);
+      const tier = tierOf(bar.seats.bass);
+      // The bar before the band opens up already plays where it is going (BA-25).
+      const next = take.plan.bars[bar.index + 1];
+      if (next?.seats.bass != null && tierOf(next.seats.bass) !== tier) continue;
+      if (landings.some((tick) => tick !== 0)) continue;
+      counted[tier]++;
+      if (tier === "low") {
+        const two = bar.meter.beats === 6 ? pulses : strongPulses(bar.meter);
+        for (const tick of two) assert.ok(ticks.includes(tick), `${where}: quiet, not in two`);
+        const lead = pulses.at(-1)!;
+        for (const tick of ticks)
+          assert.ok(two.includes(tick) || tick === lead, `${where}: quiet, a note at ${tick}`);
+        continue;
+      }
+      for (const tick of pulses) assert.ok(ticks.includes(tick), `${where}: no note at ${tick}`);
+      for (let i = 1; i < own.length; i++)
+        assert.notEqual(own[i]!.pitch, own[i - 1]!.pitch, `${where}: a pitch twice running`);
+      if (tier === "high")
+        assert.ok(ticks.some(pickup), `${where}: hot, and no pickup into a pulse`);
+    }
+  }
+  assert.ok(
+    counted.low > 20 && counted.mid > 50 && counted.high > 20,
+    `only ${counted.low} quiet bars, ${counted.mid} working, ${counted.high} hot`,
+  );
+});
+
 // ── rock ────────────────────────────────────────────────────────────────────
 
 test(

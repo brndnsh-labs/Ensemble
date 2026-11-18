@@ -430,8 +430,47 @@ test(
   },
 );
 
+test("jazz: in six and twelve the piano comps round the pulses, not a pad (AU-94): no bar it comps is struck more than five times (four, and the lean into the next bar), seven strikes in ten at least are on a pulse or the eighth before one, and from the working level, away from a soloist, it pushes, striking the eighth before a pulse, in a fifth of its bars or more", {
+  skip: only("jazz").skip || !LIBRARY.some((c) => c.meter === "6/8" || c.meter === "12/8"),
+}, () => {
+  const jazz = STYLES.find((style) => style.id === "jazz")!;
+  const compound = (jam: { style: { id: string }; chart: { meter: string } }) =>
+    jam.style.id === "jazz" && (jam.chart.meter === "6/8" || jam.chart.meter === "12/8");
+  const counted = { strikes: 0, round: 0, working: 0, pushed: 0 };
+  for (const { chart, options, take } of [
+    ...takes(compound),
+    ...heldTakes(jazz, "6/8", false, true),
+    ...heldTakes(jazz, "12/8", false, true),
+  ]) {
+    const byBar = strikesByBar(take);
+    for (const bar of take.plan.bars) {
+      if (bar.kind !== "music" || bar.ending || bar.seats.chords === null) continue;
+      if (!isCompound(bar.meter)) continue;
+      const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
+      const ticks = (byBar.get(bar.index) ?? []).map((strike) => strike.tick - bar.start);
+      assert.ok(ticks.length <= 5, `${where}: ${ticks.length} strikes`);
+      const pulses = pulseStarts(bar.meter);
+      const pushes = ticks.filter((tick) => onAnd(bar.meter, tick));
+      counted.strikes += ticks.length;
+      counted.round += ticks.filter((tick) => pulses.includes(tick)).length + pushes.length;
+      if (bar.solo !== null || tierOf(bar.seats.chords) === "low") continue;
+      counted.working++;
+      if (pushes.length > 0) counted.pushed++;
+    }
+  }
+  assert.ok(counted.strikes > 500 && counted.working > 100, `only ${JSON.stringify(counted)}`);
+  assert.ok(
+    counted.round >= 0.7 * counted.strikes,
+    `${counted.round} of ${counted.strikes} strikes on a pulse or the eighth before one`,
+  );
+  assert.ok(
+    counted.pushed >= 0.2 * counted.working,
+    `pushed in ${counted.pushed} of ${counted.working} working bars`,
+  );
+});
+
 test(
-  "neo-soul: in six and twelve the Rhodes holds and leans: away from a soloist, in a bar of one chord, it is never struck on every pulse, and from the working level up it leans into a pulse, struck on an eighth between them (the lazy re-strike, or a chord laid in late)",
+  "neo-soul: in six and twelve the Rhodes holds and leans:away from a soloist, in a bar of one chord, it is never struck on every pulse, and from the working level up it leans into a pulse, struck on an eighth between them (the lazy re-strike, or a chord laid in late)",
   only("neosoul"),
   () => {
     let quiet = 0;

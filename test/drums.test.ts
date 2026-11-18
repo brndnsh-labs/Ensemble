@@ -17,6 +17,7 @@ import {
   TIER_MID,
   tierOf,
 } from "@ensemble/engine";
+import { POCKET } from "./reading.ts";
 import {
   enough,
   heldTakes,
@@ -26,7 +27,9 @@ import {
   only,
   ownCharts,
   STYLES,
+  soloistTakes,
   takes,
+  WRITTEN,
   written,
 } from "./takes.ts";
 
@@ -326,70 +329,101 @@ test(
 
 // ── jazz ────────────────────────────────────────────────────────────────────
 
+const jazz = STYLES.find((style) => style.id === "jazz");
+/** Jazz where it plays its own parts, and its own charts in six and in twelve held at each level. */
+const jazzPlayed = (): Jam[] => [
+  ...takes(itsOwn("jazz")),
+  ...(jazz
+    ? [...heldTakes(jazz, "6/8", false, true), ...heldTakes(jazz, "12/8", false, true)]
+    : []),
+];
+
 test(
-  'jazz: the whole band plays swung eighths only: nothing between a beat and its "and"',
+  'jazz: the whole band plays eighths only: in a bar of quarter-note beats nothing between a beat and its swung "and"; in a bar of dotted pulses, its own triplet, nothing between the eighths and nothing swings them, the fills and the soloist too',
   only("jazz"),
   () => {
-    for (const { chart, options, take } of takes((jam) => jam.style.id === "jazz")) {
+    let compoundNotes = 0;
+    const isJazz = (jam: { style: { id: string } }) => jam.style.id === "jazz";
+    const compoundOwn = (jam: { style: { id: string }; chart: { meter: string } }) =>
+      isJazz(jam) && (jam.chart.meter === "6/8" || jam.chart.meter === "12/8");
+    for (const { chart, options, take } of [
+      ...takes(isJazz),
+      ...soloistTakes().filter(compoundOwn),
+      ...(jazz
+        ? [...heldTakes(jazz, "6/8", true, true), ...heldTakes(jazz, "12/8", true, true)]
+        : []),
+    ]) {
       for (const note of (["drums", "bass", "chords", "solo"] as const).flatMap((seat) =>
         notesOf(take, seat),
       )) {
         const bar = take.plan.bars.findLast((candidate) => candidate.start <= note.tick)!;
-        if (bar.kind !== "music" || bar.meter.unit !== 4) continue;
-        assert.equal(
-          (note.tick - bar.start) % (2 * STEP),
-          0,
-          `${chart.file} seed ${options.seed} bar ${bar.index}: the ${note.seat} (${note.voice}) between the eighths`,
-        );
+        if (bar.kind !== "music" || (bar.meter.unit !== 4 && !isCompound(bar.meter))) continue;
+        const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}: the ${note.seat} (${note.voice})`;
+        assert.equal((note.tick - bar.start) % (2 * STEP), 0, `${where} between the eighths`);
+        if (!isCompound(bar.meter)) continue;
+        compoundNotes++;
+        assert.ok(Math.abs(note.offset) <= POCKET, `${where} moved ${note.offset}`);
       }
     }
+    if (jazz && ownCharts(jazz).some((chart) => isCompound(parse(chart.text).chart.meter)))
+      assert.ok(compoundNotes > enough(20000), `only ${compoundNotes} notes in six and twelve`);
   },
 );
 
 test(
-  "jazz: once the band has opened up the ride is on every beat, through the fills too, unless a crash takes the One or the stick goes round the toms; the hat foot closes on the second beat of each half of the bar (2 and 4; in six, 2 and 5) and on no other; the snare stays off the One and off the foot's beats",
+  "jazz: once the band has opened up the ride is on every pulse, through the fills too, unless a crash takes the One or the stick goes round the toms; the hat foot closes on the pulse after each strong one (2 and 4 in four and in twelve; in 6/4, 2 and 5; in six-eight the second pulse) and on no other; the snare stays off the One and off the foot's pulses",
   only("jazz"),
   () => {
     let bars = 0;
-    let six = 0;
-    for (const { chart, options, take } of takes(itsOwn("jazz"))) {
+    const meters = new Map<string, number>();
+    for (const { chart, options, take } of jazzPlayed()) {
       for (const { bar, kit, energy } of kitBars(take)) {
         if (bar.ending || energy < TIER_MID) continue;
-        const where = `${chart.file} seed ${options.seed} bar ${bar.index}`;
+        const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
         bars++;
-        if (chart.meter !== "4/4") six++;
-        const beats = pulseStarts(bar.meter).map((tick) => tick / STEP);
-        // The second beat of each half: the beat after each strong pulse.
-        const foot = strongPulses(bar.meter).map((tick) => (tick + PPQ) / STEP);
+        meters.set(chart.meter, (meters.get(chart.meter) ?? 0) + 1);
+        const pulses = pulseStarts(bar.meter);
+        const beats = pulses.map((tick) => tick / STEP);
+        // The second pulse of each half: the pulse after each strong one.
+        const foot = strongPulses(bar.meter).map(
+          (tick) => pulses[pulses.indexOf(tick) + 1]! / STEP,
+        );
         const toms = TOMS.some((voice) => kit.has(voice));
         for (const beat of beats) {
           if (toms && beat >= beats.at(-2)!) continue;
           assert.ok(
             strikes(kit, "ride", beat) || (beat === 0 && strikes(kit, "crash", 0)),
-            `${where}: no ride on beat ${beat / 4 + 1}`,
+            `${where}: no ride on pulse ${beats.indexOf(beat) + 1}`,
           );
           assert.equal(
             strikes(kit, "pedalHat", beat),
             foot.includes(beat),
-            `${where}: the hat foot on beat ${beat / 4 + 1}`,
+            `${where}: the hat foot on pulse ${beats.indexOf(beat) + 1}`,
           );
         }
         if (bar.fill) continue;
         for (const beat of [0, ...foot]) {
           for (const voice of ["snare", "ghostSnare"]) {
-            assert.ok(!strikes(kit, voice, beat), `${where}: the snare on beat ${beat / 4 + 1}`);
+            assert.ok(
+              !strikes(kit, voice, beat),
+              `${where}: the snare on pulse ${beats.indexOf(beat) + 1}`,
+            );
           }
         }
       }
     }
     assert.ok(bars > enough(2000), `only ${bars} bars`);
-    if (LIBRARY.some((chart) => chart.meter === "6/4"))
-      assert.ok(six > enough(300), `only ${six} bars of six`);
+    for (const meter of WRITTEN.jazz ?? [])
+      if (LIBRARY.some((chart) => chart.meter === meter))
+        assert.ok(
+          (meters.get(meter) ?? 0) > (meter === "6/4" ? enough(300) : 50),
+          `only ${meters.get(meter) ?? 0} bars of ${meter}`,
+        );
   },
 );
 
 test(
-  "jazz: the band states the tune before it opens up: the first chorus of a jam is played a level down, on the closed hat with no bass drum, all but its bridge, and the second chorus is on the ride",
+  "jazz: the band states the tune before it opens up: the first chorus of a jam is played a level down, on the closed hat (on its second pulse, in every meter) with no bass drum, all but its bridge, and the second chorus is on the ride",
   only("jazz"),
   () => {
     for (const style of STYLES.filter((candidate) => candidate.id === "jazz")) {
@@ -446,7 +480,8 @@ test(
         if (bar.level < style.arc.defaultLevel) continue;
         const where = `${chart.file} seed ${options.seed} bar ${bar.index}`;
         heads++;
-        assert.ok(strikes(kit, "closedHat", 4), `${where}: the head is not on the hat`);
+        const second = pulseStarts(bar.meter)[1]! / STEP;
+        assert.ok(strikes(kit, "closedHat", second), `${where}: the head is not on the hat`);
         assert.ok(!kit.has("ride"), `${where}: the ride in the head`);
         // A set-up into the next chorus may have a bass drum under it, and an arrival is a
         // crash with a kick (DR-20); the time has none.
@@ -457,6 +492,46 @@ test(
     assert.ok(heads > enough(500), `only ${heads} bars of head`);
   },
 );
+
+test("jazz: in six and twelve the cymbal's skip is the pulse's last eighth, never its middle (AU-92): from the working level, in six-eight the ride on each pulse and the eighth before the next and nowhere else, in twelve-eight the ballad's triplets, every eighth; quiet, the time (the head's closed hat or a ballad's soft ride) on each pulse and at most its last eighth, never the middle one", {
+  skip:
+    only("jazz").skip || !LIBRARY.some((chart) => chart.meter === "6/8" || chart.meter === "12/8"),
+}, () => {
+  const counted = { quiet: 0, six: 0, twelve: 0 };
+  for (const { chart, options, take } of jazzPlayed()) {
+    if (chart.meter !== "6/8" && chart.meter !== "12/8") continue;
+    for (const { bar, kit, energy } of kitBars(take)) {
+      if (bar.ending || bar.fill) continue;
+      const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
+      const steps = Math.round(bar.ticks / STEP);
+      // An arrival crash takes the cymbal's stroke on the One.
+      const time = (voice: string) =>
+        new Set([...(kit.get(voice) ?? [])].filter((step) => step !== 0 || !bar.crash));
+      if (energy >= TIER_MID) {
+        const ride = time("ride");
+        for (let step = 0; step < steps; step += 2) {
+          if (step === 0 && bar.crash) continue;
+          // In sixteenths a pulse is six: its eighths are 0, 2 and 4 into it.
+          const wanted: boolean = chart.meter === "12/8" || step % 6 !== 2;
+          assert.equal(ride.has(step), wanted, `${where}: the ride at ${step}`);
+        }
+        counted[chart.meter === "12/8" ? "twelve" : "six"]++;
+        continue;
+      }
+      counted.quiet++;
+      const cymbal = new Set([...time("ride"), ...time("closedHat")]);
+      for (let pulse = 0; pulse < steps; pulse += 6) {
+        if (pulse > 0 || !bar.crash)
+          assert.ok(cymbal.has(pulse), `${where}: no cymbal on pulse ${pulse / 6 + 1}`);
+        assert.ok(!cymbal.has(pulse + 2), `${where}: the triplet's middle eighth, quiet`);
+      }
+    }
+  }
+  assert.ok(
+    counted.quiet > 30 && counted.six > 30 && counted.twelve > 30,
+    `only ${counted.quiet} quiet bars, ${counted.six} of six and ${counted.twelve} of twelve working`,
+  );
+});
 
 // ── rock ────────────────────────────────────────────────────────────────────
 
