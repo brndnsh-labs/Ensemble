@@ -667,14 +667,47 @@ const guitarsInSix = guitars.filter(
     style.chords.idiom !== "keys" &&
     style.chords.idiom.strum.grid === "eighth",
 );
+/** The library's charts in twelve-eight, and the guitars that swing in eighths and have written it. */
+const TWELVES = LIBRARY.filter((chart) => chart.meter === "12/8");
+const guitarsInTwelve = guitars.filter(
+  (style) =>
+    TWELVES.length > 0 &&
+    (WRITTEN[style.id] ?? []).includes("12/8") &&
+    style.chords.idiom !== "keys" &&
+    style.chords.idiom.strum.grid === "eighth",
+);
 const inSix = (jam: { style: (typeof STYLES)[number]; chart: { meter: string } }) =>
-  guitarsInSix.includes(jam.style) && jam.chart.meter === "6/8";
+  (guitarsInSix.includes(jam.style) && jam.chart.meter === "6/8") ||
+  (guitarsInTwelve.includes(jam.style) && jam.chart.meter === "12/8");
 /**
- * The bars of six a guitar plays: every take of the library's in six that it is handed, and
- * each such chart held quiet with a bassist and without one, and held working and hot.
+ * The bars of six and twelve a guitar plays: every take of the library's in six or twelve that
+ * it is handed; each chart in six held quiet with a bassist and without one, and held working
+ * and hot; and each chart in twelve (its own on a push, every one on the full run) held at the
+ * three levels as the other seats' properties hold it, and quiet with no bassist.
  */
 function sixes(): { where: string; style: (typeof STYLES)[number]; take: Take }[] {
   return [
+    ...guitarsInTwelve.flatMap((style) => [
+      ...heldTakes(style, "12/8").map(({ chart, options, take }) => ({
+        where: `${chart.file} held at ${options.energy} seed ${options.seed}`,
+        style,
+        take,
+      })),
+      ...(FULL ? TWELVES : ownCharts(style).filter((chart) => chart.meter === "12/8")).flatMap(
+        (chart) =>
+          SEEDS.slice(0, 2).map((seed) => ({
+            where: `${chart.file} held at 0.3 with no bassist seed ${seed}`,
+            style,
+            take: render(chart.text, style, {
+              mode: "jam",
+              passes: 2,
+              seed,
+              energy: 0.3,
+              without: ["bass"],
+            }),
+          })),
+      ),
+    ]),
     ...takes(inSix).map(({ style, chart, options, take }) => ({
       where: `${chart.file} seed ${options.seed}`,
       style,
@@ -715,6 +748,12 @@ const PICKED_IN_SIX = 300;
 const PICKED_BARS_IN_SIX = 200;
 const QUIET_IN_SIX = 80;
 const STRUMMED_BARS_IN_SIX = 300;
+// The same in twelve, where the held charts are acoustic's own on a push.
+const PICKED_IN_TWELVE = 60;
+const ALONE_IN_TWELVE = 20;
+const PICKED_BARS_IN_TWELVE = 60;
+const QUIET_IN_TWELVE = 30;
+const STRUMMED_BARS_IN_TWELVE = 60;
 
 /** Standard tuning, low string first. */
 const OPEN = [40, 45, 50, 55, 59, 64];
@@ -920,6 +959,7 @@ test("a picked note is a string of the shape the hand is holding: everything the
   let plucks = 0;
   let rang = 0;
   let six = 0;
+  let twelve = 0;
   const played = [
     ...[...takes(picked), ...stressTakes(picked)].map(({ style, chart, options, take }) => ({
       of: `${chart.file} seed ${options.seed}`,
@@ -949,6 +989,7 @@ test("a picked note is a string of the shape the hand is holding: everything the
       chords++;
       const meter = take.plan.bars[arrival.bar]!.meter;
       if (meter.beats === 6 && meter.unit === 8) six++;
+      if (meter.beats === 12 && meter.unit === 8) twelve++;
       const where = `${of}: ${arrival.chord?.text} at tick ${arrival.tick}`;
       // What it strums under the same chord is the same shape. A strum in the eighth before
       // the next chord may be that chord, played early, and is left out.
@@ -993,14 +1034,17 @@ test("a picked note is a string of the shape the hand is holding: everything the
     `only ${chords} picked chords, ${plucks} plucked notes, ${rang} that rang on`,
   );
   if (guitarsInSix.length > 0) assert.ok(six > PICKED_IN_SIX, `only ${six} chords picked in six`);
+  if (guitarsInTwelve.length > 0)
+    assert.ok(twelve > PICKED_IN_TWELVE, `only ${twelve} chords picked in twelve`);
 });
 
-test("with no bassist the picking thumb is the bass: in a bar of four, or of six where the style has written six, the guitar picks while the bass is out, a string is plucked on every pulse a chord sounds on, and the first one plucked on a pulse under a chord is that chord's root, with nothing in the bar under it but the fifth below", {
+test("with no bassist the picking thumb is the bass: in a bar of four, or of six or twelve where the style has written it, the guitar picks while the bass is out, a string is plucked on every pulse a chord sounds on, and the first one plucked on a pulse under a chord is that chord's root, with nothing in the bar under it but the fifth below", {
   skip: pickers.length === 0,
 }, () => {
   let bars = 0;
   let stated = 0;
   let six = 0;
+  let twelve = 0;
   const played = [
     ...takes(picked).map(({ chart, options, take }) => ({
       where: `${chart.file} seed ${options.seed}`,
@@ -1016,12 +1060,14 @@ test("with no bassist the picking thumb is the bass: in a bar of four, or of six
       if (bar.kind !== "music" || bar.ending || bar.seats.chords === null) continue;
       const four = bar.meter.beats === 4 && bar.meter.unit === 4;
       const inSix = bar.meter.beats === 6 && bar.meter.unit === 8;
-      if (bar.seats.bass !== null || !(four || inSix)) continue;
+      const inTwelve = bar.meter.beats === 12 && bar.meter.unit === 8;
+      if (bar.seats.bass !== null || !(four || inSix || inTwelve)) continue;
       const end = bar.start + bar.ticks;
       const own = plucked.filter((note) => note.tick >= bar.start && note.tick < end);
       if (own.length === 0 || strums.some((s) => s.tick >= bar.start && s.tick < end)) continue;
       bars++;
       if (inSix) six++;
+      if (inTwelve) twelve++;
       const where = `${of} bar ${bar.index}`;
       // The chords of the bar, each from where it arrives (or the barline) to the next.
       const at = harmony.findLastIndex((arrival) => arrival.tick <= bar.start);
@@ -1062,6 +1108,8 @@ test("with no bassist the picking thumb is the bass: in a bar of four, or of six
   );
   if (guitarsInSix.length > 0)
     assert.ok(six > ALONE_IN_SIX, `only ${six} bars of six picked alone`);
+  if (guitarsInTwelve.length > 0)
+    assert.ok(twelve > ALONE_IN_TWELVE, `only ${twelve} bars of twelve picked alone`);
 });
 
 // ── a guitar in six ─────────────────────────────────────────────────────────
@@ -1077,7 +1125,7 @@ function barsOfSix() {
           bar.kind === "music" &&
           !bar.ending &&
           bar.seats.chords !== null &&
-          bar.meter.beats === 6 &&
+          (bar.meter.beats === 6 || bar.meter.beats === 12) &&
           bar.meter.unit === 8,
       )
       .map((bar) => {
@@ -1106,66 +1154,75 @@ function barsOfSix() {
 }
 
 const EIGHTH = PPQ / 2;
-const PULSE = PPQ * 1.5;
 
-test("a guitar picks a bar of six as six-eight is picked: quiet it always picks, and a picked bar of six has a string on every eighth and nothing between them, the thumb on each of the two pulses and no finger under it in the pulse", {
-  skip: guitarsInSix.length === 0,
+test("a guitar picks a bar of six or twelve as compound time is picked: quiet it always picks, and a picked bar has a string on every eighth and nothing between them, the thumb on the first pulse of each half of the bar (both pulses in six, 1 and 3 in twelve) and no finger under it before the next half", {
+  skip: guitarsInSix.length === 0 && guitarsInTwelve.length === 0,
 }, () => {
-  let picked = 0;
-  let quiet = 0;
+  const picked = { 6: 0, 12: 0 };
+  const quiet = { 6: 0, 12: 0 };
   for (const { where, bar, plucks, strums } of barsOfSix()) {
+    const beats = bar.meter.beats as 6 | 12;
     if (tierOf(bar.seats.chords!) === "low") {
-      quiet++;
+      quiet[beats]++;
       assert.equal(strums.length, 0, `${where}: quiet, and strummed`);
     }
     if (plucks.length === 0 || strums.length > 0) continue;
-    picked++;
+    picked[beats]++;
     for (const pluck of plucks) {
       assert.equal((pluck.tick - bar.start) % EIGHTH, 0, `${where}: a string between the eighths`);
     }
-    for (let eighth = 0; eighth < 6; eighth++) {
+    for (let eighth = 0; eighth < beats; eighth++) {
       const tick = bar.start + eighth * EIGHTH;
       assert.ok(
         plucks.some((pluck) => pluck.tick === tick),
         `${where}: nothing plucked on eighth ${eighth + 1}`,
       );
     }
-    for (const pulse of [0, PULSE]) {
-      const at = bar.start + pulse;
+    const half = bar.ticks / 2;
+    for (const from of [0, half]) {
+      const at = bar.start + from;
       const thumb = Math.min(
         ...plucks.filter((pluck) => pluck.tick === at).map((pluck) => pluck.pitches[0]!),
       );
-      const fingers = plucks.filter((pluck) => pluck.tick > at && pluck.tick < at + PULSE);
+      const fingers = plucks.filter((pluck) => pluck.tick > at && pluck.tick < at + half);
       assert.ok(
         fingers.every((finger) => finger.pitches[0]! >= thumb),
-        `${where}: a finger under the thumb's ${thumb} in the pulse at ${pulse}`,
+        `${where}: a finger under the thumb's ${thumb} in the half bar from ${from}`,
       );
     }
   }
-  assert.ok(
-    picked > PICKED_BARS_IN_SIX && quiet > QUIET_IN_SIX,
-    `only ${picked} bars of six picked, ${quiet} quiet`,
-  );
+  if (guitarsInSix.length > 0)
+    assert.ok(
+      picked[6] > PICKED_BARS_IN_SIX && quiet[6] > QUIET_IN_SIX,
+      `only ${picked[6]} bars of six picked, ${quiet[6]} quiet`,
+    );
+  if (guitarsInTwelve.length > 0)
+    assert.ok(
+      picked[12] > PICKED_BARS_IN_TWELVE && quiet[12] > QUIET_IN_TWELVE,
+      `only ${picked[12]} bars of twelve picked, ${quiet[12]} quiet`,
+    );
 });
 
-test("a guitar strums a bar of six as a pendulum in eighths: it strikes both pulses (the first may be the chord leant into on the eighth before, still ringing) and at least one eighth between them, and every stroke between is lighter than the pulse it follows, so the six eighths are never all hammered", {
-  skip: guitarsInSix.length === 0,
+test("a guitar strums a bar of six or twelve as a pendulum in eighths: it strikes every pulse (the first may be the chord leant into on the eighth before, still ringing) and at least one eighth between them, and every stroke between is lighter than the pulse it follows, so the eighths are never all hammered", {
+  skip: guitarsInSix.length === 0 && guitarsInTwelve.length === 0,
 }, () => {
-  let bars = 0;
+  const bars = { 6: 0, 12: 0 };
   let leant = 0;
   for (const { where, bar, plucks, strums, velocities, pushed } of barsOfSix()) {
     if (strums.length === 0 || plucks.length > 0) continue;
-    bars++;
+    bars[bar.meter.beats as 6 | 12]++;
     const ticks = strums.map((strum) => strum.tick - bar.start);
+    const pulses = pulseStarts(bar.meter);
     if (!ticks.includes(0)) {
       assert.ok(pushed, `${where}: no strum on the first pulse`);
       leant++;
     }
-    assert.ok(ticks.includes(PULSE), `${where}: no strum on the second pulse`);
-    const between = ticks.filter((tick) => tick !== 0 && tick !== PULSE);
-    assert.ok(between.length > 0, `${where}: only the two pulses strummed`);
+    for (const pulse of pulses.slice(1))
+      assert.ok(ticks.includes(pulse), `${where}: no strum on the pulse at ${pulse}`);
+    const between = ticks.filter((tick) => !pulses.includes(tick));
+    assert.ok(between.length > 0, `${where}: only the pulses strummed`);
     for (const tick of between) {
-      const pulse = tick < PULSE ? 0 : PULSE;
+      const pulse = pulses.findLast((start) => start < tick)!;
       if (!ticks.includes(pulse)) continue;
       const on = velocities.get(bar.start + pulse)!;
       const off = velocities.get(bar.start + tick)!;
@@ -1175,10 +1232,13 @@ test("a guitar strums a bar of six as a pendulum in eighths: it strikes both pul
       );
     }
   }
-  assert.ok(
-    bars > STRUMMED_BARS_IN_SIX && leant > 50,
-    `only ${bars} bars of six strummed, ${leant} leant into`,
-  );
+  if (guitarsInSix.length > 0)
+    assert.ok(
+      bars[6] > STRUMMED_BARS_IN_SIX && leant > 50,
+      `only ${bars[6]} bars of six strummed, ${leant} leant into`,
+    );
+  if (guitarsInTwelve.length > 0)
+    assert.ok(bars[12] > STRUMMED_BARS_IN_TWELVE, `only ${bars[12]} bars of twelve strummed`);
 });
 
 // ── the reggae skank in six and twelve ──────────────────────────────────────

@@ -69,7 +69,7 @@ export const WRITTEN: Readonly<Record<string, readonly string[]>> = {
   jazz: ["6/4"],
   blues: ["12/8", "6/8"],
   rock: ["12/8", "6/8"],
-  acoustic: ["6/8"],
+  acoustic: ["6/8", "12/8"],
   neosoul: ["12/8", "6/8"],
   funk: ["6/8", "12/8"],
   disco: ["12/8", "6/8"],
