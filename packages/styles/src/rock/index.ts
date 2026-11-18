@@ -20,7 +20,11 @@ export const rock: StylePack = {
     default: 120,
     min: 80,
     max: 160,
-    meters: { "12/8": { default: 66, min: 48, max: 107 } },
+    meters: {
+      "12/8": { default: 66, min: 48, max: 107 },
+      // The same ballad pulse in six: two thirds of four's would put its floor at 53.
+      "6/8": { default: 66, min: 48, max: 107 },
+    },
   },
   feel: {
     // Straight eighths. The bass on the drummer, the chords a hair behind, the lead a little
