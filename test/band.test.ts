@@ -538,13 +538,13 @@ Outro    2 1 - - .
 // ── blues ───────────────────────────────────────────────────────────────────
 
 test(
-  'blues: the offbeat eighth is the last note of a triplet, for everyone: in four the written "and" is swung there, and in twelve it is the pulse\'s last eighth and is played where it is written',
+  'blues: the offbeat eighth is the last note of a triplet, for everyone: in four the written "and" is swung there, and in six and twelve it is the pulse\'s last eighth and is played where it is written',
   only("blues"),
   () => {
     for (const { chart, take } of takes(bluesWritten)) {
-      const twelve = chart.meter !== "4/4";
+      const compound = chart.meter !== "4/4";
       for (const note of notesOf(take)) {
-        if (twelve) {
+        if (compound) {
           // A dotted pulse is its own triplet: nothing bends it.
           assert.ok(
             Math.abs(note.offset) <= POCKET,
@@ -563,35 +563,44 @@ test(
 );
 
 test(
-  "blues: the time is a kick on the bar's two strong pulses and a backbeat on the pulses between them (1 and 3, 2 and 4: quarter notes in four, dotted quarters in twelve), in every bar the drummer plays time",
+  "blues: the time is a kick on the bar's strong pulses and a backbeat on the pulses between them (1 and 3, 2 and 4: quarter notes in four, dotted quarters in twelve; in six the One and the second pulse), in every bar the drummer plays time; a fill of two beats may take the last backbeat, and in six, where no fill is longer than a pulse, every bar keeps its own",
   only("blues"),
   () => {
-    let twelve = 0;
+    const bars = new Map<string, number>();
     for (const { chart, options, take } of takes(bluesWritten)) {
       const drums = notesOf(take, "drums");
       for (const bar of take.plan.bars) {
         // A bar the arrangement lays the drummer out of is not a bar he plays time in.
         if (bar.kind !== "music" || bar.ending || bar.seats.drums === null) continue;
-        if (chart.meter !== "4/4") twelve++;
+        bars.set(chart.meter, (bars.get(chart.meter) ?? 0) + 1);
         const at = (tick: number, ...voices: string[]) =>
           drums.some((note) => note.tick === bar.start + tick && voices.includes(note.voice ?? ""));
         const where = `${chart.file} seed ${options.seed} bar ${bar.index}`;
         const strong = strongPulses(bar.meter);
         const between = pulseStarts(bar.meter).filter((tick) => !strong.includes(tick));
         for (const tick of strong) assert.ok(at(tick, "kick"), `${where}: no kick at ${tick}`);
-        assert.ok(at(between[0]!, "snare", "crossStick"), `${where}: no backbeat on 2`);
-        // A long fill takes the hands off the backbeat on 4; a short one never does.
-        if (!bar.fill)
-          assert.ok(at(between[1]!, "snare", "crossStick"), `${where}: no backbeat on 4`);
+        for (const tick of between.slice(0, -1))
+          assert.ok(at(tick, "snare", "crossStick"), `${where}: no backbeat at ${tick}`);
+        // A long fill takes the hands off the last backbeat; a short one never does. A bar of
+        // six has no room for a long one: a fill of a pulse starts on its backbeat.
+        if (!bar.fill || bar.ticks < 4 * PPQ)
+          assert.ok(
+            at(between.at(-1)!, "snare", "crossStick"),
+            `${where}: no backbeat at ${between.at(-1)}`,
+          );
       }
     }
-    if (LIBRARY.some((chart) => chart.meter === "12/8"))
-      assert.ok(twelve > enough(300), `only ${twelve} bars of twelve`);
+    for (const meter of ["12/8", "6/8"])
+      if (LIBRARY.some((chart) => chart.meter === meter))
+        assert.ok(
+          (bars.get(meter) ?? 0) > enough(300),
+          `only ${bars.get(meter) ?? 0} bars of ${meter}`,
+        );
   },
 );
 
 test(
-  "blues: nothing is ever played between the notes of the triplet, where it would flam: in four nothing on the last sixteenth of a beat, and in twelve nothing off the eighths",
+  "blues: nothing is ever played between the notes of the triplet, where it would flam: in four nothing on the last sixteenth of a beat, and in six and twelve nothing off the eighths",
   only("blues"),
   () => {
     for (const { chart, take } of takes(bluesWritten)) {
@@ -610,16 +619,18 @@ test(
 );
 
 test(
-  "blues: in twelve the cymbal plays the triplets: from the working level up, all three eighths of every pulse in every bar of time, unless a fill or a crash has that hand; and when the band is quiet it plays the pulses and leaves the triplet's middle note out",
+  "blues: in six and twelve the cymbal plays the triplets: from the working level up, all three eighths of every pulse in every bar of time, unless a fill or a crash has that hand; and when the band is quiet it plays the pulses and leaves the triplet's middle note out",
   only("blues"),
   () => {
     let working = 0;
     let quiet = 0;
     const blues = STYLES.find((style) => style.id === "blues")!;
-    const twelve = LIBRARY.filter((chart) => chart.meter === "12/8");
+    const compound = (meter: string) => meter === "12/8" || meter === "6/8";
+    const twelve = LIBRARY.filter((chart) => compound(chart.meter));
+    const meters = new Set<string>();
     // Every take of the library's, and the same charts held quiet, working and hot.
     const played = [
-      ...takes((jam) => jam.style.id === "blues" && jam.chart.meter === "12/8"),
+      ...takes((jam) => jam.style.id === "blues" && compound(jam.chart.meter)),
       ...twelve.flatMap((chart) =>
         [0.3, 0.55, 0.85].map((energy) => {
           const options = { mode: "jam", passes: 2, energy, seed: 2 } as const;
@@ -642,15 +653,17 @@ test(
             .map((note) => (note.tick - bar.start) / (PPQ / 2)),
         );
         const where = `${chart.file} seed ${options.seed} bar ${bar.index}`;
+        const eighths = bar.ticks / (PPQ / 2);
+        meters.add(chart.meter);
         if (tierOf(bar.seats.drums) === "low") {
           quiet++;
-          for (const pulse of [0, 3, 6, 9]) {
+          for (let pulse = 0; pulse < eighths; pulse += 3) {
             assert.ok(cymbal.has(pulse), `${where}: no cymbal on pulse ${pulse / 3 + 1}`);
             assert.ok(!cymbal.has(pulse + 1), `${where}: the triplet's middle note, quiet`);
           }
         } else {
           working++;
-          for (let eighth = 0; eighth < 12; eighth++) {
+          for (let eighth = 0; eighth < eighths; eighth++) {
             assert.ok(cymbal.has(eighth), `${where}: no cymbal on eighth ${eighth + 1}`);
           }
         }
@@ -658,6 +671,8 @@ test(
     }
     if (twelve.length > 0)
       assert.ok(working > 100 && quiet > 10, `only ${working} bars working and ${quiet} quiet`);
+    for (const chart of twelve)
+      assert.ok(meters.has(chart.meter), `no bar of ${chart.meter} heard`);
   },
 );
 

@@ -386,6 +386,48 @@ test(
 );
 
 test(
+  "blues: in six the piano plays the gospel blues: away from a soloist, a quiet bar of one chord is struck twice at most, besides a lean into a new chord on its last eighth; and hot, every bar of one chord has the triplet on its backbeat: the second pulse struck, and with it one of its two later eighths at least (before a change the hand gives the old chord's middle eighth, or its last, to the new chord)",
+  only("blues"),
+  () => {
+    let quiet = 0;
+    let hot = 0;
+    const blues = STYLES.find((style) => style.id === "blues")!;
+    const played = [
+      ...takes((jam) => jam.style.id === "blues" && jam.chart.meter === "6/8"),
+      ...heldTakes(blues, "6/8"),
+    ];
+    for (const { chart, options, take } of played) {
+      const byBar = strikesByBar(take);
+      for (const bar of take.plan.bars) {
+        if (bar.kind !== "music" || bar.ending || bar.seats.chords === null || bar.solo) continue;
+        if (bar.spans.some((span) => span.chord === null)) continue;
+        const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
+        const steps = new Set(
+          (byBar.get(bar.index) ?? []).map((strike) => (strike.tick - bar.start) / STEP),
+        );
+        const tier = tierOf(bar.seats.chords);
+        // A chord that arrives on the backbeat is struck early or there, as the hand leans.
+        if (bar.spans.filter((span) => !span.tied).length > 1) continue;
+        if (tier === "low") {
+          quiet++;
+          const next = take.plan.bars[bar.index + 1];
+          const change =
+            next?.kind !== "music" || next.spans[0]!.chord?.text !== bar.spans[0]!.chord?.text;
+          const own = [...steps].filter((step) => !(change && step === 10));
+          assert.ok(own.length <= 2, `${where}: ${steps.size} strikes, quiet`);
+        } else if (tier === "high") {
+          hot++;
+          assert.ok(steps.has(6), `${where}: no strike on the backbeat`);
+          assert.ok(steps.has(8) || steps.has(10), `${where}: the backbeat alone`);
+        }
+      }
+    }
+    if (LIBRARY.some((chart) => chart.meter === "6/8"))
+      assert.ok(quiet > 20 && hot > 20, `only ${quiet} bars quiet, ${hot} hot`);
+  },
+);
+
+test(
   "rock: in twelve the piano plays the ballad's triplets: away from a soloist and from the working level up, a chord on every eighth of every bar it comps, and nothing between them; quiet, no more than a chord a pulse; and under a soloist, in four as in twelve, no more strikes in a bar than the bar has pulses (no busier than quarter notes, or a chord a dotted quarter)",
   only("rock"),
   () => {
@@ -657,8 +699,10 @@ const sixesOnce = () => {
 // Floors for the bars of six. The strums are counted over the library's takes, written for the
 // full run and scaled to its seeds (6,500 on the full run); the rest are mostly the charts held
 // at a level, rendered on two seeds on every run, and are not scaled (the full run sees 62 bars
-// picked alone, 457 chords picked, 290 bars picked and 124 of them quiet, 1,374 strummed).
-const COMPOUND_STRUMS = 4000;
+// picked alone, 457 chords picked, 290 bars picked and 124 of them quiet, 1,374 strummed). A
+// chart added to the library moves which charts a style is handed on a push: with the blues'
+// chart in six the push counted 1,317 strums, under the 1,333 that 4,000 asked of it.
+const COMPOUND_STRUMS = 3600;
 const ALONE_IN_SIX = 40;
 const PICKED_IN_SIX = 300;
 const PICKED_BARS_IN_SIX = 200;

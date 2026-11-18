@@ -296,6 +296,59 @@ test(
   },
 );
 
+test(
+  "blues: in six and twelve the bass is a tone a pulse and lopes into the next: quiet it plays on the pulses alone; from the working level it plays every pulse of a bar of one chord; hot, the lope into every pulse, a note on each pulse's last eighth; and never the triplet's middle eighth",
+  only("blues"),
+  () => {
+    const blues = STYLES.find((style) => style.id === "blues")!;
+    const compound = (meter: string) => meter === "12/8" || meter === "6/8";
+    const counted = new Map<string, number>();
+    const played = [
+      ...takes((jam) => jam.style.id === "blues" && compound(jam.chart.meter)),
+      ...heldTakes(blues, "12/8"),
+      ...heldTakes(blues, "6/8"),
+    ];
+    for (const { chart, options, take } of played) {
+      const bass = notesOf(take, "bass");
+      for (const bar of take.plan.bars) {
+        if (bar.kind !== "music" || bar.seats.bass === null || bar.ending) continue;
+        if (!compound(chart.meter) || bar.spans.some((span) => span.chord === null)) continue;
+        const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
+        const end = bar.start + bar.ticks;
+        // In sixteenths: a pulse is six, its eighths at 0, 2 and 4 into it.
+        const steps = new Set(
+          bass
+            .filter((note) => note.tick >= bar.start && note.tick < end)
+            .map((note) => (note.tick - bar.start) / (PPQ / 4)),
+        );
+        const pulses = Array.from({ length: bar.ticks / (PPQ * 1.5) }, (_, i) => i * 6);
+        const tier = tierOf(bar.seats.bass);
+        counted.set(`${chart.meter} ${tier}`, (counted.get(`${chart.meter} ${tier}`) ?? 0) + 1);
+        for (const step of steps)
+          assert.notEqual(step % 6, 2, `${where}: the triplet's middle eighth at ${step}`);
+        if (tier === "low") {
+          for (const step of steps)
+            assert.equal(step % 6, 0, `${where}: quiet, a note between the pulses at ${step}`);
+          continue;
+        }
+        if (bar.spans.filter((span) => !span.tied).length === 1)
+          for (const pulse of pulses)
+            assert.ok(steps.has(pulse), `${where}: nothing on pulse ${pulse / 6 + 1}`);
+        if (tier === "high")
+          for (const pulse of pulses)
+            assert.ok(steps.has(pulse + 4), `${where}: no lope into ${pulse / 6 + 2}`);
+      }
+    }
+    for (const meter of ["12/8", "6/8"])
+      if (LIBRARY.some((chart) => chart.meter === meter))
+        for (const tier of ["low", "mid", "high"])
+          assert.ok(
+            (counted.get(`${meter} ${tier}`) ?? 0) > 20,
+            `only ${counted.get(`${meter} ${tier}`) ?? 0} bars of ${meter} at ${tier}`,
+          );
+  },
+);
+
 test("a bass note that leads into a change belongs to the scale of the chord it is played over, unless it is a half step from where it lands", () => {
   let leadIns = 0;
   for (const { chart, options, take } of takes()) {
