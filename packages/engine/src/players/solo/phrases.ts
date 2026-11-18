@@ -12,6 +12,7 @@
 import { swing } from "../../perform/feel.ts";
 import { cells, STEP } from "../../perform/grid.ts";
 import { isCompound, lastPulse, onPulse } from "../../perform/meter.ts";
+import type { Plan, PlanBar } from "../../plan/types.ts";
 import type { Rng } from "../../rng.ts";
 import type { ToneRole } from "../../theory/chord.ts";
 import { pitchClass } from "../../theory/pitch.ts";
@@ -166,6 +167,8 @@ export function phrasesFor(
   role: Role,
   memory: Memory,
   rng: Rng,
+  /** The note a pickup made by the pass before leads to: the phrase opens on it, on the one. */
+  led: number | null = null,
 ): Phrase[] {
   const { instrument } = world;
   // The rhythms are those written for the phrase's meter, where the style has written any.
@@ -194,9 +197,12 @@ export function phrasesFor(
     const lines = lineBars(world, slot, bars);
     // A lifted phrase takes its room with it, and still leaves the top note alone.
     const lift = ask.lift ?? 0;
-    const high =
+    const raised =
       lift === 0 ? slot.high : Math.min(slot.top - solo.arc.peak.clear, slot.high + lift);
-    const low = lift === 0 ? slot.low : Math.min(slot.low + lift, high - 12);
+    const lowered = lift === 0 ? slot.low : Math.min(slot.low + lift, raised - 12);
+    // Led into, the phrase reaches the note it was led to.
+    const high = led === null ? raised : Math.max(raised, led);
+    const low = led === null ? lowered : Math.min(lowered, led);
     const given = new Map<number, number>();
     const bent = new Map<number, boolean>();
     let at = 0;
@@ -209,6 +215,7 @@ export function phrasesFor(
         at++;
       }
     });
+    if (led !== null && lines[0]?.spots[0]?.tick === slot.bars[0]!.start) given.set(0, led);
     const pitches = writeLine(world, lines, {
       low,
       high,
@@ -296,6 +303,8 @@ export function phrasesFor(
       return (
         empty <= emptyAllowed &&
         !(memory.endedEmpty && letters[0] === "R") &&
+        // Led into from the pass before, it opens with a line on the one.
+        (led === null || letters[0] === "L") &&
         run <= lungs &&
         (!final || letters[length - 1] === "E")
       );
@@ -356,8 +365,20 @@ export function phrasesFor(
         ((slot.peak && peak.sequence) ||
           oneRhythm ||
           draw.fork("riff", i).chance(solo.habits.riff));
+      // Led into from the pass before, its first bar opens on the one.
+      const opensOnOne = own.filter((cell) => cells(cell)[0] === "x");
       const cell: Cell =
-        first && opening ? opening : before === null ? a : riff ? before : before === a ? b : a;
+        led !== null && i === 0 && opensOnOne.length > 0 && cells(a)[0] !== "x"
+          ? draw.fork("opens").pick(opensOnOne)
+          : first && opening
+            ? opening
+            : before === null
+              ? a
+              : riff
+                ? before
+                : before === a
+                  ? b
+                  : a;
       // Stabbed or not is decided once for a figure, so every bar that plays it agrees.
       const plan = {
         part,
@@ -606,61 +627,113 @@ export function phrasesFor(
     seen.add(key);
     return true;
   });
+  // Led into from the pass before, only a phrase that opens on the note it was led to will do.
+  const honours = (phrase: Phrase) =>
+    led === null ||
+    (phrase.line[0]?.spot.tick === slot.bars[0]!.start && phrase.line[0]?.pitch === led);
+  const kept = phrases.filter(honours);
   const fallback =
-    phrases.length > 0
-      ? phrases
-      : [statement({ name: "statement", make: "new", oneRhythm: true }, 9)];
-  return fallback.map((phrase) => withPickup(world, phrase, memory, rng));
+    kept.length > 0 ? kept : [statement({ name: "statement", make: "new", oneRhythm: true }, 9)];
+  return fallback.map((phrase) =>
+    withPickup(world, phrase, memory, rng, opensPass(world.plan, slot.bars[0]!)),
+  );
 }
 
-/**
- * A line that starts on a downbeat after a breath may be led in from the beat
- * before (SO-36). Whether it is, and with which figure, is one decision for
- * that bar of the slot. Into the phrase's first bar it needs an eighth of
- * silence after the phrase before, and it never crosses into a chorus from
- * outside it (SO-37).
- */
 /** A note that says another chord, where it would be heard as more than passing: on a beat or held. */
 const wrong = (spot: Spot, pitch: number): boolean =>
   (onPulse(spot.bar.meter, spot.tick - spot.bar.start) || spot.hold > EIGHTH) &&
   onlyPasses(spot.pool, pitch);
 
-function withPickup(world: World, phrase: Phrase, memory: Memory, rng: Rng): Phrase {
-  const { plan } = world;
-  const solo = soloIn(world.solo, phrase.slot.bars[0]!.meter);
-  const { perRank, reach } = solo.landing;
+/** A note heard as part of the harmony: on a beat, held, or struck where a chord arrives. */
+const heard = (spot: Spot): boolean =>
+  onPulse(spot.bar.meter, spot.tick - spot.bar.start) || spot.hold > EIGHTH || spot.lands;
+
+/** Where a tick on the straight grid is heard, once the band's swing has bent its bar. */
+function heardAt(world: World, tick: number): number {
+  const bar = world.plan.bars.findLast((candidate) => candidate.start <= tick);
+  if (bar?.meter.unit !== 4 || tick >= bar.start + bar.ticks) return tick;
+  return bar.start + swing(tick - bar.start, world.feel);
+}
+
+/** Whether the band plays a bar: music, not the ending, and some seat besides the soloist in it. */
+const bandPlays = (bar: PlanBar | undefined): bar is PlanBar =>
+  bar?.kind === "music" &&
+  bar.ending === null &&
+  Object.entries(bar.seats).some(([seat, level]) => seat !== "solo" && level !== null);
+
+/** The air a pickup leaves after the phrase before, in ticks: SO-37's eighth, and never less than the breath every phrase is owed (Q-47); a horn needs its own breath too. */
+function breathOf(world: World): number {
+  return Math.max(
+    EIGHTH,
+    Math.max(world.solo.space.breath, world.instrument.breath?.takes ?? 0) * world.ticksPerSecond,
+  );
+}
+
+/** Where a pickup goes into a bar, and what it has to work with. */
+interface Into {
+  /** The bar the line is led into, and the bar the pickup is played in. */
+  readonly bar: PlanBar;
+  readonly before: PlanBar;
+  /** The line's first note, on the bar's downbeat. */
+  readonly first: number;
+  /** Where the last note before the pickup stops sounding. */
+  readonly air: number;
+  /** The register it keeps to. */
+  readonly low: number;
+  readonly high: number;
+  /** The level the line is at, for the figures written for one. */
+  readonly level: string | null;
+}
+
+/**
+ * Notes led into a bar's first note from the end of the bar before (SO-36), or
+ * null where none is drawn or none will go. The figure is drawn from those
+ * written for the level that fit in half the bar before; where it will not go
+ * (too little air after the phrase before, a chord it cannot spell, the
+ * instrument's reach) each shorter one is tried, longest first, before none.
+ */
+function leadIn(world: World, into: Into, draw: Rng): Placed[] | null {
+  const { bar, before, first } = into;
+  if (!bandPlays(before) || before.start + before.ticks !== bar.start) return null;
+  // The figures are the ones written for the bar the pickup is played in.
+  const solo = soloIn(world.solo, before.meter);
   const habit = solo.habits.pickup;
-  if (habit.figures.length === 0) return phrase;
-  // An eighth of silence after the phrase before (SO-37), and never less than the breath
-  // every phrase is owed (Q-47): at a fast tempo an eighth is no air at all, and a pickup
-  // that fills the breath runs two phrases together. A horn needs its own breath too.
-  const breath =
-    Math.max(solo.space.breath, world.instrument.breath?.takes ?? 0) * world.ticksPerSecond;
-  const { slot } = phrase;
-  const leads: Placed[] = [];
+  const { perRank, reach } = solo.landing;
+  const steps = Math.round(before.ticks / STEP);
+  const length = (cell: string) => cells(cell).length;
+  const figures = habit.figures.filter(
+    (figure) =>
+      (figure.levels === undefined ||
+        (into.level !== null && figure.levels.includes(into.level))) &&
+      length(figure.cell) * 2 <= steps,
+  );
+  if (figures.length === 0 || !draw.chance(habit.chance)) return null;
+  const drawn = draw.fork("figure").weighted(figures, (f) => f.weight);
+  // The one drawn, then each shorter, longest first.
+  const tries = [
+    drawn,
+    ...figures
+      .filter((figure) => length(figure.cell) < length(drawn.cell))
+      .sort((a, b) => length(b.cell) - length(a.cell)),
+  ];
+  // Walked in by the ladder from one side, the last note a rung away (SO-36).
+  const side = draw.fork("side").chance(habit.rising) ? -1 : 1;
+  // Its last note may be the line's own approach: the half step under the first note,
+  // short and off the beat (SO-36).
+  const leans = habit.approach && draw.fork("approach").chance(solo.habits.chromatic);
+  const breath = breathOf(world);
+  const within = (pitch: number) => pitch >= into.low && pitch <= into.high;
 
-  phrase.bars.forEach((opening, at) => {
-    const bar = slot.bars[at]!;
-    const first = opening.pitches[0];
-    const afterBreath = at === 0 || phrase.bars[at - 1]!.part === "R";
-    if (!afterBreath || first === undefined || cells(opening.cell)[0] !== "x") return;
-    const draw = rng.fork("pickup", at);
-    if (!draw.chance(habit.chance)) return;
-    const before = at === 0 ? plan.bars[bar.index - 1] : slot.bars[at - 1];
-    if (before?.kind !== "music" || before.solo?.chorus !== bar.solo?.chorus) return;
-
-    const figure = draw.fork("figure").weighted(habit.figures, (f) => f.weight);
-    const steps = Math.round(before.ticks / STEP);
-    const cell = ".".repeat(Math.max(0, steps - cells(figure.beat).length)) + figure.beat;
+  for (const figure of tries) {
+    const cell = ".".repeat(steps - length(figure.cell)) + figure.cell;
     const spots = spotsOf(world, before, cell);
-    if (spots.length === 0) return;
-    if (at === 0 && spots[0]!.tick - memory.restEnds < Math.max(EIGHTH, breath)) return;
-    // Walked in by the ladder from one side, the last note a rung away (SO-36).
-    const side = draw.fork("side").chance(habit.rising) ? -1 : 1;
-    // Its last note may be the line's own approach: the half step under the first note,
-    // short and off the beat (SO-36).
-    const leans = habit.approach && draw.fork("approach").chance(solo.habits.chromatic);
-    const walk = (direction: number): Placed[] => leadingOn(walked(direction));
+    // Every note of it is struck, or none: a figure with a hole under N.C. is not the figure.
+    if (spots.length === 0 || spots.length !== cells(cell).filter((c) => c === "x").length) {
+      continue;
+    }
+    // It lives in the air the phrase before left, and leaves that air its breath, as heard:
+    // swing carries a note's end on an "and" later, and a breath on paper may not be one.
+    if (heardAt(world, spots[0]!.tick) - heardAt(world, into.air) < breath) continue;
     // A tone from outside the chord's scale leads to the note a half step on, here as in
     // the line: the phrase's first note, for the last of the pickup.
     const leadingOn = (notes: readonly Placed[]): Placed[] =>
@@ -671,46 +744,98 @@ function withPickup(world: World, phrase: Phrase, memory: Memory, rng: Rng): Phr
           note.pitch,
           notes[i - 1]?.pitch,
           next ? { tick: next.spot.tick, pitch: next.pitch } : { tick: bar.start, pitch: first },
-          (other) => other >= slot.low && other <= slot.high,
+          within,
         );
         return { ...note, pitch };
       });
-    const walked = (direction: number): Placed[] =>
-      spots.map((spot, i) => {
-        const pitch = climb(spot.pool, first, direction * (spots.length - i));
-        const further = climb(spot.pool, first, direction * (spots.length - i + 1));
+    // Walked back from the first note, a rung at a time, each note a rung on from the one
+    // after it: from one side, its last note a rung from the first (SO-36).
+    const walked = (direction: number): Placed[] => {
+      const notes: Placed[] = [];
+      let from = first;
+      for (let i = spots.length - 1; i >= 0; i--) {
+        const spot = spots[i]!;
         const beat = onPulse(spot.bar.meter, spot.tick - spot.bar.start);
+        let pitch = climb(spot.pool, from, direction);
         if (leans && i === spots.length - 1 && !beat && spot.hold <= EIGHTH && !spot.lands) {
-          return { spot, pitch: first - 1, lead: true };
+          pitch = first - 1;
+        } else if (heard(spot) && !isChordTone(spot.pool, pitch)) {
+          // A note heard as harmony (on a beat, held, or on a change) is a tone of the chord
+          // it is played over, which is the bar before's: the next rung out where that is
+          // one, or the nearest tone of the chord.
+          const further = climb(spot.pool, from, 2 * direction);
+          pitch = isChordTone(spot.pool, further)
+            ? further
+            : landing(spot.pool, pitch, solo.arrive, perRank, pitch - reach, pitch + reach, [
+                first,
+                from,
+              ]);
+        } else if (wrong(spot, pitch)) {
+          const further = climb(spot.pool, from, 2 * direction);
+          if (!wrong(spot, further)) pitch = further;
         }
-        // On a change it is a chord tone like any other note; on a beat it would rather be.
-        if (spot.lands && !isChordTone(spot.pool, pitch)) {
-          const tone = landing(
-            spot.pool,
-            pitch,
-            solo.arrive,
-            perRank,
-            pitch - reach,
-            pitch + reach,
-            [first],
-          );
-          return { spot, pitch: tone, lead: true };
-        }
-        const better =
-          (beat && !isChordTone(spot.pool, pitch) && isChordTone(spot.pool, further)) ||
-          (wrong(spot, pitch) && !wrong(spot, further));
-        return { spot, pitch: better ? further : pitch, lead: true };
-      });
+        notes.unshift({ spot, pitch, lead: true });
+        from = pitch;
+      }
+      return notes;
+    };
+    const walk = (direction: number): Placed[] => leadingOn(walked(direction));
     const inside = (notes: readonly Placed[]) =>
       notes.every(
         (note) =>
-          note.pitch >= slot.low &&
-          note.pitch <= slot.high &&
+          within(note.pitch) &&
           note.pitch !== first &&
-          !wrong(note.spot, note.pitch),
-      );
-    const pickup = inside(walk(side)) ? walk(side) : walk(-side);
-    if (inside(pickup)) leads.push(...pickup);
+          !wrong(note.spot, note.pitch) &&
+          (!heard(note.spot) || isChordTone(note.spot.pool, note.pitch)),
+      ) &&
+      // Into the line from one side: its last note a step or a third from the first.
+      Math.abs(notes.at(-1)!.pitch - first) <= 4;
+    const there = walk(side);
+    const pickup = inside(there) ? there : walk(-side);
+    if (inside(pickup)) return pickup;
+  }
+  return null;
+}
+
+/**
+ * A line that starts on a downbeat after a breath may be led in from the bar
+ * before (SO-36). Whether it is is one decision for that bar of the slot.
+ *
+ * Where it may live (SO-37, restated): only in the breath the phrase before
+ * left, never shortening it; inside a solo, in a bar of rest; into a chorus's
+ * first phrase or the solo's own, in the bar before it wherever the band is
+ * playing it (the band's own last bar, the soloist's chorus before, the
+ * turnaround). Never in a count-in, a bar the whole band rests, or an ending.
+ * Into the first bar of a pass from the pass before, the pickup is that pass's
+ * to play and is made before the phrase it leads into (`passPickup`): here it
+ * is not drawn again.
+ */
+function withPickup(world: World, phrase: Phrase, memory: Memory, rng: Rng, led: boolean): Phrase {
+  const { plan } = world;
+  const { slot } = phrase;
+  const leads: Placed[] = [];
+  phrase.bars.forEach((opening, at) => {
+    if (at === 0 && led) return;
+    const bar = slot.bars[at]!;
+    const first = opening.pitches[0];
+    const afterBreath = at === 0 || phrase.bars[at - 1]!.part === "R";
+    if (!afterBreath || first === undefined || cells(opening.cell)[0] !== "x") return;
+    const before = at === 0 ? plan.bars[bar.index - 1] : slot.bars[at - 1];
+    if (!before) return;
+    const pickup = leadIn(
+      world,
+      {
+        bar,
+        before,
+        first,
+        air: at === 0 ? memory.restEnds : before.start,
+        low: slot.low,
+        high: slot.high,
+        level: slot.level.name,
+      },
+      rng.fork("pickup", at),
+    );
+    if (pickup) leads.push(...pickup);
   });
   if (leads.length === 0) return phrase;
   const start = slot.bars[0]!.start;
@@ -721,6 +846,81 @@ function withPickup(world: World, phrase: Phrase, memory: Memory, rng: Rng): Phr
       (a, b) => a.spot.tick - b.spot.tick,
     ),
   };
+}
+
+/** A pickup into the first bar of a pass, made by the pass before it, and the note it leads to. */
+export interface PassPickup {
+  readonly notes: readonly Placed[];
+  /** The note the phrase it leads into opens on, on its downbeat. */
+  readonly first: number;
+}
+
+/**
+ * Whether a bar opens a pass the soloist leads into from the pass before. What
+ * a pass plays may not hang on the pass after it: a jam made longer, or told
+ * to finish there, plays the same up to it (the band's own rule). So a pickup
+ * into the top of a pass is made from what the pass before knows: the bar it
+ * is played in, the chord it leads into, where the soloist last stopped and
+ * the register it was in; and the phrase that follows opens on the note it
+ * leads to.
+ */
+export function opensPass(plan: Plan, bar: PlanBar): boolean {
+  const before = plan.bars[bar.index - 1];
+  return before !== undefined && before.pass !== bar.pass;
+}
+
+/**
+ * The pickup into the top of a pass (`opensPass`), or null. `bar` is the
+ * pass's first bar, in the plan or in its look-ahead; `previous` is the solo's
+ * phrase before it, where the soloist was already playing.
+ */
+export function passPickup(
+  world: World,
+  bar: PlanBar,
+  memory: Memory,
+  previous: Slot | null,
+  rng: Rng,
+): PassPickup | null {
+  const before = world.plan.bars[bar.index - 1];
+  if (!before || bar.solo === null || bar.seats.solo === null || bar.ending !== null) return null;
+  // The line it leads into must be able to open on the one, at whatever level it is played.
+  const solo = soloIn(world.solo, bar.meter);
+  const opens = solo.levels.every((level) => level.cells.some((cell) => cells(cell)[0] === "x"));
+  const pool = world.poolFor(bar.start, EIGHTH).pool;
+  if (!opens || !pool) return null;
+  // The register of the phrase before, where the soloist was playing; otherwise a little
+  // way round where a solo opens, well under its top note.
+  const going = previous !== null && before.solo !== null;
+  const home = world.instrument.home + world.solo.lift;
+  const opening = home + (world.solo.arc.stages[0]?.register ?? 0);
+  const low = going ? previous.low : Math.max(world.instrument.range[0], opening - 5);
+  const high = going ? previous.high : Math.min(world.instrument.range[1], opening + 4);
+  // The line opens on a tone of the chord, where a change lands, near where the soloist was.
+  const near = memory.rest ?? opening;
+  // The phrase it leads into opens on the one because it is led in, so a pickup is drawn as
+  // often as a phrase at that level would open on the one by itself and be led into: the
+  // style's chance, times the share of the level's rhythms that open on the one. A line that
+  // would have started late mostly still does.
+  const named = going ? previous.level.name : world.solo.arc.stages[0]?.density;
+  const level = solo.levels.find((one) => one.name === named) ?? solo.levels[0]!;
+  const onTheOne = level.cells.filter((cell) => cells(cell)[0] === "x").length / level.cells.length;
+  if (!rng.fork("opens").chance(onTheOne)) return null;
+  const { perRank } = solo.landing;
+  const first = landing(pool, near, solo.arrive, perRank, low, high);
+  const notes = leadIn(
+    world,
+    {
+      bar,
+      before,
+      first,
+      air: memory.restEnds,
+      low,
+      high,
+      level: going ? previous.level.name : null,
+    },
+    rng,
+  );
+  return notes ? { notes, first } : null;
 }
 
 /** The tones a tune comes home to, in the order a style rests on them: its root, 3rd and 5th. */

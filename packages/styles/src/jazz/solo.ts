@@ -99,10 +99,13 @@ const jazzSoloInSix: SoloTime = {
     "..x- x-x- x--- x--- ---- ----",
     "x--- ---- ---- .... .... ....",
   ],
-  // From beat 6, as from beat 4 in four.
+  // From beat 6, as from beat 4 in four; the longer ones from beats 5 and 6 (half the bar is
+  // three beats, and none is longer than four's).
   pickups: [
-    { weight: 2, beat: "..x-" },
-    { weight: 1, beat: "x-x-" },
+    { weight: 2, cell: "..x-" },
+    { weight: 1, cell: "x-x-" },
+    { weight: 1, cell: "..x-x-x-", levels: ["medium", "busy"] },
+    { weight: 0.5, cell: "x-x-x-x-", levels: ["busy"] },
   ],
   peak: "x--- ---- ---- ---- .... ....",
 };
@@ -408,9 +411,14 @@ export const jazzSolo: SoloStyle = {
       chance: 0.85,
       figures: [
         // The "and" of 4, twice as often.
-        { weight: 2, beat: "..x-" },
+        { weight: 2, cell: "..x-" },
         // Two swung eighths.
-        { weight: 1, beat: "x-x-" },
+        { weight: 1, cell: "x-x-" },
+        // Three eighths from the "and" of 3: the way ST-jazz-35's lines start, off the beat
+        // and running in eighths, once the line is moving.
+        { weight: 1, cell: "..x-x-x-", levels: ["medium", "busy"] },
+        // Half a bar of eighths from beat 3, as the busy level's runs are (ST-jazz-35).
+        { weight: 0.5, cell: "x-x-x-x-", levels: ["busy"] },
       ],
       rising: 0.6,
       // It ends on the half step under the line's first note as often as the line itself

@@ -22,6 +22,7 @@ import {
   likeness,
   lineBars,
   phrasesOf,
+  pickupsOf,
   SOLO_FEATURES,
 } from "../../players/solo/critique.ts";
 import type { World } from "../../players/solo/slots.ts";
@@ -324,12 +325,13 @@ export const soloMeasures: readonly Measure[] = [
   measure(
     "empty-bars",
     "share",
-    "Some of a solo is air: bars with no note struck in them (a pickup in the last beat is the next bar's).",
+    "Some of a solo is air: bars with no note struck in them (a pickup, or a note in the last beat, is the next bar's).",
     (reading) => {
       const bars = reading.phrases.flatMap((phrase) => phrase.slot.bars);
+      const leads = pickupsOf(reading.world, reading.notes);
       const struck = new Set(
         reading.notes
-          .filter((note) => note.tick - note.bar.start < note.bar.ticks - PPQ)
+          .filter((note) => note.tick - note.bar.start < note.bar.ticks - PPQ && !leads.has(note))
           .map((note) => note.bar.index),
       );
       // A note tied over the barline is playing in the bar it is held into.
@@ -659,11 +661,9 @@ export const soloMeasures: readonly Measure[] = [
   measure(
     "entered-early",
     "share",
-    "Some phrases are led into from the beat before the barline, and some start on the one: neither every time.",
+    "Some phrases are led into from the bar before, and some start on the one: neither every time. The solo's first phrase is counted too, since it may be led into from the band's bar.",
     (reading) => {
-      const phrases = reading.phrases.filter(
-        (phrase) => !phrase.slot.first && phrase.notes.length > 0,
-      );
+      const phrases = reading.phrases.filter((phrase) => phrase.notes.length > 0);
       const early = phrases.filter((phrase) => phrase.notes[0]!.tick < phrase.slot.bars[0]!.start);
       return share(early.length, phrases.length);
     },

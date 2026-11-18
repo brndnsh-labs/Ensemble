@@ -61,7 +61,7 @@ const SHAPES = {
 // an "and" or an "a" the pulse's last eighth, an "e" its middle): short figures
 // with the rest of the bar left open, the busy level's sixteenth bursts the
 // pulse's three eighths, never wall to wall. The same three levels by name, the
-// same phrase shapes, no pickups and nothing over the barline (ST-funk-33).
+// same phrase shapes, nothing over the barline (ST-funk-33), and pickups on the eighths.
 //
 // A bar of twelve lasts half as long again as a bar of four at the meter's
 // usual tempo, so its levels play half as many notes again; a bar of six three
@@ -113,7 +113,14 @@ const funkSoloInTwelve: SoloTime = {
     "....x. x.x--- ----.. ......",
     "x...x. ..x--- ------ ......",
   ],
-  pickups: [],
+  // On the eighths, clipped, as its lines are: the last eighth, two, a pulse of three at the
+  // medium level, and at the busy level two pulses.
+  pickups: [
+    { weight: 2, cell: "....x." },
+    { weight: 1, cell: "..x.x." },
+    { weight: 1, cell: "x.x.x.", levels: ["medium", "busy"] },
+    { weight: 0.5, cell: "x...x. x.x.x.", levels: ["busy"] },
+  ],
   peak: "x----- ------ ...... ......",
 };
 
@@ -143,7 +150,12 @@ const funkSoloInSix: SoloTime = {
   ],
   // In a bar of two the long note lands in the first pulse and is held into the second.
   endings: ["x----- ----..", "x.x--- --....", "..x.x- ---...", "x...x- ----.."],
-  pickups: [],
+  // As in twelve, a pulse at most (half a bar of two).
+  pickups: [
+    { weight: 2, cell: "....x." },
+    { weight: 1, cell: "..x.x." },
+    { weight: 1, cell: "x.x.x.", levels: ["medium", "busy"] },
+  ],
   peak: "x----- ----..",
 };
 
@@ -390,11 +402,29 @@ export const funkSolo: SoloStyle = {
     riffIs: "the same",
     // A figure is stabbed on one note before the line moves, 0.45 of the time (ST-funk-32).
     stab: 0.45,
-    // No ties over the barline and no pickups (ST-funk-33): the horn comes in on the bar.
+    // No ties over the barline (ST-funk-33): the horn comes in on the bar, most of the time.
     tie: 0,
     chromatic: 0.25,
     enclosure: 0.05,
-    pickup: { chance: 0, figures: [], rising: 0.6, approach: false },
+    // A horn section mostly hits the one; three phrases in ten are pushed into it with a
+    // sixteenth or a run of them, as the bass's last-sixteenth approach and the head's
+    // anticipated One are (ST-funk-21, ST-funk-39). ST-funk-33 had none: none was built.
+    pickup: {
+      chance: 0.3,
+      figures: [
+        // The "a" of 4, the bass's own approach, the half step under the one as often as the
+        // line approaches that way.
+        { weight: 2, cell: "...x" },
+        // The "and" and the "a" of 4.
+        { weight: 1, cell: "..xx" },
+        // The "e", "and" and "a": three sixteenths in a row, as the busy cells run (ST-funk-30).
+        { weight: 1, cell: ".xxx", levels: ["medium", "busy"] },
+        // The "and" of 3 and a sixteenth run on 4, at the busy level.
+        { weight: 0.5, cell: "..x..xxx", levels: ["busy"] },
+      ],
+      rising: 0.6,
+      approach: true,
+    },
     // No bends (ST-funk-32); a guitar shakes a note held a dotted half or longer (SO-52).
     bend: { third: 0, rootOrFifth: 0, around: 0, elsewhere: 0 },
     shake: 3,

@@ -135,7 +135,11 @@ const reggaeSoloInTwelve = (): SoloTime => ({
     "...... x----- ------ ......",
     "....x- x---x- ------ ......",
   ],
-  pickups: [],
+  // The last eighth, or the long-short.
+  pickups: [
+    { weight: 2, cell: "....x-" },
+    { weight: 1, cell: "x---x-" },
+  ],
   peak: "....x- ------ ...... ......",
 });
 
@@ -150,7 +154,11 @@ const reggaeSoloInSix = (): SoloTime => ({
   ),
   // In a bar of two the long note lands in the first pulse and is held into the second.
   endings: ["....x- ----..", "x----- ----..", "..x-x- ----.."],
-  pickups: [],
+  // The last eighth, or the long-short.
+  pickups: [
+    { weight: 2, cell: "....x-" },
+    { weight: 1, cell: "x---x-" },
+  ],
   peak: "..x--- ----..",
 });
 
@@ -335,7 +343,22 @@ export const reggaeSolo: SoloStyle = {
     tie: 0,
     chromatic: 0.1,
     enclosure: 0,
-    pickup: { chance: 0, figures: [], rising: 0.6, approach: false },
+    // Seldom: a reggae line starts after the One and rests on the drop (ST-reggae-25), so
+    // few of its phrases start on the one at all; of those, about one in six is led in from
+    // the "and" of 4, where the answer bar's cross-stick pushes (ST-reggae-30).
+    pickup: {
+      chance: 0.15,
+      figures: [
+        // The "and" of 4.
+        { weight: 2, cell: "..x-" },
+        // Two eighths on 4.
+        { weight: 1, cell: "x-x-" },
+        // Three eighths from the "and" of 3, once the line is moving.
+        { weight: 0.5, cell: "..x-x-x-", levels: ["medium", "busy"] },
+      ],
+      rising: 0.6,
+      approach: false,
+    },
     // No bends (ST-reggae-27): on a guitar too, the line is sung, not bent.
     bend: { third: 0, rootOrFifth: 0, around: 0, elsewhere: 0 },
     // Vibrato on notes of eight sixteenths or longer (ST-reggae-27).

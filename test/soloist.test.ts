@@ -217,9 +217,11 @@ function solosOf(take: Take): { bars: PlanBar[]; notes: ReturnType<typeof notesO
   for (const solo of solos) {
     const from = solo.bars[0]!.start;
     const last = solo.bars.at(-1)!;
-    // A pickup into the solo's first phrase may start in the bar before it.
+    // A pickup into the solo's first phrase may start in the later half of the bar before it.
+    const before = take.plan.bars[solo.bars[0]!.index - 1];
+    const reach = before ? before.ticks / 2 : 0;
     solo.notes = all.filter(
-      (note) => note.tick >= from - PPQ && note.tick < last.start + last.ticks,
+      (note) => note.tick >= from - reach && note.tick < last.start + last.ticks,
     );
   }
   return solos;
@@ -230,7 +232,7 @@ const solo = (jam: JamSpec) => jam.options.solo === true;
 
 const soloTakes = () => [...takes(solo), ...stressTakes(solo), ...soloistTakes()];
 
-test("the soloist plays only where it has the lead (a pickup may lead in by a beat), stays on its instrument, and is one voice", () => {
+test("the soloist plays only where it has the lead (a pickup may lead in from half the bar before, where the band plays it), stays on its instrument, and is one voice", () => {
   let notes = 0;
   for (const { chart, options, take } of soloTakes()) {
     const solo = notesOf(take, "solo");
@@ -239,7 +241,8 @@ test("the soloist plays only where it has the lead (a pickup may lead in by a be
       notes++;
       const bar = take.plan.bars.findLast((candidate) => candidate.start <= note.tick)!;
       const next = take.plan.bars[bar.index + 1];
-      const leadsIn = next?.solo && note.tick >= next.start - PPQ;
+      const leadsIn =
+        next?.solo && bar.kind === "music" && (next.start - note.tick) * 2 <= bar.ticks;
       assert.ok(
         bar.solo || leadsIn,
         `${where}: a solo note in bar ${bar.index}, where it lays out`,
@@ -440,7 +443,7 @@ function atSettings(style: Jam["style"]): Take[][] {
   return found;
 }
 
-test("the player's setting moves the soloist all the way along: over a style's own charts, notes a second and the share of the lead it sounds never go down from 0 to a quarter, a half, three quarters and 1, and at 1 it plays a tenth more notes a second than at 0 or more", () => {
+test("the player's setting moves the soloist all the way along: over a style's own charts, notes a second and the share of the lead it sounds never go down from 0 to a quarter, a half, three quarters and 1 by more than a hundredth, and at 1 it plays a tenth more notes a second than at 0 or more", () => {
   for (const style of STYLES) {
     const sums = SETTINGS.map(() => ({ lead: 0, notes: 0, sounding: 0 }));
     for (const takes of atSettings(style)) {
@@ -455,8 +458,17 @@ test("the player's setting moves the soloist all the way along: over a style's o
     const sounding = sums.map((sum) => sum.sounding / sum.lead);
     const said = `${style.id}: ${perSecond.map((n) => n.toFixed(2)).join(", ")} notes a second; sounding ${sounding.map((n) => n.toFixed(3)).join(", ")}`;
     for (let i = 1; i < SETTINGS.length; i++) {
-      assert.ok(perSecond[i]! >= perSecond[i - 1]!, `${said}: fewer notes at ${SETTINGS[i]}`);
-      assert.ok(sounding[i]! >= sounding[i - 1]!, `${said}: less sounding at ${SETTINGS[i]}`);
+      // A pickup lives in the room a phrase leaves, so a setting that gives up room gives up
+      // some of the pickups in it: notes a second may fall by a hundredth of themselves at
+      // most, and the share sounding by a hundredth of the lead.
+      assert.ok(
+        perSecond[i]! >= perSecond[i - 1]! * 0.99,
+        `${said}: fewer notes at ${SETTINGS[i]}`,
+      );
+      assert.ok(
+        sounding[i]! >= sounding[i - 1]! - 0.01,
+        `${said}: less sounding at ${SETTINGS[i]}`,
+      );
     }
     assert.ok(perSecond.at(-1)! >= perSecond[0]! * 1.1, `${said}: the ends are too close`);
   }
@@ -564,14 +576,22 @@ test("tempo is felt in the pulse: at the same pulse the soloist plays as many no
 test("a three-chorus solo builds: its last chorus has more notes than its first, in nine solos in ten", () => {
   let built = 0;
   let solos = 0;
-  for (const { take } of takes(solo)) {
+  for (const { style, take } of takes(solo)) {
+    // A pickup is counted with the chorus it leads into.
+    const leads = new Map<unknown, number>();
+    for (const start of startsOf(take, style)) {
+      for (const note of start.lead) leads.set(note, start.into.start);
+    }
     for (const { bars, notes } of solosOf(take)) {
       if (bars[0]!.solo!.of !== 3) continue;
       const inChorus = (chorus: number) => {
         const own = bars.filter((bar) => bar.solo!.chorus === chorus);
         const from = own[0]!.start;
         const to = own.at(-1)!.start + own.at(-1)!.ticks;
-        return notes.filter((note) => note.tick >= from && note.tick < to).length;
+        return notes.filter((note) => {
+          const at = leads.get(note) ?? note.tick;
+          return at >= from && at < to;
+        }).length;
       };
       solos++;
       if (inChorus(2) > inChorus(0)) built++;
@@ -675,6 +695,187 @@ test("a phrase is followed by a breath: the soloist leaves the style's breath of
     );
   }
   assert.ok(joins > enough(600), `only ${joins} phrase joins`);
+});
+
+// ── how a phrase starts ─────────────────────────────────────────────────────
+
+/**
+ * How a take's phrases start, read from its notes: a phrase is what the soloist plays after a
+ * breath (the style's, less a tenth for the player's own timing, or a horn's own). It starts
+ * before its barline (led in: struck in the later half of a bar and running on without a
+ * breath into a note on the next downbeat, SO-36), on the barline, or after it. `into` is the
+ * bar the phrase's line is in; `lead` the notes before its barline.
+ */
+interface Start {
+  readonly kind: "before" | "on" | "after";
+  readonly into: PlanBar;
+  readonly lead: ReturnType<typeof notesOf>;
+}
+const startsRead = new WeakMap<Take, Start[]>();
+function startsOf(take: Take, style: Jam["style"]): Start[] {
+  const known = startsRead.get(take);
+  if (known) return known;
+  const notes = notesOf(take, "solo");
+  const bars = take.plan.bars;
+  const instrument = SOLO_INSTRUMENTS[notes[0]?.voice ?? ""];
+  const perTick = 60 / take.plan.quarters / PPQ;
+  const owed = (Math.max(style.solo.space.breath, instrument?.breath?.takes ?? 0) * 0.9) / perTick;
+  const ends = (i: number) => notes[i]!.tick + notes[i]!.duration;
+  const starts: Start[] = [];
+  let b = 0;
+  notes.forEach((note, i) => {
+    while (bars[b + 1] && bars[b + 1]!.start <= note.tick) b++;
+    if (i > 0 && note.tick - ends(i - 1) < owed) return;
+    const bar = bars[b]!;
+    const next = bars[b + 1];
+    const inBar = note.tick - bar.start;
+    if (inBar > 0 && inBar * 2 >= bar.ticks && next) {
+      let j = i;
+      while (notes[j + 1] && notes[j + 1]!.tick < next.start && notes[j + 1]!.tick - ends(j) < owed)
+        j++;
+      const onto = notes[j + 1];
+      if (onto?.tick === next.start && onto.tick - ends(j) < owed) {
+        starts.push({ kind: "before", into: next, lead: notes.slice(i, j + 1) });
+        return;
+      }
+    }
+    starts.push({ kind: inBar === 0 ? "on" : "after", into: bar, lead: [] });
+  });
+  const inLead = starts.filter((start) => start.into.solo !== null);
+  startsRead.set(take, inLead);
+  return inLead;
+}
+
+/**
+ * The least share of a style's phrases started after a breath that are led in from before the
+ * barline, over every take with the soloist (SO-39: jazz 20 to 30 percent, the blues 25 to 50;
+ * a style where it is seldom still does it).
+ */
+const LED_IN: Readonly<Record<string, number>> = {
+  jazz: 0.18,
+  blues: 0.13,
+  rock: 0.1,
+  funk: 0.05,
+  disco: 0.05,
+  neosoul: 0.015,
+  // A reggae line starts after the One (ST-reggae-25): it leads in, but seldom.
+  reggae: 0,
+  acoustic: 0.08,
+};
+
+test("the soloist leads phrases in: of the phrases it starts after a breath, at least the style's share start before their barline, from the end of the bar before", () => {
+  for (const style of STYLES) {
+    const floor = LED_IN[style.id];
+    if (floor === undefined) continue;
+    let [phrases, before] = [0, 0];
+    for (const { take } of soloTakes().filter((jam) => jam.style === style)) {
+      for (const start of startsOf(take, style)) {
+        phrases++;
+        if (start.kind === "before") before++;
+      }
+    }
+    assert.ok(phrases > enough(300), `${style.id}: only ${phrases} phrases`);
+    assert.ok(
+      before >= Math.max(1, phrases * floor),
+      `${style.id}: ${before} of ${phrases} phrases led in (${((100 * before) / phrases).toFixed(1)}%), under ${100 * floor}%`,
+    );
+  }
+});
+
+test("the top of a chorus, and of the solo, is led into some of the time: from the band's last bar, the soloist's chorus before or the turnaround, wherever the band plays that bar; never from a count-in, and never by more than half a bar", () => {
+  for (const style of STYLES) {
+    let [allowed, tops, led, firsts, firstsLed] = [0, 0, 0, 0, 0];
+    for (const { take } of soloTakes().filter((jam) => jam.style === style)) {
+      const into = new Map(startsOf(take, style).map((start) => [start.into.index, start]));
+      for (const bar of take.plan.bars) {
+        const before = take.plan.bars[bar.index - 1];
+        if (!bar.solo || (before?.solo && before.solo.chorus === bar.solo.chorus)) continue;
+        if (before?.kind !== "music" || before.ending) continue;
+        allowed++;
+        const start = into.get(bar.index);
+        if (start?.kind !== "before" && start?.kind !== "on") continue;
+        tops++;
+        if (start.kind === "before") led++;
+        if (!before.solo) {
+          firsts++;
+          if (start.kind === "before") firstsLed++;
+        }
+      }
+      for (const start of startsOf(take, style)) {
+        if (start.kind !== "before") continue;
+        const from = start.into.start - start.lead[0]!.tick;
+        assert.ok(
+          from * 2 <= take.plan.bars[start.into.index - 1]!.ticks,
+          `${style.id}: a pickup of ${from / PPQ} beats`,
+        );
+      }
+    }
+    // A pickup into a phrase is drawn as often as the style leads in at all; at a chorus's top
+    // it needs only the air the bar before has, which is most of the time. A reggae line
+    // starts after the One (ST-reggae-25), so few of its tops are entered on the bar or before.
+    const floor = (LED_IN[style.id] ?? 0) / 2;
+    assert.ok(
+      led >= Math.floor(tops * floor),
+      `${style.id}: ${led} of ${tops} chorus tops led into`,
+    );
+    if (firsts >= enough(12)) {
+      assert.ok(firstsLed > 0, `${style.id}: none of ${firsts} solos led into`);
+    }
+    assert.ok(allowed > enough(60), `${style.id}: only ${allowed} chorus tops`);
+  }
+  // From the top of a jam the bar before the solo is the count-in: nothing is played there.
+  for (const style of STYLES) {
+    for (const takes of atSettings(style)) {
+      for (const take of takes) {
+        const counted = take.plan.bars.filter((bar) => bar.kind === "count-in");
+        for (const bar of counted) {
+          const inIt = notesOf(take, "solo").filter(
+            (note) => note.tick >= bar.start && note.tick < bar.start + bar.ticks,
+          );
+          assert.equal(inIt.length, 0, `${style.id}: ${inIt.length} solo notes in the count-in`);
+        }
+      }
+    }
+  }
+});
+
+test("a pickup spells the chord it is played over: each note of a pickup into a phrase of the form on a beat, or held, is a tone of that chord (the bar before's, not the phrase's), or of the chord it is held into", () => {
+  let judged = 0;
+  for (const { style, chart, options, take } of soloTakes()) {
+    const harmony = harmonyOf(take);
+    for (const start of startsOf(take, style)) {
+      // Into the first bar of a phrase of the form, where the bar before is a phrase's last,
+      // which ends on a long note and a breath: what starts late in it and runs into the
+      // downbeat is a pickup, not a line that started late.
+      if (start.kind !== "before" || start.into.phrase.bar !== 0) continue;
+      for (const note of start.lead) {
+        const bar = take.plan.bars[start.into.index - 1]!;
+        const onBeat = onPulse(bar.meter, note.tick - bar.start);
+        if (!onBeat && note.duration < PPQ * 0.75) continue;
+        const at = harmony.findLastIndex((arrival) => arrival.tick <= note.tick);
+        const next = harmony[at + 1];
+        const leans =
+          next?.changed &&
+          harmony[at]!.tick !== note.tick &&
+          next.tick - note.tick <= PPQ / 2 &&
+          note.tick + note.duration > next.tick;
+        const chord = (leans ? next : harmony[at])?.chord;
+        if (!chord) continue;
+        judged++;
+        const tones = chordTones(chord.quality).map(
+          (tone) => (pitchClass(chord.root) + tone.interval) % 12,
+        );
+        assert.ok(
+          tones.includes(note.pitch % 12),
+          `${chart.file} ${JSON.stringify(options)} bar ${bar.index}: a pickup's ${note.pitch} over ${chord.text}`,
+        );
+      }
+    }
+  }
+  // Neo-soul's pickups are all on the "e"s and "a"s, and reggae seldom leads in: in those
+  // there is little or nothing on a beat to judge.
+  const judging = STYLES.filter((style) => !["neosoul", "reggae"].includes(style.id)).length;
+  assert.ok(judged >= enough(5) * judging, `only ${judged} pickup notes on a beat or held`);
 });
 
 test("a horn breathes: the alto never plays eight seconds without half a second of air, as heard", () => {

@@ -49,7 +49,9 @@ export const acousticCritic: CriticStyle = {
     "solo.short-notes": { max: 0.8, kind: "measured", minCases: 20 },
     "solo.bends": { max: 0, kind: "intent" },
     "solo.barlines-tied": { max: 0, kind: "intent" },
-    "solo.entered-early": { max: 0, kind: "intent" },
+    // A sung line is led in by its anacrusis now and then: 18% of a take's phrases on
+    // the mean today, never most (SO-39's ceiling).
+    "solo.entered-early": { max: 0.45, kind: "intent", minCases: 6 },
   },
   weights: {
     // What a grip costs (CH-16, CH-24). Only the top string is led from chord to chord: the

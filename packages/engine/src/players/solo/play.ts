@@ -19,8 +19,9 @@ import type { Heard, SoloCandidate, SoloPick, Sounding } from "./critique.ts";
 import { bassStruck, bySoloCritic, SOLO_FEATURES } from "./critique.ts";
 import { EIGHTH, isChordTone } from "./harmony.ts";
 import { soloVoice } from "./instruments.ts";
-import type { Memory, Phrase } from "./phrases.ts";
-import { phrasesFor } from "./phrases.ts";
+import { spotsOf } from "./line.ts";
+import type { Memory, PassPickup, Phrase } from "./phrases.ts";
+import { opensPass, passPickup, phrasesFor } from "./phrases.ts";
 import type { Slot, World } from "./slots.ts";
 import { worldOf } from "./slots.ts";
 import type { Form, Role } from "./style.ts";
@@ -71,13 +72,39 @@ export function soloPart(
   let earlier: Heard[] = [];
   let form: readonly Role[] = ["s"];
   let solo = -1;
-  for (const slot of world.slots) {
+  /** A pickup into the top of a pass, made from the pass before (`passPickup`). */
+  const intoPass = (bar: PlanBar, previous: Slot | undefined): PassPickup | null => {
+    if (!opensPass(plan, bar)) return null;
+    const going =
+      previous !== undefined &&
+      previous.bars.at(-1)!.index === bar.index - 1 &&
+      bar.solo?.chorus !== 0;
+    return passPickup(
+      world,
+      bar,
+      memory,
+      going ? previous : null,
+      // Keyed by its place in the form and the chord it leads into.
+      heldRng(rng, "pass pickup", "bar", bar).fork(String(bar.spans[0]?.chord?.root ?? "")),
+    );
+  };
+  const writeLead = (lead: PassPickup, bar: PlanBar): SoloNote[] => {
+    const notes = realiseLead(world, lead, bar);
+    for (const note of notes) {
+      written.push({ ...note, seat: "solo", bar: note.bar.index, voice, leadsIn: true });
+    }
+    return notes;
+  };
+  world.slots.forEach((slot, s) => {
     const first = slot.bars[0]!;
     if (slot.solo !== solo) {
       solo = slot.solo;
-      memory = NOTHING;
+      // A new solo remembers nothing of the last but where its last note stopped: a pickup
+      // into it leaves that note its breath.
+      memory = { ...NOTHING, restEnds: memory.restEnds };
       earlier = [];
     }
+    const lead = intoPass(first, world.slots[s - 1]);
     if (slot.index === 0) {
       // One form for the chorus. With no idea yet to pick up, it opens on a statement.
       const forms = writtenFor(
@@ -99,13 +126,23 @@ export function soloPart(
     }
     const role = form[slot.index % form.length] ?? "s";
 
-    const phrases = phrasesFor(world, slot, role, memory, heldRng(rng, "phrase", "phrase", first));
-    const notes = phrases.map((phrase) => realise(world, phrase, accent));
+    const phrases = phrasesFor(
+      world,
+      slot,
+      role,
+      memory,
+      heldRng(rng, "phrase", "phrase", first),
+      lead?.first ?? null,
+    );
+    // The pass before's pickup into this phrase is played as it was made, whichever is chosen.
+    const leading = lead ? writeLead(lead, first) : [];
+    const from = leading[0]?.tick;
+    const notes = phrases.map((phrase) => realise(world, phrase, accent, from));
     const candidates = phrases.map(
       (phrase, i): SoloCandidate => ({
         kind: phrase.kind,
         slot,
-        notes: notes[i]!.map((note) => sounding(world, note)),
+        notes: [...leading, ...notes[i]!].map((note) => sounding(world, note)),
         earlier,
         world,
       }),
@@ -116,8 +153,11 @@ export function soloPart(
 
     const phrase = phrases[at]!;
     const played = notes[at]!;
+    const opens = slot.bars[0]!.start;
     for (const note of played) {
-      written.push({ ...note, seat: "solo", bar: note.bar.index, voice });
+      // A pickup struck before the phrase's first bar leads into it, from wherever it is played.
+      const leadsIn = note.tick < opens ? { leadsIn: true } : {};
+      written.push({ ...note, seat: "solo", bar: note.bar.index, voice, ...leadsIn });
     }
     const last = played.at(-1);
     // A new idea is the idea from now on, wherever in the form it turned up; and so is
@@ -135,6 +175,14 @@ export function soloPart(
       restEnds: last ? last.tick + last.duration : memory.restEnds,
       endedEmpty: phrase.bars.at(-1)?.part === "R",
     };
+  });
+  // An open jam's next pass is not played, but a pickup into it is the last pass's to play:
+  // made as it will be when the jam is made longer.
+  const next = plan.lookahead[0];
+  if (next?.solo) {
+    if (next.solo.chorus === 0) memory = { ...NOTHING, restEnds: memory.restEnds };
+    const lead = intoPass(next, world.slots.at(-1));
+    if (lead) writeLead(lead, next);
   }
   return written;
 }
@@ -232,7 +280,7 @@ function moveOf(
  * seconds, before whatever follows (Q-47, SU-B-15); a note stops at a change
  * of chord unless it belongs to the new one (X-B-07).
  */
-function realise(world: World, phrase: Phrase, accent: number): SoloNote[] {
+function realise(world: World, phrase: Phrase, accent: number, breathedAt?: number): SoloNote[] {
   const { solo, instrument, harmony } = world;
   const { slot } = phrase;
   const touch = solo.touch;
@@ -245,13 +293,16 @@ function realise(world: World, phrase: Phrase, accent: number): SoloNote[] {
   const all = [...phrase.pickup, ...phrase.line];
   // A horn's air: how long it may play from where it last breathed.
   const lungs = (instrument.breath?.lungs ?? Number.POSITIVE_INFINITY) * world.ticksPerSecond;
-  let breathed = all[0]?.spot.tick ?? 0;
+  // (Or from a pickup into it played before it.)
+  let breathed = breathedAt ?? all[0]?.spot.tick ?? 0;
 
   return all.flatMap(({ spot, pitch, lead, bend }, i): SoloNote[] => {
     const { bar, tick } = spot;
     const next = all[i + 1];
     const before = all[i - 1];
-    let level = (slot.peak ? touch.peak : touch.level) + touch.perSemitone * (pitch - home);
+    // A pickup is played at the line's own level, less its own, whatever the phrase it leads to.
+    let level =
+      (slot.peak && !lead ? touch.peak : touch.level) + touch.perSemitone * (pitch - home);
     if (spot.hold <= EIGHTH && onAnd(bar.meter, tick - bar.start)) level += touch.offbeat;
     if (before && next && pitch < before.pitch && pitch < next.pitch) level -= touch.valley;
     if (lead) level -= touch.pickup;
@@ -341,6 +392,45 @@ function realise(world: World, phrase: Phrase, accent: number): SoloNote[] {
     const move = moveOf(world, bend ?? 0, value, soundsFor(world, bar, tick, duration));
     return [{ bar, tick, duration, pitch, velocity, ...move }];
   });
+}
+
+/**
+ * A pickup into the top of a pass, played as a pickup into any phrase is: its
+ * notes, as far as the note it leads to on the bar's downbeat.
+ */
+function realiseLead(world: World, lead: PassPickup, bar: PlanBar): SoloNote[] {
+  const into = spotsOf(world, bar, "x")[0];
+  if (!into) return [];
+  const level = world.solo.levels[0]!;
+  const slot: Slot = {
+    bars: [bar],
+    solo: 0,
+    chorus: 0,
+    of: 1,
+    index: 0,
+    count: 1,
+    first: false,
+    peak: false,
+    last: false,
+    level,
+    room: 0,
+    asked: level,
+    centre: lead.first,
+    low: lead.first,
+    high: lead.first,
+    top: lead.first,
+  };
+  const phrase: Phrase = {
+    kind: "pickup",
+    slot,
+    bars: [
+      { part: "L", cell: "x", again: false, stab: false, tied: false, pitches: [], bends: [] },
+    ],
+    line: [{ spot: into, pitch: lead.first }],
+    pickup: lead.notes,
+    fresh: false,
+  };
+  return realise(world, phrase, 0).slice(0, lead.notes.length);
 }
 
 /** The final chord as the band plays it: where the soloist strikes, and for how long (EN-32 to EN-35). */

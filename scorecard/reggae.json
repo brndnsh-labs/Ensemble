@@ -366,25 +366,25 @@
     "inTarget": null
   },
   "solo.notes-per-second-first": {
-    "mean": 0.6606,
+    "mean": 0.6613,
     "p10": 0.4875,
     "p90": 0.8854,
     "inTarget": null
   },
   "solo.notes-per-second-last": {
-    "mean": 1.2509,
+    "mean": 1.2512,
     "p10": 1.0688,
     "p90": 1.4219,
     "inTarget": null
   },
   "solo.builds": {
-    "mean": 2.0485,
+    "mean": 2.0478,
     "p10": 1.3077,
     "p90": 2.5833,
     "inTarget": 0.8654
   },
   "solo.rises": {
-    "mean": 2.8042,
+    "mean": 2.802,
     "p10": 1.1934,
     "p90": 3.819,
     "inTarget": null
@@ -402,7 +402,7 @@
     "inTarget": null
   },
   "solo.high-points-deserved": {
-    "mean": 0.7735,
+    "mean": 0.7728,
     "p10": 0.625,
     "p90": 0.9583,
     "inTarget": null
@@ -414,9 +414,9 @@
     "inTarget": null
   },
   "solo.steps": {
-    "mean": 0.8168,
-    "p10": 0.7321,
-    "p90": 0.8879,
+    "mean": 0.817,
+    "p10": 0.7353,
+    "p90": 0.8889,
     "inTarget": null
   },
   "solo.wide-leaps": {
@@ -432,7 +432,7 @@
     "inTarget": null
   },
   "solo.trills": {
-    "mean": 0.0223,
+    "mean": 0.0222,
     "p10": 0,
     "p90": 0.0479,
     "inTarget": 0.9333
@@ -450,14 +450,14 @@
     "inTarget": 1
   },
   "solo.entered-early": {
-    "mean": 0,
+    "mean": 0.0031,
     "p10": 0,
     "p90": 0,
     "inTarget": 1
   },
   "solo.cost": {
-    "mean": 1.8654,
-    "p10": 1.538,
+    "mean": 1.8655,
+    "p10": 1.5389,
     "p90": 2.4265,
     "inTarget": null
   },

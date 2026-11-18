@@ -115,11 +115,14 @@ const bluesSoloInTwelve: SoloTime = {
     "....x- x---x- ------ ------",
     "x-x-x- x----- ------ ......",
   ],
-  // From beat 4: its last eighth, the long-short, or the triplet.
+  // From beat 4: its last eighth, the long-short, or the triplet; from beat 3 once the line is
+  // moving, the long-short and the triplet, and at the top two triplets.
   pickups: [
-    { weight: 1, beat: "....x-" },
-    { weight: 1, beat: "x---x-" },
-    { weight: 1, beat: "x-x-x-" },
+    { weight: 1, cell: "....x-" },
+    { weight: 1, cell: "x---x-" },
+    { weight: 1, cell: "x-x-x-" },
+    { weight: 0.5, cell: "x---x- x-x-x-", levels: ["medium", "busy", "flying"] },
+    { weight: 0.5, cell: "x-x-x- x-x-x-", levels: ["busy", "flying"] },
   ],
   peak: "x----- ------ ------ ......",
 };
@@ -395,11 +398,15 @@ export const bluesSolo: SoloStyle = {
       chance: 0.65,
       figures: [
         // The "and" of 4.
-        { weight: 1, beat: "..x-" },
+        { weight: 1, cell: "..x-" },
         // Two swung eighths.
-        { weight: 1, beat: "x-x-" },
+        { weight: 1, cell: "x-x-" },
         // A triplet on 4.
-        { weight: 1, beat: "xxx-" },
+        { weight: 1, cell: "xxx-" },
+        // Three swung eighths from the "and" of 3, as ST-blues-39's lines that start on an "and".
+        { weight: 0.5, cell: "..x-x-x-", levels: ["medium", "busy", "flying"] },
+        // Two triplets, beats 3 and 4: the flying level's figure (ST-blues-39) as a way in.
+        { weight: 0.5, cell: "xxx-xxx-", levels: ["busy", "flying"] },
       ],
       rising: 0.6,
       // Walked in by the scale.

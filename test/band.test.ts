@@ -495,11 +495,13 @@ Outro    2 1 - - .
       assert.equal(played("bass", 3).length, 0, "the bass is out of the second verse");
       for (let section = 0; section < 7; section++) {
         const leads = section === 4 || section === 5;
-        assert.equal(
-          played("solo", section).length > 0,
-          leads,
-          `the soloist in section ${section + 1}`,
-        );
+        // A pickup into the solo is played in the later half of the bar before it.
+        const own = played("solo", section).filter((note) => {
+          const bar = music.findLast((other) => other.start <= note.tick)!;
+          const next = take.plan.bars[bar.index + 1];
+          return !(next?.solo && (note.tick - bar.start) * 2 >= bar.ticks);
+        });
+        assert.equal(own.length > 0, leads, `the soloist in section ${section + 1}`);
       }
       for (const bar of music) {
         const { occurrence } = bar.section;

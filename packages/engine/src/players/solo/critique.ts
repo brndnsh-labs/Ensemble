@@ -7,7 +7,7 @@
 import { PPQ } from "../../chart/types.ts";
 import { choose } from "../../critic/choose.ts";
 import type { Feature } from "../../critic/types.ts";
-import { lastPulse, onPulse } from "../../perform/meter.ts";
+import { onPulse } from "../../perform/meter.ts";
 import type { PlanBar } from "../../plan/types.ts";
 import { mod12 } from "../../theory/pitch.ts";
 import { isChordTone, ranked } from "./harmony.ts";
@@ -40,17 +40,62 @@ export interface SoloCandidate extends Heard {
 export const body = (heard: Heard): Sounding[] =>
   heard.notes.filter((note) => note.tick >= heard.slot.bars[0]!.start);
 
-const inLastBeat = (note: Sounding) =>
-  note.tick - note.bar.start >= note.bar.ticks - lastPulse(note.bar.meter);
+/** Struck in the later half of its bar, where a pickup lives (SO-36): half the bar at most. */
+const inLaterHalf = (note: Sounding) => (note.tick - note.bar.start) * 2 >= note.bar.ticks;
 
 /**
  * The idea itself: a phrase's notes without any pickup, into it or inside it.
- * A bar whose only notes are in its last beat is a pickup into the next bar.
+ * A bar whose only notes are in its later half is a pickup into the next bar.
  */
 export function idea(heard: Heard): Sounding[] {
   const notes = body(heard);
-  const played = new Set(notes.filter((note) => !inLastBeat(note)).map((note) => note.bar.index));
+  const played = new Set(notes.filter((note) => !inLaterHalf(note)).map((note) => note.bar.index));
   return notes.filter((note) => played.has(note.bar.index));
+}
+
+/** The air a soloist leaves between two phrases, in ticks, less a tenth for the player's own timing. */
+export const owedBreath = (world: World): number =>
+  Math.max(world.solo.space.breath, world.instrument.breath?.takes ?? 0) *
+  0.9 *
+  world.ticksPerSecond;
+
+/**
+ * The notes of a solo that lead into a bar from the bar before it (SO-36), as
+ * heard: struck in the later half of a bar that is not the band's last, after
+ * a breath, and running on without one into a note struck on the next
+ * downbeat. A run that starts in the first half of its bar is a line, not a
+ * pickup. Notes in time order.
+ */
+export function pickupsOf(world: World, notes: readonly Sounding[]): Set<Sounding> {
+  const owed = owedBreath(world);
+  const found = new Set<Sounding>();
+  // Walking back from each downbeat struck, the run of notes joined to it in the bar before.
+  let run: Sounding[] = [];
+  const keep = (before: Sounding | undefined) => {
+    const opens = run.at(-1);
+    if (opens && (!before || opens.tick - before.ends >= owed)) {
+      for (const note of run) found.add(note);
+    }
+    run = [];
+  };
+  for (let i = notes.length - 1; i >= 0; i--) {
+    const [note, next] = [notes[i]!, notes[i + 1]];
+    const joined = next !== undefined && next.tick - note.ends < owed;
+    const into = run.length > 0 ? run[0]!.bar.start + run[0]!.bar.ticks : next?.tick;
+    const leads =
+      joined &&
+      (run.length > 0 || next.tick === next.bar.start) &&
+      note.bar.start + note.bar.ticks === into &&
+      inLaterHalf(note) &&
+      note.bar.ending === null;
+    if (leads) {
+      run.push(note);
+      continue;
+    }
+    keep(note);
+  }
+  keep(undefined);
+  return found;
 }
 
 /**
@@ -341,29 +386,23 @@ export function bassStruck(
 
 /**
  * A solo's notes sorted into its phrases. A note struck in a bar belongs to
- * that bar's slot, except a note struck in the last beat of a slot's final
- * bar, which leads into the next slot: no phrase strikes its own last beat.
+ * that bar's slot, except a pickup into a slot's first bar (`pickupsOf`),
+ * which belongs to that slot, from whichever bar it is played in: the last of
+ * the slot before, or a bar of the band's before the solo or a chorus of it.
  */
 export function phrasesOf(world: World, notes: readonly Sounding[]): Heard[] {
   const slotOf = new Map<number, number>();
+  const opens = new Map<number, number>();
   world.slots.forEach((slot, i) => {
     for (const bar of slot.bars) slotOf.set(bar.index, i);
+    opens.set(slot.bars[0]!.index, i);
   });
+  const leads = pickupsOf(world, notes);
   const sorted: Sounding[][] = world.slots.map(() => []);
   for (const note of notes) {
-    let at = slotOf.get(note.bar.index);
+    const into = leads.has(note) ? opens.get(note.bar.index + 1) : undefined;
+    const at = into ?? slotOf.get(note.bar.index);
     if (at === undefined) continue;
-    const slot = world.slots[at]!;
-    const next = world.slots[at + 1];
-    const lastBar = slot.bars.at(-1)!;
-    const leadsIn =
-      note.bar === lastBar &&
-      note.tick >= lastBar.start + lastBar.ticks - lastPulse(lastBar.meter) &&
-      !lastBar.ending &&
-      next !== undefined &&
-      next.bars[0]!.index === lastBar.index + 1 &&
-      next.chorus === slot.chorus;
-    if (leadsIn) at++;
     sorted[at]!.push(note);
   }
   return world.slots.map((slot, i) => ({ slot, notes: sorted[i]! }));

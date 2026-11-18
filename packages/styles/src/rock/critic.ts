@@ -86,9 +86,11 @@ export const rockCritic: CriticStyle = {
     "solo.wide-leaps": { max: 0.05, kind: "intent", minCases: 20 },
     "solo.trills": { max: 0.05, kind: "intent", minCases: 20 },
     "solo.repeated-notes": { max: 0.1, kind: "measured", minCases: 20 },
-    // No pickups and no ties over the barline (ST-rock-24). True by construction: tripwires.
+    // No ties over the barline (ST-rock-24). True by construction: a tripwire.
     "solo.barlines-tied": { max: 0, kind: "intent" },
-    "solo.entered-early": { max: 0, kind: "intent" },
+    // Some phrases are led into, never most of them: leading into every phrase is a
+    // mannerism (SO-39). A take's share is 26% on the mean today.
+    "solo.entered-early": { max: 0.5, kind: "intent", minCases: 6 },
     // How much the lead guitar bends and shakes, for an ear to move: today a bent note
     // every eight bars of a solo and two shaken notes every three bars. The bands sit a margin
     // outside what is delivered, so the scorecard names a solo with none or with a crowd.

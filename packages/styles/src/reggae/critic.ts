@@ -61,7 +61,8 @@ export const reggaeCritic: CriticStyle = {
     "solo.wide-leaps": { max: 0.05, kind: "intent", minCases: 20 },
     "solo.trills": { max: 0.05, kind: "intent", minCases: 20 },
     "solo.barlines-tied": { max: 0, kind: "intent" },
-    "solo.entered-early": { max: 0, kind: "intent" },
+    // A reggae line starts after the One (ST-reggae-25): it is led into very seldom.
+    "solo.entered-early": { max: 0.15, kind: "intent", minCases: 6 },
   },
   weights: {
     // What a grip costs: the funk guitar's, the top held where the style aims it (ST-reggae-18).

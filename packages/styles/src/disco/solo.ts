@@ -114,8 +114,12 @@ const rhythmsInTwelve: SoloTime = {
     "x...x- x----- ------ ------",
     "x---x- ------ ------ ------",
   ],
-  // The notes give no pickups for the solo, in any meter.
-  pickups: [],
+  // On the eighths, legato: the last eighth, two, and at the busy level two pulses.
+  pickups: [
+    { weight: 2, cell: "....x-" },
+    { weight: 1, cell: "..x-x-" },
+    { weight: 0.5, cell: "....x- x-x-x-", levels: ["busy"] },
+  ],
   peak: "x----- -----. ...... ......",
 };
 
@@ -146,7 +150,11 @@ const rhythmsInSix: SoloTime = {
   // Each lands in the first pulse and holds through the second; none lands on the first pulse's
   // last eighth alone, which at the top of disco's range leaves less than a breath after it.
   endings: ["x----- ------", "x---x- ------", "..x-x- ------", "x...x- ------", "..x--- ------"],
-  pickups: [],
+  // The last eighth, or two.
+  pickups: [
+    { weight: 2, cell: "....x-" },
+    { weight: 1, cell: "..x-x-" },
+  ],
   peak: "x----- ------",
 };
 
@@ -377,11 +385,26 @@ export const discoSolo: SoloStyle = {
     // strikes one pitch twice a sixteenth apart (ST-disco-25).
     stab: 0.8,
     stabEvery: 2,
-    // The notes give no barline ties or pickups for the solo.
+    // The notes give no barline ties for the solo.
     tie: 0,
     chromatic: 0.15,
     enclosure: 0.05,
-    pickup: { chance: 0, figures: [], rising: 0.6, approach: false },
+    // Three phrases in ten that would start on the one are led in, the horn over the floor
+    // reaching for the downbeat the kick lands on (ST-disco-28); the notes gave none because
+    // none was built. In its own sixteenths, legato (ST-disco-23).
+    pickup: {
+      chance: 0.3,
+      figures: [
+        // The "and" of 4.
+        { weight: 2, cell: "..x-" },
+        // The "and" and the "a" of 4.
+        { weight: 1, cell: "..xx" },
+        // The "and" of 3, 4, its "and" and "a", once the line is moving (ST-disco-23's medium).
+        { weight: 1, cell: "..x-x-xx", levels: ["medium", "busy"] },
+      ],
+      rising: 0.6,
+      approach: false,
+    },
     // On a guitar, a bend into the 3rd 0.30 and into the root 0.20 (ST-disco-25), in phrases
     // the hand gets lyrical in, as the blues and rock have it.
     bend: { third: 0.3, rootOrFifth: 0.2, around: 1, elsewhere: 0.5 },
