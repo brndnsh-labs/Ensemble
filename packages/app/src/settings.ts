@@ -32,6 +32,13 @@ export interface Settings {
   /** Minutes, or null to go round until stopped. */
   readonly minutes: number | null;
   readonly band: Readonly<Record<Seat, boolean>>;
+  /**
+   * How busy the soloist is, 0 the sparsest to 1 the busiest, 0.5 the style's
+   * own. The player's taste, so one for every chart, as the band is.
+   */
+  readonly soloDensity: number;
+  /** In a jam, the soloist has the lead from the first time round, not after the band has played the form once. */
+  readonly soloFromTop: boolean;
   readonly charts: Readonly<Record<string, ChartChoices>>;
 }
 
@@ -42,13 +49,26 @@ const DEFAULTS: Settings = {
   minutes: 3,
   // The soloist sits out until asked: someone practising wants the band.
   band: { drums: true, bass: true, chords: true, solo: false },
+  soloDensity: 0.5,
+  soloFromTop: false,
   charts: {},
 };
 
 export function loadSettings(): Settings {
   try {
     const stored = JSON.parse(localStorage.getItem(KEY) ?? "{}") as Partial<Settings>;
-    return { ...DEFAULTS, ...stored, band: { ...DEFAULTS.band, ...stored.band } };
+    // Settings kept before a setting existed lack it, and take its default.
+    const density = stored.soloDensity;
+    return {
+      ...DEFAULTS,
+      ...stored,
+      band: { ...DEFAULTS.band, ...stored.band },
+      soloDensity:
+        typeof density === "number" && density >= 0 && density <= 1
+          ? density
+          : DEFAULTS.soloDensity,
+      soloFromTop: stored.soloFromTop === true,
+    };
   } catch {
     return DEFAULTS;
   }

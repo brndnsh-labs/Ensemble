@@ -46,6 +46,10 @@ export interface JamSetup {
   /** Who plays. */
   readonly band: Readonly<Record<Seat, boolean>>;
   readonly soloInstrument: string;
+  /** How busy the soloist is, 0 to 1: 0.5 is the style's own. */
+  readonly soloDensity: number;
+  /** In a jam, the soloist leads from the first time round. */
+  readonly soloFromTop: boolean;
   /** The instrument a seat is played on, where the player chose one of the style's others. */
   readonly instruments: HowPlayed["instruments"];
 }
@@ -81,6 +85,10 @@ export function takeOptions(setup: JamSetup): HowPlayed {
     ...(setup.key === null ? {} : { key: setup.key }),
     solo: setup.band.solo,
     soloInstrument: setup.soloInstrument,
+    // Said only where they change what is played: at the style's own, or with no soloist, or for
+    // a song once through, the take is the one it was before the settings existed.
+    ...(setup.band.solo && setup.soloDensity !== 0.5 ? { soloDensity: setup.soloDensity } : {}),
+    ...(setup.band.solo && setup.soloFromTop && !setup.song ? { soloFromTop: true } : {}),
     ...(setup.instruments && Object.keys(setup.instruments).length > 0
       ? { instruments: setup.instruments }
       : {}),
