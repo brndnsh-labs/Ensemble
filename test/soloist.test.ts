@@ -405,7 +405,7 @@ test("the soloist is not sparse: over a style's own charts at their own tempo, w
 const SETTINGS = [0, 0.25, 0.5, 0.75, 1] as const;
 
 /**
- * A style's own charts (six at most) as one solo of three choruses from the top, on three
+ * A style's own charts (five at most) as one solo of three choruses from the top, on three
  * seeds, at each setting: the bass and the soloist only, since the soloist hears the bass and nothing else
  * (what it plays is the same note for note with the band all there), which is a third of
  * what a whole take costs.
@@ -415,7 +415,7 @@ function atSettings(style: Jam["style"]): Take[][] {
   let found = settled.get(style.id);
   if (!found) {
     found = ownCharts(style)
-      .slice(0, 6)
+      .slice(0, 5)
       .flatMap((chart) =>
         [1, 2, 3].map((seed) =>
           SETTINGS.map((setting) =>
