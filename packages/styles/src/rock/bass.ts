@@ -76,8 +76,50 @@ const slowDriving = {
   followsKick: true,
 } as const;
 
+// ── in six ──────────────────────────────────────────────────────────────────
+// The rock ballad in six-eight. A bar of 6/8 is two slow pulses: a figure is
+// twelve sixteenths, written in sixes. Twelve's line said for a bar of two: a
+// root on each pulse, the pickup where the section takes one (into the One, or
+// into the backbeat), the kick's pickups always (ST-rock-12), and hot a pickup
+// into both pulses with the section's octave pops. Quiet, the downbeat and the kick.
+
+/** The hot line in six: both pulses and their pickups, the octave on the pickups the section chose once. */
+const SIX_POPS: Figure[] = [
+  { name: "pickups", weight: 1, grid: "R---R- R---R-" },
+  { name: "pop into the backbeat", weight: 1, grid: "R---8- R---R-" },
+  { name: "pop into the One", weight: 1, grid: "R---R- R---8-" },
+  { name: "pops into both", weight: 1, grid: "R---8- R---8-" },
+];
+
 export const rockBass: BassStyle = {
   meters: {
+    "6/8": {
+      low: {
+        tones: [{ bars: [["R"]] }],
+        figures: { hold: "song", options: [{ weight: 1, grid: "x----- ------" }] },
+        followsKick: true,
+        otherMeters: "downbeat",
+        ceiling: 52,
+        length: { note: 0.95, long: 0.95, short: 0.95, gap: 12 },
+        velocity: { arrival: 98, strong: 92, weak: 92, off: 86, restrike: 86, approach: 84 },
+      },
+      // A root on both pulses; a section takes a pickup into the One, into the backbeat, or none.
+      mid: {
+        ...slowDriving,
+        figures: {
+          hold: "section",
+          options: [
+            { weight: 2, grid: "x----- x-----" },
+            { weight: 2, grid: "x----- x---o-" },
+            { weight: 1, grid: "x---o- x-----" },
+          ],
+        },
+      },
+      high: {
+        ...slowDriving,
+        figures: { hold: "section", options: SIX_POPS },
+      },
+    },
     "12/8": {
       // Quiet: the downbeat, and wherever the kick plays.
       low: {
