@@ -307,6 +307,8 @@ export const acousticSolo: SoloStyle = {
     patience: 7,
   },
 
+  busier: { lift: 0, room: 0 },
+
   habits: {
     // A riff repeated 0.25; a chromatic approach 0.05; no enclosures (ST-acoustic-28).
     riff: 0.25,

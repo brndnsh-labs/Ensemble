@@ -5,6 +5,7 @@ import { cells, STEP } from "../../perform/grid.ts";
 import { barSteps, pulseTicks } from "../../perform/meter.ts";
 import { readMeter } from "../../style/meters.ts";
 import { SOLO_INSTRUMENTS } from "./instruments.ts";
+import { MOST_BUSY } from "./slots.ts";
 import type { Cell, Role, SoloStyle, Way } from "./style.ts";
 import { CONTOURS, ROLES } from "./style.ts";
 
@@ -230,6 +231,14 @@ export function validateSoloStyle(solo: SoloStyle): string[] {
   say(solo.space.patience > 0, "space: patience is a number of seconds.");
   say(solo.space.emptyBars >= 0, "space: empty bars cannot be negative.");
   chance(solo.space.roomier, "space, roomier");
+  say(
+    solo.busier.lift >= 0 && solo.busier.lift <= MOST_BUSY.lift,
+    `busier: a lift is from 0 to ${MOST_BUSY.lift} levels.`,
+  );
+  say(
+    solo.busier.room >= 0 && solo.busier.room <= MOST_BUSY.room,
+    `busier: the room given up is a share from 0 to ${MOST_BUSY.room}.`,
+  );
   chance(solo.habits.riff, "habits, riff");
   chance(solo.habits.stab, "habits, stab");
   const every = solo.habits.stabEvery ?? 1;

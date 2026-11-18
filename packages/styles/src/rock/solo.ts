@@ -329,6 +329,8 @@ export const rockSolo: SoloStyle = {
     patience: 7,
   },
 
+  busier: { lift: 0, room: 0 },
+
   habits: {
     // A lick said again, as it was, 0.40 (ST-rock-24).
     riff: 0.4,

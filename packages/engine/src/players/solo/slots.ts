@@ -7,7 +7,7 @@ import type { Meter } from "../../chart/types.ts";
 import { PPQ } from "../../chart/types.ts";
 import type { Arrival } from "../../perform/harmony.ts";
 import { arrivals } from "../../perform/harmony.ts";
-import { writtenFor } from "../../perform/meter.ts";
+import { pulseTicks, writtenFor } from "../../perform/meter.ts";
 import type { Plan, PlanBar } from "../../plan/types.ts";
 import type { FeelStyle, StylePack } from "../../style/types.ts";
 import { tierOf } from "../../style/types.ts";
@@ -33,8 +33,10 @@ export interface Slot {
   readonly peak: boolean;
   /** The last phrase of the solo, which winds down. */
   readonly last: boolean;
-  /** How busy the arc, the band's energy and the tempo ask it to be. */
+  /** How busy the arc, the band's energy, the tempo and the player's setting ask it to be. */
   readonly level: Density;
+  /** The share of its room the soloist gives up here, 0 to 1 (`SoloStyle.busier.room`). */
+  readonly room: number;
   /** The pitch the phrase sits around, and the lowest and highest it may reach (SO-12). */
   readonly centre: number;
   readonly low: number;
@@ -72,6 +74,37 @@ export function soloIn(solo: SoloStyle, meter: Meter): SoloStyle {
   }
   return style;
 }
+
+/**
+ * The most the player's setting at its top asks of any style: levels lifted, and
+ * the share of its room given up. Each is past every style's own, so the top of
+ * the setting is busier than the middle in every style.
+ */
+export const MOST_BUSY = { lift: 1.5, room: 0.8 } as const;
+
+/**
+ * How much busier than its arc the soloist plays in a take: the style's own at
+ * the middle of the player's setting (or with none set), nothing at its
+ * bottom, the engine's most at its top, and in a straight line between.
+ */
+export function busyOf(plan: Plan, solo: SoloStyle): { lift: number; room: number } {
+  const setting = plan.soloDensity ?? 0.5;
+  const own = solo.busier;
+  if (setting <= 0.5) return { lift: own.lift * (setting / 0.5), room: own.room * (setting / 0.5) };
+  const up = (setting - 0.5) / 0.5;
+  return {
+    lift: own.lift + (MOST_BUSY.lift - own.lift) * up,
+    room: own.room + (MOST_BUSY.room - own.room) * up,
+  };
+}
+
+/**
+ * Where a phrase stands among the phrases of its solo for a part of a lift, 0
+ * to 1: the n-th phrase's place on the golden-ratio sequence, which spreads
+ * any share of them evenly through the solo, and keeps every phrase lifted at
+ * a smaller share lifted at a larger one.
+ */
+const RANK = (n: number): number => ((n + 1) * 0.6180339887498949) % 1;
 
 /** A level's place among the style's, sparsest first, by its name: the same level in every meter. */
 export function levelIndex(solo: SoloStyle, level: Density): number {
@@ -179,7 +212,12 @@ function slotsOf(plan: Plan, solo: SoloStyle, instrument: SoloInstrument): Slot[
       0,
       solo.levels.findIndex((level) => level.name === name),
     );
-  const barSeconds = (bar: PlanBar) => (bar.ticks / PPQ) * (60 / plan.quarters);
+  // Tempo is felt in the pulse, not the bar: a bar is judged as four of its pulses, so a
+  // bar of six-eight is as quick as a bar of four at the same pulse, and a bar of three
+  // as slow.
+  const fourPulses = (bar: PlanBar) =>
+    ((bar.ticks / PPQ) * (60 / plan.quarters) * 4) / pulseTicks(bar.meter).length;
+  const busy = busyOf(plan, solo);
   const home = instrument.home + solo.lift;
   const top = Math.min(instrument.range[1] - 1, home + solo.arc.peak.above);
 
@@ -201,12 +239,17 @@ function slotsOf(plan: Plan, solo: SoloStyle, instrument: SoloInstrument): Slot[
 
   const slots: Slot[] = [];
   let soloIndex = -1;
+  /** The phrase's place in its solo, from 0. */
+  let ordinal = 0;
   phrases.forEach((bars, i) => {
     const mark = bars[0]!.solo!;
     const index = i - chorusOf.indexOf(chorusOf[i]!);
     const count = chorusOf.filter((chorus) => chorus === chorusOf[i]).length;
     // A solo is its choruses in a row; a chorus that starts the count again is a new solo.
-    if (index === 0 && (mark.chorus === 0 || soloIndex < 0)) soloIndex++;
+    if (index === 0 && (mark.chorus === 0 || soloIndex < 0)) {
+      soloIndex++;
+      ordinal = 0;
+    }
     const lastChorus = mark.chorus === mark.of - 1;
     const peak = lastChorus && index === Math.max(0, count - 1 - solo.arc.peak.fromEnd);
     const last = lastChorus && count > 1 && index === count - 1;
@@ -219,7 +262,7 @@ function slotsOf(plan: Plan, solo: SoloStyle, instrument: SoloInstrument): Slot[
     // The band's energy and the tempo each move the density a step, a step in all; the
     // peak is never made sparser (SO-06). Energy does not move the register.
     const tier = tierOf(bars[0]!.seats.solo ?? bars[0]!.energy);
-    const seconds = barSeconds(bars[0]!);
+    const seconds = fourPulses(bars[0]!);
     // However hot the band, a solo opens with room: its first stage is not made busier.
     const opening = stage === stages[0] && !peak;
     const byEnergy = tier === "low" ? -1 : tier === "high" && !opening ? 1 : 0;
@@ -228,8 +271,14 @@ function slotsOf(plan: Plan, solo: SoloStyle, instrument: SoloInstrument): Slot[
     const base = levelNamed(peak ? solo.arc.peak.density : stage.density);
     // The level's rhythms are the ones written for the phrase's meter, where there are any.
     const levels = soloIn(solo, bars[0]!.meter).levels;
-    const level =
-      levels[Math.max(0, Math.min(levels.length - 1, base + (peak ? Math.max(0, shift) : shift)))]!;
+    const busiest = levels.length - 1;
+    const asked = Math.max(0, Math.min(busiest, base + (peak ? Math.max(0, shift) : shift)));
+    // Busier as the style and the player ask: whole steps, and a share of the phrases a
+    // step more. The opening is never lifted to the busiest level (SO-05).
+    const steps =
+      Math.floor(busy.lift) + (RANK(ordinal++) < busy.lift - Math.floor(busy.lift) ? 1 : 0);
+    const lifted = Math.min(busiest, asked + steps);
+    const level = levels[opening ? Math.min(lifted, Math.max(asked, busiest - 1)) : lifted]!;
 
     const centre = home + stage.register;
     const high = peak ? top : Math.min(top - solo.arc.peak.clear, centre + level.span / 2 + 3);
@@ -245,6 +294,7 @@ function slotsOf(plan: Plan, solo: SoloStyle, instrument: SoloInstrument): Slot[
       peak,
       last,
       level,
+      room: busy.room,
       centre,
       low: Math.round(low),
       high: Math.round(high),

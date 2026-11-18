@@ -193,6 +193,9 @@ export function phrasesFor(
     ? Math.floor((instrument.breath.lungs + instrument.breath.takes) / barSeconds - 1)
     : length;
   const lungs = Math.max(1, Math.min(patient, air));
+  // The empty bars a phrase may leave; the first of a solo one more, unless the soloist
+  // has been asked to give up half its room or more (SO-10).
+  const emptyAllowed = solo.space.emptyBars + (slot.first && slot.room < 0.5 ? 1 : 0);
 
   // Where the hand gets lyrical, and bends: the phrase that climbs to the top note and the
   // ones beside it, always; any other phrase as often as the style says. The rest are the
@@ -292,10 +295,14 @@ export function phrasesFor(
   /** A shape for this slot that leaves no more air than the style allows (SO-10). */
   const drawShape = (draw: Rng, lines = 1): Part[] => {
     const at = levelIndex(solo, slot.level);
-    const roomier = !slot.peak && at > 0 && draw.fork("room").chance(solo.space.roomier);
+    // A soloist asked to be busier gives up some of its room: a roomier shape less
+    // often, and a shape with bars of rest in it less often for each of them.
+    const roomier =
+      !slot.peak && at > 0 && draw.fork("room").chance(solo.space.roomier * (1 - slot.room));
     const shapes = slot.peak
       ? [{ weight: 1, bars: peak.shape }]
       : solo.levels[roomier ? at - 1 : at]!.shapes;
+    const rests = (bars: string) => cells(bars).filter((letter) => letter === "R").length;
     const allowed = (letters: readonly Part[]) => {
       const empty = letters.filter((letter) => letter === "R").length;
       const run = Math.max(
@@ -305,14 +312,17 @@ export function phrasesFor(
           .map((line) => line.length),
       );
       return (
-        empty <= solo.space.emptyBars + (slot.first ? 1 : 0) &&
+        empty <= emptyAllowed &&
         !(memory.endedEmpty && letters[0] === "R") &&
         run <= lungs &&
         (!final || letters[length - 1] === "E")
       );
     };
     const fitted = shapes
-      .map((shape) => ({ weight: shape.weight, letters: fitShape(shape.bars, length) }))
+      .map((shape) => ({
+        weight: shape.weight * (1 - slot.room) ** rests(shape.bars),
+        letters: fitShape(shape.bars, length),
+      }))
       .filter((shape) => shape.weight > 0 && allowed(shape.letters));
     // An idea being opened out wants more than one bar of line to open out into.
     const roomy = fitted.filter(
@@ -417,8 +427,8 @@ export function phrasesFor(
     const rests = (i: number) => i < 0 || idea.bars[i]!.part === "R";
     if (memory.endedEmpty && rests(from[0]!)) from = [...from.slice(1), -1];
     const echo = idea.bars.findLastIndex((bar) => bar.part === "E");
-    const allowed = solo.space.emptyBars + (slot.first ? 1 : 0);
-    while (echo >= 0 && from.filter(rests).length > allowed) from[from.findLastIndex(rests)] = echo;
+    while (echo >= 0 && from.filter(rests).length > emptyAllowed)
+      from[from.findLastIndex(rests)] = echo;
     return from;
   };
   const barsOf = (idea: Phrase, from: readonly number[]): BarPlan[] =>

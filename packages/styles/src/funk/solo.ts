@@ -378,6 +378,8 @@ export const funkSolo: SoloStyle = {
     patience: 7,
   },
 
+  busier: { lift: 0, room: 0 },
+
   habits: {
     // A riff repeated bar after bar more often than not (ST-funk-32), and said the same:
     // the same notes, moved only where the chord moved.

@@ -321,6 +321,8 @@ export const reggaeSolo: SoloStyle = {
     patience: 7,
   },
 
+  busier: { lift: 0, room: 0 },
+
   habits: {
     // A riff repeated 0.45; a chromatic approach 0.10; no enclosures (ST-reggae-27).
     riff: 0.45,

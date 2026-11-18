@@ -387,6 +387,8 @@ export const jazzSolo: SoloStyle = {
     patience: 7,
   },
 
+  busier: { lift: 0, room: 0 },
+
   habits: {
     // A bar seldom comes straight back (SO-18); when it does it is a sequence.
     riff: 0.08,

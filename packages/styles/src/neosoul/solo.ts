@@ -355,6 +355,8 @@ export const neosoulSolo: SoloStyle = {
     patience: 7,
   },
 
+  busier: { lift: 0, room: 0 },
+
   habits: {
     // A riff repeated 0.15; a chromatic approach 0.30, an enclosure 0.12 (ST-neosoul-33).
     riff: 0.15,

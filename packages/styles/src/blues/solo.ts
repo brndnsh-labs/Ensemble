@@ -374,6 +374,8 @@ export const bluesSolo: SoloStyle = {
     patience: 7,
   },
 
+  busier: { lift: 0, room: 0 },
+
   habits: {
     riff: 0.35,
     // A blues riff is a sequence: the bar again, moved along the line.

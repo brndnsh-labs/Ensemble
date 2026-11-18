@@ -364,6 +364,8 @@ export const discoSolo: SoloStyle = {
     patience: 7,
   },
 
+  busier: { lift: 0, room: 0 },
+
   habits: {
     // A figure said again, as it was, 0.35 (ST-disco-25).
     riff: 0.35,

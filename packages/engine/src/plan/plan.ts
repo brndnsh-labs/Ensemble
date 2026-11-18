@@ -48,6 +48,11 @@ export function planBars(
   options: PlanOptions,
 ): Plan {
   const tempo = clampTempo(options.tempo ?? chartTempo ?? tempoRange(style, meter).default);
+  // How busy the soloist is goes on the plan only where the player set it.
+  const density =
+    options.soloDensity !== undefined && Number.isFinite(options.soloDensity)
+      ? { soloDensity: clamp01(options.soloDensity) }
+      : {};
   // A tick is a fraction of a quarter note, so time is kept in quarter notes a minute.
   const quarters = tempo * tempoPulse(meter);
   // The jam as it set out: how many passes, or none in particular. The arc and the solos are
@@ -79,6 +84,7 @@ export function planBars(
       passes: 0,
       open: !ends,
       ticks: 0,
+      ...density,
     };
   }
 
@@ -305,6 +311,7 @@ export function planBars(
     passes: options.mode === "jam" ? passes : 1,
     open: !ends,
     ticks: lastBar.start + lastBar.ticks,
+    ...density,
   };
 }
 

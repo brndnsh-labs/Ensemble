@@ -336,6 +336,29 @@ export interface SoloStyle {
     readonly patience: number;
   };
 
+  /**
+   * How much busier than its arc the soloist plays, as the style's own: where
+   * the player's setting (`soloDensity`) sits at its middle. At the setting's
+   * bottom both are none, which is the soloist as first written; at its top
+   * they are the engine's most (`MOST_BUSY` in slots.ts).
+   */
+  readonly busier: {
+    /**
+     * Levels above what the arc, the band's energy and the tempo ask, in
+     * steps: 0.5 lifts every other phrase of a solo a level, 1 every phrase.
+     * The first stretch of a solo is never lifted to the busiest level, so a
+     * solo still opens lower than it ends (SO-05).
+     */
+    readonly lift: number;
+    /**
+     * The share of its room it gives up, 0 to 1: of the chance of a roomier
+     * shape (`space.roomier`), and of the weight of a shape for each bar of
+     * rest in it. From a half, the first phrase of a solo leaves no more empty
+     * bars than any other (SO-10).
+     */
+    readonly room: number;
+  };
+
   readonly habits: {
     /** A line bar plays the bar before it again: a riff, a sequence (SO-18). */
     readonly riff: number;
