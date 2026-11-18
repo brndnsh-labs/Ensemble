@@ -272,6 +272,79 @@ test("a solo breathes and keeps going: no silence inside it reaches three bars (
   assert.ok(solos > enough(40), `only ${solos} solos`);
 });
 
+/**
+ * How much of its lead a take's soloist plays: the seconds it has the lead, the notes it
+ * strikes in them, and the seconds some note of it is sounding.
+ */
+function leadOf(take: Take): { lead: number; notes: number; sounding: number } {
+  const seconds = (ticks: number) => (ticks / PPQ) * (60 / take.plan.quarters);
+  const solo = notesOf(take, "solo");
+  let [lead, notes, sounding] = [0, 0, 0];
+  for (const bar of take.plan.bars) {
+    if (bar.kind !== "music" || !bar.solo) continue;
+    const [from, to] = [bar.start, bar.start + bar.ticks];
+    lead += seconds(bar.ticks);
+    let reach = from;
+    for (const note of solo) {
+      if (note.tick >= to) break;
+      if (note.tick >= from) notes++;
+      const [a, b] = [Math.max(reach, note.tick), Math.min(to, note.tick + note.duration)];
+      if (b > a) sounding += seconds(b - a);
+      reach = Math.max(reach, Math.min(to, note.tick + note.duration));
+    }
+  }
+  return { lead, notes, sounding };
+}
+
+/**
+ * The least a style's soloist plays of its lead, over its own charts at their own tempo
+ * with the band's own arc (a jam of four passes: the band, then a solo of three choruses):
+ * notes a second, and the share of its lead some note of it sounds. Set between what it
+ * played when it was first written and what it plays now (`scripts/solo-density.ts`).
+ */
+const PLAYS: Readonly<Record<string, { readonly perSecond: number; readonly sounding: number }>> = {
+  blues: { perSecond: 1.65, sounding: 0.715 },
+  funk: { perSecond: 1.69, sounding: 0.37 },
+  jazz: { perSecond: 2.45, sounding: 0.64 },
+  rock: { perSecond: 1.77, sounding: 0.715 },
+  disco: { perSecond: 2.23, sounding: 0.66 },
+  neosoul: { perSecond: 1.14, sounding: 0.58 },
+  reggae: { perSecond: 0.9, sounding: 0.557 },
+  acoustic: { perSecond: 1.27, sounding: 0.648 },
+};
+
+test("the soloist is not sparse: over a style's own charts at their own tempo, with the band's own arc, it plays at least the style's notes a second while it has the lead, and some note of it sounds through at least the style's share of the lead", () => {
+  for (const style of STYLES) {
+    const floor = PLAYS[style.id];
+    if (!floor) continue;
+    const own = takes(
+      (jam) =>
+        jam.style === style &&
+        jam.options.solo === true &&
+        jam.options.passes === 4 &&
+        jam.options.tempo === undefined &&
+        jam.options.energy === undefined,
+    );
+    assert.ok(own.length >= 6, `${style.id}: only ${own.length} takes`);
+    const sum = { lead: 0, notes: 0, sounding: 0 };
+    for (const { take } of own) {
+      const played = leadOf(take);
+      sum.lead += played.lead;
+      sum.notes += played.notes;
+      sum.sounding += played.sounding;
+    }
+    const [perSecond, sounding] = [sum.notes / sum.lead, sum.sounding / sum.lead];
+    assert.ok(
+      perSecond >= floor.perSecond,
+      `${style.id}: ${perSecond.toFixed(2)} notes a second, under ${floor.perSecond}`,
+    );
+    assert.ok(
+      sounding >= floor.sounding,
+      `${style.id}: sounding through ${sounding.toFixed(3)} of the lead, under ${floor.sounding}`,
+    );
+  }
+});
+
 test("a three-chorus solo builds: its last chorus has more notes than its first, in nine solos in ten", () => {
   let built = 0;
   let solos = 0;

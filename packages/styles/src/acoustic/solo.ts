@@ -307,7 +307,10 @@ export const acousticSolo: SoloStyle = {
     patience: 7,
   },
 
-  busier: { lift: 0, room: 0 },
+  // Busier than its arc: six tenths of its phrases a level up, three tenths of its room given
+  // up (acoustic's space is 0.3, SO-11). It played little more than a note a second at 66 to
+  // 108. To move the default, change these two numbers.
+  busier: { lift: 0.6, room: 0.3 },
 
   habits: {
     // A riff repeated 0.25; a chromatic approach 0.05; no enclosures (ST-acoustic-28).
