@@ -897,6 +897,14 @@ export function passPickup(
   const high = going ? previous.high : Math.min(world.instrument.range[1], opening + 4);
   // The line opens on a tone of the chord, where a change lands, near where the soloist was.
   const near = memory.rest ?? opening;
+  // The phrase it leads into opens on the one because it is led in, so a pickup is drawn as
+  // often as a phrase at that level would open on the one by itself and be led into: the
+  // style's chance, times the share of the level's rhythms that open on the one. A line that
+  // would have started late mostly still does.
+  const named = going ? previous.level.name : world.solo.arc.stages[0]?.density;
+  const level = solo.levels.find((one) => one.name === named) ?? solo.levels[0]!;
+  const onTheOne = level.cells.filter((cell) => cells(cell)[0] === "x").length / level.cells.length;
+  if (!rng.fork("opens").chance(onTheOne)) return null;
   const { perRank } = solo.landing;
   const first = landing(pool, near, solo.arrive, perRank, low, high);
   const notes = leadIn(

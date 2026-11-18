@@ -143,9 +143,11 @@ export const funkCritic: CriticStyle = {
     // 40% to 85% of the sixteenths in a bar that is played in are silent (ST-funk-35,
     // Q-33). Delivers 58% (50% to 72% by take).
     "solo.silent-sixteenths": { min: 0.4, max: 0.85, kind: "intent", minCases: 32 },
-    // No pickups and no ties over the barline (ST-funk-33). True by construction: tripwires.
+    // No ties over the barline (ST-funk-33). True by construction: a tripwire.
     "solo.barlines-tied": { max: 0, kind: "intent" },
-    "solo.entered-early": { max: 0, kind: "intent" },
+    // The horn mostly hits the one: a take's share of phrases led into is 21% on the mean
+    // today, and never as much as half (SO-39's ceiling, for a style that seldom leads in).
+    "solo.entered-early": { max: 0.45, kind: "intent", minCases: 6 },
     // Not a target for the music: a ceiling one take in ten sits above today, so that the
     // scorecard names the worst solos, which are the ones to go and listen to.
     "solo.cost": { max: 2.4, kind: "measured" },

@@ -83,7 +83,8 @@ export const discoCritic: CriticStyle = {
     "solo.short-notes": { min: 0.6, max: 0.9, kind: "intent", minCases: 20 },
     "solo.silent-sixteenths": { min: 0.1, max: 0.35, kind: "intent", minCases: 32 },
     "solo.barlines-tied": { max: 0, kind: "intent" },
-    "solo.entered-early": { max: 0, kind: "intent" },
+    // Some phrases are led into, few: 14% of a take's on the mean today (SO-39's ceiling).
+    "solo.entered-early": { max: 0.4, kind: "intent", minCases: 6 },
     "solo.cost": { max: 2.45, kind: "measured" },
   },
   weights: {

@@ -69,7 +69,8 @@ export const neosoulCritic: CriticStyle = {
     "solo.wide-leaps": { max: 0.05, kind: "intent", minCases: 20 },
     "solo.trills": { max: 0.05, kind: "intent", minCases: 20 },
     "solo.barlines-tied": { max: 0, kind: "intent" },
-    "solo.entered-early": { max: 0, kind: "intent" },
+    // A neo-soul line enters late, seldom early: 9% of a take's phrases on the mean today.
+    "solo.entered-early": { max: 0.3, kind: "intent", minCases: 6 },
   },
   weights: {
     // The jazz pianist's costs: the top led smoothly where the style aims it, and kept off the

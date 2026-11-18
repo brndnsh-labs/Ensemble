@@ -443,7 +443,7 @@ function atSettings(style: Jam["style"]): Take[][] {
   return found;
 }
 
-test("the player's setting moves the soloist all the way along: over a style's own charts, notes a second never go down from 0 to a quarter, a half, three quarters and 1, nor the share of the lead it sounds by more than a hundredth, and at 1 it plays a tenth more notes a second than at 0 or more", () => {
+test("the player's setting moves the soloist all the way along: over a style's own charts, notes a second and the share of the lead it sounds never go down from 0 to a quarter, a half, three quarters and 1 by more than a hundredth, and at 1 it plays a tenth more notes a second than at 0 or more", () => {
   for (const style of STYLES) {
     const sums = SETTINGS.map(() => ({ lead: 0, notes: 0, sounding: 0 }));
     for (const takes of atSettings(style)) {
@@ -458,9 +458,13 @@ test("the player's setting moves the soloist all the way along: over a style's o
     const sounding = sums.map((sum) => sum.sounding / sum.lead);
     const said = `${style.id}: ${perSecond.map((n) => n.toFixed(2)).join(", ")} notes a second; sounding ${sounding.map((n) => n.toFixed(3)).join(", ")}`;
     for (let i = 1; i < SETTINGS.length; i++) {
-      assert.ok(perSecond[i]! >= perSecond[i - 1]!, `${said}: fewer notes at ${SETTINGS[i]}`);
       // A pickup lives in the room a phrase leaves, so a setting that gives up room gives up
-      // some of the pickups in it: the share sounding may fall by a hundredth at most.
+      // some of the pickups in it: notes a second may fall by a hundredth of themselves at
+      // most, and the share sounding by a hundredth of the lead.
+      assert.ok(
+        perSecond[i]! >= perSecond[i - 1]! * 0.99,
+        `${said}: fewer notes at ${SETTINGS[i]}`,
+      );
       assert.ok(
         sounding[i]! >= sounding[i - 1]! - 0.01,
         `${said}: less sounding at ${SETTINGS[i]}`,
