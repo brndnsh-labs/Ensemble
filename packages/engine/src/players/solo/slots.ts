@@ -147,8 +147,9 @@ export function busyOf(plan: Plan, solo: SoloStyle): { lift: number; room: numbe
  * to 1: the n-th phrase's place on the golden-ratio sequence, which spreads
  * any share of them evenly through the solo, and keeps every phrase lifted at
  * a smaller share lifted at a larger one. The first phrase that can be lifted
- * (mostly the solo's opening, its sparsest) stands just under the middle: a
- * lift of half a level or more takes it, a lift of less leaves it.
+ * (mostly the solo's opening, its sparsest, whose lift is worth the most) stands
+ * at 0.6: only a lift past every style's own takes it, so the setting's third
+ * quarter has it to give, and the slider moves by more even steps.
  */
 const RANK = (n: number): number => (0.6 + n * 0.6180339887498949) % 1;
 
