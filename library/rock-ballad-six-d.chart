@@ -1,0 +1,28 @@
+title: Rock Ballad in Six
+key: D
+tempo: 66
+meter: 6/8
+style: rock
+
+// The rock ballad in six-eight: two slow beats to the bar, three eighths in
+// each. The verse walks the bass down from the one through the five over its
+// third to the six and the four; the chorus starts on the four and turns on
+// the four and the five, a chord a beat, back into the verse; the bridge sits
+// on the six minor, climbs to the four and the five, and lands on the five.
+[Verse]
+| D | A/C# | Bm | G |
+| D | A/C# | G  | A |
+
+[Chorus]
+| G | A | D | Bm  |
+| G | A | D | G A |
+
+[Verse]
+
+[Chorus]
+
+[Bridge]
+| Bm | F#m | G | D |
+| Em | F#m | G | A |
+
+[Chorus]
