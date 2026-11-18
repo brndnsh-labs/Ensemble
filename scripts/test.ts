@@ -28,6 +28,8 @@ interface Run {
   readonly name: string;
   readonly code: number;
   readonly output: string;
+  /** The machine ended the process (out of memory, mostly): it failed no test. */
+  readonly killed: boolean;
 }
 
 function run(name: string, paths: readonly string[], styleId?: string): Promise<Run> {
@@ -39,14 +41,32 @@ function run(name: string, paths: readonly string[], styleId?: string): Promise<
     let output = "";
     child.stdout.on("data", (chunk: Buffer) => (output += chunk));
     child.stderr.on("data", (chunk: Buffer) => (output += chunk));
-    child.on("close", (code) => resolve({ name, code: code ?? 1, output }));
+    child.on("close", (code, signal) =>
+      resolve({ name, code: code ?? 1, output, killed: signal !== null }),
+    );
   });
 }
 
-const runs = await Promise.all([
+const first = await Promise.all([
   run("charts and goldens", once),
   ...styles.map((id) => run(id, perStyle, id)),
 ]);
+// Nine processes side by side can be more than the machine has memory for, and it ends one.
+// That is no test failing: such a run is made again, alone, once the others are done.
+const runs: Run[] = [];
+for (const done of first) {
+  if (!done.killed) runs.push(done);
+  else {
+    console.log(`(${done.name} was ended by the machine; running it again alone)`);
+    runs.push(
+      await run(
+        done.name,
+        done.name === "charts and goldens" ? once : perStyle,
+        done.name === "charts and goldens" ? undefined : done.name,
+      ),
+    );
+  }
+}
 
 let failed = false;
 for (const { name, code, output } of runs) {
