@@ -276,6 +276,79 @@ const rhythmInTwelve: RhythmBook = {
   candidates: rhythm.candidates,
 };
 
+// ── in six ──────────────────────────────────────────────────────────────────
+// The blues counted in two, the gospel blues ballad's piano. A bar of 6/8 is
+// two slow beats of three eighths: one strong beat and one answering it, so the
+// hand's figures are written for that bar and are not twelve's cut in half.
+// Quiet it is twelve's pad. At the working level it chops the backbeat, or
+// leans into it, or plays the triplet on it, which is where a gospel hand goes
+// in six; hot, the triplets all bar or on the backbeat, every hot figure with
+// the backbeat's triplet in it. Under a soloist it stays in its working book,
+// as in four and twelve.
+
+const rhythmInSix: RhythmBook = {
+  tiers: {
+    low: {
+      draw: "quiet",
+      articulation: PAD,
+      figures: [
+        { name: "held", weight: 3, grid: "x----- ------" },
+        // Struck again on the last eighth, leaning into the next bar.
+        { name: "held and a lean", weight: 2, grid: "x----- ----X-" },
+        // The One, then the last eighth of the first beat held to the barline.
+        { name: "charleston", weight: 1, grid: "x---X- ------" },
+      ],
+      answers: [{ name: "halves", weight: 2, grid: "x----- x-----" }],
+      busy: { from: 1, to: 1.5 },
+      arrival: { level: 80, steps: 12 },
+    },
+
+    mid: {
+      draw: "working",
+      articulation: CHOPS,
+      figures: [
+        // The chop on the backbeat, like a second snare.
+        { name: "chop", weight: 3, grid: "...... X....." },
+        // All three eighths of the backbeat.
+        { name: "the triplet on the backbeat", weight: 2, grid: "...... X.o.o." },
+        // The One and the push into the backbeat.
+        { name: "charleston", weight: 2, grid: "x---X. ......" },
+      ],
+      answers: [
+        { name: "a late one", weight: 2, grid: "...... ....X." },
+        { name: "the push, and a chop", weight: 1, grid: "....X. X....." },
+      ],
+      busy: { from: 1, to: 2.5 },
+      arrival: { level: 80, steps: 6 },
+    },
+
+    high: {
+      draw: "hot",
+      articulation: CHOPS,
+      figures: [
+        {
+          name: "triplets",
+          weight: 2,
+          grid: "x.o.o. x.o.o.",
+          articulation: TRIPLET,
+          voicing: "close",
+          groove: true,
+        },
+        { name: "backbeat triplet", weight: 2, grid: "...... X.o.o." },
+      ],
+      answers: [
+        { name: "the One, and the backbeat triplet", weight: 2, grid: "x..... X.o.o." },
+        { name: "the push into the backbeat triplet", weight: 1, grid: "....X. X.o.o." },
+      ],
+      busy: { from: 3, to: 5 },
+      arrival: { level: 80, steps: 6 },
+    },
+  },
+  hold: rhythm.hold,
+  forms: rhythm.forms,
+  candidates: rhythm.candidates,
+};
+
 export const bluesChords: ChordStyle = {
   idiom: "keys",
   kinds: { rootless, close },
@@ -290,7 +363,7 @@ export const bluesChords: ChordStyle = {
   // four fifths of that, as a rock keyboard re-strikes a held chord (CH-48: 64 against 80).
   plain: { length: 0.95, velocity: { beat: 74, offbeat: 80, restrike: 60 } },
   rhythm,
-  meters: { "12/8": rhythmInTwelve },
+  meters: { "12/8": rhythmInTwelve, "6/8": rhythmInSix },
   // The hand leans into a change at the barline three times in ten when quiet, four at the
   // working level, five when hot (ST-blues-46), as a leaned-on strike. A change inside the
   // bar is played early by any strike in the eighth before it (ST-blues-47). Where the hand
