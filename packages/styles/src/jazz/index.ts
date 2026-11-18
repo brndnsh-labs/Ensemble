@@ -12,8 +12,17 @@ import { jazzSolo } from "./solo.ts";
 export const jazz: StylePack = {
   id: "jazz",
   name: "Jazz",
-  // ST-jazz-01: ballads near 66, medium swing 130 to 140, bebop near 200.
-  tempo: { default: 138, min: 60, max: 240 },
+  // ST-jazz-01: ballads near 66, medium swing 130 to 140, bebop near 200. Twelve-eight is
+  // the ballad in twelve, in dotted quarters: two thirds of four's range would make it usually
+  // 92 and as quick as 160, a medium six and not a ballad, so the usual is 60, the floor 40
+  // (a bar of six seconds) and the ceiling 96. Six-eight keeps two thirds of four's: 40 to
+  // 160, usually 92, its eighths as quick as four's at most.
+  tempo: {
+    default: 138,
+    min: 60,
+    max: 240,
+    meters: { "12/8": { default: 60, min: 40, max: 96 } },
+  },
   feel: {
     // Lighter than a triplet, and it does not ease off as the tempo rises (ST-jazz-02, 03).
     swing: { unit: "eighth", amount: 60 },
