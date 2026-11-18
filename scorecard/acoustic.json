@@ -12,9 +12,9 @@
     "inTarget": 1
   },
   "drums.fills-that-repeat": {
-    "mean": 0.0413,
+    "mean": 0.0408,
     "p10": 0,
-    "p90": 0,
+    "p90": 0.0833,
     "inTarget": null
   },
   "drums.cymbal-under-backbeat": {
@@ -36,9 +36,9 @@
     "inTarget": null
   },
   "bass.half-step-approaches": {
-    "mean": 0.1893,
+    "mean": 0.1642,
     "p10": 0,
-    "p90": 0.4032,
+    "p90": 0.3846,
     "inTarget": null
   },
   "bass.lead-ins-that-leap": {
@@ -48,15 +48,15 @@
     "inTarget": 1
   },
   "bass.semitones-per-move": {
-    "mean": 4.2754,
-    "p10": 3.6333,
-    "p90": 4.916,
+    "mean": 4.267,
+    "p10": 3.6154,
+    "p90": 4.8525,
     "inTarget": null
   },
   "bass.register": {
-    "mean": 34.7787,
-    "p10": 33.3757,
-    "p90": 36.2051,
+    "mean": 34.7214,
+    "p10": 33.3684,
+    "p90": 36.2414,
     "inTarget": 1
   },
   "bass.high-notes": {
@@ -66,14 +66,14 @@
     "inTarget": null
   },
   "bass.chorus-same-as-last": {
-    "mean": 0.0038,
+    "mean": 0.006,
     "p10": 0,
     "p90": 0,
     "inTarget": null
   },
   "bass.bars-same-as-last-chorus": {
-    "mean": 0.4957,
-    "p10": 0.1739,
+    "mean": 0.5089,
+    "p10": 0.1304,
     "p90": 0.6809,
     "inTarget": null
   },
@@ -84,21 +84,21 @@
     "inTarget": null
   },
   "bass.steps-into-the-top": {
-    "mean": 0.4474,
+    "mean": 0.378,
     "p10": 0,
     "p90": 1,
     "inTarget": null
   },
   "bass.steps-into-a-line": {
-    "mean": 0.4768,
-    "p10": 0.125,
-    "p90": 0.8571,
+    "mean": 0.4121,
+    "p10": 0,
+    "p90": 0.8333,
     "inTarget": null
   },
   "bass.changes-by-step": {
-    "mean": 0.4337,
+    "mean": 0.3843,
     "p10": 0,
-    "p90": 0.8261,
+    "p90": 0.7826,
     "inTarget": null
   },
   "bass.roots-and-fifths": {
@@ -108,33 +108,33 @@
     "inTarget": 1
   },
   "bass.passing-tones": {
-    "mean": 0.0939,
+    "mean": 0.0892,
     "p10": 0,
-    "p90": 0.1603,
+    "p90": 0.1585,
     "inTarget": 0.685
   },
   "bass.note-length-quiet": {
-    "mean": 9.3167,
+    "mean": 9.9626,
     "p10": 7.6167,
-    "p90": 12.2403,
-    "inTarget": 1
+    "p90": 14.6066,
+    "inTarget": 0.9767
   },
   "chords.top-holds": {
-    "mean": 0.2791,
+    "mean": 0.2786,
     "p10": 0.127,
     "p90": 0.4107,
     "inTarget": null
   },
   "chords.top-steps": {
-    "mean": 0.5822,
+    "mean": 0.5837,
     "p10": 0.4516,
     "p90": 0.7619,
     "inTarget": null
   },
   "chords.top-small-leaps": {
-    "mean": 0.1388,
+    "mean": 0.1377,
     "p10": 0,
-    "p90": 0.2979,
+    "p90": 0.2667,
     "inTarget": null
   },
   "chords.top-leaps": {
@@ -144,39 +144,39 @@
     "inTarget": 1
   },
   "chords.top-movement": {
-    "mean": 1.276,
-    "p10": 0.9375,
-    "p90": 1.662,
+    "mean": 1.3288,
+    "p10": 0.9677,
+    "p90": 1.6776,
     "inTarget": 1
   },
   "chords.floor-clearance": {
-    "mean": 1.16,
+    "mean": 0.96,
     "p10": 0,
-    "p90": 5,
+    "p90": 3,
     "inTarget": 1
   },
   "chords.crowds-the-bass": {
-    "mean": 0.0462,
+    "mean": 0.0477,
     "p10": 0,
-    "p90": 0.1257,
+    "p90": 0.1173,
     "inTarget": null
   },
   "chords.closest-to-bass": {
-    "mean": 2.955,
+    "mean": 2.785,
     "p10": 0,
     "p90": 12,
     "inTarget": null
   },
   "chords.lowest-note": {
-    "mean": 49.6483,
-    "p10": 46.5474,
-    "p90": 51.4302,
+    "mean": 49.57,
+    "p10": 46.5539,
+    "p90": 51.2446,
     "inTarget": 1
   },
   "chords.colour": {
-    "mean": 0.0072,
+    "mean": 0.0059,
     "p10": 0,
-    "p90": 0.0319,
+    "p90": 0.0307,
     "inTarget": 1
   },
   "chords.voicing-faults": {
@@ -186,15 +186,15 @@
     "inTarget": 1
   },
   "chords.width-jumps": {
-    "mean": 0.0975,
+    "mean": 0.0904,
     "p10": 0,
-    "p90": 0.2303,
+    "p90": 0.2077,
     "inTarget": null
   },
   "chords.neck-movement": {
-    "mean": 0.63,
+    "mean": 0.6239,
     "p10": 0.1667,
-    "p90": 1.0968,
+    "p90": 1.0909,
     "inTarget": 1
   },
   "chords.neck-jumps": {
@@ -204,33 +204,33 @@
     "inTarget": 1
   },
   "chords.with-the-drums": {
-    "mean": 0.6099,
-    "p10": 0.4917,
-    "p90": 0.7356,
+    "mean": 0.6154,
+    "p10": 0.5181,
+    "p90": 0.7265,
     "inTarget": null
   },
   "chords.drums-by-chance": {
-    "mean": 0.5481,
-    "p10": 0.3584,
-    "p90": 0.6755,
+    "mean": 0.5522,
+    "p10": 0.3758,
+    "p90": 0.6813,
     "inTarget": null
   },
   "chords.with-the-drums-over-chance": {
-    "mean": 0.0177,
-    "p10": -0.0498,
-    "p90": 0.111,
+    "mean": 0.0226,
+    "p10": -0.0401,
+    "p90": 0.09,
     "inTarget": null
   },
   "chords.off-the-beat": {
-    "mean": 0.4961,
-    "p10": 0.4175,
-    "p90": 0.5283,
+    "mean": 0.4918,
+    "p10": 0.4127,
+    "p90": 0.525,
     "inTarget": null
   },
   "chords.changes-anticipated": {
-    "mean": 0.2563,
+    "mean": 0.2674,
     "p10": 0,
-    "p90": 0.4714,
+    "p90": 0.4348,
     "inTarget": null
   },
   "chords.picked-quiet": {
@@ -240,10 +240,10 @@
     "inTarget": 1
   },
   "chords.picked-working": {
-    "mean": 0.3963,
+    "mean": 0.3178,
     "p10": 0,
     "p90": 1,
-    "inTarget": 0.0753
+    "inTarget": 0.0824
   },
   "chords.picked-hot": {
     "mean": 0,
@@ -252,16 +252,16 @@
     "inTarget": 1
   },
   "chords.upstrokes": {
-    "mean": 0.4961,
-    "p10": 0.4175,
-    "p90": 0.5283,
+    "mean": 0.4918,
+    "p10": 0.4127,
+    "p90": 0.525,
     "inTarget": 1
   },
   "chords.open-strings": {
-    "mean": 1.8355,
-    "p10": 1.4566,
-    "p90": 2.5568,
-    "inTarget": 0.8087
+    "mean": 1.8235,
+    "p10": 1.4535,
+    "p90": 2.5393,
+    "inTarget": 0.7981
   },
   "chords.line-kept": {
     "mean": 1,
@@ -270,43 +270,43 @@
     "inTarget": 1
   },
   "chords.on-the-soloists-note": {
-    "mean": 0.1188,
-    "p10": 0.0213,
-    "p90": 0.2485,
+    "mean": 0.13,
+    "p10": 0.0209,
+    "p90": 0.2759,
     "inTarget": null
   },
   "chords.in-the-soloists-register": {
-    "mean": 0.0526,
-    "p10": 0.0215,
-    "p90": 0.0957,
+    "mean": 0.0508,
+    "p10": 0.024,
+    "p90": 0.0816,
     "inTarget": null
   },
   "chords.overlap": {
-    "mean": 0.6659,
-    "p10": 0.6154,
-    "p90": 0.7273,
+    "mean": 0.6754,
+    "p10": 0.6106,
+    "p90": 0.7778,
     "inTarget": null
   },
   "chords.overlap-over-chance": {
-    "mean": 0.0126,
-    "p10": -0.0152,
-    "p90": 0.0403,
+    "mean": 0.0122,
+    "p10": -0.0214,
+    "p90": 0.0437,
     "inTarget": null
   },
   "chords.struck-with-the-soloist": {
-    "mean": 0.7742,
-    "p10": 0.6269,
-    "p90": 0.9602,
+    "mean": 0.7645,
+    "p10": 0.6048,
+    "p90": 0.9706,
     "inTarget": null
   },
   "chords.breaths-over-the-line": {
-    "mean": 1.022,
-    "p10": 0.9226,
-    "p90": 1.1272,
+    "mean": 0.9932,
+    "p10": 0.8728,
+    "p90": 1.1238,
     "inTarget": null
   },
   "chords.top-leaps-under-the-solo": {
-    "mean": 0.1945,
+    "mean": 0.2067,
     "p10": 0,
     "p90": 0.4921,
     "inTarget": null
@@ -318,51 +318,51 @@
     "inTarget": 1
   },
   "solo.thirds-and-sevenths-on-changes": {
-    "mean": 0.4837,
-    "p10": 0.3125,
+    "mean": 0.4841,
+    "p10": 0.3617,
     "p90": 0.6129,
-    "inTarget": 0.9
+    "inTarget": 0.9844
   },
   "solo.beats-on-chord-tones": {
-    "mean": 0.8625,
-    "p10": 0.7932,
-    "p90": 0.9293,
+    "mean": 0.87,
+    "p10": 0.8191,
+    "p90": 0.9326,
     "inTarget": 1
   },
   "solo.phrase-ends-on-chord-tones": {
-    "mean": 0.9752,
-    "p10": 0.8824,
+    "mean": 0.9678,
+    "p10": 0.8889,
     "p90": 1,
-    "inTarget": 0.9833
+    "inTarget": 0.9531
   },
   "solo.phrases-related": {
-    "mean": 0.7199,
-    "p10": 0.5714,
-    "p90": 0.9091,
+    "mean": 0.7557,
+    "p10": 0.6,
+    "p90": 0.913,
     "inTarget": null
   },
   "solo.phrase-likeness": {
-    "mean": 0.6639,
-    "p10": 0.5411,
-    "p90": 0.7759,
+    "mean": 0.6857,
+    "p10": 0.5712,
+    "p90": 0.7706,
     "inTarget": null
   },
   "solo.phrase-same-as-last": {
-    "mean": 0.1587,
+    "mean": 0.1616,
     "p10": 0,
-    "p90": 0.3333,
+    "p90": 0.2857,
     "inTarget": null
   },
   "solo.bars-that-rhyme": {
-    "mean": 0.8321,
-    "p10": 0.5926,
+    "mean": 0.835,
+    "p10": 0.6,
     "p90": 1,
     "inTarget": null
   },
   "solo.empty-bars": {
-    "mean": 0.1777,
-    "p10": 0.125,
-    "p90": 0.2375,
+    "mean": 0.1558,
+    "p10": 0.0625,
+    "p90": 0.2292,
     "inTarget": null
   },
   "solo.long-breaths": {
@@ -372,7 +372,7 @@
     "inTarget": 1
   },
   "solo.breath": {
-    "mean": 1.7115,
+    "mean": 1.5887,
     "p10": 0.6406,
     "p90": 3,
     "inTarget": 1
@@ -384,33 +384,33 @@
     "inTarget": 1
   },
   "solo.longest-silence": {
-    "mean": 3.199,
-    "p10": 2.7273,
-    "p90": 3.75,
+    "mean": 3.1159,
+    "p10": 2.4447,
+    "p90": 4.125,
     "inTarget": null
   },
   "solo.notes-per-second-first": {
-    "mean": 0.9128,
-    "p10": 0.6458,
-    "p90": 1.2656,
+    "mean": 0.934,
+    "p10": 0.6563,
+    "p90": 1.2719,
     "inTarget": null
   },
   "solo.notes-per-second-last": {
-    "mean": 1.5867,
-    "p10": 1.2917,
-    "p90": 1.9125,
+    "mean": 1.5591,
+    "p10": 1.1719,
+    "p90": 1.9139,
     "inTarget": null
   },
   "solo.builds": {
-    "mean": 1.8184,
-    "p10": 1.3824,
-    "p90": 2.2524,
-    "inTarget": 0.9286
+    "mean": 1.753,
+    "p10": 1.119,
+    "p90": 2.3214,
+    "inTarget": 0.8214
   },
   "solo.rises": {
-    "mean": 2.2476,
-    "p10": 0.9881,
-    "p90": 3.3244,
+    "mean": 2.268,
+    "p10": 0.9089,
+    "p90": 3.7863,
     "inTarget": null
   },
   "solo.top-in-last-chorus": {
@@ -420,34 +420,34 @@
     "inTarget": 1
   },
   "solo.top-falls": {
-    "mean": 0.8556,
-    "p10": 0.7796,
-    "p90": 0.9084,
+    "mean": 0.8651,
+    "p10": 0.7826,
+    "p90": 0.9579,
     "inTarget": null
   },
   "solo.high-points-deserved": {
-    "mean": 0.8175,
-    "p10": 0.5833,
+    "mean": 0.8146,
+    "p10": 0.6667,
     "p90": 1,
     "inTarget": null
   },
   "solo.range": {
-    "mean": 12.2528,
+    "mean": 12.8477,
     "p10": 10.6667,
-    "p90": 13.6667,
+    "p90": 16,
     "inTarget": null
   },
   "solo.steps": {
-    "mean": 0.773,
-    "p10": 0.7103,
-    "p90": 0.8455,
+    "mean": 0.7729,
+    "p10": 0.6966,
+    "p90": 0.8571,
     "inTarget": null
   },
   "solo.wide-leaps": {
-    "mean": 0.0045,
+    "mean": 0.0038,
     "p10": 0,
-    "p90": 0.0156,
-    "inTarget": 0.9833
+    "p90": 0.0123,
+    "inTarget": 1
   },
   "solo.leaps-resolved": {
     "mean": 0.5789,
@@ -456,21 +456,21 @@
     "inTarget": null
   },
   "solo.trills": {
-    "mean": 0.0248,
-    "p10": 0.0064,
-    "p90": 0.0497,
-    "inTarget": 0.9167
+    "mean": 0.0258,
+    "p10": 0.0051,
+    "p90": 0.0488,
+    "inTarget": 0.9375
   },
   "solo.repeated-notes": {
-    "mean": 0.0111,
+    "mean": 0.0103,
     "p10": 0,
-    "p90": 0.0313,
+    "p90": 0.0265,
     "inTarget": null
   },
   "solo.short-notes": {
-    "mean": 0.6047,
-    "p10": 0.5,
-    "p90": 0.6919,
+    "mean": 0.5784,
+    "p10": 0.46,
+    "p90": 0.6934,
     "inTarget": 1
   },
   "solo.barlines-tied": {
@@ -486,33 +486,33 @@
     "inTarget": 1
   },
   "solo.entered-early": {
-    "mean": 0.1659,
+    "mean": 0.1407,
     "p10": 0,
     "p90": 0.3333,
-    "inTarget": 0.9833
+    "inTarget": 0.9219
   },
   "solo.cost": {
-    "mean": 1.9711,
-    "p10": 1.6787,
-    "p90": 2.2765,
+    "mean": 2.024,
+    "p10": 1.7455,
+    "p90": 2.3123,
     "inTarget": null
   },
   "solo.worst-phrase": {
-    "mean": 3.0904,
-    "p10": 2.6101,
-    "p90": 3.6061,
+    "mean": 3.1061,
+    "p10": 2.5885,
+    "p90": 3.7118,
     "inTarget": null
   },
   "band.backbeat-swell": {
-    "mean": 25.3539,
-    "p10": 1.8333,
-    "p90": 45.0357,
+    "mean": 22.3352,
+    "p10": 2,
+    "p90": 44.9286,
     "inTarget": null
   },
   "band.backbeat-level": {
-    "mean": 91.6629,
-    "p10": 68.5089,
-    "p90": 106.4286,
+    "mean": 93.9785,
+    "p10": 69.2321,
+    "p90": 106.625,
     "inTarget": null
   },
   "band.notes-near-the-top": {

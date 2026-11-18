@@ -818,7 +818,8 @@ test("the top of a chorus, and of the solo, is led into some of the time: from t
       led >= Math.floor(tops * floor),
       `${style.id}: ${led} of ${tops} chorus tops led into`,
     );
-    if (firsts >= enough(12)) {
+    // Asked of a style that leads in as a habit: reggae's floor is none, here as above.
+    if (floor > 0 && firsts >= enough(12)) {
       assert.ok(firstsLed > 0, `${style.id}: none of ${firsts} solos led into`);
     }
     assert.ok(allowed > enough(60), `${style.id}: only ${allowed} chorus tops`);

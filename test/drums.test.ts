@@ -800,3 +800,50 @@ test("a button ending is the whole band's: where the bass plays the short last h
   }
   assert.ok(played > enough(20), `only ${played} buttons`);
 });
+
+// ── acoustic ────────────────────────────────────────────────────────────────
+
+const acoustic = STYLES.find((style) => style.id === "acoustic");
+
+test("acoustic: in six and twelve the kit is restraint said in pulses: in every bar of time the kick is on the One and elsewhere only on the bar's other strong pulse (3, in twelve) or a pulse's last eighth; the snare and the cross-stick never on the One and never on a pulse's middle eighth, and no snare at all when the band is quiet; and wherever the hat or the shaker keeps time, they keep every eighth of the bar", {
+  skip:
+    only("acoustic").skip || !LIBRARY.some((chart) => isCompound(parse(chart.text).chart.meter)),
+}, () => {
+  const counted = new Map<string, number>();
+  const KEEPERS = ["closedHat", "openHat", "shaker", "ride"];
+  const played = [
+    ...takes(itsOwn("acoustic")),
+    ...(acoustic ? [...heldTakes(acoustic, "6/8"), ...heldTakes(acoustic, "12/8")] : []),
+  ];
+  for (const { chart, options, take } of played) {
+    if (chart.meter !== "12/8" && chart.meter !== "6/8") continue;
+    for (const { bar, kit, energy } of kitBars(take)) {
+      if (bar.ending || bar.fill || bar.crash) continue;
+      const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
+      const steps = Math.round(bar.ticks / STEP);
+      const strong = strongPulses(bar.meter).map((tick) => tick / STEP);
+      const key = `${chart.meter} ${tierOf(energy)}`;
+      counted.set(key, (counted.get(key) ?? 0) + 1);
+      assert.ok(strikes(kit, "kick", 0), `${where}: no kick on the One`);
+      for (const step of kit.get("kick") ?? [])
+        assert.ok(strong.includes(step) || step % 6 === 4, `${where}: a kick at ${step}`);
+      for (const voice of ["snare", "crossStick"])
+        for (const step of kit.get(voice) ?? []) {
+          assert.ok(step !== 0 && step % 6 !== 2, `${where}: the ${voice} at ${step}`);
+          if (voice === "snare")
+            assert.notEqual(tierOf(energy), "low", `${where}: a snare when quiet`);
+        }
+      const kept = new Set(KEEPERS.flatMap((voice) => [...(kit.get(voice) ?? [])]));
+      if (kept.size === 0) continue;
+      for (let step = 0; step < steps; step += 2)
+        assert.ok(kept.has(step), `${where}: the time not kept on eighth ${step / 2 + 1}`);
+    }
+  }
+  for (const meter of ["6/8", "12/8"])
+    if (LIBRARY.some((chart) => chart.meter === meter && chart.file.startsWith("acoustic-")))
+      for (const tier of ["low", "mid", "high"])
+        assert.ok(
+          (counted.get(`${meter} ${tier}`) ?? 0) > 20,
+          `only ${counted.get(`${meter} ${tier}`) ?? 0} bars of ${meter} at ${tier}`,
+        );
+});

@@ -139,10 +139,13 @@ const OCTAVES_IN_TWELVE: Figure = { name: "octaves", weight: 1, grid: "R...8. R.
  * In six a turn of a pulse is half the bar, and comes straight after the riff's first pulse,
  * which may end on its pop: the pickup's fifth is taken over the root, where under it the line
  * would fall more than an octave from the pop. Two pulses are the whole bar: the octaves are
- * one pulse's.
+ * one pulse's, the pop on the pulse and the root again on its last eighth, pushing into the
+ * One. A pop in the bar's last quarter is brought down an octave whenever the next root lies
+ * more than an octave under it (the line comes through the octave), and with the pop on the
+ * last eighth the octaves were then four roots.
  */
 const PICKUP_IN_SIX: Figure = { name: "pickup", weight: 2, grid: "..5.7." };
-const OCTAVES_IN_SIX: Figure = { name: "octaves", weight: 1, grid: "R...8." };
+const OCTAVES_IN_SIX: Figure = { name: "octaves", weight: 1, grid: "8...R." };
 
 function compoundLines(
   list: readonly string[],

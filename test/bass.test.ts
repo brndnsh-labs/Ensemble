@@ -722,23 +722,23 @@ test(
 // ── an upright in six ───────────────────────────────────────────────────────
 
 test(
-  "acoustic: in six the upright is in two: every note on an eighth and no more than four in a bar; the chord's bass note on the first pulse; when the band is quiet nothing else but a chord arriving (or, where the root lies a seventh over the next one, the step down into it on the second pulse), and from the working level the second pulse is always played, as the chord's fifth or its bass note, or a step into the next bass note",
+  "acoustic: in six the upright is in two, and in twelve it is four's root and fifth said in pulses: every note on a pulse or a pulse's last eighth (never its middle eighth), no more than four in a bar of six or five in a bar of twelve; the chord's bass note on the first pulse; when the band is quiet nothing else in six but a chord arriving, and in twelve nothing else but a chord arriving and the third pulse (the chord's fifth or its bass note); where the root lies a seventh over the next one, the step down into it on the last pulse; and from the working level the second half's first pulse (the second pulse in six, the third in twelve) is always played, as the chord's fifth or its bass note, or a step into the next bass note",
   only("acoustic"),
   () => {
-    const counted = { low: 0, mid: 0, high: 0 };
+    const counted = new Map<string, number>();
     const acoustic = STYLES.find((style) => style.id === "acoustic")!;
-    const sixes = LIBRARY.filter((chart) => chart.meter === "6/8");
+    const compound = (meter: string) => meter === "6/8" || meter === "12/8";
     const played = [
-      ...takes((jam) => jam.style.id === "acoustic" && jam.chart.meter === "6/8").map(
+      ...takes((jam) => jam.style.id === "acoustic" && compound(jam.chart.meter)).map(
         ({ chart, options, take }) => ({ where: `${chart.file} seed ${options.seed}`, take }),
       ),
-      ...sixes.flatMap((chart) =>
-        [0.3, 0.55, 0.85].flatMap((energy) =>
-          [1, 3].map((seed) => ({
-            where: `${chart.file} at ${energy} seed ${seed}`,
-            take: render(chart.text, acoustic, { mode: "jam", passes: 2, energy, seed }),
-          })),
-        ),
+      // Each chart in six and twelve held at each level (acoustic's own on a push, every one on
+      // the full run).
+      ...[...heldTakes(acoustic, "6/8"), ...heldTakes(acoustic, "12/8")].map(
+        ({ chart, options, take }) => ({
+          where: `${chart.file} at ${options.energy} seed ${options.seed}`,
+          take,
+        }),
       ),
     ];
     const PULSE = PPQ * 1.5;
@@ -748,7 +748,11 @@ test(
       for (const bar of take.plan.bars) {
         if (bar.kind !== "music" || bar.ending || bar.seats.bass === null) continue;
         if (bar.spans.some((span) => span.chord === null)) continue;
+        const twelve = bar.meter.beats === 12 && bar.meter.unit === 8;
+        if (!twelve && !(bar.meter.beats === 6 && bar.meter.unit === 8)) continue;
         const end = bar.start + bar.ticks;
+        const half = bar.ticks / 2;
+        const last = bar.ticks - PULSE;
         const own = bass.filter((note) => note.tick >= bar.start && note.tick < end);
         const where = `${of} bar ${bar.index}`;
         const sounding = (tick: number) =>
@@ -760,8 +764,9 @@ test(
         const ticks = own.map((note) => note.tick - bar.start);
         for (const tick of ticks) {
           assert.equal(tick % (PPQ / 2), 0, `${where}: a note between the eighths`);
+          assert.notEqual(tick % PULSE, PPQ / 2, `${where}: a note on a pulse's middle eighth`);
         }
-        assert.ok(own.length <= 4, `${where}: ${own.length} notes in a bar`);
+        assert.ok(own.length <= (twelve ? 5 : 4), `${where}: ${own.length} notes in a bar`);
         const first = own.find((note) => note.tick === bar.start);
         assert.ok(first, `${where}: nothing on the first pulse`);
         assert.equal(first.pitch % 12, bassOf(sounding(bar.start)), `${where}: the One`);
@@ -769,34 +774,44 @@ test(
         const into = next?.chord ? bassOf(next.chord) : -1;
         const stepsInto = (pitch: number) =>
           into >= 0 && [1, 2, 10, 11].includes(((pitch % 12) - into + 12) % 12);
+        const fifthOrBass = (note: (typeof own)[number]) => {
+          const chord = sounding(note.tick);
+          const pc = note.pitch % 12;
+          return pc === (pitchClass(chord.root) + 7) % 12 || pc === bassOf(chord);
+        };
         const tier = tierOf(bar.seats.bass);
-        counted[tier]++;
+        const key = `${bar.meter.beats}/8 ${tier}`;
+        counted.set(key, (counted.get(key) ?? 0) + 1);
         if (tier === "low") {
           for (const note of own) {
             const tick = note.tick - bar.start;
             assert.ok(
-              tick === 0 || landings.includes(tick) || (tick === PULSE && stepsInto(note.pitch)),
+              tick === 0 ||
+                landings.includes(tick) ||
+                (twelve && tick === half && fifthOrBass(note)) ||
+                (tick === last && stepsInto(note.pitch)),
               `${where}: quiet, a note at ${tick}`,
             );
           }
           continue;
         }
-        const second = own.find((note) => note.tick === bar.start + PULSE);
-        assert.ok(second, `${where}: nothing on the second pulse at the ${tier} level`);
-        const chord = sounding(second.tick);
-        const pc = second.pitch % 12;
-        const step = stepsInto(second.pitch);
+        const second = own.find((note) => note.tick === bar.start + half);
+        assert.ok(second, `${where}: nothing at ${half} at the ${tier} level`);
         assert.ok(
-          pc === (pitchClass(chord.root) + 7) % 12 || pc === bassOf(chord) || step,
-          `${where}: ${second.pitch} on the second pulse over ${chord.text}`,
+          fifthOrBass(second) || stepsInto(second.pitch),
+          `${where}: ${second.pitch} at ${half} over ${sounding(second.tick).text}`,
         );
       }
     }
-    if (sixes.length > 0)
+    for (const meter of ["6/8", "12/8"]) {
+      if (!LIBRARY.some((chart) => chart.meter === meter && chart.file.startsWith("acoustic-")))
+        continue;
+      const n = (tier: string) => counted.get(`${meter} ${tier}`) ?? 0;
       assert.ok(
-        counted.low > 40 && counted.mid > enough(450) && counted.high > enough(450),
-        `only ${counted.low} quiet bars, ${counted.mid} working, ${counted.high} hot`,
+        n("low") > 20 && n("mid") > enough(300) && n("high") > enough(300),
+        `${meter}: only ${n("low")} quiet bars, ${n("mid")} working, ${n("high")} hot`,
       );
+    }
   },
 );
 

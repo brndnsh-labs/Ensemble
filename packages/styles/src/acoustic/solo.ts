@@ -92,9 +92,89 @@ const acousticSoloInSix: SoloTime = {
   peak: "x----- ----..",
 };
 
+// ── in twelve ───────────────────────────────────────────────────────────────
+// A bar of 12/8 is four slow pulses of three eighths: a rhythm is twenty-four
+// sixteenths, written in sixes. ST-acoustic-26's sung cells said in pulses, as
+// the bar of four is: a quarter of four is a pulse held (`x-----`), its two
+// eighths the long-short (`x---x-`), and where four's busy line has a
+// sixteenth, twelve has the pulse's three eighths (`x-x-x-`, six's figure).
+// Nothing is quicker than the eighth, and nothing begun between the pulses is
+// held across one. Four's levels by name and notes a bar, four's shapes; the
+// endings land on a long note and leave the last pulse unstruck; the pickups
+// are four's in pulses (the last eighth, the long-short, two pulses), half a
+// bar at most.
+const acousticSoloInTwelve: SoloTime = {
+  levels: [
+    {
+      name: "sparse",
+      notesPerBar: 1.8,
+      span: 7,
+      cells: [
+        "x----- x----- x----- ------",
+        "x----- ----x- x----- ------",
+        "....x- x---x- x----- ......",
+        "x----- x---x- ------ ......",
+      ],
+      shapes: [
+        { weight: 4.3, bars: "L E R R" },
+        { weight: 4.3, bars: "R L E R" },
+        { weight: 3.6, bars: "E R L E" },
+        { weight: 2.4, bars: "L L E R" },
+      ],
+    },
+    {
+      name: "medium",
+      notesPerBar: 3.4,
+      span: 9,
+      cells: [
+        "x---x- x----- x---x- x-----",
+        "x----- x---x- x----- x-----",
+        "....x- x---x- x---x- ......",
+        "x---x- x-x-x- x----- x-----",
+        "x----- ----x- x---x- x-----",
+      ],
+      shapes: [
+        { weight: 6, bars: "L L E R" },
+        { weight: 3.6, bars: "E R L E" },
+        { weight: 2, bars: "L E L E" },
+      ],
+    },
+    {
+      name: "busy",
+      notesPerBar: 5.2,
+      span: 10,
+      cells: [
+        "x-x-x- x---x- x----- x-----",
+        "....x- x---x- x---x- x-----",
+        "x---x- x-x-x- x---x- x-----",
+        "x----- x---x- x-x-x- x-----",
+      ],
+      shapes: [
+        { weight: 4, bars: "L L L E" },
+        { weight: 4.8, bars: "L L E R" },
+        { weight: 2, bars: "L E L E" },
+      ],
+    },
+  ],
+  endings: [
+    "x----- ------ ------ ------",
+    "x----- x----- ------ ------",
+    "x---x- x----- ------ ------",
+    "....x- x----- ------ ------",
+  ],
+  // Four's anacrusis in pulses: the last eighth most of all, the long-short in the last pulse,
+  // and once the line is moving the last two pulses.
+  pickups: [
+    { weight: 2, cell: "....x-" },
+    { weight: 1, cell: "x---x-" },
+    { weight: 1, cell: "x----- x-----", levels: ["medium", "busy"] },
+  ],
+  peak: "x----- ------ ------ ......",
+};
+
 export const acousticSolo: SoloStyle = {
-  // Six-eight, written above.
-  meters: { "6/8": acousticSoloInSix },
+  // Six-eight and twelve-eight, written above.
+  meters: { "6/8": acousticSoloInSix, "12/8": acousticSoloInTwelve },
   instrument: "steel-guitar",
   // Home a fourth over the instrument's own, above the strummed guitar (ST-acoustic-28).
   lift: 5,

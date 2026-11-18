@@ -1,0 +1,26 @@
+title: Folk Ballad in Twelve
+key: E
+tempo: 60
+meter: 12/8
+style: acoustic
+
+// The slow folk ballad in twelve-eight: four slow pulses to the bar, three
+// eighths in each. The verse leaves home for the four over its own bass note,
+// sits on the six minor, and turns home through the two and the five, a chord
+// a half bar; the chorus starts on the four, climbs to the five and the three
+// minor, and ends on the five to turn back; the bridge climbs from the six
+// minor through the five over its third to home, and from the two minor up to
+// the five.
+[Verse]
+| E   | A/E | E       | B7 |
+| C#m | A   | F#m7 B7 | E  |
+
+[Chorus]
+| A | B | G#m | C#m |
+| A | B | E   | B7  |
+
+[Bridge]
+| C#m  | B/D# | E | A  |
+| F#m7 | G#m  | A | B7 |
+
+[Chorus]
