@@ -461,23 +461,23 @@ test(
 // ── rock ────────────────────────────────────────────────────────────────────
 
 const rock = STYLES.find((style) => style.id === "rock");
-/** Rock where it plays its own parts, and rock in twelve held at each of its levels. */
+/** Rock where it plays its own parts, and rock in twelve and in six held at each of its levels. */
 const rockPlayed = (): Jam[] => [
   ...takes(itsOwn("rock")),
-  ...(rock ? heldTakes(rock, "12/8") : []),
+  ...(rock ? [...heldTakes(rock, "12/8"), ...heldTakes(rock, "6/8")] : []),
 ];
 
 test(
-  "rock: the time is a kick on the bar's two strong pulses and a backbeat on the pulses between them (1 and 3, 2 and 4: quarter notes in four, dotted quarters in twelve), in every bar the drummer plays time",
+  "rock: the time is a kick on the bar's strong pulses and a backbeat on the pulses between them (1 and 3, 2 and 4: quarter notes in four, dotted quarters in twelve; in six the One and the second pulse), in every bar the drummer plays time; a fill may take the last backbeat",
   only("rock"),
   () => {
     let bars = 0;
-    let twelve = 0;
+    const meters = new Map<string, number>();
     for (const { chart, options, take } of rockPlayed()) {
       for (const { bar, kit } of kitBars(take)) {
         if (bar.ending) continue;
         bars++;
-        if (chart.meter === "12/8") twelve++;
+        meters.set(chart.meter, (meters.get(chart.meter) ?? 0) + 1);
         const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
         const strong = strongPulses(bar.meter);
         const between = pulseStarts(bar.meter).filter((tick) => !strong.includes(tick));
@@ -485,49 +485,69 @@ test(
           assert.ok(strikes(kit, "kick", tick / STEP), `${where}: no kick at ${tick}`);
         const backbeat = (tick: number) =>
           strikes(kit, "snare", tick / STEP) || strikes(kit, "crossStick", tick / STEP);
-        assert.ok(backbeat(between[0]!), `${where}: no backbeat on 2`);
-        // A fill takes the hands off the backbeat on 4.
-        if (!bar.fill) assert.ok(backbeat(between[1]!), `${where}: no backbeat on 4`);
+        for (const tick of between.slice(0, -1))
+          assert.ok(backbeat(tick), `${where}: no backbeat at ${tick}`);
+        // A fill takes the hands off the last backbeat (on 4; in six, the second pulse).
+        if (!bar.fill)
+          assert.ok(backbeat(between.at(-1)!), `${where}: no backbeat at ${between.at(-1)}`);
       }
     }
     assert.ok(bars > enough(2000), `only ${bars} bars`);
-    if (LIBRARY.some((chart) => chart.meter === "12/8"))
-      assert.ok(twelve > enough(300), `only ${twelve} bars of twelve`);
+    for (const meter of ["12/8", "6/8"])
+      if (LIBRARY.some((chart) => chart.meter === meter))
+        assert.ok(
+          (meters.get(meter) ?? 0) > enough(300),
+          `only ${meters.get(meter) ?? 0} bars of ${meter}`,
+        );
   },
 );
 
-test("rock: in twelve the cymbal is on every eighth from the working level up, all twelve in every bar of time unless a fill has the hand; and a quiet bar is thinner: the cymbal on each pulse and at most the eighth before the next, never the triplet's middle eighth, the kick on 1 and 3 and at most the eighth before a pulse, and the snare on 2 and 4 alone", {
-  skip: only("rock").skip || !LIBRARY.some((chart) => chart.meter === "12/8"),
+test("rock: in six and twelve the cymbal is on every eighth from the working level up, all of them in every bar of time unless a fill has the hand; and a quiet bar is thinner: the cymbal on each pulse and at most the eighth before the next, never the triplet's middle eighth, the kick on the strong pulses (1 and 3; in six the One) and at most the eighth before a pulse, and the snare on the pulses between them alone", {
+  skip: only("rock").skip || !LIBRARY.some((chart) => isCompound(parse(chart.text).chart.meter)),
 }, () => {
-  let working = 0;
-  let quiet = 0;
+  const counted = new Map<string, number>();
   const CYMBALS = ["closedHat", "ride", "openHat", "crash"];
   for (const { chart, options, take } of rockPlayed()) {
-    if (chart.meter !== "12/8") continue;
+    if (chart.meter !== "12/8" && chart.meter !== "6/8") continue;
     for (const { bar, kit, energy } of kitBars(take)) {
       if (bar.ending || bar.fill) continue;
       const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
+      const steps = Math.round(bar.ticks / STEP);
+      const strong = strongPulses(bar.meter).map((tick) => tick / STEP);
+      const between = pulseStarts(bar.meter)
+        .map((tick) => tick / STEP)
+        .filter((step) => !strong.includes(step));
       const cymbal = new Set(CYMBALS.flatMap((voice) => [...(kit.get(voice) ?? [])]));
+      const key = `${chart.meter} ${energy >= TIER_MID ? "working" : "quiet"}`;
+      counted.set(key, (counted.get(key) ?? 0) + 1);
       if (energy >= TIER_MID) {
-        working++;
-        for (let step = 0; step < 24; step += 2)
+        for (let step = 0; step < steps; step += 2)
           assert.ok(cymbal.has(step), `${where}: no cymbal on eighth ${step / 2 + 1}`);
         continue;
       }
-      quiet++;
       // In sixteenths: a pulse is six, its eighths at 0, 2 and 4 into it.
-      for (const pulse of [0, 6, 12, 18]) {
+      for (let pulse = 0; pulse < steps; pulse += 6) {
         assert.ok(cymbal.has(pulse), `${where}: no cymbal on pulse ${pulse / 6 + 1}`);
         assert.ok(!cymbal.has(pulse + 2), `${where}: the triplet's middle eighth, quiet`);
       }
       for (const step of kit.get("kick") ?? [])
-        assert.ok(step === 0 || step === 12 || step % 6 === 4, `${where}: a kick at ${step}`);
+        assert.ok(strong.includes(step) || step % 6 === 4, `${where}: a kick at ${step}`);
       for (const voice of ["snare", "crossStick"])
         for (const step of kit.get(voice) ?? [])
-          assert.ok(step === 6 || step === 18, `${where}: the ${voice} at ${step}`);
+          assert.ok(between.includes(step), `${where}: the ${voice} at ${step}`);
     }
   }
-  assert.ok(working > 100 && quiet > 50, `only ${working} bars working and ${quiet} quiet`);
+  // Twelve as it was asked before six was written; six has one chart, half as long.
+  for (const [meter, working, quiet] of [
+    ["12/8", 100, 50],
+    ["6/8", 50, 20],
+  ] as const)
+    if (LIBRARY.some((chart) => chart.meter === meter))
+      assert.ok(
+        (counted.get(`${meter} working`) ?? 0) > working &&
+          (counted.get(`${meter} quiet`) ?? 0) > quiet,
+        `only ${counted.get(`${meter} working`) ?? 0} bars of ${meter} working and ${counted.get(`${meter} quiet`) ?? 0} quiet`,
+      );
 });
 
 // ── neo-soul ────────────────────────────────────────────────────────────────

@@ -736,17 +736,20 @@ test(
 
 // ── rock ────────────────────────────────────────────────────────────────────
 
-test("rock: in twelve the whole band is on the triplet's eighths: no note of the drums (their fills too), the bass, the piano or the lead guitar falls between them, so the soloist's rhythms are eighths and longer", {
-  skip: only("rock").skip || !LIBRARY.some((chart) => chart.meter === "12/8"),
+test("rock: in six and twelve the whole band is on the triplet's eighths: no note of the drums (their fills too), the bass, the piano or the lead guitar falls between them, so the soloist's rhythms are eighths and longer", {
+  skip:
+    only("rock").skip || !LIBRARY.some((chart) => chart.meter === "12/8" || chart.meter === "6/8"),
 }, () => {
   const rock = STYLES.find((style) => style.id === "rock")!;
   const twelve = (jam: { style: { id: string }; chart: { meter: string } }) =>
-    jam.style.id === "rock" && jam.chart.meter === "12/8";
+    jam.style.id === "rock" && (jam.chart.meter === "12/8" || jam.chart.meter === "6/8");
   const played = [
     ...takes(twelve),
     ...soloistTakes().filter(twelve),
     ...heldTakes(rock, "12/8"),
     ...heldTakes(rock, "12/8", true),
+    ...heldTakes(rock, "6/8"),
+    ...heldTakes(rock, "6/8", true),
   ];
   const seats = new Set<string>();
   for (const { chart, options, take } of played) {

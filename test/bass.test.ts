@@ -490,16 +490,17 @@ test(
 // ── rock ────────────────────────────────────────────────────────────────────
 
 test(
-  "rock: the bass is the kick's, a note wherever the kick is played at every level (quiet the line follows it; in four the eighths cover it, and in twelve the kick's pickups are the bass's too); and in twelve it is roots on the pulses and never all twelve eighths: every note on an eighth, a note between the pulses only on the eighth before one (a pickup), from the working level a note on every pulse, and hot a pickup into every pulse",
+  "rock: the bass is the kick's, a note wherever the kick is played at every level (quiet the line follows it; in four the eighths cover it, and in six and twelve the kick's pickups are the bass's too); and in six and twelve it is roots on the pulses and never every eighth: every note on an eighth, a note between the pulses only on the eighth before one (a pickup), no more notes than two of every three eighths, from the working level a note on every pulse, and hot a pickup into every pulse",
   only("rock"),
   () => {
     let quiet = 0;
-    let twelve = 0;
+    const compound = new Map<string, number>();
     let hot = 0;
     const rock = STYLES.find((style) => style.id === "rock")!;
     const played = [
       ...takes((jam) => jam.style.id === "rock" && written(jam)),
       ...heldTakes(rock, "12/8"),
+      ...heldTakes(rock, "6/8"),
     ];
     for (const { chart, options, take } of played) {
       const bass = notesOf(take, "bass");
@@ -523,26 +524,32 @@ test(
             assert.ok(steps.has(step), `${where}: a kick at ${step} with no bass under it`);
           }
         }
-        if (chart.meter !== "12/8") continue;
-        twelve++;
+        if (chart.meter !== "12/8" && chart.meter !== "6/8") continue;
+        compound.set(chart.meter, (compound.get(chart.meter) ?? 0) + 1);
         // In sixteenths: a pulse is six, its eighths at 0, 2 and 4 into it.
+        const pulses = Array.from({ length: bar.ticks / (PPQ * 1.5) }, (_, i) => i * 6);
         for (const step of steps) {
           assert.ok(step % 2 === 0, `${where}: a note between the eighths at ${step}`);
           assert.ok(step % 6 !== 2, `${where}: a note on the triplet's middle eighth at ${step}`);
         }
-        assert.ok(steps.size <= 8, `${where}: ${steps.size} notes in a bar`);
+        assert.ok(steps.size <= pulses.length * 2, `${where}: ${steps.size} notes in a bar`);
         if (tier === "low") continue;
-        for (const pulse of [0, 6, 12, 18])
+        for (const pulse of pulses)
           assert.ok(steps.has(pulse), `${where}: nothing on pulse ${pulse / 6 + 1}`);
         if (tier !== "high") continue;
         hot++;
-        for (const pickup of [4, 10, 16, 22])
-          assert.ok(steps.has(pickup), `${where}: no pickup at ${pickup}`);
+        for (const pulse of pulses)
+          assert.ok(steps.has(pulse + 4), `${where}: no pickup at ${pulse + 4}`);
       }
     }
     assert.ok(quiet > enough(200), `only ${quiet} quiet bars`);
     if (LIBRARY.some((chart) => chart.meter === "12/8"))
-      assert.ok(twelve > 200 && hot > 50, `only ${twelve} bars of twelve, ${hot} hot`);
+      assert.ok(
+        (compound.get("12/8") ?? 0) > 200 && hot > 50,
+        `only ${compound.get("12/8") ?? 0} bars of twelve, ${hot} hot`,
+      );
+    if (LIBRARY.some((chart) => chart.meter === "6/8"))
+      assert.ok((compound.get("6/8") ?? 0) > 100, `only ${compound.get("6/8") ?? 0} bars of six`);
   },
 );
 
