@@ -41,6 +41,16 @@ export interface PlanOptions {
    * not a soloist (SO-04). Where it plays and lays out is the plan's to say.
    */
   readonly solo?: boolean;
+  /**
+   * Jam mode: the soloist has the lead from the first pass. Default false: the
+   * band plays the form once before the soloist comes in.
+   */
+  readonly soloFromTop?: boolean;
+  /**
+   * How busy the soloist is, as the player set it: 0 the sparsest, 1 the
+   * busiest, 0.5 the style's own. Left out, the style's own.
+   */
+  readonly soloDensity?: number;
   /** A bar of sticks before the first bar. Default true. */
   readonly countIn?: boolean;
   /** Seats to leave out entirely. Default: none. */
