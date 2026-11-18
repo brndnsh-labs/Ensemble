@@ -66,7 +66,7 @@ export const LIBRARY: readonly LibraryChart[] = readdirSync(libraryDir)
  * makes up from its 4/4 parts, and only the rules that hold of any bar are asked of it.
  */
 export const WRITTEN: Readonly<Record<string, readonly string[]>> = {
-  jazz: ["6/4"],
+  jazz: ["6/4", "6/8", "12/8"],
   blues: ["12/8", "6/8"],
   rock: ["12/8", "6/8"],
   acoustic: ["6/8"],
@@ -159,8 +159,11 @@ const standardsOf = (style: StylePack): LibraryChart[] =>
 const SOLO_KIND = KINDS.find((kind) => kind.solo)!;
 const BAND_KINDS = KINDS.filter((kind) => !kind.solo);
 
-/** A style with few charts of its own: the blues has six, and no seed of them to spare. */
-const few = (style: StylePack): boolean => ownCharts(style).length <= 6;
+/**
+ * A style with few charts of its own: the blues has six, and no seed of them to spare. Jazz's
+ * standards are its own too (fourteen of them), so it is not short of material.
+ */
+const few = (style: StylePack): boolean => ownCharts(style).length + standardsOf(style).length <= 6;
 
 const otherCharts = (style: StylePack): LibraryChart[] => {
   const mine = new Set([...ownCharts(style), ...standardsOf(style)]);

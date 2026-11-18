@@ -253,6 +253,155 @@ const rhythmInSix: RhythmBook = {
   candidates: rhythm.candidates,
 };
 
+// ── in twelve and in six-eight ──────────────────────────────────────────────
+// A bar of dotted pulses: twenty-four sixteenths to a bar of twelve, twelve
+// to a bar of six, grouped by pulse, a pulse's eighths its first, third and
+// fifth characters. Nothing swings, and nothing is struck between the eighths.
+// The cells are four's said in pulses (AU-97): a beat is a pulse and an "and"
+// the pulse's last eighth, the eighth that leans into the next pulse. So the
+// Charleston in twelve is 1 and the last eighth of 2, pushed into 3; and the
+// eighth before a change still plays the chord coming. The comp of a waltz in
+// six is the bar's model for six-eight (AU-94: one to four chords a bar, most
+// on a pulse or the eighth before one).
+
+/** Four's book said in pulses: twelve, the ballad. A tier's figures, then its answers. */
+const rhythmInTwelve: RhythmBook = {
+  tiers: {
+    // Quiet: half the chords laid in and held, and a bar whose chord is held over may be left
+    // alone (ST-jazz-27, ST-jazz-28).
+    low: {
+      draw: "quiet",
+      articulation: STAB,
+      figures: [
+        { name: "charleston, held", weight: 4, grid: "x..... ....X- ------ ------" },
+        { name: "one, held", weight: 3, grid: "x----- ------ ------ ------" },
+        { name: "and of two, held", weight: 2, grid: "...... ....X- ------ ------" },
+        { name: "reverse charleston, held", weight: 2, grid: "....X. ...... x----- ------" },
+      ],
+      answers: [
+        { name: "rest", weight: 3, grid: "...... ...... ...... ......" },
+        { name: "charleston", weight: 2, grid: "x..... ....X. ...... ......" },
+        { name: "and of two", weight: 2, grid: "...... ....X. ...... ......" },
+      ],
+      busy: { from: 1, to: 1.5 },
+      arrival: { level: 74, steps: 24 },
+    },
+    // The working level: stabs round the pulses, a quarter of them held (ST-jazz-26, 27), and
+    // one answer of the ballad's own, the triplet leaning into the One.
+    mid: {
+      draw: "working",
+      articulation: STAB,
+      figures: [
+        { name: "charleston", weight: 4, grid: "x..... ....X. ...... ......" },
+        { name: "reverse charleston", weight: 2, grid: "....X. ...... x----- ------" },
+        { name: "two and the and of three", weight: 2, grid: "...... x..... ....X- ------" },
+        { name: "the ands of two and four", weight: 2, grid: "...... ....X. ...... ....X." },
+      ],
+      answers: [
+        { name: "and of two", weight: 3, grid: "...... ....X- ------ ------" },
+        { name: "charleston, held", weight: 3, grid: "x..... ....X- ------ ------" },
+        { name: "one, held", weight: 2, grid: "x----- ------ ------ ------" },
+        { name: "and of two, short", weight: 1, grid: "...... ....X. ...... ......" },
+        { name: "the ands of one and two", weight: 1, grid: "....X. ....X. ...... ......" },
+        { name: "the triplet into the One", weight: 1, grid: "x----- ------ ...... ..x.X." },
+      ],
+      busy: { from: 2.1, to: 2.6 },
+      arrival: { level: 78, steps: 6 },
+    },
+    // Hot, with the band to itself: the same cells, and in many bars one more stab leaning into
+    // 4 or into the One (ST-jazz-27).
+    high: {
+      draw: "working",
+      articulation: { ...STAB, o: { level: 84, steps: 1.5 } },
+      figures: [
+        { name: "charleston", weight: 4, grid: "x..... ....X. ...... ....o." },
+        { name: "reverse charleston", weight: 2, grid: "....X. ...... x..... ....o." },
+        { name: "two and the and of three", weight: 2, grid: "...... x..... ....X. ......" },
+        { name: "the ands of two and four", weight: 2, grid: "...... ....X. ...... ....X." },
+      ],
+      answers: [
+        { name: "and of two, and of three", weight: 3, grid: "...... ....X. ....o. ......" },
+        { name: "charleston, held", weight: 2, grid: "x..... ....X- ------ ------" },
+        { name: "one held, and a stab", weight: 2, grid: "x----- ------ ....o. ......" },
+        { name: "the ands of one and two", weight: 1, grid: "....X. ....X. ...... ....o." },
+        { name: "the triplet into three", weight: 1, grid: "x..... ..o.X. ...... ......" },
+      ],
+      busy: { from: 2.4, to: 3 },
+      arrival: { level: 80, steps: 6 },
+    },
+  },
+  hold: rhythm.hold,
+  forms: rhythm.forms,
+  candidates: rhythm.candidates,
+};
+
+/**
+ * Six-eight: the strong pulse and its answer, and the eighth before each (the last eighth of
+ * the first pulse pushes the second; the last of the bar pushes the One).
+ */
+const rhythmInSixEight: RhythmBook = {
+  tiers: {
+    // Quiet: laid in and held, on the One, or pushed into the second pulse.
+    low: {
+      draw: "quiet",
+      articulation: STAB,
+      figures: [
+        { name: "one, held", weight: 3, grid: "x----- ------" },
+        { name: "one, and two pushed", weight: 3, grid: "x..... ....X-" },
+        { name: "two pushed, held", weight: 2, grid: "....X- ------" },
+      ],
+      answers: [
+        { name: "rest", weight: 3, grid: "...... ......" },
+        { name: "two, held", weight: 2, grid: "...... x-----" },
+        { name: "one, short", weight: 1, grid: "x..... ......" },
+      ],
+      busy: { from: 0.8, to: 1.3 },
+      arrival: { level: 74, steps: 12 },
+    },
+    // The working level: two stabs, on the pulses and round them.
+    mid: {
+      draw: "working",
+      articulation: STAB,
+      figures: [
+        // The One, and the second pulse pushed: the Charleston of a bar of two.
+        { name: "charleston", weight: 4, grid: "x...X. ......" },
+        { name: "one and two", weight: 3, grid: "x..... X....." },
+        { name: "two, and into the One", weight: 2, grid: "...... x...X." },
+        { name: "both pushed", weight: 2, grid: "....X. ....X." },
+      ],
+      answers: [
+        { name: "two pushed, held", weight: 3, grid: "....X- ------" },
+        { name: "one, held", weight: 2, grid: "x----- ------" },
+        { name: "two, held", weight: 2, grid: "...... x-----" },
+        { name: "two pushed, short", weight: 1, grid: "....X. ......" },
+      ],
+      busy: { from: 1.6, to: 2.2 },
+      arrival: { level: 78, steps: 6 },
+    },
+    // Hot, with the band to itself: one more stab leaning into a pulse.
+    high: {
+      draw: "working",
+      articulation: { ...STAB, o: { level: 84, steps: 1.5 } },
+      figures: [
+        { name: "charleston", weight: 4, grid: "x...X. ....o." },
+        { name: "one and two", weight: 3, grid: "x..... X...o." },
+        { name: "two, and into the One", weight: 2, grid: "....o. x...X." },
+        { name: "both pushed", weight: 2, grid: "....X. ....X." },
+      ],
+      answers: [
+        { name: "charleston, held", weight: 3, grid: "x...X- ------" },
+        { name: "two pushed, and into the One", weight: 2, grid: "....X. ....o." },
+        { name: "one held, and a stab", weight: 2, grid: "x----- ....o." },
+      ],
+      busy: { from: 2, to: 2.8 },
+      arrival: { level: 80, steps: 6 },
+    },
+  },
+  hold: rhythm.hold,
+  forms: rhythm.forms,
+  candidates: rhythm.candidates,
+};
+
 export const jazzChords: ChordStyle = {
   idiom: "keys",
   kinds: { rootless },
@@ -264,7 +413,7 @@ export const jazzChords: ChordStyle = {
   // The pad, for a meter the book is not written in (CH-54): the jazz waltz.
   plain: { length: 0.95, velocity: { beat: 74, offbeat: 80, restrike: 60 } },
   rhythm,
-  meters: { "6/4": rhythmInSix },
+  meters: { "6/4": rhythmInSix, "12/8": rhythmInTwelve, "6/8": rhythmInSixEight },
   // The hand leans into a change at the barline a quarter of the time when quiet, more as the
   // band gets louder (ST-jazz-41, CH-39: the added "and" of 4 at 25%, 40%, 45%). A change
   // inside the bar is always played early by a strike in the eighth before it, which ties

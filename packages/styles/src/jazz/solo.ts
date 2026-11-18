@@ -28,6 +28,25 @@ const ELSE = {
   lift: 4,
 } satisfies Way;
 
+// Each level's phrase shapes, the same in every meter: SO-09's weights, which jazz's space
+// (0.25) leaves as they are (SO-11).
+const SPARSE_SHAPES = [
+  { weight: 3, bars: "L E R R" },
+  { weight: 3, bars: "R L E R" },
+  { weight: 3, bars: "E R L E" },
+  { weight: 2, bars: "L L E R" },
+];
+const MEDIUM_SHAPES = [
+  { weight: 5, bars: "L L E R" },
+  { weight: 3, bars: "E R L E" },
+  { weight: 2, bars: "L E L E" },
+];
+const BUSY_SHAPES = [
+  { weight: 4, bars: "L L L E" },
+  { weight: 4, bars: "L L E R" },
+  { weight: 2, bars: "L E L E" },
+];
+
 // ── in six ──────────────────────────────────────────────────────────────────
 // A bar of 6/4, six beats in two threes: twenty-four sixteenths, grouped by
 // beat, and still nothing but beats and their swung "and"s. The levels are
@@ -47,12 +66,7 @@ const jazzSoloInSix: SoloTime = {
         "x-x- --x- ---- .... x-x- x---",
         "..x- ---- x-x- x--- ---- ....",
       ],
-      shapes: [
-        { weight: 3, bars: "L E R R" },
-        { weight: 3, bars: "R L E R" },
-        { weight: 3, bars: "E R L E" },
-        { weight: 2, bars: "L L E R" },
-      ],
+      shapes: SPARSE_SHAPES,
     },
     {
       name: "medium",
@@ -66,11 +80,7 @@ const jazzSoloInSix: SoloTime = {
         ".... x-x- x--- x--- x-x- --..",
         "..x- --x- x--- .... x-x- x---",
       ],
-      shapes: [
-        { weight: 5, bars: "L L E R" },
-        { weight: 3, bars: "E R L E" },
-        { weight: 2, bars: "L E L E" },
-      ],
+      shapes: MEDIUM_SHAPES,
     },
     {
       name: "busy",
@@ -83,11 +93,7 @@ const jazzSoloInSix: SoloTime = {
         ".... x-x- x-x- x-x- x-x- x-x-",
         "x-x- x--- x-x- x-x- x--- x-x-",
       ],
-      shapes: [
-        { weight: 4, bars: "L L L E" },
-        { weight: 4, bars: "L L E R" },
-        { weight: 2, bars: "L E L E" },
-      ],
+      shapes: BUSY_SHAPES,
     },
   ],
   // Each lands on a long note and leaves beat 6 unstruck.
@@ -110,8 +116,125 @@ const jazzSoloInSix: SoloTime = {
   peak: "x--- ---- ---- ---- .... ....",
 };
 
+// ── in twelve and in six-eight ──────────────────────────────────────────────
+// A bar of dotted pulses is its own triplet and is not swung: a rhythm is
+// twenty-four sixteenths in twelve and twelve in six, written in sixes, and
+// only a pulse's eighths (its first, third and fifth characters) are struck.
+// `x-----` is a pulse held, `x---x-` four's swung pair said in pulses (the
+// beat and its "and", the long-short), `x-x-x-` the pulse's three eighths,
+// the triplet a line in four would have to go to its top level to play.
+//
+// Twelve is the ballad: four's cells said in pulses at each level (a beat a
+// pulse, an "and" the pulse's last eighth), and from the medium level the
+// triplet a ballad's horn runs in, as its double time; the busy level is
+// mostly triplets. Endings land on a long note and leave the last pulse
+// unstruck. Six is a bar of two: one strong pulse and its answer, the line
+// mostly long-short and triplet against the ride's skip; its levels are
+// written for the bar, not cut from twelve's.
+const jazzSoloInTwelve: SoloTime = {
+  levels: [
+    {
+      name: "sparse",
+      notesPerBar: 2,
+      span: 6,
+      cells: [
+        "....x- x---x- ------ ......",
+        "x---x- ----x- ------ ......",
+        "...... x---x- x----- ------",
+        "x----- ....x- x----- ......",
+        "....x- ------ x---x- x-----",
+      ],
+      shapes: SPARSE_SHAPES,
+    },
+    {
+      name: "medium",
+      notesPerBar: 5.5,
+      span: 9,
+      cells: [
+        "x----- x---x- x-x-x- ----..",
+        // These two end on 4's last eighth: a run that can be tied over the barline.
+        "....x- x-x-x- ----.. x---x-",
+        "x---x- x-x-x- ----.. x---x-",
+        "...... x---x- x-x-x- x-----",
+        "x-x-x- x----- x---x- ......",
+        "....x- x-x-x- x-x-x- ......",
+      ],
+      shapes: MEDIUM_SHAPES,
+    },
+    {
+      name: "busy",
+      notesPerBar: 8,
+      span: 12,
+      cells: [
+        "x-x-x- x-x-x- x-x-x- x-x-x-",
+        "....x- x-x-x- x-x-x- x---x-",
+        "x-x-x- x---x- x-x-x- x-x-x-",
+        "...... x-x-x- x-x-x- x-x-x-",
+        "x---x- x-x-x- x---x- x-x-x-",
+      ],
+      shapes: BUSY_SHAPES,
+    },
+  ],
+  // Each lands on a long note and leaves pulse 4 unstruck.
+  endings: [
+    "x---x- x----- ------ ......",
+    "....x- x---x- ------ ......",
+    "x---x- ----.. ...... ......",
+    "x----- x----- ------ ......",
+    "....x- x---x- x----- ------",
+    "x----- ------ ...... ......",
+  ],
+  // From pulse 4, as from beat 4 in four; the longer ones from pulse 3 (half the bar).
+  pickups: [
+    { weight: 2, cell: "....x-" },
+    { weight: 1, cell: "x---x-" },
+    { weight: 1, cell: "....x- x-x-x-", levels: ["medium", "busy"] },
+    { weight: 0.5, cell: "x-x-x- x-x-x-", levels: ["busy"] },
+  ],
+  peak: "x----- ------ ------ ......",
+};
+
+const jazzSoloInSixEight: SoloTime = {
+  levels: [
+    {
+      name: "sparse",
+      notesPerBar: 1.5,
+      span: 6,
+      cells: ["....x- x-----", "x---x- ------", "x----- ....x-", "....x- ----x-", "x----- x-----"],
+      shapes: SPARSE_SHAPES,
+    },
+    {
+      name: "medium",
+      notesPerBar: 2.6,
+      span: 9,
+      cells: ["x---x- x-----", "....x- x---x-", "x-x-x- x-----", "...... x-x-x-", "x----- x---x-"],
+      shapes: MEDIUM_SHAPES,
+    },
+    {
+      name: "busy",
+      notesPerBar: 4.2,
+      span: 12,
+      cells: ["x-x-x- x-x-x-", "x---x- x-x-x-", "....x- x-x-x-", "x-x-x- x---x-", "x-x-x- x-x---"],
+      shapes: BUSY_SHAPES,
+    },
+  ],
+  // Each lands in the first pulse and holds through the second, which is the next phrase's;
+  // none lands on the first pulse's last eighth alone, which at the top of the range (a pulse
+  // is 0.38 s at 160) leaves less than a breath after it, and each opens on the One, so that a
+  // pickup into a phrase that opens on its ending leads into a note on the One.
+  endings: ["x----- ------", "x---x- ------", "x-x-x- ------", "x...x- ------"],
+  // From the second pulse: its last eighth most of all, the long-short, and once the line is
+  // moving its three eighths (half the bar).
+  pickups: [
+    { weight: 2, cell: "....x-" },
+    { weight: 1, cell: "x---x-" },
+    { weight: 1, cell: "x-x-x-", levels: ["medium", "busy"] },
+  ],
+  peak: "x----- ----..",
+};
+
 export const jazzSolo: SoloStyle = {
-  meters: { "6/4": jazzSoloInSix },
+  meters: { "6/4": jazzSoloInSix, "12/8": jazzSoloInTwelve, "6/8": jazzSoloInSixEight },
   instrument: "alto-sax",
   lift: 0,
 
@@ -167,12 +290,7 @@ export const jazzSolo: SoloStyle = {
         "..x- ---- x-x- x---",
       ],
       // SO-09's weights; jazz's space (0.25) leaves them as they are (SO-11).
-      shapes: [
-        { weight: 3, bars: "L E R R" },
-        { weight: 3, bars: "R L E R" },
-        { weight: 3, bars: "E R L E" },
-        { weight: 2, bars: "L L E R" },
-      ],
+      shapes: SPARSE_SHAPES,
     },
     {
       name: "medium",
@@ -186,11 +304,7 @@ export const jazzSolo: SoloStyle = {
         ".... x-x- x--- x---",
         "..x- --x- x--- ....",
       ],
-      shapes: [
-        { weight: 5, bars: "L L E R" },
-        { weight: 3, bars: "E R L E" },
-        { weight: 2, bars: "L E L E" },
-      ],
+      shapes: MEDIUM_SHAPES,
     },
     {
       // Eighth notes, all the way through the bar. There is no level above this: nothing
@@ -205,11 +319,7 @@ export const jazzSolo: SoloStyle = {
         ".... x-x- x-x- x-x-",
         "x-x- x--- x-x- x-x-",
       ],
-      shapes: [
-        { weight: 4, bars: "L L L E" },
-        { weight: 4, bars: "L L E R" },
-        { weight: 2, bars: "L E L E" },
-      ],
+      shapes: BUSY_SHAPES,
     },
   ],
   // Each lands on a long note and leaves beat 4 unstruck. The third is the "doo-dat".

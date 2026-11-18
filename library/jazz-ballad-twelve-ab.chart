@@ -1,0 +1,20 @@
+title: Ballad in Twelve
+key: Ab
+tempo: 66
+meter: 12/8
+style: jazz
+
+// The jazz ballad in twelve-eight: four slow pulses to the bar, three eighths
+// in each, two chords to most bars. Sixteen bars, two eights. The first eight
+// goes round the one, the six, the two and the five, through the three and
+// the five of two, then up to the four by its own two-five and back through
+// the flat seven. The second eight goes to the four by way of its two-five,
+// borrows the minor four, and comes home down the three, the six of two and
+// the two-five, turning round on the five of two.
+[A]
+| Abmaj7 Fm7 | Bbm7 Eb7   | Cm7 F7b9 | Bbm7 Eb7 |
+| Abmaj7 Ab7 | Dbmaj7 Gb9 | Cm7 F7b9 | Bbm7 Eb7 |
+
+[B]
+| Abmaj7 Fm7 | Bbm7 Eb7 | Ebm7 Ab7    | Dbmaj7 Dbm6 |
+| Cm7 F7b9   | Bbm7 Eb7 | Abmaj7 F7#9 | Bbm7 Eb7    |

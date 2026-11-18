@@ -94,6 +94,83 @@ const nearlyWalking: Line = {
   },
 };
 
+// ── in twelve and in six-eight ──────────────────────────────────────────────
+// A bar of dotted pulses: twenty-four sixteenths to a bar of twelve and twelve
+// to a bar of six, grouped by pulse, a pulse's eighths its first, third and
+// fifth characters. The walk is four's said in pulses (AU-97): a note on a
+// pulse is a note on a beat, its pitches walked as in four. What compound
+// time adds is the triplet's last eighth: the ballad bassist's "ba-DUM", a
+// note an eighth before a pulse that leads into it. Never the middle eighth.
+
+/**
+ * Twelve, the ballad. Quiet it is four's two-feel in pulses (the low line, below); once the
+ * band opens up it walks a note a pulse, and a section may lean into 3 and the One from the
+ * pulse before's last eighth. Hot, a pickup into the One in every bar.
+ */
+const walkingInTwelve: Line = {
+  ...walking,
+  figures: {
+    hold: "section",
+    options: [
+      { name: "a note a pulse", weight: 3, grid: "x----- x----- x----- x-----" },
+      { name: "a pulse, and into the One", weight: 2, grid: "x----- x----- x----- x---x-" },
+      { name: "into 3 and into the One", weight: 1, grid: "x----- x---x- x----- x---x-" },
+    ],
+  },
+};
+
+const hotInTwelve: Line = {
+  ...walkingInTwelve,
+  figures: {
+    hold: "section",
+    options: [
+      { name: "into 3 and into the One", weight: 3, grid: "x----- x---x- x----- x---x-" },
+      { name: "into 4 and into the One", weight: 2, grid: "x----- x----- x---x- x---x-" },
+      { name: "into every pulse", weight: 1, grid: "x---x- x---x- x---x- x---x-" },
+    ],
+  },
+};
+
+/**
+ * Six-eight: one strong pulse and its answer. Quiet in two, a note each pulse. Once the band
+ * opens up the line lilts (AU-93's waltz bass, which plays the pulses and a pickup or two):
+ * the One held and the second pulse leaning into the next One, or the One leaning into the
+ * second pulse. Hot, a pickup into both.
+ */
+const liltInSix: Line = {
+  ...walking,
+  figures: {
+    hold: "section",
+    options: [
+      { name: "two, and into the One", weight: 3, grid: "x----- x---x-" },
+      { name: "the One, leaning into two", weight: 2, grid: "x---x- x-----" },
+      { name: "into both", weight: 1, grid: "x---x- x---x-" },
+    ],
+  },
+  velocity: { arrival: 98, strong: 92, weak: 86, restrike: 70, approach: 88 },
+};
+
+const hotInSix: Line = {
+  ...liltInSix,
+  figures: {
+    hold: "section",
+    options: [
+      { name: "into both", weight: 3, grid: "x---x- x---x-" },
+      { name: "two, and into the One", weight: 1, grid: "x----- x---x-" },
+    ],
+  },
+};
+
+/** Quiet in a bar of dotted pulses: four's two-feel, the bass note and its fifth. */
+const inTwo = (grid: string): Line => ({
+  tones: [{ when: { slash: true }, bars: [["R", "R"]] }, { bars: [["R", "5"]] }],
+  figures: { hold: "song", options: [{ weight: 1, grid }] },
+  otherMeters: "downbeat",
+  ceiling: 45,
+  length: { note: 0.92, long: 0.92, short: 0.4 },
+  velocity: { arrival: 96, strong: 86, weak: 86, restrike: 70, approach: 84 },
+});
+
 export const jazzBass: BassStyle = {
   // E1 up to A2 for a root, home on D2: each root goes nearest the line, pulled 35% of the
   // way back home (ST-jazz-18). The notes let a root sit as high as E3; a line that started
@@ -140,6 +217,10 @@ export const jazzBass: BassStyle = {
       mid: lilt,
       high: nearlyWalking,
     },
+    // Quiet in two: in twelve the bass note on 1 and its fifth on 3, pulse 4 an approach when
+    // the lead-in's coin says so; in six one on each pulse. The rest is written above.
+    "12/8": { low: inTwo("x----- ------ x----- ------"), mid: walkingInTwelve, high: hotInTwelve },
+    "6/8": { low: inTwo("x----- x-----"), mid: liltInSix, high: hotInSix },
   },
 
   leadIn: {

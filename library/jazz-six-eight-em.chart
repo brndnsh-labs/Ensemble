@@ -1,0 +1,23 @@
+title: Jazz in Six
+key: Em
+tempo: 88
+meter: 6/8
+style: jazz
+
+// Jazz's six-eight: two pulses to the bar, three eighths in each, the ride on
+// each pulse and the eighth before the next. Thirty-two bars, AABA, most
+// chords two bars long. The A sits on the minor one and its four, and turns
+// round by the minor two-five; the second and last A come home through the
+// flat six. The bridge is the relative major's two-five-one and its four,
+// and the minor two-five back, ending on the five with a sharp nine.
+[A]
+| Em9 | % | Am9 | % | Em9 | % | F#m7b5 | B7b9 |
+
+[A2]
+| Em9 | % | Am9 | % | Cmaj7 | F#m7b5 B7b9 | Em9 | % |
+
+[Bridge]
+| Am9 | D13 | Gmaj7 | Cmaj7 | F#m7b5 | B7b9 | Em9 | B7#9 |
+
+[A3]
+| Em9 | % | Am9 | % | Cmaj7 | F#m7b5 B7b9 | Em9 | % |

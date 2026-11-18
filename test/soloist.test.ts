@@ -1254,8 +1254,8 @@ test(
   only("jazz"),
   () => {
     let chromatic = 0;
-    // Where jazz has written its soloist: in a bar of dotted pulses it has not written (6/8,
-    // 12/8) the line is the fit's, and is not jazz's own until it is written there.
+    // Where jazz has written its soloist (4/4, 6/4, 6/8, 12/8) and in three, where its line is
+    // a 4/4 rhythm cut to the bar.
     const own = (jam: Parameters<typeof written>[0]) =>
       written(jam) || !isCompound(parse(jam.chart.text).chart.meter);
     for (const { chart, options, take } of soloTakes().filter(own)) {

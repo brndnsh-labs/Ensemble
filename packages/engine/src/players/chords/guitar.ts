@@ -316,7 +316,9 @@ function alternate(voicing: Voicing, chord: Chord | null): Plucked {
   ) {
     return { string: below, pitch: bass - 5 };
   }
-  const over = [1, 2].find((k) => voicing.tones[k] === "5");
+  // At or under the lowest string a finger reaches (the third from the top): the fingers
+  // pluck over the thumb, never under it.
+  const over = [1, 2].find((k) => voicing.tones[k] === "5" && k <= strings.length - 3);
   const k = over ?? 0;
   return { string: strings[k]!, pitch: voicing.pitches[k]! };
 }
