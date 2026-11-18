@@ -100,6 +100,42 @@ const bassInSix: BassStyle["lines"] = {
   high: lineInSix(0.8, figures(["lilt", 2, "R---R- 5---5-"], ["fifth twice", 1, "R----- 5---5-"])),
 };
 
+// ── in twelve ───────────────────────────────────────────────────────────────
+// A bar of 12/8 is four slow pulses of three eighths: twenty-four sixteenths,
+// written in sixes. The upright is four's, each beat of four a pulse: the root
+// on 1 and the fifth on 3, energy adding the root again on the "and" of 2 (the
+// second pulse's last eighth) and hot a note on every pulse. Nothing on a
+// pulse's middle eighth: the line is four's, not six's lilt. A lead-in, "a beat
+// before the change", is the last pulse, as in four. Written, not derived: half
+// of this bar is not six's bar (six is in two, a root a bar when quiet).
+
+const bassInTwelve: BassStyle["lines"] = {
+  // Quiet: root and fifth (2), or the root alone (1). 95%.
+  low: line(
+    0.95,
+    figures(
+      ["root and fifth", 2, "R----- ------ 5----- ------"],
+      ["root", 1, "R----- ------ ------ ------"],
+    ),
+  ),
+  // The working level: root and fifth (2), or with the root again on the "and" of 2 (1). 88%.
+  mid: line(
+    0.88,
+    figures(
+      ["root and fifth", 2, "R----- ------ 5----- ------"],
+      ["pickup", 1, "R----- ----R- 5----- ------"],
+    ),
+  ),
+  // Hot: a note on every pulse (2), or the pickup and two fifths (1). 80%.
+  high: line(
+    0.8,
+    figures(
+      ["four", 2, "R----- R----- 5----- 5-----"],
+      ["pickup and fifths", 1, "R----- ----R- 5----- 5-----"],
+    ),
+  ),
+};
+
 export const acousticBass: BassStyle = {
   // An upright in its bottom octave and a half: every root nearest a home drawn for the section
   // between A1 and D2, so a fifth usually has room under it.
@@ -120,8 +156,8 @@ export const acousticBass: BassStyle = {
       figures(["four", 2, "R--- R--- 5--- 5---"], ["pickup and fifths", 1, "R--- --R- 5--- 5---"]),
     ),
   },
-  // Six-eight, written above.
-  meters: { "6/8": bassInSix },
+  // Six-eight and twelve-eight, written above.
+  meters: { "6/8": bassInSix, "12/8": bassInTwelve },
   leadIn,
   // The soft ending: 80% of 96 (ST-acoustic-35).
   ending: { velocity: 96 },
