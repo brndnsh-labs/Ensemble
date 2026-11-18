@@ -148,16 +148,16 @@ const jazzSoloInTwelve: SoloTime = {
     },
     {
       name: "medium",
-      notesPerBar: 4,
+      notesPerBar: 5.5,
       span: 9,
       cells: [
-        "x----- x---x- x----- ----..",
+        "x----- x---x- x-x-x- ----..",
         // These two end on 4's last eighth: a run that can be tied over the barline.
-        "....x- x---x- ----.. x---x-",
-        "x---x- x----- ----.. x---x-",
+        "....x- x-x-x- ----.. x---x-",
+        "x---x- x-x-x- ----.. x---x-",
         "...... x---x- x-x-x- x-----",
         "x-x-x- x----- x---x- ......",
-        "....x- x-x-x- x----- ......",
+        "....x- x-x-x- x-x-x- ......",
       ],
       shapes: MEDIUM_SHAPES,
     },
@@ -220,8 +220,9 @@ const jazzSoloInSixEight: SoloTime = {
   ],
   // Each lands in the first pulse and holds through the second, which is the next phrase's;
   // none lands on the first pulse's last eighth alone, which at the top of the range (a pulse
-  // is 0.38 s at 160) leaves less than a breath after it.
-  endings: ["x----- ------", "x---x- ------", "x-x-x- ------", "..x-x- ------"],
+  // is 0.38 s at 160) leaves less than a breath after it, and each opens on the One, so that a
+  // pickup into a phrase that opens on its ending leads into a note on the One.
+  endings: ["x----- ------", "x---x- ------", "x-x-x- ------", "x...x- ------"],
   // From the second pulse: its last eighth most of all, the long-short, and once the line is
   // moving its three eighths (half the bar).
   pickups: [
