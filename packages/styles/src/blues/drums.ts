@@ -336,6 +336,174 @@ const bluesDrumsInTwelve: DrumTime = {
   },
 };
 
+// ── in six ──────────────────────────────────────────────────────────────────
+// The blues counted in two, as a gospel blues ballad is. A bar of 6/8 is two
+// slow beats of three eighths: twelve sixteenths, written in sixes. It is one
+// strong beat and one answering it, not half a bar of twelve: there is no beat
+// 3, so the kick has the One and the backbeat the second beat (SU-D-14). The
+// cymbal's triplets and the backbeat are twelve's first half (`halfOf`): that
+// much of the slow blues is the same bar cut. The kick's push into the One is
+// twelve's too, moved to the end of the shorter bar. The fills are written for
+// a bar of two: none is longer than a beat, and one of a beat starts on the
+// backbeat, so no bar of six loses it (DR-46).
+
+/** The first half of a line written for twelve: the same beat in a bar of six. */
+const halfOf = (line: string) => line.split(" ").slice(0, 2).join(" ");
+
+const SIX_KICK_PLAIN = { kick: halfOf(TWELVE_KICK_PLAIN.kick) };
+/** The One, and the soft push on the last eighth into the next bar. */
+const SIX_KICK_PUSHED = { kick: "x..... ....o." };
+const SIX_BACKBEAT = { snare: halfOf(TWELVE_BACKBEAT.snare) };
+const SIX_TRIPLETS = halfOf(TRIPLETS);
+
+const SIX_BREATH = {
+  bars: TWELVE_BREATH.bars,
+  open: { openHat: "...... ....o." },
+} as const;
+
+/** The backbeat, then the high tom and the floor: round the kit in one beat. */
+const SIX_ROUND = { snare: "x.....", highTom: "..o...", lowTom: "....X." };
+/** Both hands on the backbeat's triplet, landing on the floor. */
+const SIX_FLAT = { snare: "x.o...", lowTom: "x...X." };
+
+const bluesDrumsInSix: DrumTime = {
+  grooves: {
+    low: [
+      {
+        id: "time",
+        hold: "section",
+        options: [{ weight: 1, lines: { closedHat: halfOf("o...g. o...g. o...g. o...g.") } }],
+      },
+      {
+        id: "kick",
+        hold: "section",
+        options: [
+          { weight: 3, lines: SIX_KICK_PLAIN },
+          { weight: 1, lines: SIX_KICK_PUSHED },
+        ],
+      },
+      {
+        id: "snare",
+        hold: "section",
+        when: { energyFrom: 0.3 },
+        options: [{ weight: 1, lines: { snare: "...... x....." } }],
+      },
+      {
+        id: "rim",
+        hold: "section",
+        when: { energyBelow: 0.3 },
+        options: [{ weight: 1, lines: { crossStick: "...... x....." } }],
+      },
+    ],
+
+    mid: [
+      { id: "time", hold: "section", options: [{ weight: 1, lines: { closedHat: SIX_TRIPLETS } }] },
+      {
+        id: "kick",
+        hold: "section",
+        options: [
+          { weight: 2, lines: SIX_KICK_PLAIN },
+          { weight: 3, lines: SIX_KICK_PUSHED },
+        ],
+      },
+      {
+        id: "snare",
+        hold: "section",
+        options: [
+          { weight: 7, lines: SIX_BACKBEAT },
+          // A ghost on the last eighth, loping into the One.
+          { weight: 3, lines: { snare: "...... X...g." } },
+        ],
+      },
+      {
+        id: "breath",
+        hold: "section",
+        when: SIX_BREATH.bars,
+        options: [
+          { weight: 65, lines: {} },
+          { weight: 35, lines: SIX_BREATH.open },
+        ],
+      },
+    ],
+
+    high: [
+      {
+        id: "time",
+        hold: "pass",
+        options: [
+          { weight: 1, lines: { closedHat: SIX_TRIPLETS } },
+          { weight: 1, lines: { ride: SIX_TRIPLETS, pedalHat: "...... x....." } },
+        ],
+      },
+      { id: "kick", hold: "section", options: [{ weight: 1, lines: SIX_KICK_PUSHED }] },
+      {
+        id: "feather",
+        hold: "section",
+        options: [
+          { weight: 2, lines: {} },
+          { weight: 3, lines: { kick: "...... g....." } },
+        ],
+      },
+      {
+        id: "snare",
+        hold: "section",
+        options: [
+          { weight: 2, lines: SIX_BACKBEAT },
+          { weight: 2, lines: { snare: "...... X...g." } },
+          // The triplet ghosted round the backbeat.
+          { weight: 1, lines: { snare: "....g. X.g.g." } },
+        ],
+      },
+      {
+        id: "breath",
+        hold: "section",
+        when: SIX_BREATH.bars,
+        options: [
+          { weight: 2, lines: {} },
+          { weight: 3, lines: SIX_BREATH.open },
+        ],
+      },
+    ],
+  },
+
+  // The lope: the backbeat's last eighth is played lighter, so the bar circles in two.
+  touches: [{ voices: ["closedHat", "ride"], steps: [10], scale: 0.8 }],
+
+  fills: {
+    // An eighth, or a beat: the backbeat and what follows it.
+    length: {
+      phrase: { low: 0, mid: 2, high: 6 },
+      section: { low: 2, mid: 6, high: 6 },
+    },
+    phrase: [
+      { weight: 3, lines: PICKUP },
+      { weight: 1, lines: PICKUP_FLOOR },
+      { weight: 2, lines: TWELVE_FOUR_AND },
+      { weight: 3, lines: TWELVE_TRIPLET },
+      { weight: 1, lines: TWELVE_CRACK_BOOM },
+    ],
+    section: [
+      { weight: 3, lines: PICKUP },
+      { weight: 1, lines: PICKUP_FLOOR },
+      { weight: 2, lines: TWELVE_FOUR_AND },
+      { weight: 3, lines: TWELVE_TRIPLET },
+      { weight: 1, lines: TWELVE_CRACK_BOOM },
+      { weight: 2, lines: TWELVE_TRIPLET_BOOM },
+      { weight: 2, lines: SIX_ROUND },
+    ],
+    top: [
+      { weight: 2, lines: PICKUP },
+      { weight: 2, lines: PICKUP_BOTH },
+      { weight: 1, lines: PICKUP_FLOOR },
+      { weight: 2, lines: TWELVE_TRIPLET },
+      { weight: 2, lines: TWELVE_TRIPLET_BOOM },
+      { weight: 1, lines: TWELVE_FOUR_AND_BOTH },
+      { weight: 2, lines: SIX_ROUND },
+      { weight: 2, lines: SIX_FLAT },
+    ],
+  },
+};
+
 export const bluesDrums: DrumStyle = {
   grooves: {
     // Quiet: a soft hat with the "and"s at half weight, a plain backbeat, mostly a plain kick.
@@ -451,7 +619,7 @@ export const bluesDrums: DrumStyle = {
   },
 
   // The slow blues in twelve-eight, written above.
-  meters: { "12/8": bluesDrumsInTwelve },
+  meters: { "12/8": bluesDrumsInTwelve, "6/8": bluesDrumsInSix },
 
   // The shuffle is carried on the hat or the ride; a crash on an arrival takes that hand.
   timekeepers: ["closedHat", "ride"],
