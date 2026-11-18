@@ -29,7 +29,7 @@ import type { Call } from "./jam.ts";
 import { SEAT_ORDER, seatsOf } from "./jam.ts";
 import type { Rig } from "./rig.ts";
 import type { Seated } from "./Stage.tsx";
-import { playedOn, Stage } from "./Stage.tsx";
+import { playedOn, Stage, soloWords } from "./Stage.tsx";
 import { clock } from "./StatusStrip.tsx";
 import { useJam } from "./useJam.ts";
 
@@ -177,6 +177,7 @@ function TakeStage({
         <p className="sentence told take-told">
           A take kept {dayOf(take.kept)}: {heard.style.name} in {keyToString(heard.chart.key)},{" "}
           {Math.round(plan.tempo)} bpm, {clock(seconds(plan))}
+          {soloWords(recipe.options) && `, ${soloWords(recipe.options)}`}
         </p>
       }
       players={players}

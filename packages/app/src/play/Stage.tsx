@@ -66,6 +66,8 @@ interface Props {
   readonly players: readonly Seated[];
   /** Beside the transport: Keep. */
   readonly keep?: ReactNode;
+  /** Beside Play before it is pressed, in the place Keep takes after: the soloist's settings. */
+  readonly ready?: ReactNode;
   /** The screen's own part of More, under how the page is read. */
   readonly more: (close: () => void) => ReactNode;
   /** Something of the screen's own that went wrong, said where the band's own troubles are. */
@@ -147,6 +149,19 @@ export function playedOn(style: StylePack, options: HowPlayed, seat: Seat): stri
   return instrument(seatChoice(style, seat, options.instruments).pack);
 }
 
+/**
+ * How the soloist plays in a take, in a few words, where that is not as the
+ * style has it: a busier or sparser soloist, or one in from the top. Undefined
+ * with no soloist, or one playing as the style's own does.
+ */
+export function soloWords(options: HowPlayed): string | undefined {
+  if (!options.solo) return undefined;
+  const density = options.soloDensity ?? 0.5;
+  const busy = density > 0.5 ? "a busier soloist" : density < 0.5 ? "a sparser soloist" : undefined;
+  if (!options.soloFromTop) return busy;
+  return `${busy ?? "the soloist"} from the top`;
+}
+
 /** What a player's block says under its name, when it is not what it is played on. */
 const SAYS: Readonly<Record<Seated["state"], string | undefined>> = {
   in: undefined,
@@ -157,7 +172,7 @@ const SAYS: Readonly<Record<Seated["state"], string | undefined>> = {
 
 export function Stage(props: Props) {
   const { jam, call, chart, preview, reading, read } = props;
-  const { title, place, side, sentence, players, keep, more, editor } = props;
+  const { title, place, side, sentence, players, keep, ready, more, editor } = props;
   const problem = jam.problem ?? props.problem;
   const [focus, setFocus] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -323,6 +338,7 @@ export function Stage(props: Props) {
         {editor && <div className="edit-dock">{editor.dock}</div>}
         <div className="transport">
           {keep}
+          {idle && !editor && ready}
           {/* The second choice, and only a jam's: a song ends by itself. It comes in beside Stop, moving nothing. */}
           {!idle && plan.mode === "jam" && (
             <button type="button" className="finish" disabled={!jam.canFinish} onClick={jam.finish}>

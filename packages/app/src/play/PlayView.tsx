@@ -34,7 +34,7 @@ import { chartOf, SEAT_ORDER, takeOptions, tempoFor } from "./jam.ts";
 import type { Rig } from "./rig.ts";
 import { Sheet } from "./Sheet.tsx";
 import type { Seated } from "./Stage.tsx";
-import { playedOn, Stage } from "./Stage.tsx";
+import { playedOn, Stage, soloWords } from "./Stage.tsx";
 import { useJam } from "./useJam.ts";
 
 interface Props {
@@ -65,6 +65,18 @@ const SEAT_NAMES: Readonly<Record<Seat, string>> = {
 };
 /** The meters the band has parts written for, offered in the editing mode's More. Any other is typed. */
 const METERS: readonly string[] = ["4/4", "3/4", "6/8", "12/8", "6/4"];
+/** The soloist as the style has it: the middle of its slider, and what is passed when nothing is. */
+const OWN_DENSITY = 0.5;
+
+/** How busy the soloist is, in words: the slider shows no number. */
+function densityWords(density: number, style: StylePack): string {
+  if (density === OWN_DENSITY) return `As ${style.name.toLowerCase()} plays it`;
+  const way = density > OWN_DENSITY ? "busier" : "sparser";
+  const far = Math.abs(density - OWN_DENSITY);
+  if (far >= 0.5) return density > OWN_DENSITY ? "As busy as it goes" : "As sparse as it goes";
+  return far >= 0.25 ? `${way[0]!.toUpperCase()}${way.slice(1)}` : `A little ${way}`;
+}
+
 /** How far one press of minus or plus moves the tempo. */
 const TEMPO_STEP = 4;
 
@@ -79,7 +91,7 @@ const keysOf = (mode: Key["mode"]): Key[] =>
 const lengthWords = (song: boolean, minutes: number | null): string =>
   song ? "the song, once through" : minutes === null ? "until I stop it" : `about ${minutes} min`;
 
-type Part = "style" | "key" | "tempo" | "length";
+type Part = "style" | "key" | "tempo" | "length" | "solo";
 
 export function PlayView(props: Props) {
   const { entry, takes, rig, settings, change, autoplay, started, copied, madeCopy } = props;
@@ -127,6 +139,8 @@ export function PlayView(props: Props) {
       key: choices.key === undefined ? null : parseKey(choices.key),
       band: settings.band,
       soloInstrument,
+      soloDensity: settings.soloDensity,
+      soloFromTop: settings.soloFromTop,
       instruments: choices.instruments,
     }),
     [
@@ -138,6 +152,8 @@ export function PlayView(props: Props) {
       choices.key,
       settings.band,
       soloInstrument,
+      settings.soloDensity,
+      settings.soloFromTop,
       choices.instruments,
     ],
   );
@@ -308,14 +324,34 @@ export function PlayView(props: Props) {
   const { beats, unit } = entry.chart.meter;
   const meterShown = beats === 4 && unit === 4 ? "" : `${beats}/${unit}`;
 
+  // The soloist is in the line only when it is not playing as the style has it, as the meter is
+  // only when it is not four: what the line says is what Play would start, or what is playing.
+  const soloShown = soloWords(options);
+
   const sentence = (
     <p className={`sentence${idle ? "" : " told"}`}>
       {part("style", "Style", style.name)} in {part("key", "Key", keyShown)}
       {meterShown && `, ${meterShown},`} at {part("tempo", "Tempo", `${shownTempo} bpm`)},{" "}
       {part("length", "Length", length)}
+      {soloShown && <>, {part("solo", "Soloist", soloShown)}</>}
       {!idle && <span className="vh"> (changed when the band is stopped)</span>}
     </p>
   );
+
+  const soloOn = settings.band.solo;
+  const busyDiffers = settings.soloDensity !== OWN_DENSITY;
+  // What the soloist's button says under its name: how it will play, or that it is not playing.
+  const fromTop = settings.soloFromTop && !song;
+  const soloSays = !soloOn
+    ? ["not playing"]
+    : busyDiffers || fromTop
+      ? [
+          ...(busyDiffers ? [settings.soloDensity > OWN_DENSITY ? "busier" : "sparser"] : []),
+          ...(fromTop ? ["from the top"] : []),
+        ]
+      : ["as usual"];
+  const setDensity = (density: number) =>
+    change({ ...settings, soloDensity: Math.min(1, Math.max(0, density)) });
 
   return (
     <>
@@ -361,6 +397,23 @@ export function PlayView(props: Props) {
         }
         sentence={sentence}
         players={players}
+        ready={
+          // The soloist's settings, a tap from its switch: Keep's place, until there is a take to keep.
+          <button
+            type="button"
+            className={`solo-set${soloOn ? "" : " out"}`}
+            aria-haspopup="dialog"
+            aria-label={`The soloist: ${soloSays.join(", ")}`}
+            onClick={() => setOpen("solo")}
+          >
+            <span className="who">Solo</span>
+            {soloSays.map((line) => (
+              <span key={line} className="what">
+                {line}
+              </span>
+            ))}
+          </button>
+        }
         problem={problem}
         keep={
           // There from the press of Play, so Stop does not move when the take arrives.
@@ -694,6 +747,72 @@ export function PlayView(props: Props) {
           )}
           <span>{range.max}</span>
         </div>
+      </Sheet>
+
+      <Sheet open={open === "solo"} close={close} title="The soloist" kind="solo-sheet">
+        {!soloOn && (
+          <p className="solo-off">
+            The soloist is sitting out, so none of this is heard. It is kept for when the soloist
+            plays: switch it on in the band.
+          </p>
+        )}
+        <p className="sheet-label" id="solo-busy-label">
+          How busy
+        </p>
+        <p className="solo-now" aria-hidden="true">
+          {densityWords(settings.soloDensity, style)}
+        </p>
+        <input
+          className="tempo-range"
+          type="range"
+          min={0}
+          max={1}
+          step={0.05}
+          value={settings.soloDensity}
+          aria-labelledby="solo-busy-label"
+          aria-valuetext={densityWords(settings.soloDensity, style)}
+          onChange={(e) => setDensity(Math.round(Number(e.target.value) * 20) / 20)}
+        />
+        <div className="tempo-ends">
+          <span>Sparse</span>
+          {busyDiffers ? (
+            <button type="button" className="tempo-back" onClick={() => setDensity(OWN_DENSITY)}>
+              Back to {style.name.toLowerCase()}'s own
+            </button>
+          ) : (
+            <span />
+          )}
+          <span>Busy</span>
+        </div>
+        <p className="sheet-label" id="solo-in-label">
+          Comes in
+        </p>
+        <fieldset className="opts list-opts" aria-labelledby="solo-in-label" disabled={song}>
+          <button
+            type="button"
+            className="opt"
+            aria-pressed={!song && !settings.soloFromTop}
+            onClick={() => change({ ...settings, soloFromTop: false })}
+          >
+            After the band's first time round
+            <small>The band plays the form once, then the soloist leads</small>
+          </button>
+          <button
+            type="button"
+            className="opt"
+            aria-pressed={!song && settings.soloFromTop}
+            onClick={() => change({ ...settings, soloFromTop: true })}
+          >
+            From the top
+            <small>The soloist leads from the first time round</small>
+          </button>
+        </fieldset>
+        {song && (
+          <p className="sheet-note">
+            Played once through as a song, the soloist comes in where the song has it: this choice
+            is for a jam.
+          </p>
+        )}
       </Sheet>
 
       <Sheet open={open === "length"} close={close} title="How long">
