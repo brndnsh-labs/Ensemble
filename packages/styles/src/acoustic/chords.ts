@@ -251,6 +251,82 @@ const rhythmInSix: RhythmBook = {
   candidates: 1,
 };
 
+// ── in twelve ───────────────────────────────────────────────────────────────
+// A bar of 12/8 is four slow pulses of three eighths, the slow folk ballad's
+// bar: twenty-four sixteenths, written in sixes. The same two hands, said in
+// pulses, with six's touch (a strum rings a pulse, the middle eighth lighter).
+//
+// Picked, the ballad's arpeggio: the thumb on 1 and 3, as it is on 1 and 3 in
+// four, and the fingers up the shape and back down over two pulses (thumb,
+// index, middle, ring, middle, index), a line that turns over the half bar;
+// with no bassist the Travis thumb is on every pulse as in four (the bass, the
+// upper string, the alternate bass, the upper string) and the fingers between.
+// One pattern is six's own "up and over" said twice; the other two are written
+// for twelve.
+//
+// Strummed, the pendulum through each pulse (down, down, up), as in six. The
+// working "ring and roll" is written for the bar of four pulses: 1 and 3 left
+// to ring, 2 with its upstroke, 4 rolled into the next One. "Rolling" and "in
+// two and two" are six's own figures said twice (the second is also four's
+// down on every beat and up on the "and"s of 2 and 4). Hot is six's two
+// figures said twice, 2 and 4 leaned on with the snare.
+
+/** Six's figure, said twice: where a bar of twelve is a bar of six spread out. */
+const twice = (grid: string) => `${grid} ${grid}`;
+
+const PICKED_IN_TWELVE = (weight: number): CompFigure[] => [
+  // Up the shape and back down, from 1 and from 3: 0 1 2 3 2 1, twice. Alone, strings 3 2, 1 2.
+  picked("up and back", weight, twice("T.i.m. a.m.i."), "B.3.2. u.1.2. v.3.2. u.1.2."),
+  // Six's up and over, twice: the thumb on every pulse. Alone, strings 3 2, 2 1.
+  picked("up and over", weight, twice("T.i.m. t.a.m."), "B.3.2. u.2.1. v.3.2. u.2.1."),
+  // The fingers rocking on top, turning over the bar: from 1 thumb, middle, ring, middle,
+  // index, middle; from 3 the same. Alone, strings 2 1, 2 3.
+  picked("rocking", weight, twice("T.m.a. m.i.m."), "B.2.1. u.2.3. v.2.1. u.2.3."),
+];
+
+const rhythmInTwelve: RhythmBook = {
+  tiers: {
+    // Quiet: always fingerpicked, one pattern a section (ST-acoustic-17).
+    low: {
+      draw: "quiet",
+      articulation: HAND_IN_SIX,
+      figures: PICKED_IN_TWELVE(1),
+      answers: [],
+      busy: { from: 12, to: 12 },
+      arrival: { level: 72, steps: 6 },
+    },
+    // The working level: 35% of sections pick, the rest strum, in the weights of four.
+    mid: {
+      draw: "working",
+      articulation: HAND_IN_SIX,
+      figures: [
+        ...PICKED_IN_TWELVE(14),
+        strummed("ring and roll", 39, "x..... x...x. x..... x.o.x."),
+        strummed("rolling", 26, twice("x.o.x. x.o.x.")),
+        strummed("in two and two", 13, twice("x..... x...x.")),
+      ],
+      answers: [],
+      busy: { from: 6, to: 12 },
+      arrival: { level: 86, steps: 6 },
+    },
+    // Hot: always strummed, 2 and 4 leaned on with the snare (ST-acoustic-20).
+    high: {
+      draw: "hot",
+      articulation: HAND_IN_SIX,
+      figures: [
+        strummed("rolling, 2 and 4 leaned on", 1, twice("x.o.x. X.o.x.")),
+        strummed("ring and roll, 2 and 4 leaned on", 1, twice("x...x. X.o.x.")),
+      ],
+      answers: [],
+      busy: { from: 10, to: 12 },
+      arrival: { level: 86, steps: 6 },
+    },
+  },
+  hold: 1,
+  forms: [{ weight: 1, bars: "a a a a" }],
+  candidates: 1,
+};
+
 export const acousticChords: ChordStyle = {
   // Open position (ST-acoustic-16, CH-24): up to six strings, open strings on, every fretted
   // note at or below the 4th fret where the chord has such a shape, one muted string allowed
@@ -277,8 +353,8 @@ export const acousticChords: ChordStyle = {
   // on a pulse's last eighth is not played).
   plain: { length: 1, pulse: true, velocity: { beat: 86, offbeat: 86, restrike: 86 } },
   rhythm,
-  // Six-eight, written above.
-  meters: { "6/8": rhythmInSix },
+  // Six-eight and twelve-eight, written above.
+  meters: { "6/8": rhythmInSix, "12/8": rhythmInTwelve },
   // The last upstroke of a strummed bar changes early 20% of the time at the working level
   // and 30% hot, never quiet; a picked bar never does (ST-acoustic-30). Nothing leans into a
   // change inside the bar (ST-acoustic-33).
