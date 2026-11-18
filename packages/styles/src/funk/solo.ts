@@ -378,6 +378,11 @@ export const funkSolo: SoloStyle = {
     patience: 7,
   },
 
+  // Busier than its arc: half of the phrases that can go a level up do, three tenths of its room given
+  // up. Funk's rests inside the bar are its idiom (SO-17) and are not touched here; only the
+  // bars of rest between phrases are. To move the default, change these two numbers.
+  busier: { lift: 0.5, room: 0.3 },
+
   habits: {
     // A riff repeated bar after bar more often than not (ST-funk-32), and said the same:
     // the same notes, moved only where the chord moved.

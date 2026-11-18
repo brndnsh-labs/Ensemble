@@ -321,6 +321,12 @@ export const reggaeSolo: SoloStyle = {
     patience: 7,
   },
 
+  // Busier than its arc: six tenths of the phrases that can go a level up do, only a fifth of its room given
+  // up. Reggae's space is the most of any lead (0.45, SO-11), and its long held notes stay; but
+  // at 68 to 84 it played under a note a second (KF-B-12). To move the default, change these
+  // two numbers.
+  busier: { lift: 0.6, room: 0.2 },
+
   habits: {
     // A riff repeated 0.45; a chromatic approach 0.10; no enclosures (ST-reggae-27).
     riff: 0.45,

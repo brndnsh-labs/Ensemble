@@ -329,6 +329,10 @@ export const rockSolo: SoloStyle = {
     patience: 7,
   },
 
+  // Busier than its arc: half of the phrases that can go a level up do, four tenths of its room given
+  // up (rock's space is jazz's, 0.25, SO-11). To move the default, change these two numbers.
+  busier: { lift: 0.5, room: 0.4 },
+
   habits: {
     // A lick said again, as it was, 0.40 (ST-rock-24).
     riff: 0.4,

@@ -18,13 +18,12 @@ import { pitchClass } from "../../theory/pitch.ts";
 import { climb, EIGHTH, isChordTone, landing, onlyPasses } from "./harmony.ts";
 import type { LineBar, Spot } from "./line.ts";
 import { contourOf, settled, spotsOf, writeBends, writeLine } from "./line.ts";
-import type { Slot, World } from "./slots.ts";
-import { levelIndex, soloIn } from "./slots.ts";
+import type { Part, Slot, World } from "./slots.ts";
+import { breathed, fitShape, levelIndex, lungsOf, soloIn } from "./slots.ts";
 import type { Cell, Contour, Idea, Role, Way } from "./style.ts";
 import { CONTOURS } from "./style.ts";
 
-/** What a bar of a phrase is: a line bar, an end bar, a rest, or the final note of the take. */
-export type Part = "L" | "E" | "R" | "F";
+export type { Part } from "./slots.ts";
 
 export interface PhraseBar {
   readonly part: Part;
@@ -88,17 +87,6 @@ type BarPlan = Omit<PhraseBar, "pitches" | "bends">;
 const PLAIN = { again: false, stab: false, tied: false };
 const REST: BarPlan = { part: "R", cell: "", ...PLAIN };
 const playing = (bar: { part: Part }) => bar.part !== "R";
-
-/** A four-bar shape on a phrase of another length: line bars added at the front, or bars cut from it (SO-09). */
-function fitShape(shape: string, length: number): Part[] {
-  let letters = cells(shape) as Part[];
-  while (letters.length < length) {
-    letters = length - letters.length >= 2 ? ["L", "E", ...letters] : ["L", ...letters];
-  }
-  letters = letters.slice(letters.length - length);
-  if (!letters.includes("E")) letters[letters.length - 1] = "E";
-  return letters;
-}
 
 /** A bar's spots, and whether the bar before was in fact tied into it. */
 interface LaidBar extends LineBar {
@@ -184,15 +172,11 @@ export function phrasesFor(
   const solo = soloIn(world.solo, slot.bars[0]!.meter);
   const length = slot.bars.length;
   const final = slot.bars[length - 1]!.ending !== null;
-  const barSeconds = slot.bars[0]!.ticks / world.ticksPerSecond;
-  // How many line bars in a row before a phrase has to land. A phrase is as long as the
-  // style has patience for, in seconds, so at a slow tempo it is fewer bars (KF-B-12); and
-  // a horn has to get the line and the bar it lands in out of one breath.
-  const patient = Math.floor((solo.space.patience + solo.space.breath) / barSeconds);
-  const air = instrument.breath
-    ? Math.floor((instrument.breath.lungs + instrument.breath.takes) / barSeconds - 1)
-    : length;
-  const lungs = Math.max(1, Math.min(patient, air));
+  const lungs = lungsOf(solo, instrument, slot, world.ticksPerSecond);
+  // The empty bars a phrase may leave; the first of a solo one more, unless the soloist
+  // has been asked to give up a tenth of its room or more (SO-10): two empty bars are
+  // seven seconds at a slow tempo, and the solo has hardly begun.
+  const emptyAllowed = solo.space.emptyBars + (slot.first && slot.room < 0.1 ? 1 : 0);
 
   // Where the hand gets lyrical, and bends: the phrase that climbs to the top note and the
   // ones beside it, always; any other phrase as often as the style says. The rest are the
@@ -292,10 +276,15 @@ export function phrasesFor(
   /** A shape for this slot that leaves no more air than the style allows (SO-10). */
   const drawShape = (draw: Rng, lines = 1): Part[] => {
     const at = levelIndex(solo, slot.level);
-    const roomier = !slot.peak && at > 0 && draw.fork("room").chance(solo.space.roomier);
+    // A soloist asked to be busier gives up some of its room: a roomier shape less
+    // often, and a shape with bars of rest or a landing inside it less often for each.
+    const roomier =
+      !slot.peak && at > 0 && draw.fork("room").chance(solo.space.roomier * (1 - slot.room));
     const shapes = slot.peak
       ? [{ weight: 1, bars: peak.shape }]
       : solo.levels[roomier ? at - 1 : at]!.shapes;
+    const count = (bars: string, part: Part) =>
+      cells(bars).filter((letter) => letter === part).length;
     const allowed = (letters: readonly Part[]) => {
       const empty = letters.filter((letter) => letter === "R").length;
       const run = Math.max(
@@ -305,14 +294,22 @@ export function phrasesFor(
           .map((line) => line.length),
       );
       return (
-        empty <= solo.space.emptyBars + (slot.first ? 1 : 0) &&
+        empty <= emptyAllowed &&
         !(memory.endedEmpty && letters[0] === "R") &&
         run <= lungs &&
         (!final || letters[length - 1] === "E")
       );
     };
     const fitted = shapes
-      .map((shape) => ({ weight: shape.weight, letters: fitShape(shape.bars, length) }))
+      .map((shape) => ({
+        // Less room: fewer bars of rest, and fewer landings inside the phrase (a call and
+        // its answer is two phrases' worth of ending in one), at half the rate.
+        weight:
+          shape.weight *
+          (1 - slot.room) ** count(shape.bars, "R") *
+          (1 - slot.room / 2) ** Math.max(0, count(shape.bars, "E") - 1),
+        letters: fitShape(shape.bars, length),
+      }))
       .filter((shape) => shape.weight > 0 && allowed(shape.letters));
     // An idea being opened out wants more than one bar of line to open out into.
     const roomy = fitted.filter(
@@ -321,8 +318,7 @@ export function phrasesFor(
     const options = roomy.length > 0 ? roomy : fitted;
     if (options.length > 0) return draw.fork("shape").weighted(options, (s) => s.weight).letters;
     // Nothing fits: as many line bars as one breath carries and an end bar, over and over.
-    const unit = Math.min(lungs, Math.max(1, length - 1)) + 1;
-    return slot.bars.map((_, i): Part => ((length - 1 - i) % unit === 0 ? "E" : "L"));
+    return breathed(length, lungs);
   };
 
   /**
@@ -417,8 +413,8 @@ export function phrasesFor(
     const rests = (i: number) => i < 0 || idea.bars[i]!.part === "R";
     if (memory.endedEmpty && rests(from[0]!)) from = [...from.slice(1), -1];
     const echo = idea.bars.findLastIndex((bar) => bar.part === "E");
-    const allowed = solo.space.emptyBars + (slot.first ? 1 : 0);
-    while (echo >= 0 && from.filter(rests).length > allowed) from[from.findLastIndex(rests)] = echo;
+    while (echo >= 0 && from.filter(rests).length > emptyAllowed)
+      from[from.findLastIndex(rests)] = echo;
     return from;
   };
   const barsOf = (idea: Phrase, from: readonly number[]): BarPlan[] =>
@@ -583,9 +579,17 @@ export function phrasesFor(
   // the arc has got to: a new one at this slot's own pace is better than the old one starved.
   const { levels, thin } = book.outgrown;
   const played = motif ? motif.line.length / motif.slot.bars.length : 0;
+  // How far behind is read against what the arc asked where the idea was stated, before any
+  // lift: an idea from a phrase lifted to be busier is still outgrown where the arc has moved
+  // on as far from where it was; and a phrase lifted has outgrown an idea from any sparser
+  // level, since what it was lifted for is not to be spent at the old pace.
+  const at = levelIndex(solo, slot.level);
+  const behind = motif ? at - levelIndex(solo, motif.slot.asked) : 0;
+  const lifted = at > levelIndex(solo, slot.asked);
   const outgrown =
     motif !== null &&
-    (levelIndex(solo, slot.level) - levelIndex(solo, motif.slot.level) >= levels ||
+    (behind >= levels ||
+      (lifted && at > levelIndex(solo, motif.slot.level)) ||
       (thin !== undefined && played < thin * slot.level.notesPerBar));
   if (!slot.peak && outgrown && !ways.some((way) => way.make === "new")) {
     all.push(...offer(book.outgrown.ways));

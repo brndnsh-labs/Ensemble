@@ -355,6 +355,12 @@ export const neosoulSolo: SoloStyle = {
     patience: 7,
   },
 
+  // Busier than its arc: six tenths of the phrases that can go a level up do, but only a fifth of its room
+  // given up. Neo-soul leaves the most space of any lead (0.45, SO-11; ST-neosoul-33), and at its
+  // tempos (60 to 88) it played about one note a second, which is what KF-B-12 says goes
+  // unrecognised. To move the default, change these two numbers.
+  busier: { lift: 0.6, room: 0.2 },
+
   habits: {
     // A riff repeated 0.15; a chromatic approach 0.30, an enclosure 0.12 (ST-neosoul-33).
     riff: 0.15,

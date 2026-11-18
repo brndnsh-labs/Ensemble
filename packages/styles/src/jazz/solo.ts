@@ -387,6 +387,12 @@ export const jazzSolo: SoloStyle = {
     patience: 7,
   },
 
+  // Busier than its arc: a bebop alto's line is eighth notes, and its room is the 25% space
+  // jazz shares with rock (SO-11). Half of the phrases that can go a level up do, and four tenths of
+  // its room is given up: its line is near all eighths by then, so the setting's top half has
+  // somewhere to go. To move the default, change these two numbers (DECISIONS.md, a busier soloist).
+  busier: { lift: 0.5, room: 0.4 },
+
   habits: {
     // A bar seldom comes straight back (SO-18); when it does it is a sequence.
     riff: 0.08,

@@ -364,6 +364,11 @@ export const discoSolo: SoloStyle = {
     patience: 7,
   },
 
+  // Busier than its arc: disco's soloist was already the busiest in notes a second (2.0) and
+  // has the least space (0.2, SO-11); half of the phrases that can go a level up do,
+  // four tenths of its room given up. To move the default, change these two numbers.
+  busier: { lift: 0.5, room: 0.4 },
+
   habits: {
     // A figure said again, as it was, 0.35 (ST-disco-25).
     riff: 0.35,

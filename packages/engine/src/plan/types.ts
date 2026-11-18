@@ -47,8 +47,10 @@ export interface PlanOptions {
    */
   readonly soloFromTop?: boolean;
   /**
-   * How busy the soloist is, as the player set it: 0 the sparsest, 1 the
-   * busiest, 0.5 the style's own. Left out, the style's own.
+   * How busy the soloist is, as the player set it: 0 no busier than the
+   * soloist first written, 1 as busy as a soloist of the style gets while it
+   * still phrases and breathes, 0.5 the style's own. Left out, the style's own.
+   * It moves the soloist alone: the band plays what it would have played.
    */
   readonly soloDensity?: number;
   /** A bar of sticks before the first bar. Default true. */
@@ -186,6 +188,12 @@ export interface Plan {
   readonly open: boolean;
   /** Length in ticks of everything played. */
   readonly ticks: number;
+  /**
+   * How busy the soloist is, as the player set it (`PlanOptions.soloDensity`),
+   * 0 to 1. Left out, the style's own. On the plan so that anyone reading the
+   * solo from the plan reads it as the soloist did.
+   */
+  readonly soloDensity?: number;
 }
 
 /** The bar at an index, reading into the look-ahead. Undefined past the end. */

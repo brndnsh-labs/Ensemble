@@ -48,6 +48,11 @@ export function planBars(
   options: PlanOptions,
 ): Plan {
   const tempo = clampTempo(options.tempo ?? chartTempo ?? tempoRange(style, meter).default);
+  // How busy the soloist is goes on the plan only where the player set it.
+  const density =
+    options.soloDensity !== undefined && Number.isFinite(options.soloDensity)
+      ? { soloDensity: clamp01(options.soloDensity) }
+      : {};
   // A tick is a fraction of a quarter note, so time is kept in quarter notes a minute.
   const quarters = tempo * tempoPulse(meter);
   // The jam as it set out: how many passes, or none in particular. The arc and the solos are
@@ -79,6 +84,7 @@ export function planBars(
       passes: 0,
       open: !ends,
       ticks: 0,
+      ...density,
     };
   }
 
@@ -89,10 +95,16 @@ export function planBars(
     options.mode === "jam" ? chorusOf(expanded, options).bars.length : 1,
   );
 
-  const climax = soloClimax(options, planned, open);
-  const breath = climax === undefined ? undefined : soloBreath(climax, planned, open);
+  // The soloist has the lead from the first pass, where the player asked for it in a jam, and
+  // where the chart does not say where it solos itself, in a section named for it.
+  const top =
+    options.mode === "jam" &&
+    options.soloFromTop === true &&
+    !runs.some((run) => sectionIdentity(run.bars[0]!.sectionLabel).startsWith("solo"));
+  const climax = soloClimax(options, planned, open, top);
+  const breath = climax === undefined ? undefined : soloBreath(climax, planned, open, top);
   const rise = (pass: number) =>
-    climax === undefined ? undefined : soloRise(pass, climax, planned, open);
+    climax === undefined ? undefined : soloRise(pass, climax, planned, open, top);
 
   // First the music, bar by bar, without marks that depend on a neighbour.
   const drafts: Draft[] = [];
@@ -162,7 +174,7 @@ export function planBars(
     occurrence++;
   }
 
-  const solos = soloMarks(drafts, options, planned, open).map((mark, i) =>
+  const solos = soloMarks(drafts, options, planned, open, top).map((mark, i) =>
     // A solo under way when the band is told to finish makes this chorus its last (SO-05).
     mark && told !== undefined && drafts[i]!.run.pass === told
       ? { chorus: mark.chorus, of: mark.chorus + 1 }
@@ -305,6 +317,7 @@ export function planBars(
     passes: options.mode === "jam" ? passes : 1,
     open: !ends,
     ticks: lastBar.start + lastBar.ticks,
+    ...density,
   };
 }
 
@@ -545,6 +558,7 @@ function soloMarks(
   options: PlanOptions,
   passes: number,
   open: boolean,
+  fromTop: boolean,
 ): (SoloMark | null)[] {
   if (options.solo !== true) return drafts.map(() => null);
   const body = (draft: Draft) => draft.run.part === "body" && draft.flat.role === "body";
@@ -573,16 +587,18 @@ function soloMarks(
   if (options.mode === "song") {
     return drafts.map((draft) => (body(draft) ? { chorus: 0, of: 1 } : null));
   }
-  return drafts.map((draft) => (body(draft) ? soloTurn(draft.run.pass, passes, open) : null));
+  return drafts.map((draft) =>
+    body(draft) ? soloTurn(draft.run.pass, passes, open, fromTop) : null,
+  );
 }
 
 /**
  * Whether a pass of a jam is the soloist's, and where in its solo: the band
- * alone first (unless one pass is all there is), then solos of three choruses
- * with a chorus of rest between them.
+ * alone first (unless one pass is all there is, or the soloist comes in at the
+ * top), then solos of three choruses with a chorus of rest between them.
  */
-function soloTurn(pass: number, passes: number, open: boolean): SoloMark | null {
-  const lead = open || passes > 1 ? 1 : 0;
+function soloTurn(pass: number, passes: number, open: boolean, fromTop: boolean): SoloMark | null {
+  const lead = !fromTop && (open || passes > 1) ? 1 : 0;
   const cycle = SOLO_CHORUSES + 1;
   const turn = pass - lead;
   if (turn < 0 || turn % cycle === SOLO_CHORUSES) return null;
@@ -596,14 +612,25 @@ function soloTurn(pass: number, passes: number, open: boolean): SoloMark | null 
  * peaks in its last chorus (SO-05), and the band under it does the same, or the
  * band would be at its loudest while the soloist is still finding its idea.
  */
-function soloClimax(options: PlanOptions, passes: number, open: boolean): number | undefined {
-  if (options.solo !== true || options.mode !== "jam" || open || passes < 3) return undefined;
+function soloClimax(
+  options: PlanOptions,
+  passes: number,
+  open: boolean,
+  fromTop: boolean,
+): number | undefined {
+  // A solo of two choruses or more: from the second pass, or from the top.
+  if (options.solo !== true || options.mode !== "jam" || open || passes < (fromTop ? 2 : 3)) {
+    return undefined;
+  }
   const wanted = defaultClimax(passes);
   let best: number | undefined;
-  for (let pass = 1; pass < passes; pass++) {
-    const turn = soloTurn(pass, passes, open);
+  for (let pass = fromTop ? 0 : 1; pass < passes; pass++) {
+    const turn = soloTurn(pass, passes, open, fromTop);
     if (!turn || turn.of === 1 || turn.chorus !== turn.of - 1) continue;
-    if (best === undefined || Math.abs(pass - wanted) <= Math.abs(best - wanted)) best = pass;
+    // Of two as near, the later; but not the last pass, which the jam's own closing lift
+    // carries from lower down, so that the pass before it would be the louder.
+    const [here, there] = [Math.abs(pass - wanted), Math.abs((best ?? pass) - wanted)];
+    if (best === undefined || here < there || (here === there && pass < passes - 1)) best = pass;
   }
   return best;
 }
@@ -616,11 +643,16 @@ function soloClimax(options: PlanOptions, passes: number, open: boolean): number
  * the band's own; -1 where there is no chorus of rest after the peak to take
  * it on.
  */
-function soloBreath(climax: number, passes: number, open: boolean): number | undefined {
+function soloBreath(
+  climax: number,
+  passes: number,
+  open: boolean,
+  fromTop: boolean,
+): number | undefined {
   const last = passes - 1;
-  if (soloTurn(last - 1, passes, open) === null) return undefined;
+  if (soloTurn(last - 1, passes, open, fromTop) === null) return undefined;
   for (let pass = last - 1; pass > climax; pass--) {
-    if (soloTurn(pass, passes, open) === null) return pass;
+    if (soloTurn(pass, passes, open, fromTop) === null) return pass;
   }
   return -1;
 }
@@ -632,8 +664,14 @@ function soloBreath(climax: number, passes: number, open: boolean): number | und
  * for a solo of one chorus, and for one that runs into the last pass, which
  * the jam's own closing lift carries.
  */
-function soloRise(pass: number, climax: number, passes: number, open: boolean): number | undefined {
-  const turn = soloTurn(pass, passes, open);
+function soloRise(
+  pass: number,
+  climax: number,
+  passes: number,
+  open: boolean,
+  fromTop: boolean,
+): number | undefined {
+  const turn = soloTurn(pass, passes, open, fromTop);
   if (!turn || turn.of < 2 || pass <= climax) return undefined;
   if (pass - turn.chorus + turn.of - 1 >= passes - 1) return undefined;
   return turn.chorus / (turn.of - 1);
