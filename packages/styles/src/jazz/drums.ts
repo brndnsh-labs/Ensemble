@@ -16,7 +16,14 @@
 // "e" or an "a" would land between the swung eighths and flam (ST-jazz-06).
 // X accent, x normal, o soft, g ghost, "-" the stroke taken away.
 
-import type { DrumStyle, DrumTime, FillShape, GrooveLayer, GrooveOption } from "@ensemble/engine";
+import type {
+  DrumStyle,
+  DrumTime,
+  FillShape,
+  GrooveLayer,
+  GrooveOption,
+  Lines,
+} from "@ensemble/engine";
 
 // ── the time ────────────────────────────────────────────────────────────────
 
@@ -441,6 +448,384 @@ const jazzDrumsInSix: DrumTime = {
   },
 };
 
+// ── in twelve and in six-eight ──────────────────────────────────────────────
+// A bar of dotted pulses is its own triplet: nothing swings, and nothing is
+// struck between the eighths. Twenty-four sixteenths to a bar of twelve and
+// twelve to a bar of six, grouped by pulse; a pulse's eighths are its first,
+// third and fifth characters. Four's rules said in pulses (AU-97): a beat is
+// a pulse, and its "and", the skip of "spang-a-lang", is the pulse's last
+// eighth, never its middle one (AU-92: the old band's skip a sixteenth early
+// was the most audible fault of its six).
+//
+// Twelve is the jazz ballad in twelve-eight: four slow pulses. Quiet it is
+// four's light head or its ballad's soft ride, said in pulses; once the band
+// opens up the ride plays the ballad's triplets, every eighth, the pulse
+// played, the middle soft, the last (the skip) full; 2 and 4 leaned on. The
+// foot on 2 and 4, the bass drum feathered on every pulse as on every beat
+// in four, the left hand comping off the pulses as in four.
+//
+// Six is jazz's six-eight: two pulses, the strong one and its answer, the
+// ride on each pulse and the eighth before the next (AU-92's ride, the six
+// the drummers play under a modal tune), the second pulse leaned on. The foot
+// on the second pulse, the backbeat of a bar of two; the bass drum feathered
+// on the One alone, the bar's one strong pulse; the left hand off both.
+
+/** A comping figure in a bar of `steps` sixteenths, written out as `comp` writes one in four. */
+function compIn(steps: number, figure: Figure, later: "g" | "o"): GrooveOption["lines"] {
+  if (figure.length === 0) return {};
+  const line = new Array<string>(steps).fill(".");
+  figure.forEach((step, i) => {
+    line[step] = i === 0 ? "o" : later;
+  });
+  return { snare: line.join("") };
+}
+
+type Lists = { still: typeof STILL; into: typeof STILL; moving: typeof STILL };
+
+/** The comping layers of one tier for a bar of `steps`, as `comping` writes them for four. */
+function compingIn(steps: number, lists: Lists, later: "g" | "o", nothing: number): GrooveLayer[] {
+  const places = [
+    { name: "odd", phraseBars: [1, 3, 5, 7] },
+    { name: "even", phraseBars: [2, 4, 6, 8] },
+  ];
+  const kinds = [
+    { name: "still", list: lists.still, when: { changeInBar: false, changeAhead: false } },
+    { name: "into", list: lists.into, when: { changeInBar: false, changeAhead: true } },
+    { name: "moving", list: lists.moving, when: { changeInBar: true } },
+  ];
+  return places.flatMap((place) =>
+    kinds.map(
+      (kind): GrooveLayer => ({
+        id: `comp-${place.name}-${kind.name}`,
+        hold: "phrase",
+        when: { phraseBars: place.phraseBars, phraseEnd: false, ...kind.when },
+        options: kind.list.map(([figure, weight]) => ({
+          weight: figure.length === 0 ? weight * nothing : weight,
+          lines: compIn(steps, figure, later),
+        })),
+      }),
+    ),
+  );
+}
+
+/** The set-ups of a bar whose last eighth is the shot's, as four's are written. */
+function setUpsIn(shotAndBomb: Lines, shot: Lines, twoAnds: Lines, whisper: Lines) {
+  const loud: GrooveLayer[] = [
+    {
+      id: "set-up-into",
+      hold: "bar",
+      when: { ...plainEnd, changeAhead: true },
+      options: [
+        { weight: 3, lines: shotAndBomb },
+        { weight: 1, lines: shot },
+        { weight: 1, lines: twoAnds },
+        { weight: 1, lines: {} },
+      ],
+    },
+    {
+      id: "set-up-still",
+      hold: "bar",
+      when: { ...plainEnd, changeAhead: false },
+      options: [
+        { weight: 1, lines: shot },
+        { weight: 1, lines: twoAnds },
+        { weight: 2, lines: {} },
+      ],
+    },
+  ];
+  const quiet: GrooveLayer[] = [
+    {
+      id: "set-up-into",
+      hold: "bar",
+      when: { ...plainEnd, changeAhead: true },
+      options: [
+        { weight: 1, lines: whisper },
+        { weight: 1, lines: {} },
+      ],
+    },
+    {
+      id: "set-up-still",
+      hold: "bar",
+      when: { ...plainEnd, changeAhead: false },
+      options: [
+        { weight: 1, lines: whisper },
+        { weight: 3, lines: {} },
+      ],
+    },
+  ];
+  return { loud, quiet };
+}
+
+/** A fill's three lengths in a bar of dotted pulses: an eighth, a pulse, and the longest. */
+type CompoundLengths = {
+  eighth: FillShape["lines"];
+  pulse: FillShape["lines"];
+  long: FillShape["lines"];
+};
+
+function lengthsIn(weight: number, shape: CompoundLengths, handOff?: number): FillShape[] {
+  return [shape.eighth, shape.pulse, shape.long].map((lines) =>
+    handOff === undefined ? { weight, lines } : { weight, lines, handOff },
+  );
+}
+
+/** Four's fill vocabulary and its weights, which fill where (ST-jazz-14), in a meter's shapes. */
+function fillsIn(
+  shapes: Record<"shot" | "twoShot" | "eighths" | "toms" | "softShot" | "whisper", CompoundLengths>,
+  length: DrumTime["fills"]["length"],
+): DrumTime["fills"] {
+  const toms = (weight: number) => lengthsIn(weight, shapes.toms, 1);
+  const phrase = [
+    ...lengthsIn(2, shapes.shot),
+    ...lengthsIn(2, shapes.twoShot),
+    ...lengthsIn(1, shapes.eighths),
+  ];
+  const section = [...lengthsIn(2, shapes.eighths), ...lengthsIn(1, shapes.twoShot), ...toms(1)];
+  const top = [...toms(2), ...lengthsIn(1, shapes.eighths), ...lengthsIn(1, shapes.twoShot)];
+  return {
+    length,
+    phrase: { low: lengthsIn(1, shapes.whisper), mid: phrase, high: phrase },
+    section: {
+      low: [...lengthsIn(1, shapes.whisper), ...lengthsIn(1, shapes.softShot)],
+      mid: section,
+      high: section,
+    },
+    top: {
+      low: [...lengthsIn(1, shapes.eighths), ...lengthsIn(1, shapes.softShot)],
+      mid: top,
+      high: top,
+    },
+    keepTime: true,
+  };
+}
+
+// Twelve. Where the left hand falls is four's lists said in pulses: each "and" is the pulse's
+// last eighth, and beat 3 is pulse 3, under the feathered kick as it is in four.
+const T = { and1: 4, and2: 10, three: 12, and3: 16, and4: 22 };
+const TWELVE_LISTS: Lists = {
+  still: [
+    [[T.and2], 3],
+    [[T.and2, T.and3], 1],
+    [[T.and1, T.and2], 1],
+    [[], 2],
+  ],
+  into: [
+    [[T.and2], 2],
+    [[T.and4], 2],
+    [[T.and2, T.and4], 2],
+    [[], 2],
+  ],
+  moving: [
+    [[T.and3], 2],
+    [[T.and4], 2],
+    [[T.and3, T.and4], 1],
+    [[T.three], 1],
+    [[], 1],
+  ],
+};
+
+/** The ballad's triplets: every eighth, the middle soft, 2 and 4 leaned on. */
+const TWELVE_RIDE = { ride: "x.o.x. X.o.x. x.o.x. X.o.x." };
+/** The ballad's soft ride, four's said in pulses: each pulse, the skip after 2 and after 4. */
+const TWELVE_RIDE_SOFT = { ride: "o..... x...o. o..... x...o." };
+/** The light head on the closed hat: four's "spang-a-lang" in pulses (ST-jazz-09). */
+const TWELVE_HEAD_HAT = { closedHat: "x..... X...x. x..... X...x." };
+const TWELVE_FOOT = { pedalHat: "...... x..... ...... x....." };
+const TWELVE_FEATHER = { kick: "g..... g..... g..... g....." };
+
+const twelveSetUps = setUpsIn(
+  // The bomb leaves the feathered 4 to hit its last eighth with the snare.
+  { snare: "...... ...... ...... ....x.", kick: "...... ...... ...... -...x." },
+  { snare: "...... ...... ...... ....x." },
+  { snare: "...... ...... ....o. ....x." },
+  { snare: "...... ...... ...... ....o." },
+);
+
+/**
+ * Four's fills in pulses: its two sixteenths are the last eighth, its beat the last pulse, its
+ * two beats the last two pulses, every stroke on an eighth. The two-pulse shapes keep the
+ * feather on 3, as four's two-beat shapes do.
+ */
+const TWELVE_FILLS = fillsIn(
+  {
+    shot: {
+      eighth: { snare: "X.", kick: "X." },
+      pulse: { snare: "....X.", kick: "....X." },
+      long: { snare: "..........X.", kick: "g.........X." },
+    },
+    twoShot: {
+      eighth: { snare: "X.", kick: "x." },
+      pulse: { snare: "o...X.", kick: "....x." },
+      long: { snare: "....o.....X.", kick: "g.........X." },
+    },
+    eighths: {
+      eighth: { snare: "x." },
+      pulse: { snare: "o.o.X.", kick: "....x." },
+      long: { snare: "o...o.o.o.X.", kick: "g.........x." },
+    },
+    toms: {
+      eighth: { lowTom: "X.", kick: "x." },
+      pulse: { highTom: "o.o...", lowTom: "....X.", kick: "....x." },
+      long: {
+        snare: "o...o.......",
+        highTom: "......o.o...",
+        lowTom: "..........X.",
+        kick: "g.........x.",
+      },
+    },
+    softShot: {
+      eighth: { snare: "x.", kick: "o." },
+      pulse: { snare: "o...x.", kick: "....o." },
+      long: { snare: "....o.....x.", kick: "..........o." },
+    },
+    whisper: {
+      eighth: { snare: "o." },
+      pulse: { snare: "g...o." },
+      long: { snare: "g...g.o...o." },
+    },
+  },
+  // Four's lengths in pulses: an eighth, a pulse, two pulses (ST-jazz-12).
+  { phrase: { low: 0, mid: 2, high: 6 }, section: { low: 6, mid: 6, high: 12 } },
+);
+
+const jazzDrumsInTwelve: DrumTime = {
+  grooves: {
+    low: [
+      { ...ride(TWELVE_RIDE_SOFT), when: { energyBelow: BALLAD } },
+      { ...ride(TWELVE_HEAD_HAT), id: "head", when: { energyFrom: BALLAD } },
+      { ...foot, options: [{ weight: 1, lines: TWELVE_FOOT }] },
+      ...twelveSetUps.quiet,
+    ],
+    mid: [
+      ride(TWELVE_RIDE),
+      { ...foot, options: [{ weight: 1, lines: TWELVE_FOOT }] },
+      { ...feather, options: [{ weight: 1, lines: TWELVE_FEATHER }] },
+      ...compingIn(24, TWELVE_LISTS, "g", 1),
+      ...twelveSetUps.loud,
+    ],
+    high: [
+      ride(TWELVE_RIDE),
+      { ...foot, options: [{ weight: 1, lines: TWELVE_FOOT }] },
+      { ...feather, options: [{ weight: 1, lines: TWELVE_FEATHER }] },
+      ...compingIn(24, TWELVE_LISTS, "o", 0.5),
+      ...twelveSetUps.loud,
+    ],
+  },
+  touches: [],
+  fills: TWELVE_FILLS,
+};
+
+// Six-eight. The left hand on the eighths between the pulses: the two of the first pulse, the
+// last of which pushes the backbeat, and the two of the second, the last pushing the One.
+const S = { mid1: 2, and1: 4, mid2: 8, and2: 10 };
+const SIX_EIGHT_LISTS: Lists = {
+  // One chord, and the same after it: the push into the second pulse most of all.
+  still: [
+    [[S.and1], 3],
+    [[S.and1, S.mid2], 1],
+    [[S.mid1, S.and1], 1],
+    [[], 2],
+  ],
+  // A change at the barline: the second pulse leans into it.
+  into: [
+    [[S.and1], 2],
+    [[S.and2], 2],
+    [[S.and1, S.and2], 2],
+    [[], 2],
+  ],
+  // A change inside the bar, on the second pulse as a rule: its "and" sets it up.
+  moving: [
+    [[S.and1], 2],
+    [[S.and2], 2],
+    [[S.and1, S.and2], 1],
+    [[S.mid2], 1],
+    [[], 1],
+  ],
+};
+
+/** AU-92's ride: each pulse and the eighth before the next, the second pulse leaned on. */
+const SIX_EIGHT_RIDE = { ride: "x...x. X...x." };
+/** The ballad's soft ride: the same, soft. */
+const SIX_EIGHT_RIDE_SOFT = { ride: "o...o. x...o." };
+const SIX_EIGHT_HEAD_HAT = { closedHat: "x...x. X...x." };
+const SIX_EIGHT_FOOT = { pedalHat: "...... x....." };
+const SIX_EIGHT_FEATHER = { kick: "g..... ......" };
+
+const sixEightSetUps = setUpsIn(
+  { snare: "...... ....x.", kick: "...... ....x." },
+  { snare: "...... ....x." },
+  { snare: "....o. ....x." },
+  { snare: "...... ....o." },
+);
+
+/**
+ * In a bar of two the longest fill is the second pulse: two pulses would be the whole bar.
+ * A pulse's fill takes the backbeat pulse's hand, and the foot keeps it.
+ */
+const SIX_EIGHT_FILLS = fillsIn(
+  {
+    shot: {
+      eighth: { snare: "X.", kick: "X." },
+      pulse: { snare: "..X.", kick: "..X." },
+      long: { snare: "....X.", kick: "....X." },
+    },
+    twoShot: {
+      eighth: { snare: "X.", kick: "x." },
+      pulse: { snare: "o.X.", kick: "..x." },
+      long: { snare: "..o.X.", kick: "....x." },
+    },
+    eighths: {
+      eighth: { snare: "x." },
+      pulse: { snare: "o.X.", kick: "..x." },
+      long: { snare: "o.o.X.", kick: "....x." },
+    },
+    toms: {
+      eighth: { lowTom: "X.", kick: "x." },
+      pulse: { highTom: "o...", lowTom: "..X.", kick: "..x." },
+      long: { snare: "o.....", highTom: "..o...", lowTom: "....X.", kick: "....x." },
+    },
+    softShot: {
+      eighth: { snare: "x.", kick: "o." },
+      pulse: { snare: "o.x.", kick: "..o." },
+      long: { snare: "..o.x.", kick: "....o." },
+    },
+    whisper: {
+      eighth: { snare: "o." },
+      pulse: { snare: "g.o." },
+      long: { snare: "g.g.o." },
+    },
+  },
+  // An eighth, two eighths, the second pulse: four's lengths, the longest kept to half the bar.
+  { phrase: { low: 0, mid: 2, high: 4 }, section: { low: 4, mid: 4, high: 6 } },
+);
+
+const jazzDrumsInSixEight: DrumTime = {
+  grooves: {
+    low: [
+      { ...ride(SIX_EIGHT_RIDE_SOFT), when: { energyBelow: BALLAD } },
+      { ...ride(SIX_EIGHT_HEAD_HAT), id: "head", when: { energyFrom: BALLAD } },
+      { ...foot, options: [{ weight: 1, lines: SIX_EIGHT_FOOT }] },
+      ...sixEightSetUps.quiet,
+    ],
+    mid: [
+      ride(SIX_EIGHT_RIDE),
+      { ...foot, options: [{ weight: 1, lines: SIX_EIGHT_FOOT }] },
+      { ...feather, options: [{ weight: 1, lines: SIX_EIGHT_FEATHER }] },
+      ...compingIn(12, SIX_EIGHT_LISTS, "g", 1),
+      ...sixEightSetUps.loud,
+    ],
+    high: [
+      ride(SIX_EIGHT_RIDE),
+      { ...foot, options: [{ weight: 1, lines: SIX_EIGHT_FOOT }] },
+      { ...feather, options: [{ weight: 1, lines: SIX_EIGHT_FEATHER }] },
+      ...compingIn(12, SIX_EIGHT_LISTS, "o", 0.5),
+      ...sixEightSetUps.loud,
+    ],
+  },
+  touches: [],
+  fills: SIX_EIGHT_FILLS,
+};
+
 export const jazzDrums: DrumStyle = {
   grooves: {
     // The light head on the hat, or a ballad's soft ride; no kick, no comping, phrase ends
@@ -459,8 +844,9 @@ export const jazzDrums: DrumStyle = {
     high: [ride(RIDE), foot, feather, ...comping("o", 0.5), ...setUps],
   },
 
-  // Six beats to the bar: the modal blues in six, written above.
-  meters: { "6/4": jazzDrumsInSix },
+  // Six beats to the bar (the modal blues in six), the ballad in twelve-eight and jazz's
+  // six-eight, written above.
+  meters: { "6/4": jazzDrumsInSix, "12/8": jazzDrumsInTwelve, "6/8": jazzDrumsInSixEight },
 
   // The ride keeps time, or the hat under the light head; an arrival crash takes that hand.
   timekeepers: ["ride", "closedHat"],
