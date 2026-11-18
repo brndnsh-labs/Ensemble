@@ -872,7 +872,7 @@ test(
     if (LIBRARY.some((chart) => chart.meter === "6/8"))
       assert.ok(notes > enough(30000), `only ${notes} notes in six and twelve`);
     if (LIBRARY.some((chart) => chart.meter === "12/8" && chart.file.startsWith("acoustic-")))
-      assert.ok(twelve > enough(15000), `only ${twelve} notes in twelve`);
+      assert.ok(twelve > enough(120000), `only ${twelve} notes in twelve`);
   },
 );
 

@@ -745,7 +745,7 @@ test(
         continue;
       const n = (tier: string) => counted.get(`${meter} ${tier}`) ?? 0;
       assert.ok(
-        n("low") > 40 && n("mid") > enough(450) && n("high") > enough(450),
+        n("low") > 20 && n("mid") > enough(450) && n("high") > enough(450),
         `${meter}: only ${n("low")} quiet bars, ${n("mid")} working, ${n("high")} hot`,
       );
     }

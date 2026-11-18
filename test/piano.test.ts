@@ -714,7 +714,7 @@ function sixes(): { where: string; style: (typeof STYLES)[number]; take: Take }[
       take,
     })),
     ...guitarsInSix.flatMap((style) =>
-      SIXES.flatMap((chart) =>
+      (FULL ? SIXES : ownCharts(style).filter((chart) => chart.meter === "6/8")).flatMap((chart) =>
         [
           { energy: 0.3 },
           { energy: 0.3, without: ["bass"] as const },
@@ -737,9 +737,10 @@ const sixesOnce = () => {
   return sixesMade;
 };
 // Floors for the bars of six. The strums are counted over the library's takes, written for the
-// full run and scaled to its seeds (6,500 on the full run); the rest are mostly the charts held
-// at a level, rendered on two seeds on every run, and are not scaled (the full run sees 62 bars
-// picked alone, 457 chords picked, 290 bars picked and 124 of them quiet, 1,374 strummed). A
+// full run and scaled to its seeds; the rest are mostly the charts held at a level, rendered on
+// two seeds on every run (acoustic's own on a push, every chart in the meter on the full run),
+// and are not scaled (a push sees 62 bars picked alone, 379 chords picked, 273 bars picked and
+// 124 of them quiet, 433 strummed). A
 // chart added to the library moves which charts a style is handed on a push: with the blues'
 // chart in six the push counted 1,317 strums, under the 1,333 that 4,000 asked of it.
 const COMPOUND_STRUMS = 3600;
@@ -748,12 +749,13 @@ const PICKED_IN_SIX = 300;
 const PICKED_BARS_IN_SIX = 200;
 const QUIET_IN_SIX = 80;
 const STRUMMED_BARS_IN_SIX = 300;
-// The same in twelve, where the held charts are acoustic's own on a push.
-const PICKED_IN_TWELVE = 60;
-const ALONE_IN_TWELVE = 20;
-const PICKED_BARS_IN_TWELVE = 60;
-const QUIET_IN_TWELVE = 30;
-const STRUMMED_BARS_IN_TWELVE = 60;
+// The same in twelve (a push sees 226 chords picked, 126 bars picked alone, 220 bars picked
+// and 189 of them quiet, 491 strummed).
+const PICKED_IN_TWELVE = 150;
+const ALONE_IN_TWELVE = 80;
+const PICKED_BARS_IN_TWELVE = 150;
+const QUIET_IN_TWELVE = 120;
+const STRUMMED_BARS_IN_TWELVE = 300;
 
 /** Standard tuning, low string first. */
 const OPEN = [40, 45, 50, 55, 59, 64];
@@ -978,8 +980,15 @@ test("a picked note is a string of the shape the hand is holding: everything the
     let strummed = 0;
     harmony.forEach((arrival, i) => {
       if (!arrival.changed) return;
-      // The chord sounds until the next one that is not the same chord written again.
-      const until = harmony.slice(i + 1).find((next) => next.changed)?.tick ?? Infinity;
+      // The chord sounds until the next one that is not the same chord written again. The same
+      // chord over another bass note (G7 to G7/B) is the same grip: a guitar that stands on its
+      // root holds it, and leaves the bass note to the bassist.
+      const above = (chord: typeof arrival.chord) => chord?.text.split("/")[0];
+      const until =
+        harmony
+          .slice(i + 1)
+          .find((next) => next.changed && above(next.chord) !== above(arrival.chord))?.tick ??
+        Infinity;
       while (from < plucked.length && plucked[from]!.tick < arrival.tick) from++;
       let to = from;
       while (to < plucked.length && plucked[to]!.tick < until) to++;
@@ -1119,6 +1128,7 @@ function barsOfSix() {
   return sixesOnce().flatMap(({ where, take }) => {
     const plucked = pluckedOf(take);
     const strums = strikesOf(take);
+    const harmony = harmonyOf(take);
     return take.plan.bars
       .filter(
         (bar) =>
@@ -1134,6 +1144,7 @@ function barsOfSix() {
         return {
           where: `${where} bar ${bar.index}`,
           bar,
+          harmony,
           plucks: inBar(plucked),
           strums: inBar(strums),
           // The chord leant into on the eighth before the barline, still ringing in this bar.
@@ -1160,7 +1171,7 @@ test("a guitar picks a bar of six or twelve as compound time is picked: quiet it
 }, () => {
   const picked = { 6: 0, 12: 0 };
   const quiet = { 6: 0, 12: 0 };
-  for (const { where, bar, plucks, strums } of barsOfSix()) {
+  for (const { where, bar, harmony, plucks, strums } of barsOfSix()) {
     const beats = bar.meter.beats as 6 | 12;
     if (tierOf(bar.seats.chords!) === "low") {
       quiet[beats]++;
@@ -1184,7 +1195,10 @@ test("a guitar picks a bar of six or twelve as compound time is picked: quiet it
       const thumb = Math.min(
         ...plucks.filter((pluck) => pluck.tick === at).map((pluck) => pluck.pitches[0]!),
       );
-      const fingers = plucks.filter((pluck) => pluck.tick > at && pluck.tick < at + half);
+      // Under the chord the thumb stated: a chord arriving inside the half bar has its own bass.
+      const next = harmony.find((arrival) => arrival.changed && arrival.tick > at);
+      const stops = Math.min(at + half, next?.tick ?? Infinity);
+      const fingers = plucks.filter((pluck) => pluck.tick > at && pluck.tick < stops);
       assert.ok(
         fingers.every((finger) => finger.pitches[0]! >= thumb),
         `${where}: a finger under the thumb's ${thumb} in the half bar from ${from}`,
