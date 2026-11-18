@@ -349,9 +349,7 @@ test(
     for (const { chart, options, take } of [
       ...takes(isJazz),
       ...soloistTakes().filter(compoundOwn),
-      ...(jazz
-        ? [...heldTakes(jazz, "6/8", true, true), ...heldTakes(jazz, "12/8", true, true)]
-        : []),
+      ...jazzPlayed().filter(compoundOwn),
     ]) {
       for (const note of (["drums", "bass", "chords", "solo"] as const).flatMap((seat) =>
         notesOf(take, seat),
