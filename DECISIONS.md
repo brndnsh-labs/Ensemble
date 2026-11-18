@@ -2252,3 +2252,10 @@ An Opus build from `prompts/meter-compound-style.md`, all of it style data. On t
 - **Reggae's tempo in six and twelve is its 4/4 range, 60 to 90**: the builder's reasoning is the slow count's beat is the pulse. His ear decides.
 - **Still there with reggae's soloist written**: a major seventh over a dominant tonic on funk's chart in six (A4 over Bb9; the note pool, not the rhythm). The three bars of silence are gone.
 - **Left**: in six at 76 a bar is shorter than the soloist's fast-bar mark, so its quiet and working levels come out alike (the engine reads a bar's length, not its pulses; acoustic's and disco's six are the same).
+
+## the engine's budget counts written meters as it counts styles (stage 6, 2026-11-17)
+
+- **The rule is restated, with Brandon's word** ("i'm on board with your recommendations for the test suite ... we're packing a lot of functionality in here"). It was written for eight styles in 4/4; there are now 22 written style-meters, each held to every property. On a push: 10 s for three styles, 2 more for each style after the third, and 2 more for each meter beyond 4/4 that the style with the most of them has written. That is 24 s today (five styles have written two) and 26 when jazz has three. The six-seed suite is three times the push budget (72 s today) in place of a flat 60.
+- **Why by the style with the most meters and not by the count of style-meters**: the styles are tested side by side, so the suite takes as long as its longest style, and a meter written by a style that has few costs the suite nothing.
+- **Why not sample harder instead**: the push suite already plays the other meters on one seed; thinner than that and a fault in six or twelve is found at the gate and not at the push.
+- **What is still rationed**: the rules. A new property, a new kind of take or more seeds still has to fit, by consolidating or deleting. The scorecard's and the smoke journeys' budgets are as they were.

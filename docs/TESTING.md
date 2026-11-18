@@ -85,12 +85,13 @@ Musical quality is statistical. "Is the soloist aimless" is a distribution over 
 
 | Suite | Limit | When it runs |
 |---|---|---|
-| Engine (corpus, properties, goldens) | 10 seconds with three styles, and 2 more for each style after the third (20 at eight) | every push |
+| Engine (corpus, properties, goldens) | 10 seconds with three styles, 2 more for each style after the third, and 2 more for each meter beyond 4/4 that the style with the most of them has written (24 at eight styles and two meters) | every push |
+| Engine, six seeds | three times the push budget (72) | before a gate |
 | Scorecard | 2 minutes | every push, report only except for tolerance failures |
 | Browser smoke | 60 seconds total | merge to main |
 
 CI fails when a budget is exceeded. The response to an exceeded budget is to consolidate or delete, never to raise the limit without a `DECISIONS.md` entry.
 
-The engine's budget grows with the styles and with nothing else. Every style is held to every property, each in a process of its own, so a style added is the same rules checked on one more band: the cost is real and is not the suite growing. What is rationed is the rules. A new property, a new kind of take, or more seeds on a push still has to fit inside the budget as it stands, by consolidating or deleting.
+The engine's budget grows with what the band can play and with nothing else. Every style is held to every property, each in a process of its own, so a style added is the same rules checked on one more band, and a meter a style has written its parts for is the same rules checked on one more bar: the cost is real and is not the suite growing. The styles run side by side, so the suite takes as long as its longest style, and the meters are counted on the style that has written the most. What is rationed is the rules. A new property, a new kind of take, or more seeds on a push still has to fit inside the budget as it stands, by consolidating or deleting.
 
 Property tests can use a small seed count on every push and a larger one nightly, so long as the push run stays inside the budget.

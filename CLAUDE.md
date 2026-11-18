@@ -26,11 +26,11 @@ A browser-based generative backing band. Read these before doing anything:
 
 ```sh
 pnpm install            # once
-pnpm check              # typecheck, lint, tests (budget: 10 seconds, and 2 more for each style after the third)
+pnpm check              # typecheck, lint, tests (budget: 10 seconds, 2 more for each style after the third, 2 more for each meter the busiest style has written beyond 4/4: 24 now)
 pnpm typecheck          # tsc --build across packages
 pnpm lint               # biome check; `pnpm format` to fix
 pnpm test               # engine suite under the budget: every property, two seeds
-pnpm test:full          # the same on six seeds (60-second budget); run before a gate
+pnpm test:full          # the same on six seeds (three times the push budget: 72 seconds); run before a gate
 pnpm score              # every style's scorecard against its accepted baseline (2-minute budget)
 pnpm goldens            # rewrite the golden takes (then say why in DECISIONS.md)
 pnpm gate:1             # write a gate's audition files to out/gate-1/ (also gate:2, gate:3, gate:4)
