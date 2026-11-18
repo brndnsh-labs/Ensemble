@@ -107,7 +107,12 @@ const rhythmsInTwelve: SoloTime = {
     "x----- ------ ------ ......",
     "..x-x- --x--- ------ ......",
   ],
-  pickups: [],
+  // On the eighths: the last eighth, two, and at the busy level two pulses.
+  pickups: [
+    { weight: 2, cell: "....x-" },
+    { weight: 1, cell: "..x-x-" },
+    { weight: 0.5, cell: "....x- ..x-x-", levels: ["busy"] },
+  ],
   peak: "x----- ------ ...... ......",
 };
 
@@ -137,7 +142,11 @@ const rhythmsInSix: SoloTime = {
   ],
   // Each lands in the first pulse and holds through the second.
   endings: ["....x- ------", "x---x- ------", "..x--- ------", "x----- ------", "..x-x- ------"],
-  pickups: [],
+  // The last eighth, or two.
+  pickups: [
+    { weight: 2, cell: "....x-" },
+    { weight: 1, cell: "..x-x-" },
+  ],
   peak: "x----- ------",
 };
 
@@ -369,7 +378,23 @@ export const neosoulSolo: SoloStyle = {
     tie: 0,
     chromatic: 0.3,
     enclosure: 0.12,
-    pickup: { chance: 0, figures: [], rising: 0.6, approach: false },
+    // Seldom: a neo-soul line enters late, on the "e"s and "a"s after the one (ST-neosoul-31),
+    // not before it. A phrase that would start on the one is led in one time in five, by a
+    // sixteenth or two on the "a"s, a grace into it; its last the half step under as often as
+    // the line approaches that way (the slide into the 3rd, ST-neosoul-33).
+    pickup: {
+      chance: 0.2,
+      figures: [
+        // The "a" of 4.
+        { weight: 2, cell: "...x" },
+        // The "e" and the "a" of 4.
+        { weight: 1, cell: ".x-x" },
+        // The "a" of 3, the "e" and the "a" of 4, once the line is moving.
+        { weight: 0.5, cell: "...x.x-x", levels: ["medium", "busy"] },
+      ],
+      rising: 0.6,
+      approach: true,
+    },
     // On a guitar, a bend into the 3rd 0.40 and into the root 0.08 (ST-neosoul-33, SO-53), in
     // phrases the hand gets lyrical in, as every guitar style has it.
     bend: { third: 0.4, rootOrFifth: 0.08, around: 1, elsewhere: 0.5 },

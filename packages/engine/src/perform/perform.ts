@@ -2,6 +2,7 @@
 // before it, and the shared passes turn what they wrote into events.
 
 import type { Plan } from "../plan/types.ts";
+import { planBar } from "../plan/types.ts";
 import { playBass } from "../players/bass/play.ts";
 import { playChords } from "../players/chords/play.ts";
 import { playDrums } from "../players/drums/play.ts";
@@ -32,12 +33,19 @@ export function perform(plan: Plan, style: StylePack, seed: number | string): Pe
     const player = PLAYERS[seat];
     if (!player) continue;
     const part = player({ plan, style, rng: rng.fork("seat", seat), heard: heard as Heard });
-    // A seat that is out for a bar plays nothing in it, whatever its player wrote, and the
-    // look-ahead pass is read but never played.
-    const sounding = part.filter((note) => {
-      const bar = plan.bars[note.bar];
-      return bar !== undefined && bar.seats[seat] !== null && note.seat === seat;
-    });
+    // A seat that is out for a bar plays nothing in it, whatever its player wrote, but a
+    // note leading into a bar it plays; and the look-ahead pass is read but never played.
+    // (The bar a note leads into may be the look-ahead's.)
+    const plays = (index: number) => {
+      const bar = planBar(plan, index);
+      return bar !== undefined && bar.seats[seat] !== null;
+    };
+    const sounding = part.filter(
+      (note) =>
+        note.seat === seat &&
+        plan.bars[note.bar] !== undefined &&
+        (plays(note.bar) || (note.leadsIn === true && plays(note.bar + 1))),
+    );
     heard[seat] = byBar(sounding, barCount);
     written.push(...sounding);
   }

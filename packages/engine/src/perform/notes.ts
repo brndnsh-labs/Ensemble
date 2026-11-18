@@ -31,6 +31,11 @@ export interface WrittenNote {
   readonly nudge?: number;
   /** How the pitch moves while the note sounds: a bend, a vibrato. */
   readonly move?: PitchMove;
+  /**
+   * It leads into the next bar (a soloist's pickup, SO-36): it is played in a bar
+   * its seat sits out, where the seat plays the bar it leads into.
+   */
+  readonly leadsIn?: boolean;
 }
 
 /** A sounding note. Its time is `tick + offset`. */

@@ -82,8 +82,13 @@ const acousticSoloInSix: SoloTime = {
   ],
   // Each lands on the first pulse and holds through the second, which is the next phrase's.
   endings: ["x----- ------", "x---x- ------", "x-x-x- ------", "..x-x- ------"],
-  // Acoustic leads into nothing (no pickups, ST-acoustic-28); if one is asked for, the last eighth.
-  pickups: [{ weight: 1, beat: "....x-" }],
+  // The tune's own lead-in in six: the last eighth most of all, the long-short, and once the
+  // line is moving the three eighths of the pulse.
+  pickups: [
+    { weight: 2, cell: "....x-" },
+    { weight: 1, cell: "x---x-" },
+    { weight: 1, cell: "x-x-x-", levels: ["medium", "busy"] },
+  ],
   peak: "x----- ----..",
 };
 
@@ -320,7 +325,23 @@ export const acousticSolo: SoloStyle = {
     tie: 0,
     chromatic: 0.05,
     enclosure: 0,
-    pickup: { chance: 0, figures: [], rising: 0.6, approach: false },
+    // A sung line is led in as a tune is, by its anacrusis: a phrase that would start on the
+    // one is led in a third of the time, by the "and" of 4, two eighths, or at the medium
+    // level two quarters on 3 and 4, in the quarters and eighths of its cells (ST-acoustic-26).
+    // ST-acoustic-28 gave none, because none was built for the style.
+    pickup: {
+      chance: 0.35,
+      figures: [
+        // The "and" of 4.
+        { weight: 2, cell: "..x-" },
+        // Two eighths on 4.
+        { weight: 1, cell: "x-x-" },
+        // Two quarters, beats 3 and 4.
+        { weight: 1, cell: "x---x---", levels: ["medium", "busy"] },
+      ],
+      rising: 0.6,
+      approach: false,
+    },
     // No whole-step bends and no scoops (ST-acoustic-28); the acoustic guitars' hands do not bend,
     // and on an instrument that can the line is still sung, not bent.
     bend: { third: 0, rootOrFifth: 0, around: 0, elsewhere: 0 },

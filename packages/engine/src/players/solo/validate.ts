@@ -6,7 +6,7 @@ import { barSteps, pulseTicks } from "../../perform/meter.ts";
 import { readMeter } from "../../style/meters.ts";
 import { SOLO_INSTRUMENTS } from "./instruments.ts";
 import { MOST_BUSY } from "./slots.ts";
-import type { Cell, Role, SoloStyle, Way } from "./style.ts";
+import type { Cell, Role, SoloStyle, SoloTime, Way } from "./style.ts";
 import { CONTOURS, ROLES } from "./style.ts";
 
 const STEPS = 16;
@@ -251,7 +251,19 @@ export function validateSoloStyle(solo: SoloStyle): string[] {
   chance(solo.habits.enclosure, "habits, enclosure");
   chance(solo.habits.pickup.chance, "habits, pickup");
   chance(solo.habits.pickup.rising, "habits, pickup rising");
-  for (const figure of solo.habits.pickup.figures) rhythm(figure.beat, "habits, pickup", 4);
+  const pickups = (figures: SoloTime["pickups"], where: string, steps: number, pulse: number) => {
+    for (const figure of figures) {
+      const length = cells(figure.cell).length;
+      say(
+        length > 0 && length % pulse === 0 && length <= steps / 2,
+        `${where}: "${figure.cell}" is not a whole number of the bar's pulses, half the bar at most.`,
+      );
+      if (length > 0) rhythm(figure.cell, where, length);
+      say(figure.weight > 0, `${where}: "${figure.cell}" has no weight.`);
+      for (const level of figure.levels ?? []) known(level, `${where} "${figure.cell}"`);
+    }
+  };
+  pickups(solo.habits.pickup.figures, "habits, pickup", STEPS, 4);
   chance(solo.habits.bend.third, "habits, bend into a third");
   chance(solo.habits.bend.rootOrFifth, "habits, bend into a root or fifth");
   chance(solo.habits.bend.elsewhere, "habits, bend elsewhere");
@@ -312,7 +324,7 @@ export function validateSoloStyle(solo: SoloStyle): string[] {
       const held = symbols.slice(last + 1).filter((symbol) => symbol === "-").length + 1;
       say(held >= 4, `${where}, endings: "${cell}" does not finish on a long note.`);
     }
-    for (const figure of written.pickups) rhythm(figure.beat, `${where}, pickup`, pulse);
+    pickups(written.pickups, `${where}, pickup`, steps, pulse);
   }
 
   return problems;

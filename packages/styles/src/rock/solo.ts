@@ -100,8 +100,13 @@ const rockSoloInTwelve: SoloTime = {
     "x----- x----- ------ ------",
     "....x- x---x- ------ ------",
   ],
-  // No pickups, as in four (ST-rock-24).
-  pickups: [],
+  // As in four, said in pulses: the last eighth, three eighths up into the one (a pulse's
+  // triplet, which is the busy level's figure), and from the medium level two pulses.
+  pickups: [
+    { weight: 1, cell: "....x-" },
+    { weight: 2, cell: "x-x-x-" },
+    { weight: 1, cell: "....x- x-x-x-", levels: ["medium", "busy"] },
+  ],
   peak: "x----- ------ ...... ......",
 };
 
@@ -342,7 +347,24 @@ export const rockSolo: SoloStyle = {
     tie: 0,
     chromatic: 0.1,
     enclosure: 0,
-    pickup: { chance: 0, figures: [], rising: 0.6, approach: false },
+    // A phrase that would start on the one is led in a little under half the time: three
+    // eighths up the pentatonic into it most of all (Brandon, 2026-11-17; ST-rock-24 had none,
+    // because none was built). From below three times in four: up into the one.
+    pickup: {
+      chance: 0.45,
+      figures: [
+        // The "and" of 4.
+        { weight: 1, cell: "..x-" },
+        // Three eighths from the "and" of 3, up into the one.
+        { weight: 2, cell: "..x-x-x-" },
+        // Half a bar of eighths, once the line is moving (ST-rock-22's medium cells).
+        { weight: 1, cell: "x-x-x-x-", levels: ["medium", "busy"] },
+        // The busy level's sixteenth burst on beat 4, after the "and" of 3 (ST-rock-22).
+        { weight: 1, cell: "..x-xxxx", levels: ["busy"] },
+      ],
+      rising: 0.75,
+      approach: false,
+    },
     // The blue third pushed up into the third, the flat 7th into the root or the 4th into the
     // 5th (SO-53, ST-rock-24).
     bend: { third: 0.45, rootOrFifth: 0.55, around: 1, elsewhere: 0.5 },

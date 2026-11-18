@@ -140,15 +140,25 @@ export type Way = { readonly name: string } & (
     }
 );
 
-/** One way of leading into a phrase from the last beat of the bar before: a beat of rhythm (SO-36). */
+/**
+ * One way of leading into a phrase from the end of the bar before (SO-36): the
+ * rhythm of the bar's last pulses, as many as the figure needs and half the
+ * bar at most (in 4/4 the "and" of 4 is `..x-`, three eighths up into the one
+ * `..x-x-x-`). Where the bar before has too little air for it after the
+ * phrase before, a shorter figure is taken before none.
+ */
 export interface Pickup {
   readonly weight: number;
-  readonly beat: Cell;
+  /** A whole number of the bar's pulses, ending at the barline. */
+  readonly cell: Cell;
+  /** The levels it is played at, by name. Left out, every level. */
+  readonly levels?: readonly string[];
 }
 
 /**
  * What the soloist writes as a bar, written for a meter other than 4/4: every
- * rhythm as long as that meter's bar, and a pickup as long as its last pulse.
+ * rhythm as long as that meter's bar, and a pickup as many of its last pulses
+ * as it needs, half the bar at most.
  */
 export interface SoloTime {
   /**
@@ -158,7 +168,7 @@ export interface SoloTime {
   readonly levels: readonly Density[];
   /** The rhythms an end bar may take: each finishes on a long note and leaves its last pulse unstruck. */
   readonly endings: readonly Cell[];
-  /** The ways of leading into a phrase from the last pulse of the bar before. */
+  /** The ways of leading into a phrase from the end of the bar before. */
   readonly pickups: readonly Pickup[];
   /** The bar the solo's top note is held in. */
   readonly peak: Cell;
@@ -392,7 +402,11 @@ export interface SoloStyle {
     readonly chromatic: number;
     /** Two short notes before a landing circle it: the step above, the half step below (SO-26). */
     readonly enclosure: number;
-    /** A phrase that would start on a downbeat is led in from the beat before (SO-36). */
+    /**
+     * A phrase that would start on a downbeat after a breath is led in from the
+     * bar before (SO-36): from inside the solo, or from a bar the band plays
+     * into a chorus's first phrase and the solo's own (SO-37 as restated).
+     */
     readonly pickup: {
       readonly chance: number;
       readonly figures: readonly Pickup[];
