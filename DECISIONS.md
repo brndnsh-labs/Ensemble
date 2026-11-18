@@ -2392,3 +2392,9 @@ An Opus build from `prompts/solo-pickups.md` (in the builder's clone, `.work/pic
 - **The solo builds less again** in rock (in target 75% to 65%) and disco (80 to 73): a first chorus led into opens on the one. With the last build's fall, this is now the soloist's largest known fault; the cure is still a busier top.
 - **A comp that listens hears a pickup in the band's bar** and moves its voicing off it (21 of 31 such bars). Left; the comp was not in the brief.
 - **The push suite is at 23.1 s of 24 again.** Before the four style-meters: find time in the suite, since each adds charts to every style's run. The six-seed run once lost a style's process to memory on the builder's side (eight processes of 1.2 GB on 6.9 GB); it did not on main. Watch it.
+
+## where the push suite's time goes (stage 6, 2026-11-17)
+
+- **Measured, with pickups merged**: typecheck 0.1 s, lint 0.4 s, the suite 23 s. One style alone is 11.4 s (funk), four together 16 s, all nine processes 23.5 s on eight virtual cores. Running fewer at once is slower (26.8 to 28.5 s at four to seven); a larger young generation, single-threaded collection and lazy compilation change nothing. So the suite's time is the machine's whole work, not its slowest style's, and not memory.
+- **In one style's run** (a profile of funk): rendering takes is 7.3 s of 11.4, the soloist the dearest seat (2.0 s), then the bass (1.5); the second render that checks a take is the same take again is 2.7 s of that.
+- **Not acted on.** The four style-meters fit: jazz's third meter takes the budget to 26 s by the rule. If time is wanted later, the first place to look is the second render (every take twice), then the soloist's critic.
