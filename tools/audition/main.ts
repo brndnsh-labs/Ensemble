@@ -80,6 +80,10 @@ async function perform(): Promise<Performance> {
     ...(soloInstrument ? { solo: true, soloInstrument } : {}),
     // `energy=0.3` holds the band at a level, as the CLI's --energy does.
     ...(params.has("energy") ? { energy: Number(params.get("energy")) } : {}),
+    // `density=0.75` sets how busy the soloist is, as the CLI's --solo-density does; `fromtop=1`
+    // gives it the lead from the first pass.
+    ...(params.has("density") ? { soloDensity: Number(params.get("density")) } : {}),
+    ...(params.get("fromtop") === "1" ? { soloFromTop: true } : {}),
   });
   const only = params.get("only")?.split(",");
   // `packs=chords:electric-piano` puts another instrument in a seat: for hearing a pack

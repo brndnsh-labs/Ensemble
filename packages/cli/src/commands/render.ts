@@ -14,7 +14,7 @@ const SEAT_NAMES: readonly Seat[] = ["drums", "bass", "chords", "solo"];
 export const renderCommand: Command = {
   summary: "play the chart and write the performance as a MIDI file",
   usage:
-    "<chart> [--out take.mid] [--save take.json] [--style S] [--seed N] [--minutes M | --passes P] [--song] [--solo] [--solo-instrument NAME] [--tempo BPM] [--energy 0..1] [--key K] [--without seat,seat] [--no-count-in]",
+    "<chart> [--out take.mid] [--save take.json] [--style S] [--seed N] [--minutes M | --passes P] [--song] [--solo] [--solo-instrument NAME] [--solo-density 0..1] [--solo-from-top] [--tempo BPM] [--energy 0..1] [--key K] [--without seat,seat] [--no-count-in]",
   run(args) {
     const { positionals, values } = parseArgs({
       args,
@@ -29,6 +29,8 @@ export const renderCommand: Command = {
         song: { type: "boolean", default: false },
         solo: { type: "boolean", default: false },
         "solo-instrument": { type: "string" },
+        "solo-density": { type: "string" },
+        "solo-from-top": { type: "boolean", default: false },
         tempo: { type: "string", short: "t" },
         energy: { type: "string", short: "e" },
         key: { type: "string", short: "k" },
@@ -76,12 +78,24 @@ export const renderCommand: Command = {
     if (energy !== undefined && !(energy >= 0 && energy <= 1)) {
       throw new UsageError("--energy is a level from 0 (quiet) to 1 (loud)");
     }
+    // How busy the soloist is, and the soloist from the first pass: each asks for the soloist.
+    const density =
+      values["solo-density"] === undefined ? undefined : Number(values["solo-density"]);
+    if (density !== undefined && !(density >= 0 && density <= 1)) {
+      throw new UsageError(
+        "--solo-density is a setting from 0 (sparse) to 1 (busy); 0.5 is the style's own",
+      );
+    }
+    const fromTop = values["solo-from-top"] === true;
+    const soloist = values.solo || instrument !== undefined || density !== undefined || fromTop;
     const options: TakeOptions = {
       mode: values.song ? "song" : "jam",
       seed: values.seed,
       countIn: !values["no-count-in"],
-      ...(values.solo || instrument !== undefined ? { solo: true } : {}),
+      ...(soloist ? { solo: true } : {}),
       ...(instrument === undefined ? {} : { soloInstrument: instrument }),
+      ...(density === undefined ? {} : { soloDensity: density }),
+      ...(fromTop ? { soloFromTop: true } : {}),
       without: without as Seat[],
       ...(minutes === undefined ? {} : { minutes }),
       ...(passes === undefined ? {} : { passes }),
