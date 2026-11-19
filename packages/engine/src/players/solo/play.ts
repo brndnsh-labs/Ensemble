@@ -43,11 +43,11 @@ interface SoloNote {
   /** Ticks it sounds past its end, dying away: a fall. */
   readonly fade?: number;
   /** A breath follows it: it ends a phrase as heard. */
-  readonly ends?: boolean;
+  readonly ends: boolean;
   /** Its length in the rhythm, in ticks. */
-  readonly value?: number;
+  readonly value: number;
   /** A note of a pickup into the phrase. */
-  readonly lead?: boolean;
+  readonly lead: boolean;
 }
 
 /** A soloist's note as the band is given it. */
@@ -367,8 +367,9 @@ function realise(world: World, phrase: Phrase, accent: number, breathedAt?: numb
             soundsFor(world, bar, strike.tick, duration),
             s === strikes.length - 1,
           ),
-          ...(s === strikes.length - 1 ? { ends: true } : {}),
           value: duration,
+          ends: s === strikes.length - 1,
+          lead: false,
         };
       });
     }
@@ -447,8 +448,8 @@ function realise(world: World, phrase: Phrase, accent: number, breathedAt?: numb
         velocity,
         ...move,
         value: spot.hold,
-        ...(ends ? { ends: true } : {}),
-        ...(lead ? { lead: true } : {}),
+        ends,
+        lead: lead === true,
       },
     ];
   });
@@ -583,7 +584,7 @@ function hornMoves(
     const arrivals = notes.flatMap((note, i) => {
       const before = notes[i - 1];
       if (!before || note.lead || note.bar.ending !== null) return [];
-      if ((note.value ?? 0) < PPQ) return [];
+      if (note.value < PPQ) return [];
       // Come to in the line, as heard: well inside a breath of the note before.
       const heardEnd = before.tick + soundsFor(world, before.bar, before.tick, before.duration);
       if (2 * (note.tick - heardEnd) >= breath) return [];
@@ -628,7 +629,7 @@ function hornMoves(
       // A half note or longer in the rhythm, and a dotted quarter at least as heard, its
       // breath taken (SO-54).
       const sounds = soundsFor(world, note.bar, note.tick, note.duration);
-      if (note.move?.glide || (note.value ?? 0) < 2 * PPQ || sounds < 1.5 * PPQ) return;
+      if (note.move?.glide || note.value < 2 * PPQ || sounds < 1.5 * PPQ) return;
       if (note.pitch <= home) return;
       if ((note.bar.seats.solo ?? note.bar.energy) < TIER_MID) return;
       const over = note.tick + sounds + drop + breath;

@@ -55,15 +55,17 @@ export function perform(plan: Plan, style: StylePack, seed: number | string): Pe
   const time = (e: PerformanceEvent) => (e.kind === "note" ? e.tick + e.offset : e.tick);
   const rank = (e: PerformanceEvent) => (e.kind === "marker" ? -1 : SEATS.indexOf(e.seat));
   const pitch = (e: PerformanceEvent) => (e.kind === "note" ? e.pitch : 0);
+  // Each event's keys are read once: events of many shapes (notes with and without a move, a
+  // fade, a voice, and markers) make reading them in the comparison slow.
   return events
-    .map((event, index) => ({ event, index }))
-    .sort(
-      (a, b) =>
-        time(a.event) - time(b.event) ||
-        rank(a.event) - rank(b.event) ||
-        pitch(a.event) - pitch(b.event) ||
-        a.index - b.index,
-    )
+    .map((event, index) => ({
+      event,
+      index,
+      at: time(event),
+      rank: rank(event),
+      pitch: pitch(event),
+    }))
+    .sort((a, b) => a.at - b.at || a.rank - b.rank || a.pitch - b.pitch || a.index - b.index)
     .map(({ event }) => event);
 }
 
