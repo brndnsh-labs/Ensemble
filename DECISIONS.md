@@ -2674,3 +2674,14 @@ Brandon chose the study's ninth clip ("i'm leaning toward option 9, the player's
 - **Timings on a quiet machine**: `pnpm check` 25.3 s of 26; `pnpm test:full` 69.4 s of 78, all pass. The builder's `pnpm score`: 64.2 s of 120, no scorecard moved. **The push suite has under a second of room**: the next build that adds a property finds time first.
 - **Known and left**: the alto shakes most phrase endings in the slower styles (18 of 20 in the disco take on the page, 41 of 52 in the ballad), which is clip 9's rule (every ending long enough) and more shakes a minute than the clip had; for his ear. Falls are rare enough (1 to 5% of endings) that the page's half and double takes differ by a note at most. Jazz's falls ceiling does not catch ten times the chance. Scoops are not said again when a phrase is. A fading note under `silence` or a choke has not been tried in a browser.
 - For his ear: `out/horn-moves/`.
+
+## the app's icon (stage 6, 2026-11-18)
+
+Brandon asked "what about an icon?"; the one in place was a placeholder from the app's first commit. Two pages of candidates (`prompts/icon-study.md`, `prompts/icon-study-2.md`, pages in `out/icon-study/` and `out/icon-study-2/`): of the first nine he "liked b the best" (the wall: tiles of style ink) "but i don't think we're done with it yet. how can we make it look more musical?"; of eight variations on it, "b1 is my pick, let's go in that direction. feel free to refine".
+
+- **The icon is B1**: four tiles in the inks of blues, funk, jazz and rock are the four bars of a chart's first line; the first carries E7 as the chart sets a chord, the other three the mark for the same bar again.
+- **Refined on the main thread, by eye from renders**: the chord larger and centred in its tile (it sat low and right, pulled toward the middle for Android's circle); the three marks larger (about 20 px at home-screen size before, about 37 now) and centred in theirs.
+- **Android gets its own drawing** (`icon-maskable-512.png`): the same icon at 74% about the middle with the tiles run on to the edges, so the iPhone's icon is not composed around a crop it never gets.
+- **A tab gets the simpler one** (`favicon.svg`): the four tiles and E7 alone, larger; the marks are dust at 16 px.
+- **One script draws all of it** (`scripts/icons.ts`, pictures by headless Chrome), so a change is made once.
+- Not checked: a real iPhone's home screen (an installed app keeps its old icon until it is removed and added again), a real Android launcher.

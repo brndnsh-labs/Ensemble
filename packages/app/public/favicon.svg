@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Ensemble</title>
+  <rect x="0" y="0" width="384" height="384" fill="#5aa9ff"/>
+  <rect x="384" y="0" width="128" height="384" fill="#ff8b2b"/>
+  <rect x="0" y="384" width="224" height="128" fill="#1fc2b0"/>
+  <rect x="224" y="384" width="288" height="128" fill="#ff5f7e"/>
+  <g fill="#1e1a4f">
+    <path transform="translate(32 32) scale(1.6)" d="M0 0H160V62H136L130 28H72V86H110L114 68H134V132H114L110 114H72V172H134L142 134H166V200H0V176H24V24H0Z"/>
+    <path transform="translate(320 32) scale(1.4)" d="M0 0H92V20L48 112H18L60 26H22V40H0Z"/>
+  </g>
+</svg>

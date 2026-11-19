@@ -1,6 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <title>Ensemble</title>
-  <rect width="64" height="64" fill="#1e1a4f"/>
-  <path d="M9 18l44-3 2 30-45 4z" fill="#ffe53b"/>
-  <path d="M22 44V20h20v5H28v4.5h12v5H28V39h14v5z" fill="#1e1a4f"/>
+  <rect x="0" y="0" width="340" height="340" fill="#5aa9ff"/>
+  <rect x="340" y="0" width="172" height="340" fill="#ff8b2b"/>
+  <rect x="0" y="340" width="226" height="172" fill="#1fc2b0"/>
+  <rect x="226" y="340" width="286" height="172" fill="#ff5f7e"/>
+  <g fill="#1e1a4f">
+    <path transform="translate(45.74 72) scale(0.98)" d="M0 0H160V62H136L130 28H72V86H110L114 68H134V132H114L110 114H72V172H134L142 134H166V200H0V176H24V24H0Z"/>
+    <path transform="translate(222.14 72) scale(0.78)" d="M0 0H92V20L48 112H18L60 26H22V40H0Z"/>
+    <path d="M382.32 222H403.12L469.68 118H448.88Z"/><circle cx="394.8" cy="141.92" r="13.52"/><circle cx="457.2" cy="198.08" r="13.52"/>
+    <path d="M69.32 478H90.12L156.68 374H135.88Z"/><circle cx="81.8" cy="397.92" r="13.52"/><circle cx="144.2" cy="454.08" r="13.52"/>
+    <path d="M325.32 478H346.12L412.68 374H391.88Z"/><circle cx="337.8" cy="397.92" r="13.52"/><circle cx="400.2" cy="454.08" r="13.52"/>
+  </g>
 </svg>
