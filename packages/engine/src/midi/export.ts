@@ -23,6 +23,11 @@ const TRACK_NAMES: Readonly<Record<Seat, string>> = {
 /** Cents the pitch must have moved before the file says so again. */
 const BEND_STEP = 3;
 
+/** Channel expression, the controller a note's dying away is said with. */
+const EXPRESSION = 11;
+/** How many steps a fade is said in. */
+const FADE_STEPS = 16;
+
 /** General MIDI puts drums on channel 10 (index 9). The pitched seats take the first channels. */
 const CHANNELS: Readonly<Record<Seat, number>> = { drums: 9, bass: 0, chords: 1, solo: 2 };
 
@@ -72,6 +77,12 @@ export function toMidi(
     chords: [],
     solo: [],
   };
+  const controls: Record<Seat, { tick: number; number: number; value: number }[]> = {
+    drums: [],
+    bass: [],
+    chords: [],
+    solo: [],
+  };
   const secondsPerTick = 60 / (plan.quarters * PPQ);
   let soloProgram: number | undefined;
   for (const event of events) {
@@ -83,15 +94,29 @@ export function toMidi(
     } else {
       if (event.seat === "solo") soloProgram ??= SOLO_INSTRUMENTS[event.voice ?? ""]?.program;
       const start = event.tick + event.offset;
+      // A note that dies away past its end is held until it has.
+      const sounds = event.duration + (event.fade ?? 0);
       notes[event.seat].push({
         tick: start,
-        duration: event.duration,
+        duration: sounds,
         pitch: event.pitch,
         velocity: event.velocity,
       });
+      if (event.fade) {
+        // The dying away as the channel's expression, straight down to nothing as the sound's
+        // gain goes, and back to full when the note is let go.
+        for (let i = 0; i < FADE_STEPS; i++) {
+          controls[event.seat].push({
+            tick: start + event.duration + (event.fade * i) / FADE_STEPS,
+            number: EXPRESSION,
+            value: 127 * (1 - i / FADE_STEPS),
+          });
+        }
+        controls[event.seat].push({ tick: start + sounds, number: EXPRESSION, value: 127 });
+      }
       if (event.move) {
         // The same curve the sound follows, said as pitch bend wherever it has moved 3 cents.
-        const curve = pitchCurve(event.move, secondsPerTick, event.duration * secondsPerTick);
+        const curve = pitchCurve(event.move, secondsPerTick, sounds * secondsPerTick);
         let said = Number.NaN;
         curve.forEach((cents, i) => {
           if (Math.abs(cents - said) < BEND_STEP && i > 0) return;
@@ -102,7 +127,7 @@ export function toMidi(
           });
         });
         // The channel is let go when the note is, or the next note would start bent.
-        bends[event.seat].push({ tick: start + event.duration, semitones: 0 });
+        bends[event.seat].push({ tick: start + sounds, semitones: 0 });
       }
     }
   }
@@ -115,6 +140,7 @@ export function toMidi(
       channel: CHANNELS[seat],
       notes: notes[seat],
       ...(bends[seat].length > 0 ? { bends: bends[seat] } : {}),
+      ...(controls[seat].length > 0 ? { controls: controls[seat] } : {}),
     };
     if (seat === "drums") tracks.push(track);
     // The soloist's notes name the instrument that played them.

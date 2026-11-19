@@ -25,6 +25,8 @@ export interface TimedNote {
    * `step` seconds from its start. After the last, the pitch stays there.
    */
   readonly bend?: { readonly step: number; readonly cents: readonly number[] };
+  /** The last seconds of `length`, over which the note dies away to nothing: a fall. */
+  readonly fade?: number;
 }
 
 /** Seconds from the start of the performance to a tick. */
@@ -38,7 +40,8 @@ export function timedNotes(plan: Plan, events: readonly PerformanceEvent[]): Tim
   const secondsPerTick = secondsAt(plan, 1);
   for (const event of events) {
     if (event.kind !== "note") continue;
-    const length = secondsAt(plan, event.duration);
+    // A note that dies away past its end sounds until it has.
+    const length = secondsAt(plan, event.duration + (event.fade ?? 0));
     notes.push({
       seat: event.seat,
       ...(event.voice === undefined ? {} : { voice: event.voice }),
@@ -50,6 +53,7 @@ export function timedNotes(plan: Plan, events: readonly PerformanceEvent[]): Tim
       ...(event.move === undefined
         ? {}
         : { bend: { step: CURVE_STEP, cents: pitchCurve(event.move, secondsPerTick, length) } }),
+      ...(event.fade === undefined ? {} : { fade: secondsAt(plan, event.fade) }),
     });
   }
   return notes.sort((a, b) => a.at - b.at);

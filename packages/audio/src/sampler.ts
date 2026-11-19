@@ -17,8 +17,10 @@ interface Sounding {
   readonly begins: number;
   /** When its hit lands: the note's time. */
   readonly when: number;
-  /** When its release begins. Absent for a strike that rings out. */
+  /** When its release begins, or for a sound that dies away, when it is gone. Absent for a strike that rings out. */
   readonly end?: number;
+  /** A sound that dies away: from when, and from what level, straight down to nothing at `end`. */
+  readonly dies?: { readonly from: number; readonly level: number };
 }
 
 interface Instrument {
@@ -96,7 +98,13 @@ export class Sampler {
       );
     }
     const end = voice.oneShot ? undefined : when + sound.length;
-    if (end !== undefined) release(source, gain, level, end, voice.release ?? 0.1);
+    // A sound that dies away over its last stretch goes to nothing there, in place of its release.
+    const dying = end !== undefined && (sound.fade ?? 0) > 0;
+    const dies = dying ? { from: end - Math.min(sound.fade!, sound.length), level } : undefined;
+    if (end !== undefined) {
+      if (dies) dieAway(source, gain, dies.level, dies.from, end);
+      else release(source, gain, level, end, voice.release ?? 0.1);
+    }
 
     const sounding: Sounding = {
       source,
@@ -104,6 +112,7 @@ export class Sampler {
       begins: startAt,
       when,
       ...(end === undefined ? {} : { end }),
+      ...(dies ? { dies } : {}),
     };
     const ringing = instrument.sounding.get(name) ?? new Set();
     instrument.sounding.set(name, ringing);
@@ -182,12 +191,25 @@ function release(
   stop(source, end + seconds + 0.02);
 }
 
+/** The note dies away: straight down from its level to nothing, as a breath let go as the note falls. */
+function dieAway(
+  source: AudioBufferSourceNode,
+  gain: GainNode,
+  level: number,
+  from: number,
+  end: number,
+): void {
+  gain.gain.setValueAtTime(level, from);
+  gain.gain.linearRampToValueAtTime(0, end);
+  stop(source, end + 0.02);
+}
+
 /**
  * Take a sound out at a time, over `seconds`. One whose recording has not
  * begun by then never sounds at all: it is stopped where it would have begun,
  * since letting it start in order to fade it clicks.
  */
-function fade({ source, gain, begins, end }: Sounding, at: number, seconds: number): void {
+function fade({ source, gain, begins, end, dies }: Sounding, at: number, seconds: number): void {
   if (begins >= at) {
     stop(source, begins);
     return;
@@ -195,6 +217,11 @@ function fade({ source, gain, begins, end }: Sounding, at: number, seconds: numb
   // Already dying away: its own release is the quicker and the cleaner end.
   if (end !== undefined && at >= end) return;
   gain.gain.cancelScheduledValues(at);
+  // Part of the way down its own dying away: taken out from where it has got to, not from
+  // the level it started at, which the cancelled ramp would leave it at.
+  if (dies && end !== undefined && at > dies.from) {
+    gain.gain.setValueAtTime(dies.level * ((end - at) / (end - dies.from)), at);
+  }
   gain.gain.setTargetAtTime(0, at, seconds / 5);
   stop(source, at + seconds);
 }

@@ -90,6 +90,7 @@ export function applyFeel(
       ...event,
       ...(note.voice === undefined ? {} : { voice: note.voice }),
       ...(note.move === undefined ? {} : { move: note.move }),
+      ...(note.fade === undefined ? {} : { fade: note.fade }),
     };
   });
 }

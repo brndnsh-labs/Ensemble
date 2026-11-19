@@ -34,6 +34,12 @@ export interface SmfTrack {
    * most). A track with any sets its bend range to an octave first.
    */
   readonly bends?: readonly { readonly tick: number; readonly semitones: number }[];
+  /** Controller changes on the channel: a controller's number and its value, 0 to 127. */
+  readonly controls?: readonly {
+    readonly tick: number;
+    readonly number: number;
+    readonly value: number;
+  }[];
 }
 
 export interface SmfFile {
@@ -95,6 +101,13 @@ function instrumentTrack(track: SmfTrack): number[] {
         bytes: [0xe0 | track.channel, value & 0x7f, value >> 7],
       });
     }
+  }
+  for (const change of track.controls ?? []) {
+    timed.push({
+      tick: Math.max(0, Math.round(change.tick)),
+      order: 1,
+      bytes: [0xb0 | track.channel, change.number & 0x7f, clamp(Math.round(change.value), 0, 127)],
+    });
   }
   for (const note of withoutSelfOverlap(track.notes)) {
     const pitch = clamp(note.pitch, 0, 127);

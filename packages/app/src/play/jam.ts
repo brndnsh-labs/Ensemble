@@ -214,6 +214,7 @@ export function soundsOf(take: Take, style: StylePack, options: HowPlayed): Soun
       // A seat touched more gently than it is heard plays its softer recordings.
       ...(touch ? { touch: Math.max(1, Math.min(127, note.velocity + touch)) } : {}),
       ...(note.bend === undefined ? {} : { bend: note.bend }),
+      ...(note.fade === undefined ? {} : { fade: note.fade }),
     });
   }
   return sounds;

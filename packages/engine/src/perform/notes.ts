@@ -32,6 +32,13 @@ export interface WrittenNote {
   /** How the pitch moves while the note sounds: a bend, a vibrato. */
   readonly move?: PitchMove;
   /**
+   * Ticks the note goes on sounding past its end, dying away to nothing over
+   * them: a horn's fall, blown after the note's full length. Its loudness, not
+   * its pitch, so it sits beside `move`; its length in the rhythm is still
+   * `duration`, which is what the band hears of it.
+   */
+  readonly fade?: number;
+  /**
    * It leads into the next bar (a soloist's pickup, SO-36): it is played in a bar
    * its seat sits out, where the seat plays the bar it leads into.
    */
@@ -54,6 +61,8 @@ export interface NoteEvent {
   readonly voice?: string;
   /** How the pitch moves while the note sounds, in ticks from where it starts. */
   readonly move?: PitchMove;
+  /** Ticks it goes on sounding past `duration`, dying away to nothing: a fall (`WrittenNote.fade`). */
+  readonly fade?: number;
 }
 
 /** Something a chart view or a MIDI file can show: where we are in the form. */

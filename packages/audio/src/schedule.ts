@@ -32,6 +32,11 @@ export interface Sound {
    * every `step` seconds from its start. After the last, it stays there.
    */
   readonly bend?: { readonly step: number; readonly cents: readonly number[] };
+  /**
+   * The last seconds of `length`, over which it dies away to nothing, in place
+   * of the voice's own release at its end.
+   */
+  readonly fade?: number;
 }
 
 export interface SchedulerOptions {

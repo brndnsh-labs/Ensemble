@@ -116,8 +116,13 @@ async function perform(): Promise<Performance> {
       .map((pair) => pair.split(":"))
       .map(([seat, by]) => [seat!, Number(by)] as const),
   );
-  for (const note of [...timedNotes(take.plan, take.events), ...extra]) {
-    if (only && !only.includes(note.seat)) continue;
+  // `only=` keeps the take's own seats named; notes written by hand are always played, so a
+  // seat of the take can be heard played another way (`only=drums,bass,chords` and the solo's
+  // notes in a file).
+  const own = timedNotes(take.plan, take.events).filter(
+    (note) => !only || only.includes(note.seat),
+  );
+  for (const note of [...own, ...extra]) {
     const pack = nameOf(note.seat, packOf(note.seat, note.voice));
     wanted.set(pack, note.seat);
     const touch =
@@ -132,6 +137,7 @@ async function perform(): Promise<Performance> {
       velocity: note.velocity,
       ...(touch ? { touch: Math.max(1, Math.min(127, note.velocity + touch)) } : {}),
       ...(note.bend === undefined ? {} : { bend: note.bend }),
+      ...(note.fade === undefined ? {} : { fade: note.fade }),
     });
   }
   sounds.sort((a, b) => a.at - b.at);
