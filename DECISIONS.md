@@ -2699,3 +2699,10 @@ What the old plumbing is (read, not copied): its CI builds two images (`ensemble
 - **Every commit's author and committer address was rewritten** to his GitHub no-reply address before the first push (the repository is public and his own address is private; the old repo's commits use the same no-reply address). The files are byte for byte the same; every commit's name changed, and the 14 references to commits in `DECISIONS.md`, `PLAN.md` and one prompt were moved to the new names. The history before the rewrite is in `.git/pre-rewrite-main.bundle`.
 - **A licence and a front page**: `LICENSE` is the AGPL-3.0 the repository already carries; `README.md` is new.
 - **The account API is left running and unreferenced** for now: the new app never calls it. Taking it out of the two recipes (and its Caddy route, its backups, its volume) is cleanup after production has held, and nothing of its data is deleted without his word.
+
+## production is the new app (stage 6, 2026-11-18)
+
+Brandon: "let's do prod". Released by the workflow run by hand with "production" ticked: `ensemble.brndn.zip` serves `f70774c`, and the five smoke journeys pass against it (11.7 s). The image it replaced is `ensemble-web:sha-06c97d8ce0fdcd06779d54ecd6b7d42509674c23`; going back is `ensemble-release ensemble web` with that tag on docker04.
+
+- Not checked: a browser that had the old app installed. The journeys run in a clean browser; the old app's service worker is still on his devices until the new one takes over or the home-screen app is removed and added again.
+- Left as it was: the account API in both stacks, its database, its Caddy route and its backups. Nothing calls it.
