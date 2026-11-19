@@ -22,6 +22,14 @@ A browser-based generative backing band. Read these before doing anything:
 - **Stay in scope.** `docs/BRIEF.md` lists non-goals. Do not build them.
 - **Check current versions.** Do not assume library versions or APIs from memory. Look them up when adding a dependency, and prefer few dependencies.
 
+## The repository
+
+- **It is public** (github.com/brndnsh-labs/Ensemble, AGPL-3.0). Everything committed is published: no secrets, no private addresses, nothing about the network the sites run on beyond what is already here. Commits carry Brandon's GitHub no-reply address (the repo's own `user.email`); check it before the first commit on a new machine.
+- **Work lands on `main`**, pushed as it is finished. There are no pull requests and no required checks: `pnpm check` is run here before a push, and CI runs it again.
+- **A push to `main` is a release to the test site.** Production is released by hand and only when Brandon has asked for it.
+- **The old version is the `legacy` branch.** Do not read it, merge it or copy from it: `docs/MUSIC_NOTES.md` and `docs/AUDIO_NOTES.md` are what was carried over.
+- **Something for Brandon's ear or eye is a page**, written under `out/` (not committed) with what was measured beside each clip or picture, and nothing merged on a claim that it sounds or looks good.
+
 ## Commands
 
 ```sh
