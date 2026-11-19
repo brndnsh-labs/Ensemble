@@ -428,6 +428,10 @@ export const funkSolo: SoloStyle = {
     // No bends (ST-funk-32); a guitar shakes a note held a dotted half or longer (SO-52).
     bend: { third: 0, rootOrFifth: 0, around: 0, elsewhere: 0 },
     shake: 3,
+    // A horn scoops 0.2 (ST-funk-32), a phrase's one arrival, and falls off a phrase's last
+    // note 0.35 (ST-funk-32, SO-54).
+    scoop: 0.2,
+    fall: 0.35,
   },
 
   // Clipped: a note that runs into the next gives up a fifth of its length.

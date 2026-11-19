@@ -538,6 +538,11 @@ export const jazzSolo: SoloStyle = {
     // No bends (ST-jazz-37); a guitar shakes a note held a half note or longer (SO-52).
     bend: { third: 0, rootOrFifth: 0, around: 0, elsewhere: 0 },
     shake: 2,
+    // On a horn: a scoop into a long note 0.15 (ST-jazz-37), here a phrase's one arrival. The
+    // notes give jazz no fall; Brandon chose one over the jazz band (horn-study clip 9), so the
+    // horn styles' 0.3 (SO-54).
+    scoop: 0.15,
+    fall: 0.3,
   },
 
   // SO-51: louder as it goes up, the "and"s leaned on, the bottom of a run ghosted.

@@ -41,8 +41,20 @@ export function validateSoloStyle(solo: SoloStyle): string[] {
       low < instrument.home && instrument.home < high,
       `instrument "${name}": its home is outside its range.`,
     );
-    const { bend, shake } = instrument;
+    const { bend, shake, scoop, fall } = instrument;
     say(bend === null || bend.takes > 0, `instrument "${name}": a bend takes time.`);
+    say(
+      scoop === null || (scoop.below > 0 && scoop.takes > 0),
+      `instrument "${name}": a scoop comes from under the note and takes time.`,
+    );
+    say(
+      fall === null || (fall.semitones > 0 && fall.takes > 0),
+      `instrument "${name}": a fall drops and takes time.`,
+    );
+    say(
+      shake === null || shake.shortest === undefined || shake.shortest > shake.after,
+      `instrument "${name}": a note shaken sounds past where the shake starts.`,
+    );
     say(
       shake === null || (shake.depth > 0 && shake.rate > 0 && shake.after >= 0 && shake.grows >= 0),
       `instrument "${name}": a shake has a depth and a rate, and starts and grows in seconds.`,
@@ -272,6 +284,8 @@ export function validateSoloStyle(solo: SoloStyle): string[] {
     "habits, bend: the hand is lyrical a whole number of phrases either side of the top note.",
   );
   say(solo.habits.shake > 0, "habits, shake: a note is held some beats before it is shaken.");
+  chance(solo.habits.scoop, "habits, scoop");
+  chance(solo.habits.fall, "habits, fall");
 
   const touch = solo.touch;
   for (const level of [touch.level, touch.peak, touch.floor, touch.ceiling]) {

@@ -932,7 +932,7 @@ test("a horn breathes: the alto never plays eight seconds without half a second 
   }
 });
 
-test("a guitar bends only into a note a phrase lands on (one struck where the chord changes, or the last before a breath), of an eighth or longer and never in the bar the band ends on: a half step up into a major third, or a whole step up into a root or a fifth of a quarter or longer (the solo's top note from the scale note under it, whatever tone it is, in two solos in three at least), in a tenth of a second; it shakes only a note held as long as the style asks; a style that does not bend does not; and a horn and a vibraphone do neither", () => {
+test("a guitar bends only into a note a phrase lands on (one struck where the chord changes, or the last before a breath), of an eighth or longer and never in the bar the band ends on: a half step up into a major third, or a whole step up into a root or a fifth of a quarter or longer (the solo's top note from the scale note under it, whatever tone it is, in two solos in three at least), in a tenth of a second; it shakes only a note held as long as the style asks; a style that does not bend does not; and a vibraphone does neither (the horn has its own)", () => {
   // Every instrument whose hand can move a pitch, in a style where it is not the soloist
   // already: the takes the other properties read are on each style's own soloist and the
   // horn. On a push, each chart on one seed where the style bends, and every other chart
@@ -954,7 +954,7 @@ test("a guitar bends only into a note a phrase lands on (one struck where the ch
         ),
       ),
   );
-  const PLAIN = ["alto-sax", "vibraphone"];
+  const PLAIN = ["vibraphone"];
   let [bent, shaken, plain] = [0, 0, 0];
   // Solos on a hand that bends in a style that does, and how many push up into their top note.
   let [solos, topped] = [0, 0];
@@ -972,6 +972,8 @@ test("a guitar bends only into a note a phrase lands on (one struck where the ch
     }
     notes.forEach((note, i) => {
       const hand = SOLO_INSTRUMENTS[note.voice ?? ""]!;
+      // A horn's pitch moves its own way: the property after this one.
+      if (hand.shake?.on === "last") return;
       const where = `${chart.file} ${JSON.stringify(options)} at tick ${note.tick}: ${note.pitch}`;
       const { glide, vibrato } = note.move ?? {};
       if (PLAIN.includes(note.voice ?? "")) {
@@ -1072,7 +1074,149 @@ test("a guitar bends only into a note a phrase lands on (one struck where the ch
   // The top note is always pushed up into where the hand can (SO-53): not in a song's one
   // short solo, which has no climb, nor over a chord that leaves no note under it to start on.
   assert.ok(topped * 3 >= solos * 2, `only ${topped} of ${solos} solos bend into their top note`);
-  assert.ok(plain > enough(2000), `only ${plain} notes on the horn and the vibraphone`);
+  const vibes = STYLES.some((style) => style.solo.instrument === "vibraphone");
+  assert.ok(!vibes || plain > enough(2000), `only ${plain} notes on the vibraphone`);
+});
+
+/**
+ * The least a style's horn does over the takes its properties read, and the most: shaken
+ * phrase endings as a share of them, and scoops and falls present wherever the style's chances
+ * give them, under ceilings taken from those chances. A scoop is drawn once a phrase, and only
+ * a phrase with a note it may go into can take one: half the chance, over the phrases heard, is
+ * more than that gives (a third of it or less in every style), and a style scooping every phrase
+ * it could would go past it. A fall is drawn only on a phrase ending it may be drawn on, which is
+ * one in ten or fewer: three twentieths of the chance, over every ending, is past what that gives
+ * (a tenth of it or less), and a style falling ten times as often goes past it.
+ */
+test("a horn moves a note's pitch as a player does, and seldom: the alto shakes the last note before a breath and no other, 30 cents either side from 0.4 s; it scoops at most one note a phrase, a half step up in 0.06 s into a note of a quarter or longer it arrives on in the line, on a strong beat, from below or by a leap; it falls rarely, off a phrase's last note of a half or longer once it has sounded its length, 6 semitones in half a second, dying away as it drops, never into the next note, a pickup included, nor into the bar the band ends on; and no other note of any seat dies away", () => {
+  const alto = SOLO_INSTRUMENTS["alto-sax"]!;
+  const shake = alto.shake!;
+  const [scoop, fall] = [alto.scoop!, alto.fall!];
+  const near = (a: number, b: number) => Math.abs(a - b) <= 1;
+  for (const style of STYLES) {
+    let [ends, shaken, scoops, falls, phrases] = [0, 0, 0, 0, 0];
+    for (const { chart, options, take } of soloTakes().filter((jam) => jam.style === style)) {
+      for (const note of notesOf(take)) {
+        if (note.fade === undefined) continue;
+        assert.ok(
+          note.voice === "alto-sax" && note.move?.glide?.at(-1)?.semitones === -fall.semitones,
+          `${chart.file}: a ${note.seat} note dies away and does not fall`,
+        );
+      }
+      const notes = notesOf(take, "solo");
+      if (notes[0]?.voice !== "alto-sax") continue;
+      const perSecond = (take.plan.quarters * PPQ) / 60;
+      const owed = Math.max(style.solo.space.breath, alto.breath!.takes) * 0.9 * perSecond;
+      const bars = take.plan.bars;
+      let [b, inPhrase] = [0, 0];
+      notes.forEach((note, i) => {
+        while (bars[b + 1] && bars[b + 1]!.start <= note.tick) b++;
+        const bar = bars[b]!;
+        const where = `${style.id} ${chart.file} ${JSON.stringify(options)} bar ${bar.index} tick ${note.tick}`;
+        const before = notes[i - 1];
+        const after = notes[i + 1];
+        const breathes = !after || after.tick - (note.tick + note.duration) >= owed;
+        if (!before || note.tick - (before.tick + before.duration) >= owed) {
+          phrases++;
+          inPhrase = 0;
+        }
+        if (breathes) ends++;
+        const { glide, vibrato } = note.move ?? {};
+        if (vibrato) {
+          shaken++;
+          assert.ok(breathes, `${where}: a shake on a note that is not a phrase's last`);
+          assert.deepEqual(
+            [vibrato.depth, vibrato.rate, vibrato.upward ?? false],
+            [shake.depth, shake.rate, false],
+            `${where}: not the alto's shake`,
+          );
+          assert.ok(
+            near(vibrato.from, shake.after * perSecond) &&
+              near(vibrato.grow, shake.grows * perSecond),
+            `${where}: a shake from ${(vibrato.from / perSecond).toFixed(2)} s`,
+          );
+          assert.ok(
+            note.duration >= shake.shortest! * perSecond - POCKET,
+            `${where}: a shake on a note of ${(note.duration / perSecond).toFixed(2)} s`,
+          );
+        }
+        if (!glide) return;
+        const [from, to] = [glide[0]!, glide[1]!];
+        assert.equal(glide.length, 2, `${where}: a glide of ${glide.length} points`);
+        assert.equal(bar.ending, null, `${where}: a scoop or a fall in the bar the band ends on`);
+        if (from.at === 0) {
+          scoops++;
+          inPhrase++;
+          assert.ok(inPhrase <= 1, `${where}: a second scoop in a phrase`);
+          assert.ok(
+            from.semitones === -scoop.below &&
+              to.semitones === 0 &&
+              near(to.at, scoop.takes * perSecond),
+            `${where}: a scoop from ${from.semitones} over ${(to.at / perSecond).toFixed(3)} s`,
+          );
+          assert.ok(!vibrato && note.fade === undefined, `${where}: a scooped note is not plain`);
+          assert.ok(
+            before && note.tick - (before.tick + before.duration) < owed,
+            `${where}: a scoop after a breath`,
+          );
+          const by = note.pitch - before.pitch;
+          assert.ok(by > 0 || by <= -3, `${where}: scooped after a step down`);
+          const inBar = note.tick - bar.start;
+          assert.ok(
+            inBar === 0 || inBar * 2 === bar.ticks,
+            `${where}: a scoop off the strong beats`,
+          );
+          assert.ok(
+            note.duration >= PPQ * style.solo.touch.legato * 0.5,
+            `${where}: a scoop into a short note`,
+          );
+          return;
+        }
+        falls++;
+        // Where it sounds: into air, never into the next note or the band's last chord.
+        const drop = to.at - from.at;
+        const gone = note.tick + note.offset + note.duration + drop;
+        if (after) {
+          assert.ok(gone <= after.tick + after.offset, `${where}: a fall into the next note`);
+        }
+        assert.ok(
+          take.plan.open || gone <= take.plan.ticks,
+          `${where}: a fall past the take's end`,
+        );
+        const into = bars.findLast((other) => other.start <= gone)!;
+        assert.equal(into.ending, null, `${where}: a fall into the band's last chord`);
+        // What it is: off a phrase's long last note once it has sounded, the alto's drop.
+        assert.ok(breathes, `${where}: a fall off a note inside a phrase`);
+        assert.ok(
+          note.duration >= 1.5 * PPQ - POCKET,
+          `${where}: a fall off a note of ${note.duration} ticks`,
+        );
+        assert.ok(
+          near(from.at, note.duration) && from.semitones === 0 && to.semitones === -fall.semitones,
+          `${where}: a fall from ${from.at} into a note of ${note.duration}`,
+        );
+        assert.ok(
+          near(drop, fall.takes * perSecond),
+          `${where}: a fall of ${(drop / perSecond).toFixed(2)} s`,
+        );
+        assert.equal(note.fade, drop, `${where}: a fall that does not die away over its drop`);
+      });
+    }
+    const { scoop: scoopChance, fall: fallChance } = style.solo.habits;
+    const where = `${style.id}: ${shaken} of ${ends} phrase endings shaken, ${scoops} scoops in ${phrases} phrases, ${falls} falls`;
+    assert.ok(ends > enough(300), `${where}: too few to judge`);
+    assert.ok(shaken >= ends / 5, where);
+    assert.ok(scoops <= phrases * scoopChance * 0.5, `${where}: too many scoops`);
+    assert.ok(falls <= ends * fallChance * 0.15, `${where}: too many falls`);
+    assert.ok(
+      scoopChance === 0 ? scoops === 0 : scoops > 0,
+      `${where}: scoops against a chance of ${scoopChance}`,
+    );
+    assert.ok(
+      fallChance === 0 ? falls === 0 : falls > 0,
+      `${where}: falls against a chance of ${fallChance}`,
+    );
+  }
 });
 
 // ── the piano around the soloist ────────────────────────────────────────────

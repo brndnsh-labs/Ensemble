@@ -2587,3 +2587,66 @@ An Opus build from `prompts/meter-compound-style.md` in its own clone on the bra
 - **Acoustic's tempo in twelve is the default**, 48 to 80, usually 63.
 - **Known and left**: with no bassist the guitar does not take a slash chord's bass (every meter); acoustic's solo in twelve builds little (`solo.builds` 1.18, 21% of takes in band).
 - **For his ear**: `out/meter-study-5-acoustic/`.
+
+## what the alto does with a note's pitch (stage 6, during gate 6)
+
+An Opus build from `prompts/horn-moves.md`. Brandon, 2026-11-18, of `out/horn-study/` (`scripts/horn-study.ts`): "i'm leaning toward option 9, the player's choice. sounds most varied and natural of the bunch, in my opinion." Clip 9: the last note of each phrase shaken 30 cents either side, 5 a second, from 0.4 s, growing over 0.6 s; one quick scoop (0.06 s) into a landing; one fall of 6 semitones over a beat after the note's full length. Asked whether a fall should die away as it drops: "i trust your judgment on the fade, especially if you think it'll sound more realistic without being a bunch more work". The engineer's decision: a player's fall is a drop in pitch and in breath together, so the alto's fall dies away over the fall's own length.
+
+**What the engine gained.**
+
+- *A note may go on past its end and die away* (`WrittenNote.fade`, `NoteEvent.fade`: ticks past `duration`). Beside `PitchMove`, not in it: it is the note's loudness, not its pitch, and its length in the rhythm stays `duration`, which is what the band hears of it (the comp that listens reads durations, so nothing it hears moves). Feel passes it on untouched. `timedNotes` lengthens the note by it and gives `fade` in seconds (the last stretch of `length`); the MIDI file holds the note through it and says it as channel expression, controller 11, straight down in sixteen steps over the fade and back to 127 when the note is let go. In audio, `Sound.fade` (seconds) makes the sampler ramp the gain straight down to nothing over the note's last stretch in place of its release, stopping the source 20 ms after; `silence` and a choke on a note part-way down take it out from the level it has reached (computed, since a cancelled ramp would leave it at its starting level).
+- *The instrument's way* (`SoloInstrument`): `shake.on` (`held`: every note held as long as the style asks, the guitars, as before; `last`: the last note before a breath), `shake.shortest` (seconds), `scoop` (`below`, `takes`), `fall` (`semitones`, `takes`). Only the alto has a scoop and a fall; the guitars' and the vibraphone's entries gain `on: "held"` (or nothing) and nulls, and play what they played.
+- *The style's chances* (`SoloStyle.habits.scoop`, `.fall`), validated as chances. Every style writes both, with the line it was taken from.
+
+**Decided here.**
+
+- **A phrase's last note is the last note before a breath, as heard**: the note whose gap to the next note, as heard after swing, is the breath, or the last of the phrase, or the last strike of the tune. That is what the suite's properties call a phrase, and in a shape like `L E L E` it shakes both ends: each is followed by a breath.
+- **The least length shaken is 0.7 s as heard**, not after + grows (1.0 s): the shortest note shaken in clip 9 was the first phrase's dotted quarter at 120, 0.71 s; from 0.4 s that is a turn and a half of the shake, at half its depth. The style's `habits.shake` (beats) is the guitar's and does not apply: clip 9 shook a dotted quarter over a jazz band whose guitar threshold is a half note.
+- **Every style's alto shakes.** Every style's notes give a vibrato length (SO-52), so none says no; there is no style switch.
+- **A scoop goes into a note struck on a strong beat (the bar's first, or the pulse halfway through it) where the chord changes or where the phrase ends; a quarter note or longer in the rhythm; come to in the line (the note before ends well inside a breath of it, as heard) from below or by a leap of a minor third or more down.** A step down into it is not scooped (it is the usual approach, and clip 9's step down was the one the brief named unusual). A note at a phrase's end may be scooped, and then stays plain (SO-52: no shake; SO-54: no fall); without them, scoops had nearly nowhere to go (blues 0.1 a chorus). Never a pickup, never in the bar the band ends on. A half step under, in 0.06 s, from 0 at the note's start: clip 9.
+- **A scoop is drawn once a phrase, at the style's chance, onto one of its candidates** (one at most a phrase, so never the note after a scoop). The notes' numbers are per long note; taken here per phrase, they give 0.02 to 0.6 scoops a chorus.
+- **A fall goes off the last note before a breath when it is a half note or longer in the rhythm and a dotted quarter or longer as heard, above the line's home (instrument home plus the style's lift), with the band at its working level or above (the seat's energy from 0.42), not scooped, and only where the drop and a breath after it are over before anything else can be struck: the next note of the phrase, or, after its last, the middle of the phrase's last bar, the earliest a pickup into the next phrase can start (SO-37: half its bar at most).** Never in or into a bar the band ends on, never past a take's end. That last rule makes the fall's room the phrase's own: nothing it decides waits on the phrase after, so a jam made longer or told to finish plays every earlier fall as it would have.
+- **SO-54's weights are kept**: the chance half as much again in a section's last two bars, seven tenths elsewhere, a third straight after a line that fell. Engine constants (SO-54 gives them for every style); the base chance is the style's.
+- **A fall is timed in seconds: 0.5 s**, the beat of clip 9 at 120. A breath and a lip let go at their own speed: at 240 a beat is 0.25 s, a drop of six semitones in it is a smear; at 66 a beat is 0.9 s. The room it needs is in seconds too.
+- **The fade is straight in gain, from the note's level to silence at the bottom of the fall**, over the same 0.5 s as the drop; the pitch eases (smoothstep) as every glide does. The shake, on a note that has one, goes on through the drop, as clip 9 drew it.
+- **The moves are drawn after the critic has chosen the phrase**, keyed by place (the phrase's first bar for the scoop, the note's place for the fall), so the choice of phrase, every note, and every other draw are what they were.
+- **A phrase said again is not said with the same scoops.** The guitar's bends are remembered with the idea; a scoop here is drawn by place. Left for an ear to ask for.
+- **`soloDensity` does not move the chances.** It moves which phrases are played, and so which notes there are to move.
+
+**Chances written** (`habits.scoop` a phrase, `habits.fall` a phrase ending that can take one):
+
+- jazz 0.15 (ST-jazz-37) and 0.3 (the notes give jazz none; he chose the fall over the jazz band; SO-54's horn styles' 0.3);
+- blues 0.15 (ST-blues-41) and 0.3 (ST-blues-43, SO-54);
+- funk 0.2 and 0.35 (ST-funk-32, SO-54);
+- disco 0.3 and 0.3 (ST-disco-25);
+- neo-soul 0.35 (ST-neosoul-33, SO-53) and none (the notes give none);
+- reggae 0.25 (ST-reggae-27, SO-53) and none;
+- acoustic none and none (ST-acoustic-28: no scoops; a sung line);
+- rock none (ST-rock-24: no scoops) and none.
+
+**Measured** (`out/horn-moves/src/count.ts`: each style's own charts, about 200 takes each, a jam of four passes with the alto, so a three-chorus solo; per chorus 1, 2, 3; a phrase ending is a note with half a second of air after it, or the last):
+
+| style | ending notes | shaken | scoops | falls |
+|---|---|---|---|---|
+| jazz (27.8 bars) | 13.9, 11.1, 11.0 | 4.6, 3.7, 3.9 | 0.45, 0.33, 0.32 | 0.06, 0.15, 0.07 |
+| blues (12) | 7.4, 5.5, 5.2 | 6.1, 4.3, 4.5 | 0.15, 0.20, 0.27 | 0.10, 0.06, 0.07 |
+| funk (19) | 14.3, 9.5, 9.0 | 6.3, 5.8, 5.3 | 0.02, 0.07, 0.14 | 0.17, 0.29, 0.47 |
+| disco (22.7) | 10.0, 8.1, 7.8 | 7.5, 6.0, 5.7 | 0.44, 0.45, 0.59 | 0.15, 0.21, 0.34 |
+| neo-soul (20.6) | 13.5, 11.8, 11.1 | 10.7, 8.4, 8.2 | 0.29, 0.37, 0.52 | none |
+| reggae (24) | 15.7, 15.8, 15.3 | 12.7, 11.6, 10.3 | 0.13, 0.20, 0.07 | none |
+| rock (22) | 10.1, 9.3, 9.1 | 7.6, 6.8, 7.1 | none | none |
+| acoustic (20) | 10.4, 8.8, 8.8 | 8.9, 7.6, 8.1 | none | none |
+
+- **Falls are rarer than SO-54's chance reads**: of the endings, 1 to 5 in a hundred fall. Few endings can take one: most are short, low, or have no half second plus a breath before the next phrase can start. A three-chorus jazz solo has a fall one time in four; funk's, about one. Clip 9 had one in eight bars. At double the chance (for his ear, below): jazz 0.2 to 0.4 a chorus, the blues 0.1 to 0.4.
+- **Scoops are fewer than the guitar's bends in the styles that bend** (on the driven guitar, same charts: the blues 1.9, 0.8, 2.3 a chorus; disco 0.6, 0.6, 1.1), except neo-soul's second chorus (0.37 scoops against 0.05 bends; over the solo 1.2 against 1.4). Jazz, funk and reggae do not bend.
+- **A ballad shakes more than it scoops** everywhere: shakes are on most endings long enough, scoops one a phrase at most.
+
+**Properties.** One added (`test/soloist.test.ts`, "a horn moves a note's pitch as a player does, and seldom"), reading the takes the soloist's properties already read, rendering none: the alto shakes only a note followed by a breath, with clip 9's shake, on a note of 0.7 s or more; at most one scoop a heard phrase, a half step in 0.06 s, after no breath, from below or a leap, on a strong beat, never in the ending bar, the note plain; a fall only off a note followed by a breath, a dotted quarter or longer, starting at the note's end, 6 semitones in 0.5 s, dying away over the same ticks, never sounding into the next note as heard, past a closed take's end, or into a bar with the band's ending; no note of any seat dies away but a falling alto note; per style, shaken endings a fifth of all at least, scoops and falls present where the chances are over none and absent where none, scoops under half the chance over the phrases heard, falls under three twentieths of the chance over every ending. On the starting commit it fails in every style ("0 of 1582 phrase endings shaken, 0 scoops ..., 0 falls" in jazz). Broken in the engine one at a time, it failed on: the alto shaking every held note; a fall without its fade; a scoop after a step down; every candidate in a phrase scooped; a fall's room taken away and its drop made 2 s ("a fall into the next note"); the room and the ending checks taken away ("in the bar the band ends on", disco; "too many falls", the blues); falls ten times as likely ("too many falls", funk and disco; jazz's eligible endings are too few to cross its ceiling); scoops five times as likely ("too many scoops", jazz and disco). Taking the room check away with the drop as built did not fail it: half a second of breath after the note already holds a drop of half a second.
+
+The guitar's property ("a guitar bends only into ...") no longer asks the alto to be plain: it skips an instrument that shakes `last`, and its floor on plain notes is the vibraphone's, asked only where a style's own soloist is the vibraphone.
+
+**Unchanged, and how it is known.** `out/horn-moves/src/fingerprint.ts`, run on the starting commit (a worktree of `0c6f249`) and on the branch: every library chart in every style, on each of the seven solo instruments, as a jam of four passes on seeds 1 and 2, the song and an open jam of three on seed 1 (13,632 takes, 2,505,544 solo notes): the drums', bass's and chords' events the same in every take; the guitars' and the vibraphone's solo events and MIDI bytes the same in every take; the alto's notes (all but `move` and `fade`) and their count the same in every take.
+
+**Goldens.** Rewritten, the four whose soloist is the alto: `disco-four-chord-c-solo`, `funk-two-chord-dm-solo`, `jazz-rhythm-changes-bb-solo`, `reggae-three-chord-d-solo`: the solo track gains pitch bend and, where a note falls, expression; its notes are the same 232, 210, 401 and 79. The drums, bass and chords tracks are byte for byte; the other thirteen goldens (four with a guitar or the vibraphone soloing, nine with no soloist) are byte for byte.
+
+**Scorecards**: written before and after to scratch files for all eight styles: identical.

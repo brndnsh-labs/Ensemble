@@ -446,6 +446,20 @@ export interface SoloStyle {
      * that shakes its notes (SO-52): a dotted quarter is 1.5.
      */
     readonly shake: number;
+    /**
+     * The chance a phrase scoops into one note it arrives on, on an instrument
+     * that scoops: one struck where the chord changes, on a pulse, a quarter or
+     * longer, come to from below or by a leap (SO-53). One at most a phrase.
+     */
+    readonly scoop: number;
+    /**
+     * The chance the last note of a phrase falls, on an instrument that falls,
+     * where it may (SO-54): a half note or longer, above the line's home, with
+     * the band at its working level or above, and air after it for the fall
+     * and a breath. Half as much again in a section's last two bars, seven
+     * tenths elsewhere, a third straight after a phrase that fell.
+     */
+    readonly fall: number;
   };
 
   /** Written levels, before the band's energy scales them (SO-51). */
@@ -506,5 +520,28 @@ export interface SoloInstrument {
     readonly after: number;
     readonly grows: number;
     readonly upward: boolean;
+    /**
+     * Which notes it shakes: `held`, every note held as long as the style asks
+     * (`habits.shake`), as a guitarist does; `last`, only the last note before
+     * a breath, the end of a phrase as heard, as a horn player does.
+     */
+    readonly on: "held" | "last";
+    /**
+     * The fewest seconds a note must sound to be shaken. Left out, until the
+     * shake has reached its depth (`after` and `grows`).
+     */
+    readonly shortest?: number;
   } | null;
+  /**
+   * A horn's scoop: a note the line arrives on is struck `below` semitones
+   * flat and eased up to pitch in `takes` seconds. Null for an instrument that
+   * does not scoop.
+   */
+  readonly scoop: { readonly below: number; readonly takes: number } | null;
+  /**
+   * A horn's fall: the last note of a phrase sounds its full length, then
+   * drops `semitones` over `takes` seconds and dies away as it drops. Null for
+   * an instrument that does not fall.
+   */
+  readonly fall: { readonly semitones: number; readonly takes: number } | null;
 }

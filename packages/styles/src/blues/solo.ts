@@ -476,6 +476,10 @@ export const bluesSolo: SoloStyle = {
     bend: { third: 0.65, rootOrFifth: 0.45, around: 1, elsewhere: 0.5 },
     // A note held a dotted quarter is shaken (SO-52).
     shake: 1.5,
+    // On a horn: a scoop into a long note 0.15 (ST-blues-41), here a phrase's one arrival; a
+    // fall off a phrase's last note 0.3, mostly at the chorus's close (ST-blues-43, SO-54).
+    scoop: 0.15,
+    fall: 0.3,
   },
 
   // SO-51: louder as it goes up, a short "and" leaned on, the bottom of a run ghosted.

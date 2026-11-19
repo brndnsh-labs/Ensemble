@@ -400,6 +400,10 @@ export const neosoulSolo: SoloStyle = {
     bend: { third: 0.4, rootOrFifth: 0.08, around: 1, elsewhere: 0.5 },
     // Vibrato only on notes of eight sixteenths or longer: a half note (ST-neosoul-33, SO-52).
     shake: 2,
+    // A horn scoops 0.35 (ST-neosoul-33, SO-53), a phrase's one arrival; the notes give it no
+    // fall.
+    scoop: 0.35,
+    fall: 0,
   },
 
   // Behind a singer: a touch under the horns, legato.

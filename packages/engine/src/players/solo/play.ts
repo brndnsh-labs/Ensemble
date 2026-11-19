@@ -10,16 +10,18 @@ import type { Scored } from "../../critic/choose.ts";
 import { score } from "../../critic/choose.ts";
 import { swing } from "../../perform/feel.ts";
 import { cells, STEP } from "../../perform/grid.ts";
-import { onAnd, pulseTicks } from "../../perform/meter.ts";
+import { onAnd, onPulse, pulseTicks } from "../../perform/meter.ts";
 import type { Player, PlayerContext, WrittenNote } from "../../perform/notes.ts";
 import { heldRng } from "../../perform/notes.ts";
 import type { PitchMove } from "../../perform/pitch.ts";
 import type { PlanBar } from "../../plan/types.ts";
+import type { Rng } from "../../rng.ts";
+import { TIER_MID } from "../../style/types.ts";
 import type { Heard, SoloCandidate, SoloPick, Sounding } from "./critique.ts";
 import { bassStruck, bySoloCritic, SOLO_FEATURES } from "./critique.ts";
 import { EIGHTH, isChordTone } from "./harmony.ts";
 import { soloVoice } from "./instruments.ts";
-import { spotsOf } from "./line.ts";
+import { placeOf, spotsOf } from "./line.ts";
 import type { Memory, PassPickup, Phrase } from "./phrases.ts";
 import { opensPass, passPickup, phrasesFor } from "./phrases.ts";
 import type { Slot, World } from "./slots.ts";
@@ -38,6 +40,30 @@ interface SoloNote {
   readonly velocity: number;
   /** How its pitch moves while it sounds: a bend into it, a held note shaken. */
   readonly move?: PitchMove;
+  /** Ticks it sounds past its end, dying away: a fall. */
+  readonly fade?: number;
+  /** A breath follows it: it ends a phrase as heard. */
+  readonly ends?: boolean;
+  /** Its length in the rhythm, in ticks. */
+  readonly value?: number;
+  /** A note of a pickup into the phrase. */
+  readonly lead?: boolean;
+}
+
+/** A soloist's note as the band is given it. */
+function writtenOf(note: SoloNote, voice: string, leadsIn: boolean): WrittenNote {
+  return {
+    seat: "solo",
+    bar: note.bar.index,
+    tick: note.tick,
+    duration: note.duration,
+    pitch: note.pitch,
+    velocity: note.velocity,
+    voice,
+    ...(note.move ? { move: note.move } : {}),
+    ...(note.fade ? { fade: note.fade } : {}),
+    ...(leadsIn ? { leadsIn: true } : {}),
+  };
 }
 
 /** One phrase as it was chosen: for a report that wants to show the alternatives. */
@@ -72,6 +98,8 @@ export function soloPart(
   let earlier: Heard[] = [];
   let form: readonly Role[] = ["s"];
   let solo = -1;
+  /** The last line before this one fell. */
+  let fell = false;
   /** A pickup into the top of a pass, made from the pass before (`passPickup`). */
   const intoPass = (bar: PlanBar, previous: Slot | undefined): PassPickup | null => {
     if (!opensPass(plan, bar)) return null;
@@ -90,9 +118,7 @@ export function soloPart(
   };
   const writeLead = (lead: PassPickup, bar: PlanBar): SoloNote[] => {
     const notes = realiseLead(world, lead, bar);
-    for (const note of notes) {
-      written.push({ ...note, seat: "solo", bar: note.bar.index, voice, leadsIn: true });
-    }
+    for (const note of notes) written.push(writtenOf(note, voice, true));
     return notes;
   };
   world.slots.forEach((slot, s) => {
@@ -103,6 +129,7 @@ export function soloPart(
       // into it leaves that note its breath.
       memory = { ...NOTHING, restEnds: memory.restEnds };
       earlier = [];
+      fell = false;
     }
     const lead = intoPass(first, world.slots[s - 1]);
     if (slot.index === 0) {
@@ -152,12 +179,16 @@ export function soloPart(
     report?.({ slot, role, candidates: score(candidates, SOLO_FEATURES, weights), chosen });
 
     const phrase = phrases[at]!;
-    const played = notes[at]!;
+    // How the horn plays the phrase chosen: what it does with the pitch of the notes it
+    // arrives on and of the notes it leaves. Drawn by place, after the choice, so the
+    // phrase is the one the critic chose whatever it does.
+    const horned = hornMoves(world, slot, notes[at]!, rng, fell);
+    const played = horned.notes;
+    fell = horned.fell;
     const opens = slot.bars[0]!.start;
     for (const note of played) {
       // A pickup struck before the phrase's first bar leads into it, from wherever it is played.
-      const leadsIn = note.tick < opens ? { leadsIn: true } : {};
-      written.push({ ...note, seat: "solo", bar: note.bar.index, voice, ...leadsIn });
+      written.push(writtenOf(note, voice, note.tick < opens));
     }
     const last = played.at(-1);
     // A new idea is the idea from now on, wherever in the form it turned up; and so is
@@ -239,6 +270,7 @@ function moveOf(
   bend: number,
   value: number,
   sounds: number,
+  ends: boolean,
 ): { move: PitchMove } | undefined {
   const { instrument, solo, ticksPerSecond } = world;
   const seconds = sounds / ticksPerSecond;
@@ -246,8 +278,12 @@ function moveOf(
   const bends =
     push !== null && bend > 0 && value >= (bend === 1 ? EIGHTH : PPQ) && seconds >= 2 * push.takes;
   const shake = instrument.shake;
+  // A guitarist shakes every note held long enough; a horn player the note a phrase ends on.
   const shakes =
-    shake !== null && value >= solo.habits.shake * PPQ && seconds >= shake.after + shake.grows;
+    shake !== null &&
+    (shake.on === "held"
+      ? value >= solo.habits.shake * PPQ && seconds >= shake.after + shake.grows
+      : ends && seconds >= (shake.shortest ?? shake.after + shake.grows));
   if (!bends && !shakes) return undefined;
   return {
     move: {
@@ -311,7 +347,7 @@ function realise(world: World, phrase: Phrase, accent: number, breathedAt?: numb
     const isFinal = (note: typeof next) =>
       note !== undefined && note.spot.bar.ending !== null && phrase.bars.at(-1)?.part === "F";
     if (!next && isFinal(all[i])) {
-      return finalStrikes(bar, tick).map((strike) => {
+      return finalStrikes(bar, tick).map((strike, s, strikes) => {
         // A horn holds the last note as long as the band does, or as long as it has air.
         const duration = Math.min(
           strike.duration,
@@ -324,7 +360,15 @@ function realise(world: World, phrase: Phrase, accent: number, breathedAt?: numb
           pitch,
           velocity: strike.accent ? Math.max(velocity, accent) : velocity,
           // A last note held is shaken. (The line never asks for a bend here: SO-57.)
-          ...moveOf(world, bend ?? 0, duration, soundsFor(world, bar, strike.tick, duration)),
+          ...moveOf(
+            world,
+            bend ?? 0,
+            duration,
+            soundsFor(world, bar, strike.tick, duration),
+            s === strikes.length - 1,
+          ),
+          ...(s === strikes.length - 1 ? { ends: true } : {}),
+          value: duration,
         };
       });
     }
@@ -384,13 +428,29 @@ function realise(world: World, phrase: Phrase, accent: number, breathedAt?: numb
       while (until > tick && entry - heard(until, bar) < breath) until -= STEP;
       if (until - tick >= STEP) duration = Math.min(duration, until - tick);
     }
+    // A breath after it, as heard, and it ends a phrase as heard; the last note of a phrase
+    // always has one before whatever follows.
+    let ends = !next;
     if (next) {
       const gap = heard(next.spot.tick, next.spot.bar) - heard(tick + duration, bar);
       if (gap >= breath) breathed = next.spot.tick;
+      ends = gap >= breath && !lead;
     }
     duration = Math.max(SHORTEST, duration);
-    const move = moveOf(world, bend ?? 0, value, soundsFor(world, bar, tick, duration));
-    return [{ bar, tick, duration, pitch, velocity, ...move }];
+    const move = moveOf(world, bend ?? 0, value, soundsFor(world, bar, tick, duration), ends);
+    return [
+      {
+        bar,
+        tick,
+        duration,
+        pitch,
+        velocity,
+        ...move,
+        value: spot.hold,
+        ...(ends ? { ends: true } : {}),
+        ...(lead ? { lead: true } : {}),
+      },
+    ];
   });
 }
 
@@ -480,4 +540,124 @@ function finalStrikes(
       });
     }
   }
+}
+
+/** A fall's chance in a section's last two bars, and elsewhere (SO-54). */
+const FALL_AT_CLOSE = 1.5;
+const FALL_ELSEWHERE = 0.7;
+/** And straight after a line that fell (SO-54). */
+const FALL_AFTER_FALL = 1 / 3;
+
+/**
+ * What a horn does with the pitch of a phrase's notes, on an instrument that
+ * scoops and falls (SO-53, SO-54, SO-57). One note it arrives on may be
+ * scooped, as often as the style says: struck on a strong beat (the bar's
+ * first, or the pulse halfway through it) where the chord changes or where
+ * the phrase ends, a quarter note or longer, come to in the line from below or
+ * by a leap. A note scooped into stays plain (SO-52): no shake, no fall.
+ * A line's last note may fall: a half note or longer, above the line's home,
+ * with the band at its working level or above, never one scooped into, never
+ * in or into the bar the band ends on, and only where the fall and a breath
+ * are over before anything else can be struck: the next note of the phrase,
+ * or, after its last, the later half of its last bar, which is as early as a
+ * pickup into the next phrase can start (SO-37). It sounds its full length,
+ * drops, and dies away as it drops. Every draw is keyed by its place.
+ */
+function hornMoves(
+  world: World,
+  slot: Slot,
+  notes: readonly SoloNote[],
+  rng: Rng,
+  fellBefore: boolean,
+): { notes: SoloNote[]; fell: boolean } {
+  const { instrument, solo, ticksPerSecond, plan } = world;
+  const scoop = solo.habits.scoop > 0 ? instrument.scoop : null;
+  const fall = solo.habits.fall > 0 ? instrument.fall : null;
+  if (scoop === null && fall === null) return { notes: [...notes], fell: false };
+  const breath = Math.ceil(
+    Math.max(solo.space.breath, instrument.breath?.takes ?? 0) * ticksPerSecond,
+  );
+  const out = [...notes];
+
+  if (scoop !== null) {
+    const arrivals = notes.flatMap((note, i) => {
+      const before = notes[i - 1];
+      if (!before || note.lead || note.bar.ending !== null) return [];
+      if ((note.value ?? 0) < PPQ) return [];
+      // Come to in the line, as heard: well inside a breath of the note before.
+      const heardEnd = before.tick + soundsFor(world, before.bar, before.tick, before.duration);
+      if (2 * (note.tick - heardEnd) >= breath) return [];
+      // On a strong beat: the bar's first, or the pulse halfway through it.
+      const inBar = note.tick - note.bar.start;
+      if (inBar !== 0 && (inBar * 2 !== note.bar.ticks || !onPulse(note.bar.meter, inBar)))
+        return [];
+      // Where the chord changes, or the note a phrase ends on.
+      const arrival = world.arrivalAt(note.tick);
+      if (!arrival?.chord) return [];
+      if (!note.ends && (!arrival.changed || arrival.tick !== note.tick)) return [];
+      const by = note.pitch - before.pitch;
+      return by > 0 || by <= -3 ? [i] : [];
+    });
+    const first = slot.bars[0]!;
+    const draw = rng.fork("scoop", placeOf(first, first.start));
+    if (arrivals.length > 0 && draw.chance(solo.habits.scoop)) {
+      const i = draw.pick(arrivals);
+      // A scooped note stays plain (SO-52): it is not shaken as well.
+      out[i] = {
+        ...notes[i]!,
+        move: {
+          glide: [
+            { at: 0, semitones: -scoop.below },
+            { at: scoop.takes * ticksPerSecond, semitones: 0 },
+          ],
+        },
+      };
+    }
+  }
+
+  let fell = fellBefore;
+  if (fall !== null) {
+    const lastBar = slot.bars.at(-1)!;
+    const nextPhrase = lastBar.start + lastBar.ticks / 2;
+    const home = instrument.home + solo.lift;
+    const drop = Math.round(fall.takes * ticksPerSecond);
+    out.forEach((note, i) => {
+      if (!note.ends || note.lead) return;
+      const before = fell;
+      fell = false;
+      // A half note or longer in the rhythm, and a dotted quarter at least as heard, its
+      // breath taken (SO-54).
+      const sounds = soundsFor(world, note.bar, note.tick, note.duration);
+      if (note.move?.glide || (note.value ?? 0) < 2 * PPQ || sounds < 1.5 * PPQ) return;
+      if (note.pitch <= home) return;
+      if ((note.bar.seats.solo ?? note.bar.energy) < TIER_MID) return;
+      const over = note.tick + sounds + drop + breath;
+      if (over > (out[i + 1]?.tick ?? nextPhrase)) return;
+      if (!plan.open && over > plan.ticks) return;
+      for (let b = note.bar.index; b < plan.bars.length; b++) {
+        const bar = plan.bars[b]!;
+        if (bar.start >= over) break;
+        if (bar.ending !== null || bar.kind !== "music") return;
+      }
+      const closing = note.bar.barInSection >= note.bar.section.bars - 2;
+      const chance =
+        solo.habits.fall *
+        (closing ? FALL_AT_CLOSE : FALL_ELSEWHERE) *
+        (before ? FALL_AFTER_FALL : 1);
+      if (!rng.fork("fall", placeOf(note.bar, note.tick)).chance(chance)) return;
+      fell = true;
+      out[i] = {
+        ...note,
+        move: {
+          ...note.move,
+          glide: [
+            { at: sounds, semitones: 0 },
+            { at: sounds + drop, semitones: -fall.semitones },
+          ],
+        },
+        fade: drop,
+      };
+    });
+  }
+  return { notes: out, fell };
 }

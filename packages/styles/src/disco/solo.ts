@@ -410,6 +410,10 @@ export const discoSolo: SoloStyle = {
     bend: { third: 0.3, rootOrFifth: 0.2, around: 1, elsewhere: 0.5 },
     // Vibrato on every note of six sixteenths or more (ST-disco-25): a dotted quarter.
     shake: 1.5,
+    // A horn scoops into a long note 0.3 (ST-disco-25), a phrase's one arrival, and falls off a
+    // phrase end 0.3 (ST-disco-25, SO-54).
+    scoop: 0.3,
+    fall: 0.3,
   },
 
   // Legato: funk's sixteenths, held on.

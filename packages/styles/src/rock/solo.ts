@@ -411,6 +411,9 @@ export const rockSolo: SoloStyle = {
     bend: { third: 0.45, rootOrFifth: 0.55, around: 1, elsewhere: 0.5 },
     // A note held a dotted quarter is shaken (SO-52).
     shake: 1.5,
+    // No scoops (ST-rock-24), and the notes give rock no fall.
+    scoop: 0,
+    fall: 0,
   },
 
   touch: {

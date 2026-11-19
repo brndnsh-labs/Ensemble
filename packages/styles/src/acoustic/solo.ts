@@ -427,6 +427,9 @@ export const acousticSolo: SoloStyle = {
     bend: { third: 0, rootOrFifth: 0, around: 0, elsewhere: 0 },
     // Vibrato on notes of eight sixteenths or longer (ST-acoustic-28).
     shake: 2,
+    // No scoops (ST-acoustic-28), and no falls: the line is sung.
+    scoop: 0,
+    fall: 0,
   },
 
   // A plucked melody over a quiet band: a little under the horns, legato.

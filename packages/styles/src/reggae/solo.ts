@@ -363,6 +363,10 @@ export const reggaeSolo: SoloStyle = {
     bend: { third: 0, rootOrFifth: 0, around: 0, elsewhere: 0 },
     // Vibrato on notes of eight sixteenths or longer (ST-reggae-27).
     shake: 2,
+    // A horn scoops 0.25 (ST-reggae-27, SO-53), a phrase's one arrival; the notes give it no
+    // fall.
+    scoop: 0.25,
+    fall: 0,
   },
 
   // The horn laid back: a touch under disco's, legato.
