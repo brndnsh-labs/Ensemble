@@ -2706,3 +2706,13 @@ Brandon: "let's do prod". Released by the workflow run by hand with "production"
 
 - Not checked: a browser that had the old app installed. The journeys run in a clean browser; the old app's service worker is still on his devices until the new one takes over or the home-screen app is removed and added again.
 - Left as it was: the account API in both stacks, its database, its Caddy route and its backups. Nothing calls it.
+
+## after the swap: the account API retired, the side door closed (stage 6, 2026-11-18)
+
+Brandon: "Everything looks good, go ahead with the cleanup".
+
+- **The old app's account API is out of both stacks** (`~/code/homelab-maintenance`, commit `30f7314`, with its own tools): Caddy no longer routes `/api/*`; both recipes are the web container alone, now kept by hand there; both API containers are stopped and removed; the nightly dump and its cron job are gone. The web containers were not recreated. Both sites serve as before; smoke 5 of 5 against production afterwards.
+- **Nothing of its data was deleted**: both database volumes, the dumps (a final one taken before the containers stopped) and the env files are on the box. Deleting them is his word.
+- **Left for him**: the firewall still admits Caddy to ports 8092 and 8093 (changing it needs his grant on the host); the homelab commit is not pushed.
+- **`pnpm deploy:test` is retired** (`scripts/deploy-test.sh`): it built here and loaded the image over SSH because there was no remote. A push to `main` is the release to the test site now.
+- The commit that retired it (`9788b55`) went out with a comma left at the end of `package.json`'s scripts, which is not JSON; its CI run fails at install and releases nothing. Mended in the next commit.
