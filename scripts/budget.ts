@@ -24,10 +24,15 @@ const started = performance.now();
 const result = spawnSync(command, { stdio: "inherit", shell: true });
 const seconds = (performance.now() - started) / 1000;
 if (result.status !== 0) process.exit(result.status ?? 1);
-if (seconds > limit) {
+// A budget is kept on the machine the work is done on. Anywhere else (a shared runner, with
+// half the cores and someone else's load) the time is said and not judged: `ENSEMBLE_BUDGET=report`.
+const judged = process.env.ENSEMBLE_BUDGET !== "report";
+if (seconds > limit && judged) {
   console.error(
     `\nBUDGET EXCEEDED: ${seconds.toFixed(1)}s > ${limit}s. Consolidate or delete; see docs/TESTING.md.`,
   );
   process.exit(1);
 }
-console.log(`\nbudget: ${seconds.toFixed(1)}s of ${limit}s`);
+console.log(
+  `\nbudget: ${seconds.toFixed(1)}s of ${limit}s${judged ? "" : " (reported, not judged)"}`,
+);

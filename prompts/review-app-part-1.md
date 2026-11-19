@@ -10,7 +10,7 @@ Read first: `CLAUDE.md`, `docs/BRIEF.md` section 11 (the app) and 4.2 (timed jam
 
 ## What to review
 
-The three commits `1e097af`, `8ce6532`, `4587b0a` (`git show --stat` each):
+The three commits `0893aba`, `061d8e0`, `d72d730` (`git show --stat` each):
 
 1. **`packages/app/`**: a Vite and React app. `src/play/` is the play screen (`rig.ts` audio wiring, `jam.ts` take to sounds and playhead, `useJam.ts` the play/finish/stop state, `page.ts` and `ChartView.tsx` the chart on screen, `ChordSymbol.tsx`, `StatusStrip.tsx`, `PlayView.tsx`). `src/offline.ts`, `service-worker.js` and `vite.config.ts` are install and offline. `src/LibraryView.tsx`, `src/CreditsView.tsx`, `src/settings.ts`, `src/App.tsx`.
 2. **Engine**: `PlanOptions.endAfter` in `packages/engine/src/plan/plan.ts` and `arc.ts` (a jam told to finish), and `PlanBar.section.index`.
