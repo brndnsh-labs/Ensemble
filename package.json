@@ -30,7 +30,6 @@
     "app:build": "pnpm --filter @ensemble/app build",
     "smoke": "node scripts/budget.ts 60 playwright test",
     "image": "sh scripts/image.sh",
-    "deploy:test": "sh scripts/deploy-test.sh"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.7",
