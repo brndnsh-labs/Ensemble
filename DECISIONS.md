@@ -2754,3 +2754,60 @@ An Opus build from `prompts/slide-study.md` in its own clone: `scripts/slide-stu
 - **Recommended to him, and briefed** (`prompts/guitar-slides.md`): the short stepped slide (one or two frets) and the one-fret slide into a major third, as he named them; hammer-ons and pull-offs as one struck string, because that is how the player's choice he found most natural drew them and it is what the hand does (a hammered note has no pick stroke; the two-note drawing gives it one, softer). This is reasoning from his words and the mechanism, not from an ear: the page after the build has to confirm it.
 - **Left out**: the long slide (four or five frets retune a recording by a fourth, and he did not choose it); the slide between two notes; the two-note hammer-on; the alto's grace note (the alto was given three moves a day ago, and a scoop already arrives from below). Each can be asked for again from the same page.
 - **Neo-soul's move into the major third becomes the one-fret slide** its notes always wrote (ST-neosoul-33); it was a bend only because there was no slide. He has passed neo-soul's guitar as it is, so the page plays it before and after.
+
+## the guitar's short slide, hammer-on and pull-off (stage 6, during gate 6)
+
+An Opus build from `prompts/guitar-slides.md`, in two parts committed apart: the short stepped slide, then hammer-ons and pull-offs as one struck string. From his words on `out/slide-study/`: "short slide sounds pretty good, and the one fret slide is nice" (clips 3 and 7), and of clip 13 "the player's choice sounds the most natural since it mixes things up".
+
+### Part 1: the slide
+
+**What the engine gained.**
+
+- *The instrument's hand* (`SoloInstrument.slide`): `{ fret, oneFret }`, seconds a fret stands in a two-fret slide and in a one-fret slide. Every guitar has it, the same numbers on each; the alto and the vibraphone have `null`. `JUMP` (`perform/pitch.ts`, 1 ms): two glide points that far apart are a step, as the study drew them; nothing in how a curve is made changed.
+- *The style's chance* (`SoloStyle.habits.slide`): `{ chance, into }`, a phrase's chance of one slide, and `landing` (every start below) or `third` (only the minor third up into the major), validated.
+- *Where* (`slideInto` in `players/solo/play.ts`): after the critic has chosen the phrase and after `hornMoves`, drawn by the phrase's place, so the phrase and every other draw are what they were. A slide moves no note.
+- *A phrase knows whether the hand is lyrical in it* (`Phrase.lyrical`): the one decision `writeBends` already made, carried to where the slide is drawn.
+- *The critic's `solo.bends`* counts a glide of two points (a bend, or the alto's scoop and fall as before), not a slide's stepped glide: it is "how often a string is pushed up", and rock's scorecard holds it.
+
+**Decided here.**
+
+- **A slide is struck on its beat at the start fret and stands on each fret in turn, jumping to the next**: two frets 0.0285 s each, on pitch at 0.057 s (clip 3: a thirty-second at 132); one fret stands **0.057 s** (clip 7 at 132). Clip 7's single fret stood 0.057 s at 132 and 0.091 s at 82, and he liked it on both; the one figure is the faster, so that a slide of one fret or two is on its note at the same moment and the one-fret slide is never slower than the two-fret one, and it is the figure he heard first and named. In seconds, whatever the tempo; a note is slid into only if it sounds twice that long.
+- **The starts, within two frets** (SO-56's list cut to two frets): from below the flat 7th up to the root, the 4th up to the 5th, the 2nd up to a major 3rd, and the minor 3rd up to the major (one fret); from above the 2nd down to the root, the 6th to the 5th, the 4th to a minor 3rd, the root to the flat 7th (each two frets: the brief's "2 to root" is one of four SO-56 names, and all four are within two frets). The start is a pitch of the style's ladder over that chord that is not a passing tone (SU-B-17), on the instrument; the minor third into the major needs no more. **Mostly from below** is read as: from below wherever a start below exists, from above only where none does. Over a major key's I, rock's notes (the major pentatonic) have no flat 7th, so its root is slid into from the 2nd above.
+- **Which notes**: a note of an eighth or longer in the rhythm, struck where the chord changes (on the change's own tick; a note leaning into it is not), not bent, not a pickup, never in the bar the band ends on. One at most a phrase, drawn once a phrase at the style's chance, onto one of its candidates, and then one of the note's starts.
+- **Slides come where bends do: in a phrase the hand gets lyrical in** (KF-B-10, `habits.bend.around` and `.elsewhere`). Without the gate rock slid 196 times to 222 bends on the push run's takes, a slide nearly as common as a bend; with it, 117 to 222, about the share clip 13 had (one slide, two bends).
+- **A slid note held long enough is still shaken**, the shake starting where it always does (0.35 s in), long after the slide has arrived (0.057 s): clip 13 shook the C-sharp it slid into the same way. One device to a note (SO-57) is about the arrival, and a slide and a bend are never on one note.
+- **Which instruments**: all four guitars. A slide is as common on steel and nylon strings as on an electric, so the steel and nylon hands slide; how often is the style's, and acoustic's is none.
+- **Neo-soul**: its move into the major third (ST-neosoul-33, 0.40) is the one-fret slide and nothing else (`into: "third"`), and `habits.bend.third` is 0 there: the move was a bend only while there was no slide. Its bend into the root (0.08) stays.
+
+**Chances written** (`habits.slide`, a lyrical phrase's chance of one slide):
+
+- the blues 0.25, `landing` (SO-56);
+- rock 0.2, `landing` (SO-56, ST-rock-24);
+- neo-soul 0.4, `third` (ST-neosoul-33: "half-step slide up into the 3rd 0.40");
+- disco 0.05, `landing`: its notes give no slide; a guitar picked for it slides seldom, at a quarter of rock's chance, as it bends a quarter as often a phrase (0.1 at first gave more slides than bends);
+- acoustic none: its notes give no slide (ST-acoustic-25 to -28). ST-acoustic-28's "slur into the 3rd from the half step below 0.25 (the only 'bend')" is played by nothing, as before: it could be read as the one-fret slide on the steel string, which would change the style's own soloist, and nobody has heard that; left for his ear;
+- jazz, funk and reggae none: their notes give no slide, as they give no bend.
+
+**How many** (`out/guitar-slides/src/count.ts`, each style's own charts, 20 seeds, a jam of four passes: a three-chorus solo; per chorus 1, 2, 3; bends and shakes for comparison):
+
+| style, guitar | bars a chorus | bends | shakes | slides |
+|---|---|---|---|---|
+| rock, overdriven | 22 | 2.48, 1.94, 2.43 | 15.6, 11.9, 9.2 | 0.48, 0.51, 0.68 |
+| blues, overdriven | 12 | 1.59, 1.21, 2.15 | 7.9, 4.7, 4.3 | 0.23, 0.32, 0.51 |
+| neo-soul, clean | 20.6 | 0.10, 0.09, 1.06 (was 0.16, 0.09, 1.07) | 5.3, 5.0, 5.1 | 0.19, 0.24, 0.51 |
+| disco, overdriven | 22.7 | 0.35, 0.33, 1.01 | 14.0, 9.9, 8.7 | 0.10, 0.14, 0.20 |
+| acoustic, steel | 20 | none | 8.7, 6.1, 6.5 | none |
+
+Bends and shakes are the same as on the starting commit in every row but neo-soul's bends, which lost the bends into the third (a tenth of a bend a chorus in its first two choruses; a third chorus's bends are its top note's). Neo-soul now moves into a third two to five times as often as it bent into one: its bends into the third were drawn per landing and only on a landing a third with the half step under it in its notes, which neo-soul's chord pentatonics rarely have; the slide needs no start in the notes.
+
+**Property** (`test/soloist.test.ts`, "a guitar slides into a landing ..."), reading the takes the soloist's properties already read and the other guitars' takes the bend property renders (now rendered once for both, `handedTakes`): every slide is a stepped glide struck at its start, one or two frets from below or two from above, on whole frets, one fret at a time within 2 ms, on pitch at the hand's time; into a note struck where the chord changes, an eighth or longer, never in the band's last bar, from a start SO-56 names that is in the style's notes over the chord, read from the style's data (the chord, its scale, the notes it plays over a chord of that family, the key's notes: rock's blue third over the IV, disco's 2nd over a dominant whose scale has none), or the minor third into the major; at most one in a heard phrase; in a style whose chance is `third`, only that slide; per style, slides present where the chance is not none, absent where it is none, no more than the chance over the phrases, and, where the style bends and slides into landings, no more than its bends. The bend property now reads a stepped glide as a slide's and leaves it to this one. On the starting commit it fails: "rock: 0 slides and 222 bends in 2125 phrases, against a chance of undefined".
+
+Broken in the engine one at a time, it failed on: the slide timed in beats ("2 frets in 0.152 s", rock); the ending-bar check taken away ("a slide in the bar the band ends on"); a start chosen by distance, not from the notes ("a slide from 10, outside the style's notes over the chord", rock over G in G, an F); the chance taken away ("rock: 446 slides and 222 bends in 1403 phrases: more than the chance a phrase"); every candidate of a phrase slid ("a second slide in a phrase").
+
+**Unchanged, and how it is known** (`out/guitar-slides/src/fingerprint.ts`, the starting commit from a copy of its tree and this one): every library chart in every style, on each of the seven solo instruments, a jam of four passes on six seeds, the song and an open jam of three on seed 1 (27,264 takes). The alto's and the vibraphone's takes are the same in every take, every seat, and their MIDI bytes. On the four guitars the drums', bass's and chords' events, the solo's notes without their pitch moves, and their count are the same in every take; the solo's moves and the MIDI file differ in 1,293 to 1,333 takes of 4,544 an instrument (the styles that slide).
+
+**Goldens**: two rewritten, the two whose soloist is a guitar in a style that slides: `rock-four-chord-g-solo` (87 notes, as before; one slide added, its 4 bends and 12 shakes as before) and `neosoul-four-chord-d-solo` (156 notes; one slide added; 1 bend and 15 shakes as before). The other fifteen are byte for byte (`acoustic-minor-ballad-am-solo` is the steel guitar in a style that does not slide).
+
+**Scorecards**: written before and after to scratch files for all eight styles: identical, once `solo.bends` counted bends and not slides (before that, rock's moved 0.12 to 0.14 a bar).
+
+**Time** (quiet machine, alone): one style's suite, start → part 1: blues 9.26 → 9.24, rock 10.53 → 10.84, neo-soul 8.76 → 8.88, acoustic 10.43 → 10.59, jazz 12.80 → 12.80, funk 12.39 → 12.42, disco 11.55 → 11.83, reggae 7.97 → 8.20. `pnpm check` 25.3 → 25.6 s (the budget's own reading 24.2 → 25.0 of 28). `pnpm test:full` 69.5 s of 84, every style passing; `pnpm score` 62 s of 120, no movement.

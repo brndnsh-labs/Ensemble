@@ -442,6 +442,18 @@ export interface SoloStyle {
       readonly elsewhere: number;
     };
     /**
+     * A landing slid into from a fret or two away, on an instrument whose
+     * hand slides (SO-56): a note of an eighth or longer struck where the
+     * chord changes, that is not bent, never in the bar the band ends on.
+     * `chance` is a phrase's, for one of its landings: one at most a phrase.
+     * `into` is which slides the style plays: `landing`, each SO-56 names
+     * from a tone of the style's notes within two frets (from below where
+     * there is one), and the minor third up into the major; `third`, only
+     * that one-fret slide into a major third. Left at no chance, the style
+     * does not slide.
+     */
+    readonly slide: { readonly chance: number; readonly into: "landing" | "third" };
+    /**
      * Beats a note must be held for before it is shaken, on an instrument
      * that shakes its notes (SO-52): a dotted quarter is 1.5.
      */
@@ -507,6 +519,14 @@ export interface SoloInstrument {
    * move faster when the tempo does. Null for an instrument that cannot.
    */
   readonly bend: { readonly takes: number } | null;
+  /**
+   * A hand that slides into a note from a fret or two away (SO-56): the note
+   * is struck at the start fret and stands on each fret in turn, jumping to
+   * the next. Two frets stand `fret` seconds each, so the note is on its
+   * pitch at twice that; one fret stands `oneFret` seconds. In seconds, as a
+   * bend is. Null for an instrument that cannot.
+   */
+  readonly slide: { readonly fret: number; readonly oneFret: number } | null;
   /**
    * How it shakes a held note: `depth` cents, `rate` times a second, starting
    * `after` seconds into the note and reaching its depth over `grows` more.

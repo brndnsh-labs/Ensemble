@@ -537,6 +537,8 @@ export const jazzSolo: SoloStyle = {
     },
     // No bends (ST-jazz-37); a guitar shakes a note held a half note or longer (SO-52).
     bend: { third: 0, rootOrFifth: 0, around: 0, elsewhere: 0 },
+    // No slide: the notes give jazz none, as they give it no bend (ST-jazz-37).
+    slide: { chance: 0, into: "landing" },
     shake: 2,
     // On a horn: a scoop into a long note 0.15 (ST-jazz-37), here a phrase's one arrival. The
     // notes give jazz no fall; Brandon chose one over the jazz band (horn-study clip 9), so the

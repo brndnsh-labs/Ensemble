@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { PlanBar, Seat, Take } from "@ensemble/engine";
 import {
+  chordFamily,
   chordScale,
   chordTones,
   contextOf,
@@ -932,15 +933,19 @@ test("a horn breathes: the alto never plays eight seconds without half a second 
   }
 });
 
-test("a guitar bends only into a note a phrase lands on (one struck where the chord changes, or the last before a breath), of an eighth or longer and never in the bar the band ends on: a half step up into a major third, or a whole step up into a root or a fifth of a quarter or longer (the solo's top note from the scale note under it, whatever tone it is, in two solos in three at least), in a tenth of a second; it shakes only a note held as long as the style asks; a style that does not bend does not; and a vibraphone does neither (the horn has its own)", () => {
-  // Every instrument whose hand can move a pitch, in a style where it is not the soloist
-  // already: the takes the other properties read are on each style's own soloist and the
-  // horn. On a push, each chart on one seed where the style bends, and every other chart
-  // where it only shakes.
-  const bendsIn = ({ solo }: Jam["style"]) =>
-    solo.habits.bend.third + solo.habits.bend.rootOrFifth > 0;
+const bendsIn = ({ solo }: Jam["style"]) =>
+  solo.habits.bend.third + solo.habits.bend.rootOrFifth > 0;
+
+/**
+ * Every instrument whose hand can move a pitch, in a style where it is not the soloist
+ * already: the takes the other properties read are on each style's own soloist and the
+ * horn. On a push, each chart on one seed where the style bends, and every other chart
+ * where it only shakes. Rendered once, for every property of a guitar's hand.
+ */
+let handedCache: Jam[] | undefined;
+function handedTakes(): Jam[] {
   const moving = Object.entries(SOLO_INSTRUMENTS).filter(([, hand]) => hand.bend || hand.shake);
-  const handed = STYLES.flatMap((style) =>
+  handedCache ??= STYLES.flatMap((style) =>
     moving
       .filter(([soloInstrument]) => soloInstrument !== style.solo.instrument)
       .flatMap(([soloInstrument]) =>
@@ -954,11 +959,19 @@ test("a guitar bends only into a note a phrase lands on (one struck where the ch
         ),
       ),
   );
+  return handedCache;
+}
+
+/** A glide that stands on frets and jumps between them: a slide. A bend, a scoop and a fall are two points. */
+const stepped = (glide: readonly { at: number; semitones: number }[] | undefined) =>
+  glide !== undefined && glide.length > 2;
+
+test("a guitar bends only into a note a phrase lands on (one struck where the chord changes, or the last before a breath), of an eighth or longer and never in the bar the band ends on: a half step up into a major third, or a whole step up into a root or a fifth of a quarter or longer (the solo's top note from the scale note under it, whatever tone it is, in two solos in three at least), in a tenth of a second; it shakes only a note held as long as the style asks; a style that does not bend does not; and a vibraphone does neither (the horn has its own)", () => {
   const PLAIN = ["vibraphone"];
   let [bent, shaken, plain] = [0, 0, 0];
   // Solos on a hand that bends in a style that does, and how many push up into their top note.
   let [solos, topped] = [0, 0];
-  for (const { style, chart, options, take } of [...soloTakes(), ...handed]) {
+  for (const { style, chart, options, take } of [...soloTakes(), ...handedTakes()]) {
     const harmony = harmonyOf(take);
     const notes = notesOf(take, "solo");
     const bars = take.plan.bars;
@@ -968,14 +981,17 @@ test("a guitar bends only into a note a phrase lands on (one struck where the ch
     const top = Math.max(...notes.map((note) => note.pitch));
     if (bendsIn(style) && notes.some((note) => SOLO_INSTRUMENTS[note.voice ?? ""]?.bend)) {
       solos++;
-      if (notes.some((note) => note.pitch === top && note.move?.glide)) topped++;
+      if (notes.some((note) => note.pitch === top && note.move?.glide && !stepped(note.move.glide)))
+        topped++;
     }
     notes.forEach((note, i) => {
       const hand = SOLO_INSTRUMENTS[note.voice ?? ""]!;
       // A horn's pitch moves its own way: the property after this one.
       if (hand.shake?.on === "last") return;
       const where = `${chart.file} ${JSON.stringify(options)} at tick ${note.tick}: ${note.pitch}`;
-      const { glide, vibrato } = note.move ?? {};
+      const { vibrato } = note.move ?? {};
+      // A slide has a property of its own, after this one.
+      const glide = stepped(note.move?.glide) ? undefined : note.move?.glide;
       if (PLAIN.includes(note.voice ?? "")) {
         plain++;
         assert.equal(note.move, undefined, `${where}: the pitch of a ${hand.name} moved`);
@@ -997,7 +1013,7 @@ test("a guitar bends only into a note a phrase lands on (one struck where the ch
           habits.bend.third > 0 || habits.bend.rootOrFifth > 0,
           `${where}: a bend in a style that does not bend`,
         );
-        // Struck flat and pushed up to the note, and nothing else: no slide, no release.
+        // Struck flat and pushed up to the note, and nothing else: no release.
         const [from, to] = glide;
         assert.ok(glide.length === 2 && from!.at === 0 && to!.semitones === 0, `${where}: a glide`);
         assert.ok(
@@ -1076,6 +1092,145 @@ test("a guitar bends only into a note a phrase lands on (one struck where the ch
   assert.ok(topped * 3 >= solos * 2, `only ${topped} of ${solos} solos bend into their top note`);
   const vibes = STYLES.some((style) => style.solo.instrument === "vibraphone");
   assert.ok(!vibes || plain > enough(2000), `only ${plain} notes on the vibraphone`);
+});
+
+/**
+ * Where a slide may come from (SO-56, within two frets): the start's distance from the root,
+ * by the landing's, as `start→landing`. From below: the flat 7th up to the root, the 4th up to
+ * the 5th, the 2nd up to a major 3rd, and the one slide of one fret, the minor 3rd up to the
+ * major. From above: the 2nd down to the root, the 6th to the 5th, the 4th to a minor 3rd, the
+ * root to the flat 7th.
+ */
+const SLIDES_FROM: Readonly<Record<string, string>> = {
+  "10→0": "root",
+  "5→7": "fifth",
+  "2→4": "third",
+  "3→4": "third",
+  "2→0": "root",
+  "9→7": "fifth",
+  "5→3": "third",
+  "0→10": "seventh",
+};
+
+test("a guitar slides into a landing from a fret or two away, stepping: struck on its beat at the start, standing on each fret and jumping to the next, on pitch in the instrument's time; only into a note of an eighth or longer struck where the chord changes, not bent, never in the bar the band ends on, from a tone of the chord's scale SO-56 names (or the minor third up into the major); one at most a phrase, some in every style whose chance is not none, no more than the style bends, and none on an instrument or in a style that does not slide", () => {
+  const counts = new Map<string, { slides: number; bends: number; phrases: number }>();
+  for (const { style, chart, options, take } of [...soloTakes(), ...handedTakes()]) {
+    const notes = notesOf(take, "solo");
+    const hand = SOLO_INSTRUMENTS[notes[0]?.voice ?? ""];
+    if (!hand) continue;
+    const harmony = harmonyOf(take);
+    const bars = take.plan.bars;
+    const perSecond = (take.plan.quarters * PPQ) / 60;
+    const { habits, space, touch } = style.solo;
+    const chance = habits.slide?.chance ?? 0;
+    const owed = space.breath * 0.9 * perSecond;
+    const count = counts.get(style.id) ?? { slides: 0, bends: 0, phrases: 0 };
+    counts.set(style.id, count);
+    // Bends and slides are counted side by side on a hand that does both.
+    const slides = hand.slide !== null;
+    const both = hand.bend !== null && slides;
+    let [at, b, inPhrase] = [0, 0, 0];
+    notes.forEach((note, i) => {
+      while (harmony[at + 1] && harmony[at + 1]!.tick <= note.tick) at++;
+      while (bars[b + 1] && bars[b + 1]!.start <= note.tick) b++;
+      const bar = bars[b]!;
+      const before = notes[i - 1];
+      if (!before || note.tick - (before.tick + before.duration) >= owed) {
+        if (slides) count.phrases++;
+        inPhrase = 0;
+      }
+      const glide = note.move?.glide;
+      if (both && glide && !stepped(glide) && glide[0]!.at === 0) count.bends++;
+      if (!stepped(glide)) return;
+      const where = `${style.id} ${chart.file} ${JSON.stringify(options)} bar ${bar.index} tick ${note.tick}: ${note.pitch}`;
+      if (slides) count.slides++;
+      inPhrase++;
+      assert.ok(hand.slide, `${where}: a slide on the ${hand.name}`);
+      assert.ok(chance > 0, `${where}: a slide in a style that does not slide`);
+      assert.ok(inPhrase <= 1, `${where}: a second slide in a phrase`);
+
+      // Struck at the start on the note's beat, standing on whole frets, a jump of one fret
+      // at a time toward the note, and on it at the end: one or two frets, from below, or
+      // two from above.
+      const points = glide!;
+      const from = points[0]!.semitones;
+      assert.ok(points[0]!.at === 0, `${where}: a slide not struck at its start`);
+      assert.ok([-2, -1, 2].includes(from), `${where}: a slide from ${from} semitones`);
+      assert.equal(points.at(-1)!.semitones, 0, `${where}: a slide that does not arrive`);
+      const jump = 0.002 * perSecond;
+      for (let p = 1; p < points.length; p++) {
+        const [was, is] = [points[p - 1]!, points[p]!];
+        assert.ok(Number.isInteger(is.semitones), `${where}: a slide between frets`);
+        if (was.semitones === is.semitones) continue;
+        assert.ok(
+          is.semitones - was.semitones === Math.sign(-from) && is.at - was.at <= jump,
+          `${where}: a slide that does not step a fret at a time`,
+        );
+      }
+      const frets = Math.abs(from);
+      const arrives = points.at(-1)!.at / perSecond;
+      const takes = frets === 1 ? hand.slide!.oneFret : 2 * hand.slide!.fret;
+      assert.ok(
+        Math.abs(arrives - takes) < 0.002,
+        `${where}: ${frets} frets in ${arrives.toFixed(3)} s`,
+      );
+      // Not both a bend and a slide: the note has the one glide, so it is not bent too.
+
+      // Into what: a landing struck where the chord changes, an eighth or longer.
+      const arrival = harmony[at]!;
+      assert.ok(
+        arrival.tick === note.tick && arrival.changed && arrival.chord,
+        `${where}: a slide into a note not struck where the chord changes`,
+      );
+      assert.equal(bar.ending, null, `${where}: a slide in the bar the band ends on`);
+      const within = note.tick - bar.start;
+      const swung = (tick: number) => (bar.meter.unit === 4 ? swing(tick, style.feel) : tick);
+      const eighth = Math.round(swung(within + (PPQ / 2) * touch.legato) - swung(within)) - 1;
+      assert.ok(note.duration >= eighth, `${where}: a slide into a note ${note.duration} long`);
+      // From where: SO-56's starts, a tone of the style's notes over the chord (the chord, its
+      // scale, the notes the style plays over a chord of its family, the key's notes; never a
+      // chromatic note chosen by distance, SU-B-17), or the minor third a fret under the major.
+      const chord = arrival.chord!;
+      const root = pitchClass(chord.root);
+      const into = (note.pitch - root + 120) % 12;
+      const start = (note.pitch + from - root + 120) % 12;
+      const role = SLIDES_FROM[`${start}→${into}`];
+      assert.ok(
+        role && chordTones(chord.quality).some((t) => t.role === role && t.interval % 12 === into),
+        `${where}: a slide from ${start} into ${into} over ${chord.root}${chord.quality}`,
+      );
+      if (from !== -1) {
+        const scale = chordScale(chord, contextOf(harmony, arrival));
+        const tones = chordTones(chord.quality).map((t) => t.interval % 12);
+        const { notes: written } = style.solo;
+        const fromKey = (start + root - pitchClass(arrival.key.tonic) + 120) % 12;
+        assert.ok(
+          scale.intervals.some((interval) => interval % 12 === start) ||
+            tones.includes(start) ||
+            (written.overRoot?.[chordFamily(chord.quality)] ?? []).includes(start) ||
+            written.key[arrival.key.mode].includes(fromKey),
+          `${where}: a slide from ${start}, outside the style's notes over the chord`,
+        );
+      }
+      if (habits.slide?.into === "third") {
+        assert.ok(from === -1 && into === 4, `${where}: a style that slides only into a third`);
+      }
+    });
+  }
+  for (const style of STYLES) {
+    const { slides, bends, phrases } = counts.get(style.id) ?? { slides: 0, bends: 0, phrases: 0 };
+    const slide = style.solo.habits.slide;
+    // (A style that names no chance has not said it does not slide.)
+    const chance = slide?.chance;
+    const where = `${style.id}: ${slides} slides and ${bends} bends in ${phrases} phrases`;
+    assert.ok(chance === 0 ? slides === 0 : slides > 0, `${where}, against a chance of ${chance}`);
+    assert.ok(slides <= phrases * (chance ?? 0), `${where}: more than the chance a phrase`);
+    // Rarer than a bend where the style bends; neo-soul's move into the third is a slide where
+    // it was a bend, and is held by its chance alone.
+    if (bendsIn(style) && slide?.into !== "third") {
+      assert.ok(slides <= bends, `${where}: more slides than bends`);
+    }
+  }
 });
 
 /**

@@ -56,6 +56,8 @@ export interface Phrase {
   readonly pickup: readonly Placed[];
   /** New material: made from nothing remembered. */
   readonly fresh: boolean;
+  /** A phrase the hand gets lyrical in (KF-B-10): it may bend, and slide. */
+  readonly lyrical: boolean;
 }
 
 export interface Placed {
@@ -261,7 +263,7 @@ export function phrasesFor(
           ...(bends[i]! > 0 ? { bend: bends[i]! } : {}),
         }),
       );
-    return { kind, slot, bars: written, line, pickup: [], fresh };
+    return { kind, slot, bars: written, line, pickup: [], fresh, lyrical };
   };
 
   // An answer comes to rest, and so does the last phrase of a solo; anything else is

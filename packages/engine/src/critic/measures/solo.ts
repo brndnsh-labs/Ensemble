@@ -650,7 +650,9 @@ export const soloMeasures: readonly Measure[] = [
     "bends",
     "per bar",
     "How often a string is pushed up into a note, in bent notes for each bar of the solo: a few to a chorus, more where the solo peaks, and never so many that they stop meaning anything (KF-B-10, EAR-02).",
-    (reading) => perSoloBar(reading, (note) => note.move?.glide !== undefined),
+    // A bend's glide is two points, from under the note to it; a slide's stands on each fret
+    // and jumps to the next, and is not a bend.
+    (reading) => perSoloBar(reading, (note) => note.move?.glide?.length === 2),
   ),
   idiom(
     "shakes",

@@ -474,6 +474,8 @@ export const bluesSolo: SoloStyle = {
     // On a guitar: the blue third pushed up into the third, the flat 7th into the root
     // (SO-53, ST-blues-41).
     bend: { third: 0.65, rootOrFifth: 0.45, around: 1, elsewhere: 0.5 },
+    // On a guitar, a slide into a landing it does not bend 0.25 (SO-56), from a fret or two.
+    slide: { chance: 0.25, into: "landing" },
     // A note held a dotted quarter is shaken (SO-52).
     shake: 1.5,
     // On a horn: a scoop into a long note 0.15 (ST-blues-41), here a phrase's one arrival; a

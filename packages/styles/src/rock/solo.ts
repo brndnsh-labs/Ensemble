@@ -409,6 +409,8 @@ export const rockSolo: SoloStyle = {
     // The blue third pushed up into the third, the flat 7th into the root or the 4th into the
     // 5th (SO-53, ST-rock-24).
     bend: { third: 0.45, rootOrFifth: 0.55, around: 1, elsewhere: 0.5 },
+    // A slide into an unbent landing 0.20 (SO-56, ST-rock-24), from a fret or two.
+    slide: { chance: 0.2, into: "landing" },
     // A note held a dotted quarter is shaken (SO-52).
     shake: 1.5,
     // No scoops (ST-rock-24), and the notes give rock no fall.

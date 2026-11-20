@@ -33,6 +33,12 @@ export interface PitchMove {
   readonly vibrato?: Vibrato;
 }
 
+/**
+ * Seconds between two glide points that make a jump of pitch: the nearest a
+ * glide comes to a step, as a finger lands on the next fret.
+ */
+export const JUMP = 0.001;
+
 /** Seconds between the points of a pitch curve. */
 export const CURVE_STEP = 0.005;
 

@@ -361,6 +361,8 @@ export const reggaeSolo: SoloStyle = {
     },
     // No bends (ST-reggae-27): on a guitar too, the line is sung, not bent.
     bend: { third: 0, rootOrFifth: 0, around: 0, elsewhere: 0 },
+    // No slide: the notes give reggae none, and the line is sung (ST-reggae-27).
+    slide: { chance: 0, into: "landing" },
     // Vibrato on notes of eight sixteenths or longer (ST-reggae-27).
     shake: 2,
     // A horn scoops 0.25 (ST-reggae-27, SO-53), a phrase's one arrival; the notes give it no

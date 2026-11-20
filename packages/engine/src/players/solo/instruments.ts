@@ -3,6 +3,17 @@
 
 import type { SoloInstrument, SoloStyle } from "./style.ts";
 
+/**
+ * A guitarist's slide into a note, as Brandon chose it from the slide study
+ * (scripts/slide-study.ts, clips 3 and 7: "short slide sounds pretty good, and the one fret
+ * slide is nice"): struck a fret or two away and stepped onto the note a fret at a time.
+ * Two frets stand 0.0285 s each (clip 3: a thirty-second note at 132, on pitch at 0.057 s);
+ * one fret stands 0.057 s (clip 7 at 132), so a slide of either length is on its note as
+ * soon. Every guitar's hand: a slide is as common on steel and nylon strings as on an
+ * electric's, and the style says how often.
+ */
+const SLIDE = { fret: 0.0285, oneFret: 0.057 } as const;
+
 export const SOLO_INSTRUMENTS: Readonly<Record<string, SoloInstrument>> = {
   // Three octaves from F3. Its solo voice sits an octave over middle C, above the piano's
   // hand; the bars ring by themselves, so it need not breathe. A bar's pitch does not move.
@@ -13,6 +24,7 @@ export const SOLO_INSTRUMENTS: Readonly<Record<string, SoloInstrument>> = {
     home: 72,
     breath: null,
     bend: null,
+    slide: null,
     shake: null,
     scoop: null,
     fall: null,
@@ -33,6 +45,7 @@ export const SOLO_INSTRUMENTS: Readonly<Record<string, SoloInstrument>> = {
     home: 67,
     breath: { lungs: 8, takes: 0.5 },
     bend: null,
+    slide: null,
     shake: { depth: 30, rate: 5, after: 0.4, grows: 0.6, upward: false, on: "last", shortest: 0.7 },
     scoop: { below: 1, takes: 0.06 },
     fall: { semitones: 6, takes: 0.5 },
@@ -49,6 +62,7 @@ export const SOLO_INSTRUMENTS: Readonly<Record<string, SoloInstrument>> = {
     home: 71,
     breath: null,
     bend: { takes: 0.1 },
+    slide: SLIDE,
     shake: { depth: 60, rate: 5.5, after: 0.35, grows: 0.3, upward: true, on: "held" },
     scoop: null,
     fall: null,
@@ -63,13 +77,14 @@ export const SOLO_INSTRUMENTS: Readonly<Record<string, SoloInstrument>> = {
     home: 69,
     breath: null,
     bend: { takes: 0.1 },
+    slide: SLIDE,
     shake: { depth: 60, rate: 5.5, after: 0.35, grows: 0.3, upward: true, on: "held" },
     scoop: null,
     fall: null,
   },
   // The nylon-string guitar as a lead: E3 to A5, at home on F#4 (SO-01), the verse melody's
   // cousin (ST-acoustic-37). Its hand does not bend: a nylon string is not pushed up a whole
-  // step (ST-acoustic-28), and the half-step slur into a note is not in the model. A held note
+  // step (ST-acoustic-28); it slides as every guitar does, as often as the style says. A held note
   // is shaken as a classical hand shakes it, along the string and so either side of the pitch,
   // and narrowly: a fifth of a half step, where the electric guitar's pushed string goes 60
   // cents sharp. The numbers are a hand's, not an ear's: nobody has listened to them.
@@ -80,6 +95,7 @@ export const SOLO_INSTRUMENTS: Readonly<Record<string, SoloInstrument>> = {
     home: 66,
     breath: null,
     bend: null,
+    slide: SLIDE,
     shake: { depth: 20, rate: 5, after: 0.35, grows: 0.3, upward: false, on: "held" },
     scoop: null,
     fall: null,
@@ -95,6 +111,7 @@ export const SOLO_INSTRUMENTS: Readonly<Record<string, SoloInstrument>> = {
     home: 66,
     breath: null,
     bend: null,
+    slide: SLIDE,
     shake: { depth: 20, rate: 5, after: 0.35, grows: 0.3, upward: false, on: "held" },
     scoop: null,
     fall: null,

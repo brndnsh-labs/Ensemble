@@ -425,6 +425,9 @@ export const acousticSolo: SoloStyle = {
     // No whole-step bends and no scoops (ST-acoustic-28); the acoustic guitars' hands do not bend,
     // and on an instrument that can the line is still sung, not bent.
     bend: { third: 0, rootOrFifth: 0, around: 0, elsewhere: 0 },
+    // No slide: the notes give acoustic none (ST-acoustic-25 to ST-acoustic-28), and the line
+    // is sung. Its slur into the 3rd from the half step below is not played (see the top).
+    slide: { chance: 0, into: "landing" },
     // Vibrato on notes of eight sixteenths or longer (ST-acoustic-28).
     shake: 2,
     // No scoops (ST-acoustic-28), and no falls: the line is sung.

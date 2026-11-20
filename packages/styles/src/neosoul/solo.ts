@@ -395,9 +395,13 @@ export const neosoulSolo: SoloStyle = {
       rising: 0.6,
       approach: true,
     },
-    // On a guitar, a bend into the 3rd 0.40 and into the root 0.08 (ST-neosoul-33, SO-53), in
-    // phrases the hand gets lyrical in, as every guitar style has it.
-    bend: { third: 0.4, rootOrFifth: 0.08, around: 1, elsewhere: 0.5 },
+    // On a guitar, a bend into the root 0.08 (ST-neosoul-33, SO-53), in phrases the hand gets
+    // lyrical in, as every guitar style has it. Its move into the 3rd is not a bend: the notes
+    // write it as a half-step slide (below), which was played as a bend while there was none.
+    bend: { third: 0, rootOrFifth: 0.08, around: 1, elsewhere: 0.5 },
+    // The half-step slide up into the 3rd 0.40 (ST-neosoul-33): the one-fret slide from the
+    // minor third, and no other.
+    slide: { chance: 0.4, into: "third" },
     // Vibrato only on notes of eight sixteenths or longer: a half note (ST-neosoul-33, SO-52).
     shake: 2,
     // A horn scoops 0.35 (ST-neosoul-33, SO-53), a phrase's one arrival; the notes give it no

@@ -10,16 +10,20 @@ import type { Scored } from "../../critic/choose.ts";
 import { score } from "../../critic/choose.ts";
 import { swing } from "../../perform/feel.ts";
 import { cells, STEP } from "../../perform/grid.ts";
+import type { Arrival } from "../../perform/harmony.ts";
 import { onAnd, onPulse, pulseTicks } from "../../perform/meter.ts";
 import type { Player, PlayerContext, WrittenNote } from "../../perform/notes.ts";
 import { heldRng } from "../../perform/notes.ts";
-import type { PitchMove } from "../../perform/pitch.ts";
+import type { GlidePoint, PitchMove } from "../../perform/pitch.ts";
+import { JUMP } from "../../perform/pitch.ts";
 import type { PlanBar } from "../../plan/types.ts";
 import type { Rng } from "../../rng.ts";
 import { TIER_MID } from "../../style/types.ts";
+import type { ToneRole } from "../../theory/chord.ts";
+import { mod12, pitchClass } from "../../theory/pitch.ts";
 import type { Heard, SoloCandidate, SoloPick, Sounding } from "./critique.ts";
 import { bassStruck, bySoloCritic, SOLO_FEATURES } from "./critique.ts";
-import { EIGHTH, isChordTone } from "./harmony.ts";
+import { EIGHTH, isChordTone, onlyPasses } from "./harmony.ts";
 import { soloVoice } from "./instruments.ts";
 import { placeOf, spotsOf } from "./line.ts";
 import type { Memory, PassPickup, Phrase } from "./phrases.ts";
@@ -183,7 +187,8 @@ export function soloPart(
     // arrives on and of the notes it leaves. Drawn by place, after the choice, so the
     // phrase is the one the critic chose whatever it does.
     const horned = hornMoves(world, slot, notes[at]!, rng, fell);
-    const played = horned.notes;
+    // And how a guitarist's left hand plays it: a landing slid into.
+    const played = slideInto(world, phrase, horned.notes, rng);
     fell = horned.fell;
     const opens = slot.bars[0]!.start;
     for (const note of played) {
@@ -490,6 +495,7 @@ function realiseLead(world: World, lead: PassPickup, bar: PlanBar): SoloNote[] {
     line: [{ spot: into, pitch: lead.first }],
     pickup: lead.notes,
     fresh: false,
+    lyrical: false,
   };
   return realise(world, phrase, 0).slice(0, lead.notes.length);
 }
@@ -661,4 +667,111 @@ function hornMoves(
     });
   }
   return { notes: out, fell };
+}
+
+/**
+ * Where a slide into a note may start (SO-56), within two frets: by the
+ * note's distance above the chord's root and its role in the chord, the
+ * semitones from it to the start. From below, the flat 7th up to the root,
+ * the 4th up to the 5th, the 2nd up to a major 3rd, and the one slide of a
+ * single fret, the minor 3rd up to the major; from above, the 2nd down to
+ * the root, the 6th to the 5th, the 4th to a minor 3rd, the root to the
+ * flat 7th. SO-56's longer slides (three to five frets) are not played.
+ */
+const SLIDE_STARTS: readonly { into: number; role: ToneRole; by: number }[] = [
+  { into: 0, role: "root", by: -2 },
+  { into: 7, role: "fifth", by: -2 },
+  { into: 4, role: "third", by: -2 },
+  { into: 4, role: "third", by: -1 },
+  { into: 0, role: "root", by: 2 },
+  { into: 7, role: "fifth", by: 2 },
+  { into: 3, role: "third", by: 2 },
+  { into: 10, role: "seventh", by: 2 },
+];
+
+/**
+ * The starts a hand may slide into a note from, in semitones from it: a
+ * tone of the style's notes over the chord, never one that only passes
+ * (SU-B-17: never a chromatic note chosen by distance), except the minor
+ * third a fret under the major, which SO-56 allows as it is; on the
+ * instrument. From below where there is a start below (SO-56: mostly from
+ * below), else from above.
+ */
+function slideStarts(world: World, arrival: Arrival, pitch: number, into: "landing" | "third") {
+  const pool = world.poolOf(arrival);
+  const chord = arrival.chord;
+  if (!pool || !chord) return [];
+  const interval = mod12(pitch - pitchClass(chord.root));
+  const role = pool.tones.find((tone) => tone.pc === mod12(pitch))?.role;
+  const [low, high] = world.instrument.range;
+  const starts = SLIDE_STARTS.filter((start) => {
+    if (start.into !== interval || start.role !== role) return false;
+    if (into === "third" && start.by !== -1) return false;
+    const from = pitch + start.by;
+    if (from < low || from > high) return false;
+    return start.by === -1 || (pool.ladder.includes(from) && !onlyPasses(pool, from));
+  }).map((start) => start.by);
+  const below = starts.filter((by) => by < 0);
+  return below.length > 0 ? below : starts;
+}
+
+/**
+ * Glide points that stand on each fret in turn, `from` semitones away to the
+ * note, jumping between: on the note at `arrive` ticks, each fret before it
+ * held `each`, the first from the strike until its turn comes.
+ */
+function frets(from: number, each: number, arrive: number, jump: number): GlidePoint[] {
+  const count = Math.abs(from);
+  const way = Math.sign(from);
+  const points: GlidePoint[] = [{ at: 0, semitones: from }];
+  for (let j = 1; j <= count; j++) {
+    const at = arrive - (count - j) * each;
+    points.push({ at: at - jump, semitones: from - way * (j - 1) });
+    points.push({ at, semitones: from - way * j });
+  }
+  return points;
+}
+
+/**
+ * A guitarist's slide (SO-56, SO-57), on an instrument whose hand slides, as
+ * often as the style says, in a phrase the hand gets lyrical in, as bends
+ * are (KF-B-10): one landing of the phrase at most, a note of an
+ * eighth or longer struck where the chord changes, that is not bent, not a
+ * pickup and not in the bar the band ends on, slid into from a fret or two
+ * away (`slideStarts`). It is struck on its beat at the start fret and
+ * stands on each fret in turn, in the hand's seconds; a note held long
+ * enough is still shaken, from where the shake starts, after it has
+ * arrived. A slide moves no note: the phrase is the one the critic chose.
+ * Drawn by the phrase's place.
+ */
+function slideInto(world: World, phrase: Phrase, notes: readonly SoloNote[], rng: Rng): SoloNote[] {
+  const { instrument, solo, ticksPerSecond } = world;
+  const hand = instrument.slide;
+  const habit = solo.habits.slide;
+  // Slides come where bends do: in a phrase the hand gets lyrical in (KF-B-10).
+  if (hand === null || habit.chance <= 0 || !phrase.lyrical) return [...notes];
+  const candidates = notes.flatMap((note, i) => {
+    if (note.lead || note.bar.ending !== null || note.value < EIGHTH || note.move?.glide) return [];
+    const arrival = world.arrivalAt(note.tick);
+    if (!arrival?.chord || !arrival.changed || arrival.tick !== note.tick) return [];
+    // A hand moves in seconds: the note has to sound as long again once it has arrived.
+    const sounds = soundsFor(world, note.bar, note.tick, note.duration) / ticksPerSecond;
+    const starts = slideStarts(world, arrival, note.pitch, habit.into).filter(
+      (by) => sounds >= 2 * (Math.abs(by) === 1 ? hand.oneFret : 2 * hand.fret),
+    );
+    return starts.length > 0 ? [{ i, starts }] : [];
+  });
+  if (candidates.length === 0) return [...notes];
+  const first = phrase.slot.bars[0]!;
+  const draw = rng.fork("slide", placeOf(first, first.start));
+  if (!draw.chance(habit.chance)) return [...notes];
+  const { i, starts } = draw.pick(candidates);
+  const by = draw.pick(starts);
+  const note = notes[i]!;
+  const [each, arrive] =
+    Math.abs(by) === 1 ? [hand.oneFret, hand.oneFret] : [hand.fret, 2 * hand.fret];
+  const glide = frets(by, each * ticksPerSecond, arrive * ticksPerSecond, JUMP * ticksPerSecond);
+  const out = [...notes];
+  out[i] = { ...note, move: { ...note.move, glide } };
+  return out;
 }

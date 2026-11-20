@@ -41,8 +41,12 @@ export function validateSoloStyle(solo: SoloStyle): string[] {
       low < instrument.home && instrument.home < high,
       `instrument "${name}": its home is outside its range.`,
     );
-    const { bend, shake, scoop, fall } = instrument;
+    const { bend, slide, shake, scoop, fall } = instrument;
     say(bend === null || bend.takes > 0, `instrument "${name}": a bend takes time.`);
+    say(
+      slide === null || (slide.fret > 0 && slide.oneFret > 0),
+      `instrument "${name}": a slide stands on each fret for some time.`,
+    );
     say(
       scoop === null || (scoop.below > 0 && scoop.takes > 0),
       `instrument "${name}": a scoop comes from under the note and takes time.`,
@@ -282,6 +286,11 @@ export function validateSoloStyle(solo: SoloStyle): string[] {
   say(
     Number.isInteger(solo.habits.bend.around) && solo.habits.bend.around >= 0,
     "habits, bend: the hand is lyrical a whole number of phrases either side of the top note.",
+  );
+  chance(solo.habits.slide.chance, "habits, slide");
+  say(
+    solo.habits.slide.into === "landing" || solo.habits.slide.into === "third",
+    "habits, slide: into a landing, or into a third.",
   );
   say(solo.habits.shake > 0, "habits, shake: a note is held some beats before it is shaken.");
   chance(solo.habits.scoop, "habits, scoop");

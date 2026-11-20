@@ -408,6 +408,10 @@ export const discoSolo: SoloStyle = {
     // On a guitar, a bend into the 3rd 0.30 and into the root 0.20 (ST-disco-25), in phrases
     // the hand gets lyrical in, as the blues and rock have it.
     bend: { third: 0.3, rootOrFifth: 0.2, around: 1, elsewhere: 0.5 },
+    // The notes give disco no slide; a guitar picked for it slides seldom, at a quarter of
+    // rock's chance: its landings are short and few are bent (a quarter of rock's bends a
+    // phrase), and a slide is rarer than a bend.
+    slide: { chance: 0.05, into: "landing" },
     // Vibrato on every note of six sixteenths or more (ST-disco-25): a dotted quarter.
     shake: 1.5,
     // A horn scoops into a long note 0.3 (ST-disco-25), a phrase's one arrival, and falls off a
