@@ -25,8 +25,9 @@ A browser-based generative backing band. Read these before doing anything:
 ## The repository
 
 - **It is public** (github.com/brndnsh-labs/Ensemble, AGPL-3.0). Everything committed is published: no secrets, no private addresses, nothing about the network the sites run on beyond what is already here. Commits carry Brandon's GitHub no-reply address (the repo's own `user.email`); check it before the first commit on a new machine.
-- **Work lands on `main`**, pushed as it is finished. There are no pull requests and no required checks: `pnpm check` is run here before a push, and CI runs it again.
-- **A push to `main` is a release to the test site.** Production is released by hand and only when Brandon has asked for it.
+- **Work is tracked in GitHub issues and built through the pipeline** (`.claude/skills/`: `/next`, `/intake`, `/cycle`, `/review`, `/scout`, `/unblock`; its rules are `.claude/skills/DOCTRINE.md`). The skills are rendered from `.cycle/config.jsonc` and `.cycle/overlays/` by `cycle update`: change those, never a rendered skill. `PLAN.md` stays the map and `DECISIONS.md` the record.
+- **Issue work lands through a pull request**, on a branch from `origin/main`. `main` requires the `build` check (`pnpm check`, `pnpm score`, the smoke journeys, the image), and a pull request merges itself when that is green (`gh pr merge --auto --squash`). A minor docs or tooling edit may still go straight to `main`.
+- **A merge or push to `main` is a release to the test site.** Production is released by hand and only when Brandon has asked for it.
 - **The old version is the `legacy` branch.** Do not read it, merge it or copy from it: `docs/MUSIC_NOTES.md` and `docs/AUDIO_NOTES.md` are what was carried over.
 - **Something for Brandon's ear or eye is a page**, written under `out/` (not committed) with what was measured beside each clip or picture, and nothing merged on a claim that it sounds or looks good.
 
@@ -49,7 +50,7 @@ pnpm app [--host 0.0.0.0] [--port 8766]   # the app, served for development (no 
 pnpm app:build          # build the app into packages/app/dist: a static site, packs and service worker included
 pnpm smoke              # the browser smoke journeys against the built app (60-second budget; needs Google Chrome)
                         # SMOKE_URL=https://... pnpm smoke runs them against the app wherever it is served
-git push                # a push to main is the release to the test site: CI (.github/workflows/ci.yml) checks, builds the
+git push                # a merge or push to main is the release to the test site: CI (.github/workflows/ci.yml) checks, builds the
                         # image and releases it to https://ensembletest.brndn.zip. The repository is public.
 gh workflow run ci -f production=true   # the same, and production too (https://ensemble.brndn.zip). Only when Brandon has asked.
 pnpm image              # build the app and its image (hosting/): ensemble-app:<commit>, an unprivileged nginx; needs docker

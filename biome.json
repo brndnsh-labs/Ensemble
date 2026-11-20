@@ -11,7 +11,9 @@
       "!**/*.md",
       "!**/*.grit",
       "!**/*.chart",
-      "!assets/packs"
+      "!assets/packs",
+      "!.cycle",
+      "!.claude"
     ]
   },
   "formatter": { "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },

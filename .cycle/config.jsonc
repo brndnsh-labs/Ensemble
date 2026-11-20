@@ -1,0 +1,107 @@
+// the-cycle bindings for this repo.
+// Everything repo-specific lives here; the skills in configured harness trees are rendered
+// from shared templates and should not be hand-edited (`cycle check` will tell you
+// if they have been). Re-render with `cycle update` after changing this file.
+{
+  "repo": {
+    "name": "ensemble",
+    "slug": "brndnsh-labs/Ensemble",
+    "human": "Brandon"
+  },
+  "profile": "standard",
+  "backend": "github",
+  "harnesses": [
+    "claude"
+  ],
+  "tracker": {
+    "description": "**GitHub issues** (`brndnsh-labs/Ensemble`)",
+    "statuses": [
+      {
+        "name": "status:ready",
+        "meaning": "scoped + pickable",
+        "action": "`/next` ranks & picks; `/cycle` builds"
+      },
+      {
+        "name": "status:in-progress",
+        "meaning": "being built",
+        "action": "don't re-pick"
+      },
+      {
+        "name": "status:in-review",
+        "meaning": "built, PR open (auto-merge queued, or left for Brandon on a brake)",
+        "action": "don't re-pick"
+      },
+      {
+        "name": "status:blocked",
+        "meaning": "blocked on a dependency",
+        "action": "skip; name the blocker"
+      },
+      {
+        "name": "status:needs-decision",
+        "meaning": "blocked on a human call",
+        "action": "surface it; **don't build**"
+      },
+      {
+        // Built, reviewed and merged, so it is on the test site; what is left is
+        // Brandon listening or looking. `/unblock`'s hands-on lane clears these.
+        "name": "status:needs-ear",
+        "meaning": "merged; waiting on Brandon's ear or eye, with a page under `out/`",
+        "action": "don't re-pick; `/unblock hands-on` presents it"
+      }
+    ],
+    "status": {
+      "pickable": "status:ready",
+      "active": "status:in-progress",
+      "done": "status:in-review",
+      "decision": "status:needs-decision"
+    },
+    "ranking": "**milestone first** (a real numbered epic beats no milestone), then **issue number** (lower first)",
+    "milestones": []
+  },
+  "routing": {
+    "model": "Use the active harness's default model unless the task explicitly requires another.",
+    "executor_default": "orchestrator-inline"
+  },
+  // `pnpm check` is typecheck, lint and the engine suite under its time budget.
+  // `pnpm score` is every style's scorecard against its accepted baseline; it
+  // fails only on a drop past a metric's tolerance. The browser smoke journeys
+  // (`pnpm smoke`) run in CI on the PR, per docs/TESTING.md, not here.
+  "gates": {
+    "check": "pnpm check",
+    "score": "pnpm score"
+  },
+  "deps": {
+    "outdated": "pnpm outdated",
+    "audit": "pnpm audit",
+    "audit_fix": "pnpm audit --fix",
+    "update": "pnpm update",
+    "install": "pnpm install",
+    "lockfile": "pnpm-lock.yaml",
+    "manifests": [
+      "package.json",
+      "pnpm-lock.yaml"
+    ]
+  },
+  "brakes": [
+    "a production release, or anything done on the Docker host",
+    "anything that would publish a secret, a private address, a network detail or a private email (the repository is public)",
+    "the release path: the release job in `.github/workflows/ci.yml`, `hosting/`, `scripts/image.sh`, repository secrets and variables, branch protection",
+    "a sample pack's source or licence: `scripts/packs/sources.ts`, a pack's `LICENCE` file, the credits",
+    "what the app keeps in the browser: the stored lists (`packages/app/src/stored.ts` and the keys and shapes kept through it) and the service worker (`packages/app/service-worker.js`, `offline.ts`)",
+    "loosening a gate: raising a time budget or a scorecard tolerance, accepting a scorecard drop, deleting or weakening a property"
+  ],
+  "branch": {
+    "minor_edits_direct": true
+  },
+  // `main` is protected: the `build` check of the `ci` workflow is required, so a
+  // queued auto-merge waits for it. `cycle check --verify-forge` confirms it still is.
+  "backend_overrides": {
+    "auto_merge": true
+  },
+  // A merge to `main` is the release to the test site (CI does it), so there is no
+  // test command. Production is the same workflow run by hand, on Brandon's word.
+  "deploy": {
+    "test": "",
+    "prod": "gh workflow run ci -f production=true"
+  }
+}

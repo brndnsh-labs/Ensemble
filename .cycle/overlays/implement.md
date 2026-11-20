@@ -1,0 +1,5 @@
+- Read the docs the change touches before building: `docs/CHART_FORMAT.md` for the format, `docs/MUSIC_NOTES.md` and its part under `docs/music-notes/` for a player, `docs/AUDIO_NOTES.md` for audio.
+- A change prompted by Brandon's ear lands as a property or a critic metric first, in its own commit, failing or moving; then the code that satisfies it.
+- If goldens moved on purpose: `pnpm goldens`, and the `DECISIONS.md` line saying why.
+- If the change can be heard or seen: write its page under `out/<name>/` (not committed), each clip or picture with what was measured beside it, before and after where that applies. `pnpm levels` before asking an ear about loudness.
+- App work: look at it (`node scripts/look.ts`, light and dark, phone size) before calling it built.

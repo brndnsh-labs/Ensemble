@@ -1,7 +1,9 @@
-# Every push to main is checked, built into an image, and released to the test
-# site, https://ensembletest.brndn.zip. Production, https://ensemble.brndn.zip,
-# is released by hand: run this workflow from the Actions tab with "production"
-# ticked, and the commit at the tip of main goes there too.
+# Every pull request is checked and built (the `build` job, which `main` requires
+# before a merge). Every push to main, which is what a merge is, is checked, built
+# into an image, and released to the test site, https://ensembletest.brndn.zip.
+# Production, https://ensemble.brndn.zip, is released by hand: run this workflow
+# from the Actions tab with "production" ticked, and the commit at the tip of main
+# goes there too. Nothing is pushed or released for a pull request.
 #
 # The release is the one the homelab already offers (homelab-maintenance,
 # docker/ensemble/release/): the runner joins the tailnet as a tag:ci node and
@@ -17,6 +19,8 @@ name: ci
 
 on:
   push:
+    branches: [main]
+  pull_request:
     branches: [main]
   workflow_dispatch:
     inputs:

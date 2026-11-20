@@ -1,0 +1,3 @@
+- `DECISIONS.md` gets the entry for any call made along the way (in the PR, not after it), and `PLAN.md` "Resume here" is updated when the state of the work moved.
+- **Work that waits on Brandon's ear or eye does not close on merge.** Write `part of #<n>` in the PR body, not `Closes #<n>`. Once it has merged, set the issue to `status:needs-ear` and comment where the page is (`out/<name>/`) and what was measured. `/unblock` closes it on his verdict.
+- The PR body reports scorecard movement and which goldens changed, in numbers, and makes no claim about how it sounds.
