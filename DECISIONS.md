@@ -2730,3 +2730,9 @@ Brandon: "Everything looks good, go ahead with the cleanup".
 - **The second render is not the place any more.** "Where the push suite's time goes" named the play-it-again check first. Timed for funk today: the 16 takes it renders a second time cost 0.27 s, comparing their events 0.05 s and writing both MIDI files 0.15 s, of a process of 11.3 s. The 1.5 to 1.9 s the test reports is the first render of the takes it happens to ask for first, which every later property then reads.
 - **No property is dear by itself** (jazz and funk, each property timed): after the first renders the slowest are the soloist's setting (0.8 to 1.1 s: it renders its own takes at five settings), the comp that listens (0.9 s, the same reason) and the style's eighths rule (0.8 to 0.9 s); everything else is under half a second. The time is the takes, as it was.
 - **So room for the next property that needs its own takes is a choice, not a fix**: fewer takes on a push for the two properties that render their own, or a DECISIONS entry that raises the budget. Not decided here; decided with the build that needs it.
+
+## the engine suite's budget, two seconds more (stage 6, 2026-11-19)
+
+- **Brandon, told the push suite had under a second of room and no cheap saving**: "i'm okay with adding a little budget for tests within reason".
+- **The rule's base goes from 10 seconds to 12**: 28 s on a push and 84 s for six seeds at eight styles and three written meters (they were 26 and 78; the last quiet timings were 25.3 and 69.4). Two seconds, not more: it is room for the soloist's next few properties at about a third of a second each, a push stays under half a minute, and the next raise needs its own entry here. The rule still grows only with what the band can play.
+- **What it does not excuse**: a new property reads the takes the suite already makes wherever it can, and a build still times each style before and after.

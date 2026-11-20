@@ -2,7 +2,7 @@
 // Usage: node scripts/budget.ts <seconds | engine | engine-full> <command> [args...]
 //
 // `engine` is the engine suite's budget on a push, which grows with what the
-// band can play and with nothing else: 10 seconds for three styles, 2 more for
+// band can play and with nothing else: 12 seconds for three styles, 2 more for
 // each style after the third, and 2 more for each meter beyond 4/4 that the
 // style with the most of them has written (the styles are tested side by side,
 // so the suite takes as long as its longest style). `engine-full` is the same
@@ -12,7 +12,7 @@ import { STYLES } from "../packages/styles/src/index.ts";
 
 const [limitArg, ...words] = process.argv.slice(2);
 const meters = Math.max(...STYLES.map((style) => Object.keys(style.drums.meters ?? {}).length));
-const engine = 10 + 2 * Math.max(0, STYLES.length - 3) + 2 * meters;
+const engine = 12 + 2 * Math.max(0, STYLES.length - 3) + 2 * meters;
 const limit =
   limitArg === "engine" ? engine : limitArg === "engine-full" ? 3 * engine : Number(limitArg);
 const command = words.join(" ");
