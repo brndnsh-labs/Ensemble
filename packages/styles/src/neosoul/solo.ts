@@ -402,6 +402,10 @@ export const neosoulSolo: SoloStyle = {
     // The half-step slide up into the 3rd 0.40 (ST-neosoul-33): the one-fret slide from the
     // minor third, and no other.
     slide: { chance: 0.4, into: "third" },
+    // Hammer-ons and pull-offs: the notes give no figure, and this lead leaves the most space of
+    // any (ST-neosoul-33): under half rock's chance.
+    hammerOn: 0.15,
+    pullOff: 0.15,
     // Vibrato only on notes of eight sixteenths or longer: a half note (ST-neosoul-33, SO-52).
     shake: 2,
     // A horn scoops 0.35 (ST-neosoul-33, SO-53), a phrase's one arrival; the notes give it no

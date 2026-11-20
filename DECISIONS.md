@@ -2811,3 +2811,58 @@ Broken in the engine one at a time, it failed on: the slide timed in beats ("2 f
 **Scorecards**: written before and after to scratch files for all eight styles: identical, once `solo.bends` counted bends and not slides (before that, rock's moved 0.12 to 0.14 a bar).
 
 **Time** (quiet machine, alone): one style's suite, start → part 1: blues 9.26 → 9.24, rock 10.53 → 10.84, neo-soul 8.76 → 8.88, acoustic 10.43 → 10.59, jazz 12.80 → 12.80, funk 12.39 → 12.42, disco 11.55 → 11.83, reggae 7.97 → 8.20. `pnpm check` 25.3 → 25.6 s (the budget's own reading 24.2 → 25.0 of 28). `pnpm test:full` 69.5 s of 84, every style passing; `pnpm score` 62 s of 120, no movement.
+
+### Part 2: the hammer-on and the pull-off
+
+**How it is written: two events, the second marked not struck, joined into one sound inside the engine.** `WrittenNote.slur` and `NoteEvent.slur` (feel passes it on) say a note is not struck: the seat's note before it is still ringing on the same string, and the pitch moves to this one at this one's time. Every note keeps its own time, length, pitch and level, so everything that reads notes reads the line as the critic chose it: the critic's measures, the properties that count the soloist's notes, the comp that listens. The joining is one function, `asStruck` (`perform/pitch.ts`), which `timedNotes` and `toMidi` read the performance through: the pair becomes one sound struck at the first note's time and level, at the second's pitch, standing at the first's pitch (a glide point at 0 and one a millisecond before the second's time) and jumping to the second's there, with the second's shake moved to start where it did, sounding to the second's end. So the sampler, the app's lamps (they light on the sounds' starts) and the MIDI file hear one attack, and `packages/audio` and `packages/app` did not change.
+- *Weighed against one event whose pitch steps* (as the study wrote it): the line would lose a note for the critic, the note counts, the "lands the changes" and "one voice" properties and anything else that reads pitch at a time; a note's pitch would no longer say what is heard at its start. *Against two events with the sampler and the MIDI writer taught a not-struck note*: the same events as chosen here, but a sampler that holds a voice open for a later note to retune, and the app and audition passing a flag, for what the engine can say as a pitch curve it already knows how to make. The engine owns both readers, so the join lives there.
+- *The joined sound's pitch is the second note's*, as the study's clips 8, 10a and 13 had it: the sampler takes the recording by it, and the second is the longer note; the MIDI note-on says the same pitch, bent down to the first's for the first's length. A MIDI player hears one note-on and a pitch-bend step: one attack. The goldens show it: the rock solo's 87 notes are 85 note-ons, neo-soul's 156 are 154, acoustic's 146 are 143.
+
+**What the engine gained, besides.** `SoloInstrument.hammers` (true on the four guitars, false on the alto and the vibraphone); `SoloStyle.habits.hammerOn` and `.pullOff`, validated chances; `slurs` in `players/solo/play.ts`, drawn after the critic's choice, the horn's moves and the slide, by the phrase's place.
+
+**Decided here.**
+
+- **Which pairs**: a note of an eighth or shorter in the rhythm, held into the next (the next is struck where it ends: no rest) and no longer than it, a step of one or two semitones up (a hammer-on) or down (a pull-off); neither a pickup, bent or slid, nor struck where the chord changes, nor in the band's last bar; the first not the phrase's first (the note before it is in the phrase, with no breath between) and no breath between the two. A phrase-ending note is not a landing for this: only a note struck where the chord changes keeps its attack by rule.
+- **One draw a phrase for each**, at the style's chance, onto one of its candidates; the pull-off's candidates leave out any pair within two notes of the hammer-on's, so at least one struck note stands between them: never three notes on one strike, never a trill (SO-28).
+- **Not gated by the lyrical phrase**, as slides and bends are: a slur is how a picking hand saves a stroke inside a run, not an ornament of a landing.
+- **Acoustic's `.xx-` cell** (ST-acoustic-26, "a hammer-on") is played today as two plucked notes at whatever pitches the line gives them: over 160 takes of its own charts the cell came 1.2 times a chorus, its grace a step up into the note in 87 of 288 cells, a step down in 83, a leap in 118 (the grace is not pitched from the step below: SO-28's grace is not built). So the cell is not made a hammer-on by rule: it cannot be one for most of what the line puts in it, and he chose neither of clips 11a and 11b. It is a pair like any other: where it steps up a fret or two, the phrase's one hammer-on may fall on it. Acoustic's chance is set near rock's because its notes name the hammer-on.
+- **`soloDensity` does not move these** (nor slides): it changes which phrases are played; the chances are the style's.
+
+**Chances written** (`habits.hammerOn`, `habits.pullOff`, a phrase's chance of one): the notes give a figure for none. Clip 13 had one of each in eight bars at the working level, taken as the most any style plays.
+
+- rock 0.4 and 0.4, the blues 0.4 and 0.4: the most, and under the clip's measure (below);
+- acoustic 0.3 and 0.15: its notes write the hammer-on into the rhythm; the pull-off they do not name;
+- neo-soul 0.15 and 0.15: the lead with the most space (ST-neosoul-33);
+- jazz 0.15 and 0.15: the notes give none; a bebop line is picked; a guitar picked for it slurs now and then;
+- disco 0.15 and 0.15: funk's sixteenths made legato (ST-disco-23);
+- funk 0.1 and 0.1: stabs and sixteenths, struck;
+- reggae 0.1 and 0.1: sung and sparse (ST-reggae-27).
+
+**How many** (`out/guitar-slides/src/count.ts`, as in part 1: own charts, 20 seeds, a three-chorus solo; per chorus 1, 2, 3; on the style's own guitar, else the overdriven):
+
+| style | bars | bends | shakes | slides | hammer-ons | pull-offs |
+|---|---|---|---|---|---|---|
+| rock | 22 | 2.48, 1.94, 2.43 | 15.6, 11.9, 9.2 | 0.48, 0.51, 0.68 | 1.14, 1.75, 1.81 | 1.14, 1.75, 1.93 |
+| blues | 12 | 1.59, 1.21, 2.15 | 7.9, 4.7, 4.3 | 0.23, 0.32, 0.51 | 1.04, 1.02, 1.13 | 0.58, 1.14, 1.13 |
+| neo-soul (clean) | 20.6 | 0.10, 0.09, 1.06 | 5.3, 5.0, 5.1 | 0.19, 0.24, 0.51 | 0.32, 0.61, 0.67 | 0.14, 0.64, 0.71 |
+| acoustic (steel) | 20 | none | 8.7, 6.1, 6.5 | none | 0.75, 1.21, 1.28 | 0.31, 0.67, 0.58 |
+| disco | 22.7 | 0.35, 0.33, 1.01 | 14.0, 9.9, 8.7 | 0.10, 0.14, 0.20 | 0.42, 0.62, 0.64 | 0.32, 0.59, 0.69 |
+| jazz | 21.3 | none | 2.2, 1.8, 3.2 | none | 0.64, 0.55, 0.93 | 0.42, 0.63, 0.69 |
+| reggae | 24 | none | 11.5, 7.7, 5.3 | none | 0.33, 0.38, 0.52 | 0.15, 0.35, 0.40 |
+| funk | 19 | none | 0.4, 0.4, 0.3 | none | 0.06, 0.11, 0.26 | 0.03, 0.11, 0.14 |
+
+The busiest is the blues' first and third choruses and rock's last: about 0.7 of each in eight bars, under clip 13's one. At double the chances (for his ear) rock has 2.3 to 3.9 of each a chorus, the blues 1.2 to 2.3; at half, rock 0.5 to 1.1, the blues 0.3 to 0.7. Slides at double are not twice as many (rock 0.9 to 1.3): they are drawn only in lyrical phrases with a landing that can take one.
+
+**Property** (`test/soloist.test.ts`, "a guitar hammers on and pulls off as one struck string ..."), on the same takes as the slide property, rendering none: every not-struck note follows a note of its phrase (not after a breath), a step of 1 or 2, from a note an eighth or shorter held into it (no rest beyond what legato and the pocket leave), into a note no shorter; neither bent nor slid nor struck where the chord changes; the first not the phrase's first; no two slurs within two notes; nothing in the band's last bar; at most one hammer-on and one pull-off a heard phrase; on a hand that hammers, in a style whose chance for that direction is not none. Then the sounds: one fewer sound for each not-struck note, the pair one sound at the first's time and level, at the second's pitch, to the second's end, its curve standing on the first's pitch until the second's time and on the second's after; and, once a style, the MIDI file's solo note-ons the notes less the not-struck. Per style: some of each where the chance is not none, none where it is, no more than the chance over the phrases. On the starting commit and on part 1 it fails: "rock: 0 hammer-ons and 0 pull-offs in 2125 phrases, against undefined". Broken in the engine one at a time, it failed on: a slur onto a note struck at a change ("a slur on a landing"); any interval ("a slur of -5"); a first note up to a half note long ("hammered from a note 480 long"); a slur from a phrase's first note; every rising pair of a phrase hammered ("a second hammer-on in a phrase"); the hammer-on and pull-off allowed to touch ("two slurs running"); `asStruck` striking the second note ("a slurred note struck"); the joined sound struck at the second's level ("struck at another level").
+
+The slide property's check of a slide's start reads the style's notes from its data (the chord, its scale, the notes it plays over a chord of the family, the key's notes); the first version, which read the notes the line happened to play over the chord, failed on the six-seed run (disco's 2nd over a B7 in E minor, in its notes but not played in that take), and was corrected in part 1's commit.
+
+**Unchanged** (the fingerprint of part 1, again, on part 2's tree; 27,264 takes): the alto's and the vibraphone's takes the same in every take, every seat and the MIDI bytes; on the four guitars every seat but the solo the same, and the solo's notes without their moves and not-struck marks the same, and as many; the solo's events and the MIDI file differ in 3,728 to 3,732 takes of 4,544 an instrument.
+
+**Goldens**: three rewritten, those whose soloist is a guitar: `rock-four-chord-g-solo` (one hammer-on and one pull-off added to part 1's; 85 note-ons for 87 notes), `neosoul-four-chord-d-solo` (one of each; 154 for 156), `acoustic-minor-ballad-am-solo` (one hammer-on, two pull-offs; 143 for 146). The other fourteen are byte for byte.
+
+**Scorecards**: before (the starting commit) and after, all eight styles, to scratch files: identical, and `pnpm score` reports no movement. Nothing that counts attacks moved because the critic reads the notes, and a not-struck note is still a note of the line: the joining is only for what makes sound.
+
+**Time** (quiet machine, alone). One style's suite, start → part 2: blues 9.26 → 9.56, rock 10.53 → 11.18, neo-soul 8.76 → 9.27, acoustic 10.43 → 11.28, jazz 12.80 → 13.07, funk 12.39 → 12.75, disco 11.55 → 11.96, reggae 7.97 → 8.17. `pnpm check` 26.2 and 26.4 s (the budget's reading 25.8 and 25.5 of 28; 24.2 at the start). `pnpm test:full` 71.5 s of 84, every style passing. `pnpm score` 64.1 s of 120, no movement. `pnpm smoke` 11.5 s of 60, five passed.
+
+**For his ear**: `out/guitar-slides/index.html` (not committed; the script in its `src/`): rock (Three-Chord Rocker in E, seed 1), neo-soul (Minor Neo-Soul Loop in C, seed 20: the old guitar bent into the third at bar 32 and the new one slides into the same note), acoustic (Four Open Chords in G, seed 1) and the blues on the overdriven guitar (12-Bar in A, seed 4), each before and after; rock and the blues at half and double the chances; under each clip the counts and where the first slide, hammer-on and pull-off are; the means above at the foot. Each take is the first seed on its chart on which every new move is heard.

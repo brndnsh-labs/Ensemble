@@ -429,6 +429,10 @@ export const funkSolo: SoloStyle = {
     bend: { third: 0, rootOrFifth: 0, around: 0, elsewhere: 0 },
     // No slide: the notes give funk none, as they give it no bend (ST-funk-32).
     slide: { chance: 0, into: "landing" },
+    // Hammer-ons and pull-offs on a guitar: the notes give none, and the lead is stabs and
+    // sixteenths, struck: seldom, a quarter of rock's chance.
+    hammerOn: 0.1,
+    pullOff: 0.1,
     shake: 3,
     // A horn scoops 0.2 (ST-funk-32), a phrase's one arrival, and falls off a phrase's last
     // note 0.35 (ST-funk-32, SO-54).

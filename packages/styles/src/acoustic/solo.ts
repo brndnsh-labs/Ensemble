@@ -2,8 +2,10 @@
 // cousin. Pentatonic and sung: quarters and eighths in the rhythm of a vocal
 // line, landing on thirds, never a run of sixteenths and never a bend
 // (ST-acoustic-25 to ST-acoustic-28). The notes' hammer-on (`.xx-`, a grace
-// sixteenth flicked into the next note) is played as two plucked notes: the
-// instrument has no hammered articulation. The half-step slur into the 3rd is
+// sixteenth flicked into the next note) is a cell of the rhythm, played as two
+// plucked notes unless the phrase's one hammer-on is drawn on it, as on any
+// pair a fret or two apart: the line pitches the grace by its own rules, a
+// step up into the note in under a third of the cells. The half-step slur into the 3rd is
 // not in the model and is not played; the heads (ST-acoustic-27, ST-acoustic-29)
 // are not built, as no style's is.
 //
@@ -428,6 +430,11 @@ export const acousticSolo: SoloStyle = {
     // No slide: the notes give acoustic none (ST-acoustic-25 to ST-acoustic-28), and the line
     // is sung. Its slur into the 3rd from the half step below is not played (see the top).
     slide: { chance: 0, into: "landing" },
+    // A hammer-on: the notes write one into the rhythm (ST-acoustic-26, `.xx-`), so the style
+    // hammers on nearly as often as rock; a pull-off they do not name, half that. The cell itself
+    // is two plucked notes unless its pair is drawn (see the top).
+    hammerOn: 0.3,
+    pullOff: 0.15,
     // Vibrato on notes of eight sixteenths or longer (ST-acoustic-28).
     shake: 2,
     // No scoops (ST-acoustic-28), and no falls: the line is sung.

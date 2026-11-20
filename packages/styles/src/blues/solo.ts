@@ -476,6 +476,11 @@ export const bluesSolo: SoloStyle = {
     bend: { third: 0.65, rootOrFifth: 0.45, around: 1, elsewhere: 0.5 },
     // On a guitar, a slide into a landing it does not bend 0.25 (SO-56), from a fret or two.
     slide: { chance: 0.25, into: "landing" },
+    // Hammer-ons and pull-offs: the notes give no figure. As rock's, the most any style plays
+    // (clip 13 of the slide study: one of each in eight bars): one of each in ten to twenty
+    // bars, the busiest chorus the most.
+    hammerOn: 0.4,
+    pullOff: 0.4,
     // A note held a dotted quarter is shaken (SO-52).
     shake: 1.5,
     // On a horn: a scoop into a long note 0.15 (ST-blues-41), here a phrase's one arrival; a

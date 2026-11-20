@@ -10,7 +10,9 @@ import type { SoloInstrument, SoloStyle } from "./style.ts";
  * Two frets stand 0.0285 s each (clip 3: a thirty-second note at 132, on pitch at 0.057 s);
  * one fret stands 0.057 s (clip 7 at 132), so a slide of either length is on its note as
  * soon. Every guitar's hand: a slide is as common on steel and nylon strings as on an
- * electric's, and the style says how often.
+ * electric's, and the style says how often. Every guitar's hand also hammers on and pulls
+ * off (`hammers`): a note sounded on the string still ringing, without a stroke, as clips 8
+ * and 10a drew it.
  */
 const SLIDE = { fret: 0.0285, oneFret: 0.057 } as const;
 
@@ -25,6 +27,7 @@ export const SOLO_INSTRUMENTS: Readonly<Record<string, SoloInstrument>> = {
     breath: null,
     bend: null,
     slide: null,
+    hammers: false,
     shake: null,
     scoop: null,
     fall: null,
@@ -46,6 +49,7 @@ export const SOLO_INSTRUMENTS: Readonly<Record<string, SoloInstrument>> = {
     breath: { lungs: 8, takes: 0.5 },
     bend: null,
     slide: null,
+    hammers: false,
     shake: { depth: 30, rate: 5, after: 0.4, grows: 0.6, upward: false, on: "last", shortest: 0.7 },
     scoop: { below: 1, takes: 0.06 },
     fall: { semitones: 6, takes: 0.5 },
@@ -63,6 +67,7 @@ export const SOLO_INSTRUMENTS: Readonly<Record<string, SoloInstrument>> = {
     breath: null,
     bend: { takes: 0.1 },
     slide: SLIDE,
+    hammers: true,
     shake: { depth: 60, rate: 5.5, after: 0.35, grows: 0.3, upward: true, on: "held" },
     scoop: null,
     fall: null,
@@ -78,6 +83,7 @@ export const SOLO_INSTRUMENTS: Readonly<Record<string, SoloInstrument>> = {
     breath: null,
     bend: { takes: 0.1 },
     slide: SLIDE,
+    hammers: true,
     shake: { depth: 60, rate: 5.5, after: 0.35, grows: 0.3, upward: true, on: "held" },
     scoop: null,
     fall: null,
@@ -96,6 +102,7 @@ export const SOLO_INSTRUMENTS: Readonly<Record<string, SoloInstrument>> = {
     breath: null,
     bend: null,
     slide: SLIDE,
+    hammers: true,
     shake: { depth: 20, rate: 5, after: 0.35, grows: 0.3, upward: false, on: "held" },
     scoop: null,
     fall: null,
@@ -112,6 +119,7 @@ export const SOLO_INSTRUMENTS: Readonly<Record<string, SoloInstrument>> = {
     breath: null,
     bend: null,
     slide: SLIDE,
+    hammers: true,
     shake: { depth: 20, rate: 5, after: 0.35, grows: 0.3, upward: false, on: "held" },
     scoop: null,
     fall: null,

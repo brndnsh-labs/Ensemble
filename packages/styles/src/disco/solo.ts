@@ -412,6 +412,10 @@ export const discoSolo: SoloStyle = {
     // rock's chance: its landings are short and few are bent (a quarter of rock's bends a
     // phrase), and a slide is rarer than a bend.
     slide: { chance: 0.05, into: "landing" },
+    // Hammer-ons and pull-offs on a guitar: the notes give none; funk's sixteenths made legato
+    // (ST-disco-23) take one now and then, under half rock's chance.
+    hammerOn: 0.15,
+    pullOff: 0.15,
     // Vibrato on every note of six sixteenths or more (ST-disco-25): a dotted quarter.
     shake: 1.5,
     // A horn scoops into a long note 0.3 (ST-disco-25), a phrase's one arrival, and falls off a

@@ -363,6 +363,10 @@ export const reggaeSolo: SoloStyle = {
     bend: { third: 0, rootOrFifth: 0, around: 0, elsewhere: 0 },
     // No slide: the notes give reggae none, and the line is sung (ST-reggae-27).
     slide: { chance: 0, into: "landing" },
+    // Hammer-ons and pull-offs on a guitar: the notes give none, and the lead is sung and
+    // sparse (ST-reggae-27): seldom, a quarter of rock's chance.
+    hammerOn: 0.1,
+    pullOff: 0.1,
     // Vibrato on notes of eight sixteenths or longer (ST-reggae-27).
     shake: 2,
     // A horn scoops 0.25 (ST-reggae-27, SO-53), a phrase's one arrival; the notes give it no

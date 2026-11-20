@@ -454,6 +454,16 @@ export interface SoloStyle {
      */
     readonly slide: { readonly chance: number; readonly into: "landing" | "third" };
     /**
+     * The chance a phrase sounds one note by hammering on, and the chance it
+     * sounds one by pulling off, on an instrument whose hand does: a note of
+     * an eighth or shorter, no longer than the next, steps a fret or two up
+     * (or down) to it inside the phrase, and the next is not struck. Neither
+     * note is bent, slid, or struck where the chord changes; the first is not
+     * the phrase's first; the two pairs, where a phrase has both, are apart.
+     */
+    readonly hammerOn: number;
+    readonly pullOff: number;
+    /**
      * Beats a note must be held for before it is shaken, on an instrument
      * that shakes its notes (SO-52): a dotted quarter is 1.5.
      */
@@ -527,6 +537,13 @@ export interface SoloInstrument {
    * bend is. Null for an instrument that cannot.
    */
   readonly slide: { readonly fret: number; readonly oneFret: number } | null;
+  /**
+   * A hand that sounds a note without striking it: a finger hammered onto the
+   * string a fret or two above the note ringing, or pulled off it to a fret a
+   * fret or two below. Two notes, one attack. False for an instrument that
+   * strikes every note.
+   */
+  readonly hammers: boolean;
   /**
    * How it shakes a held note: `depth` cents, `rate` times a second, starting
    * `after` seconds into the note and reaching its depth over `grows` more.

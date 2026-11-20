@@ -288,6 +288,8 @@ export function validateSoloStyle(solo: SoloStyle): string[] {
     "habits, bend: the hand is lyrical a whole number of phrases either side of the top note.",
   );
   chance(solo.habits.slide.chance, "habits, slide");
+  chance(solo.habits.hammerOn, "habits, hammer-on");
+  chance(solo.habits.pullOff, "habits, pull-off");
   say(
     solo.habits.slide.into === "landing" || solo.habits.slide.into === "third",
     "habits, slide: into a landing, or into a third.",

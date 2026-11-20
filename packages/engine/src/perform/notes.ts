@@ -39,6 +39,14 @@ export interface WrittenNote {
    */
   readonly fade?: number;
   /**
+   * Not struck: the seat's note before it is still sounding on the same string,
+   * and its pitch moves to this one's at this one's time, as a finger hammered
+   * on or pulled off sounds it (SO-28's guitar cousins). Its time, length and
+   * pitch are its own, as for any note; what makes sound hears the two as one
+   * attack (`asStruck`).
+   */
+  readonly slur?: boolean;
+  /**
    * It leads into the next bar (a soloist's pickup, SO-36): it is played in a bar
    * its seat sits out, where the seat plays the bar it leads into.
    */
@@ -63,6 +71,8 @@ export interface NoteEvent {
   readonly move?: PitchMove;
   /** Ticks it goes on sounding past `duration`, dying away to nothing: a fall (`WrittenNote.fade`). */
   readonly fade?: number;
+  /** Not struck: sounded on the string the seat's note before it left ringing (`WrittenNote.slur`). */
+  readonly slur?: boolean;
 }
 
 /** Something a chart view or a MIDI file can show: where we are in the form. */

@@ -539,6 +539,10 @@ export const jazzSolo: SoloStyle = {
     bend: { third: 0, rootOrFifth: 0, around: 0, elsewhere: 0 },
     // No slide: the notes give jazz none, as they give it no bend (ST-jazz-37).
     slide: { chance: 0, into: "landing" },
+    // Hammer-ons and pull-offs on a guitar: the notes give none; a bebop line is a picked one,
+    // so a guitar picked for it slurs now and then, under half rock's chance.
+    hammerOn: 0.15,
+    pullOff: 0.15,
     shake: 2,
     // On a horn: a scoop into a long note 0.15 (ST-jazz-37), here a phrase's one arrival. The
     // notes give jazz no fall; Brandon chose one over the jazz band (horn-study clip 9), so the

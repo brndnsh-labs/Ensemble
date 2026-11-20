@@ -6,7 +6,7 @@ import { PPQ } from "../chart/types.ts";
 import type { Plan } from "../plan/types.ts";
 import type { Seat } from "../style/types.ts";
 import type { PerformanceEvent } from "./notes.ts";
-import { CURVE_STEP, pitchCurve } from "./pitch.ts";
+import { asStruck, CURVE_STEP, pitchCurve } from "./pitch.ts";
 
 /** A note as a sound: when it starts, how long it lasts, and what plays it. */
 export interface TimedNote {
@@ -38,7 +38,8 @@ export function secondsAt(plan: Plan, tick: number): number {
 export function timedNotes(plan: Plan, events: readonly PerformanceEvent[]): TimedNote[] {
   const notes: TimedNote[] = [];
   const secondsPerTick = secondsAt(plan, 1);
-  for (const event of events) {
+  // A note not struck is heard as part of the note before it.
+  for (const event of asStruck(events, secondsPerTick)) {
     if (event.kind !== "note") continue;
     // A note that dies away past its end sounds until it has.
     const length = secondsAt(plan, event.duration + (event.fade ?? 0));

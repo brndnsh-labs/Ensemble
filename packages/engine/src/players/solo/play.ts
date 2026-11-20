@@ -46,6 +46,8 @@ interface SoloNote {
   readonly move?: PitchMove;
   /** Ticks it sounds past its end, dying away: a fall. */
   readonly fade?: number;
+  /** Not struck: hammered on or pulled off from the note before. */
+  readonly slur?: boolean;
   /** A breath follows it: it ends a phrase as heard. */
   readonly ends: boolean;
   /** Its length in the rhythm, in ticks. */
@@ -66,6 +68,7 @@ function writtenOf(note: SoloNote, voice: string, leadsIn: boolean): WrittenNote
     voice,
     ...(note.move ? { move: note.move } : {}),
     ...(note.fade ? { fade: note.fade } : {}),
+    ...(note.slur ? { slur: true } : {}),
     ...(leadsIn ? { leadsIn: true } : {}),
   };
 }
@@ -187,8 +190,9 @@ export function soloPart(
     // arrives on and of the notes it leaves. Drawn by place, after the choice, so the
     // phrase is the one the critic chose whatever it does.
     const horned = hornMoves(world, slot, notes[at]!, rng, fell);
-    // And how a guitarist's left hand plays it: a landing slid into.
-    const played = slideInto(world, phrase, horned.notes, rng);
+    // And how a guitarist's left hand plays it: a landing slid into, a note hammered on or
+    // pulled off.
+    const played = slurs(world, phrase, slideInto(world, phrase, horned.notes, rng), rng);
     fell = horned.fell;
     const opens = slot.bars[0]!.start;
     for (const note of played) {
@@ -773,5 +777,62 @@ function slideInto(world: World, phrase: Phrase, notes: readonly SoloNote[], rng
   const glide = frets(by, each * ticksPerSecond, arrive * ticksPerSecond, JUMP * ticksPerSecond);
   const out = [...notes];
   out[i] = { ...note, move: { ...note.move, glide } };
+  return out;
+}
+
+/**
+ * A guitarist's hammer-on and pull-off, on an instrument whose hand sounds a
+ * note without striking it, each as often as the style says: one of each in
+ * a phrase at most. Two notes of the line become one struck string: a note
+ * of an eighth or shorter, held into the next and no longer than it, that
+ * steps a fret or two to it, up (a hammer-on) or down (a pull-off); the next
+ * is not struck. Neither is bent or slid, nor struck where the chord changes
+ * (a landing keeps its attack), nor a pickup, nor in the bar the band ends
+ * on; the first is not the phrase's first note, and no breath comes between
+ * them. Where a phrase has both, at least one struck note stands between the
+ * two pairs: never three notes on one strike, nor a trill (SO-28). The notes
+ * are the line's: only whether the second is struck changes. Drawn by the
+ * phrase's place, after the critic has chosen it.
+ */
+function slurs(world: World, phrase: Phrase, notes: readonly SoloNote[], rng: Rng): SoloNote[] {
+  const { instrument, solo } = world;
+  const { hammerOn, pullOff } = solo.habits;
+  if (!instrument.hammers || (hammerOn <= 0 && pullOff <= 0)) return [...notes];
+  const landing = (note: SoloNote) => {
+    const arrival = world.arrivalAt(note.tick);
+    return arrival?.changed === true && arrival.tick === note.tick;
+  };
+  const plain = (note: SoloNote) =>
+    !note.lead && !note.move?.glide && note.bar.ending === null && !landing(note);
+  // The first note of each pair that may be one string, by the index of the first.
+  const pairs = notes.flatMap((first, i) => {
+    const second = notes[i + 1];
+    const before = notes[i - 1];
+    if (!second || !before || before.ends || first.ends) return [];
+    if (!plain(first) || !plain(second) || before.lead) return [];
+    if (first.value > EIGHTH || first.value > second.value) return [];
+    if (second.tick !== first.tick + first.value) return [];
+    const step = second.pitch - first.pitch;
+    return Math.abs(step) === 1 || Math.abs(step) === 2 ? [{ i, up: step > 0 }] : [];
+  });
+  if (pairs.length === 0) return [...notes];
+  const first = phrase.slot.bars[0]!;
+  const place = placeOf(first, first.start);
+  const out = [...notes];
+  let hammered: number | undefined;
+  const hammer = rng.fork("hammer-on", place);
+  const ups = pairs.filter((pair) => pair.up);
+  if (ups.length > 0 && hammer.chance(hammerOn)) {
+    hammered = hammer.pick(ups).i;
+    out[hammered + 1] = { ...out[hammered + 1]!, slur: true };
+  }
+  const pull = rng.fork("pull-off", place);
+  const downs = pairs.filter(
+    (pair) => !pair.up && (hammered === undefined || Math.abs(pair.i - hammered) >= 3),
+  );
+  if (downs.length > 0 && pull.chance(pullOff)) {
+    const i = pull.pick(downs).i;
+    out[i + 1] = { ...out[i + 1]!, slur: true };
+  }
   return out;
 }

@@ -411,6 +411,12 @@ export const rockSolo: SoloStyle = {
     bend: { third: 0.45, rootOrFifth: 0.55, around: 1, elsewhere: 0.5 },
     // A slide into an unbent landing 0.20 (SO-56, ST-rock-24), from a fret or two.
     slide: { chance: 0.2, into: "landing" },
+    // Hammer-ons and pull-offs: the notes give no figure. Clip 13 of the slide study had one of
+    // each in eight bars at the working level, and that is the most any style plays: here, a
+    // three-chorus solo has one of each in eleven to twenty bars, the busiest chorus the most
+    // (DECISIONS.md, "the guitar's short slide, hammer-on and pull-off").
+    hammerOn: 0.4,
+    pullOff: 0.4,
     // A note held a dotted quarter is shaken (SO-52).
     shake: 1.5,
     // No scoops (ST-rock-24), and the notes give rock no fall.

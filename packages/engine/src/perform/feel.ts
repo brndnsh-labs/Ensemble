@@ -91,6 +91,7 @@ export function applyFeel(
       ...(note.voice === undefined ? {} : { voice: note.voice }),
       ...(note.move === undefined ? {} : { move: note.move }),
       ...(note.fade === undefined ? {} : { fade: note.fade }),
+      ...(note.slur ? { slur: true } : {}),
     };
   });
 }

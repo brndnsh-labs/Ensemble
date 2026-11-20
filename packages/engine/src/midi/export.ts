@@ -4,7 +4,7 @@
 import { PPQ } from "../chart/types.ts";
 import { tempoPulse } from "../perform/meter.ts";
 import type { PerformanceEvent } from "../perform/notes.ts";
-import { CURVE_STEP, pitchCurve } from "../perform/pitch.ts";
+import { asStruck, CURVE_STEP, pitchCurve } from "../perform/pitch.ts";
 import type { Plan } from "../plan/types.ts";
 import { SOLO_INSTRUMENTS } from "../players/solo/instruments.ts";
 import type { Seat, StylePack } from "../style/types.ts";
@@ -85,7 +85,8 @@ export function toMidi(
   };
   const secondsPerTick = 60 / (plan.quarters * PPQ);
   let soloProgram: number | undefined;
-  for (const event of events) {
+  // A note not struck is said as part of the note before it: one note-on, the pitch bent.
+  for (const event of asStruck(events, secondsPerTick)) {
     if (event.kind === "marker") {
       // Sections and landmarks are markers a DAW can show; chords and pass counts are text.
       const isLandmark = event.marker !== "chord" && event.marker !== "pass";

@@ -21,6 +21,8 @@ import {
   SOLO_INSTRUMENTS,
   swing,
   tierOf,
+  timedNotes,
+  toMidi,
 } from "@ensemble/engine";
 import { chordsUnder, harmonyOf, POCKET, strikesOf } from "./reading.ts";
 import {
@@ -31,6 +33,7 @@ import {
   notesOf,
   only,
   ownCharts,
+  readSmf,
   SEEDS,
   STYLES,
   soloistTakes,
@@ -1230,6 +1233,125 @@ test("a guitar slides into a landing from a fret or two away, stepping: struck o
     if (bendsIn(style) && slide?.into !== "third") {
       assert.ok(slides <= bends, `${where}: more slides than bends`);
     }
+  }
+});
+
+test("a guitar hammers on and pulls off as one struck string: inside a phrase, a note of an eighth or shorter, no longer than the next, that steps a fret or two to it, neither bent nor slid nor struck where the chord changes, not the phrase's first, may leave the next unstruck; then it is heard as one attack, at the first note's time and level, its pitch jumping to the second's at the second's time and sounding to the second's end, in the sounds and in the MIDI file; one hammer-on and one pull-off a phrase at most and never two pairs running; some in every style whose chance is not none, and none on an instrument or in a style that does not", () => {
+  const counts = new Map<string, { hammers: number; pulls: number; phrases: number }>();
+  const filed = new Set<string>();
+  for (const { style, chart, options, take } of [...soloTakes(), ...handedTakes()]) {
+    const notes = notesOf(take, "solo");
+    const hand = SOLO_INSTRUMENTS[notes[0]?.voice ?? ""];
+    if (!hand) continue;
+    const harmony = harmonyOf(take);
+    const bars = take.plan.bars;
+    const perSecond = (take.plan.quarters * PPQ) / 60;
+    const { habits, space, touch } = style.solo;
+    const owed = space.breath * 0.9 * perSecond;
+    const count = counts.get(style.id) ?? { hammers: 0, pulls: 0, phrases: 0 };
+    counts.set(style.id, count);
+    const hammers = hand.hammers !== false;
+    const changes = (tick: number) =>
+      harmony.some((arrival) => arrival.tick === tick && arrival.changed && arrival.chord);
+    const barOf = (tick: number) => bars.findLast((bar) => bar.start <= tick)!;
+    const gapBefore = (i: number) => notes[i]!.tick - (notes[i - 1]!.tick + notes[i - 1]!.duration);
+    const starts = (i: number) => i === 0 || gapBefore(i) >= owed;
+    // Surely after a breath, as heard: the breath itself, and the pocket's slack.
+    const breathed = (i: number) => i === 0 || gapBefore(i) >= space.breath * perSecond + POCKET;
+    let [up, down, slurs] = [0, 0, 0];
+    notes.forEach((note, i) => {
+      if (starts(i)) {
+        if (hammers) count.phrases++;
+        [up, down] = [0, 0];
+      }
+      if (!note.slur) return;
+      slurs++;
+      const where = `${style.id} ${chart.file} ${JSON.stringify(options)} tick ${note.tick}: ${note.pitch}`;
+      const before = notes[i - 1];
+      assert.ok(before && !breathed(i), `${where}: not struck, after a breath or nothing`);
+      const step = note.pitch - before.pitch;
+      const hammer = step > 0;
+      if (hammers) count[hammer ? "hammers" : "pulls"]++;
+      assert.ok(hand.hammers, `${where}: not struck on the ${hand.name}`);
+      assert.ok(
+        ((hammer ? habits.hammerOn : habits.pullOff) ?? 0) > 0,
+        `${where}: a ${hammer ? "hammer-on" : "pull-off"} in a style that does not`,
+      );
+      assert.ok(Math.abs(step) === 1 || Math.abs(step) === 2, `${where}: a slur of ${step}`);
+      // The first an eighth or shorter, held into the second, and no longer than it.
+      const span = note.tick - before.tick;
+      assert.ok(span > 0 && span <= PPQ / 2, `${where}: hammered from a note ${span} long`);
+      const gap = note.tick + note.offset - (before.tick + before.offset + before.duration);
+      assert.ok(gap <= span * (1 - touch.legato) + POCKET, `${where}: a slur across a rest`);
+      const after = notes[i + 1];
+      assert.ok(
+        Math.max(note.duration + POCKET, (after?.tick ?? 0) - note.tick) >= span * touch.legato,
+        `${where}: a slur into a shorter note`,
+      );
+      // Neither moved, nor a landing, nor the phrase's first; nothing in the band's last bar.
+      assert.ok(!before.move?.glide && !note.move?.glide, `${where}: a slur with a bend or slide`);
+      assert.ok(!changes(before.tick) && !changes(note.tick), `${where}: a slur on a landing`);
+      assert.ok(!breathed(i - 1), `${where}: hammered from a phrase's first note`);
+      assert.ok(!before.slur && !notes[i - 2]?.slur, `${where}: two slurs running`);
+      assert.equal(barOf(note.tick).ending, null, `${where}: a slur in the bar the band ends on`);
+      if (hammer) up++;
+      else down++;
+      assert.ok(
+        up <= 1 && down <= 1,
+        `${where}: a second ${hammer ? "hammer-on" : "pull-off"} in a phrase`,
+      );
+    });
+    if (slurs === 0) continue;
+    // One attack: the sounds and the MIDI file strike the pair once, from the first note.
+    const sounds = timedNotes(take.plan, take.events).filter((sound) => sound.seat === "solo");
+    assert.equal(sounds.length, notes.length - slurs, `${chart.file}: a slurred note struck`);
+    const secondsAt = (tick: number) => (tick / PPQ) * (60 / take.plan.quarters);
+    notes.forEach((note, i) => {
+      if (!note.slur) return;
+      const before = notes[i - 1]!;
+      const at = Math.max(0, secondsAt(before.tick + before.offset));
+      const sound = sounds.find((s) => Math.abs(s.at - at) < 1e-9);
+      const where = `${style.id} ${chart.file} tick ${note.tick}`;
+      assert.ok(
+        sound && sound.pitch === note.pitch,
+        `${where}: the pair is not one sound at its pitch`,
+      );
+      assert.equal(sound.velocity, before.velocity, `${where}: struck at another level`);
+      const ends = secondsAt(note.tick + note.offset + note.duration);
+      assert.ok(
+        Math.abs(sound.at + sound.length - ends) < 1e-6,
+        `${where}: not to the second's end`,
+      );
+      const cents = sound.bend?.cents ?? [];
+      const jump = Math.floor((secondsAt(note.tick + note.offset) - at) / sound.bend!.step);
+      assert.ok(
+        cents[0] === (before.pitch - note.pitch) * 100 &&
+          cents[Math.max(0, jump - 1)] === cents[0] &&
+          Math.abs(cents[jump + 2]!) < 5,
+        `${where}: the pitch does not stand on the first note and jump to the second`,
+      );
+    });
+    if (!filed.has(style.id)) {
+      filed.add(style.id);
+      const solo = readSmf(toMidi(take.plan, take.events, style)).tracks.find(
+        (track) => track.name === "Solo",
+      )!;
+      assert.equal(solo.noteOns, notes.length - slurs, `${chart.file}: the file strikes a slur`);
+    }
+  }
+  for (const style of STYLES) {
+    const { hammers, pulls, phrases } = counts.get(style.id) ?? {
+      hammers: 0,
+      pulls: 0,
+      phrases: 0,
+    };
+    const { hammerOn, pullOff } = style.solo.habits;
+    const where = `${style.id}: ${hammers} hammer-ons and ${pulls} pull-offs in ${phrases} phrases`;
+    // (A style that names no chance has not said it does not.)
+    assert.ok(hammerOn === 0 ? hammers === 0 : hammers > 0, `${where}, against ${hammerOn}`);
+    assert.ok(pullOff === 0 ? pulls === 0 : pulls > 0, `${where}, against ${pullOff}`);
+    assert.ok(hammers <= phrases * (hammerOn ?? 0), `${where}: more hammer-ons than the chance`);
+    assert.ok(pulls <= phrases * (pullOff ?? 0), `${where}: more pull-offs than the chance`);
   }
 });
 
