@@ -588,3 +588,12 @@ Brandon asked "what about an icon?"; the one in place was a placeholder from the
 - **One script draws all of it** (`scripts/icons.ts`, pictures by headless Chrome), so a change is made once.
 - Not checked: a real iPhone's home screen (an installed app keeps its old icon until it is removed and added again), a real Android launcher.
 
+
+## a gap of paper between the coloured blocks (2026-11-21, #2264)
+
+Brandon: "we might want to have some slight padding between the squares - right now they can run together and make recent songs visually run together". On home the last-played poster and the two bills under it were pasted flush, so two recent charts in one style read as one block; the wall of styles was edge to edge by design. Asked where the gap should go, he chose everywhere.
+
+- **One gap, a token** (`--gap` beside `--gutter` in `style.css`): 6px on a phone, 8px from 900px wide, the paper showing through. Chosen by looking: wide enough that two blocks in one ink are plainly two, narrow enough that the wall still reads as one wall.
+- **Where it applies**: between the last-played poster and the bills under it, between those bills, between the wall's tiles both ways, and between the bills of the style picker (the wall in small, so it keeps the wall's rule though its neighbours never share an ink).
+- **Not changed**: any block's own size, type or padding; the shorter wall column's last tile still runs down to meet the other's. The other blocks in a style's ink (the trail's crumb, the badge, a style's head, the dock's flood, the play button) each stand alone and touch no other.
+- Pictures before and after, light and dark, phone and wide: `out/home-gaps/` (not committed). Waits on his eye on the test site.

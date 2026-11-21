@@ -39,6 +39,8 @@
   --under: var(--paper);
 
   --gutter: 16px;
+  /* The paper showing between two blocks of colour, so that neighbours in one ink are two. */
+  --gap: 6px;
   /* How tall anything pressed is: a fingertip on a phone, a little less under a mouse. */
   --control: 44px;
   /* A breath of ink: under a pointer, and the hatching of what is only pencilled in. */
@@ -74,6 +76,7 @@
 @media (min-width: 900px) {
   :root {
     --gutter: 32px;
+    --gap: 8px;
   }
 }
 
@@ -721,11 +724,12 @@ button:active:not(:disabled, .row-play, .last-play, .go, .player, .opt, .menu-li
   height: 24px;
 }
 
-/* The two before it: smaller bills, pasted under. */
+/* The two before it: smaller bills, pasted under, a gap of paper round each. */
 .lately {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  margin: 0;
+  gap: var(--gap);
+  margin: var(--gap) 0 0;
   padding: 0;
   list-style: none;
 }
@@ -814,9 +818,11 @@ button:active:not(:disabled, .row-play, .last-play, .go, .player, .opt, .menu-li
   margin-top: 34px;
 }
 
-/* The wall: a bill for each style, edge to edge, and each a way into the library. */
+/* The wall: a bill for each style, a gap of paper between them, and each a way into
+   the library. */
 .wall {
   display: flex;
+  gap: var(--gap);
   margin-top: 12px;
 }
 
@@ -824,6 +830,7 @@ button:active:not(:disabled, .row-play, .last-play, .go, .player, .opt, .menu-li
   display: flex;
   flex: 1 1 0;
   flex-direction: column;
+  gap: var(--gap);
   min-width: 0;
 }
 
@@ -3448,11 +3455,11 @@ button.mark[aria-expanded="true"] {
   padding: 0 14px;
 }
 
-/* A style to choose is its bill, small, in its own ink; the one being played has the press
-   ink's frame round it. */
+/* A style to choose is its bill, small, in its own ink, a gap of paper between them as on
+   the wall; the one being played has the press ink's frame round it. */
 .styles-opts {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0;
+  gap: var(--gap);
 }
 
 .style-opt,
