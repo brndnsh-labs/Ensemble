@@ -674,6 +674,32 @@
       "heard": "out/solo-displaced/: alto on So What and All the Things You Are (jazz), funk in D minor and the vamp in A, vibraphone on the minor blues; nine moved ideas, main before against now, same seeds, served over the LAN.",
       "recorded": "e1988803",
       "doubt": "He did not say whether he wants moved ideas more often."
+    },
+    {
+      "id": "compound-written-net-improvement",
+      "date": "2026-11-21",
+      "words": "everything i'm listening to sounds like a net improvement",
+      "source": "DECISIONS.md: his ear on the meters and the guitar's slides (2026-11-21, #2233, #2234, #2235)",
+      "kind": "passed",
+      "medium": "sound",
+      "recorded": "b32f23bd",
+      "doubt": "One remark for every page on the front page; he did not answer the questions put per page (the neo-soul slide or bend, more or fewer, rock's tempo in twelve) one by one, and did not say which pages he played.",
+      "seat": "band",
+      "styles": ["blues", "rock", "jazz", "acoustic", "funk", "disco", "reggae"],
+      "heard": "out/meter-study-5-blues/, -rock/, -jazz/, -acoustic/ and out/meter-study-4-funk/, -disco/, -reggae/: each style written for 6/8 and 12/8 beside the same takes fitted from its 4/4 parts, quiet and at the working level, with and without the soloist; rendered from main that day."
+    },
+    {
+      "id": "guitar-slides-net-improvement",
+      "date": "2026-11-21",
+      "words": "everything i'm listening to sounds like a net improvement",
+      "source": "DECISIONS.md: his ear on the meters and the guitar's slides (2026-11-21, #2233, #2234, #2235)",
+      "kind": "passed",
+      "medium": "sound",
+      "recorded": "b32f23bd",
+      "doubt": "One remark for every page on the front page; he did not answer the questions put per page (the neo-soul slide or bend, more or fewer, rock's tempo in twelve) one by one, and did not say which pages he played.",
+      "seat": "soloist",
+      "styles": ["rock", "neosoul", "acoustic", "blues"],
+      "heard": "out/guitar-slides/: the guitar soloist's slides, hammer-ons and pull-offs, before (74e14d2) and after, and rock and the blues at half and at double the chances."
     }
   ],
   "leftOut": [
