@@ -3023,3 +3023,7 @@ Two reviews (the code, and 33 takes read before and after) sent it back. Each fi
 ### his ear (2026-11-21)
 
 Heard on `out/solo-displaced/` (jazz on So What and All the Things You Are, funk in D minor and the vamp in A, the minor blues; main before against now, same seeds): "seems like this is all sounding good, i'm not hearing anything that seems off in the new clips. great job, everything sounds pretty natural and melodic". Passed; #2237 closed. He did not say whether he wants it more often, so the chances stay as written and #2256 (holding a note over a barline inside a phrase, which is what keeps the moved idea rare) goes back to the queue as ready, its own change for his ear.
+
+## his ear on the meters and the guitar's slides (2026-11-21, #2233, #2234, #2235)
+
+Heard over the LAN from a front page linking `out/meter-study-5-blues/`, `-rock/`, `-jazz/`, `-acoustic/` (#2234), `out/meter-study-4-funk/`, `-disco/`, `-reggae/` (#2235), each re-rendered from `main` at 5e03bb09's parent, and `out/guitar-slides/` (#2233, rendered 2026-11-19, nothing touching those guitars changed since but the rare moved idea): "everything i'm listening to sounds like a net improvement". Passed; the three issues closed. The questions he did not answer one by one keep what is built: neo-soul's slide stays in place of its bend, the slides' and slurs' chances stay as written, and rock's tempo in twelve (48 to 107, usually 66) stays the builder's judgement. One verdict was asked per style; he gave one for all, so each style's case carries the same words.
