@@ -726,6 +726,19 @@
       "seat": "band",
       "styles": ["funk"],
       "heard": "out/funk-grooves/: four funk charts in 4/4 at one seed each, the rhythm section alone and with the alto at the working level, and quiet, main's take of the same seed (before the wider pool) beside each."
+    },
+    {
+      "id": "solo-held-over-barline-good",
+      "date": "2026-11-21",
+      "words": "everything sounds (and looks) good on the test server",
+      "source": "docs/decisions/critic.md: his ear and eye on the held note and the gaps (2026-11-21, #2256, #2264)",
+      "kind": "passed",
+      "medium": "notes",
+      "recorded": "e201cdc4",
+      "doubt": "One remark for the test site and a front page of four pages; he did not say which clips he played, nor answer the questions put (does the answer read as the same idea, does the held note hang, do neo-soul and reggae still sound like themselves) one by one. Taken for what the test site served, not for the tempo that breathes or dark mode, which it did not serve yet.",
+      "seat": "soloist",
+      "styles": ["jazz", "blues", "neosoul", "reggae", "acoustic"],
+      "heard": "The test site at f5c66b1c, and out/solo-held/: jazz (Take the A Train), the blues (jazz blues in F), neo-soul, reggae and acoustic, main before the held note and after on the same seed, each idea's note lengths beside its answer's."
     }
   ],
   "leftOut": [
