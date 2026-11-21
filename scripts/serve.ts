@@ -24,6 +24,7 @@ const TYPES: Readonly<Record<string, string>> = {
   ".webm": "audio/webm",
   ".wav": "audio/wav",
   ".m4a": "audio/mp4",
+  ".mp3": "audio/mpeg",
   ".md": "text/plain; charset=utf-8",
   ".mid": "audio/midi",
 };
