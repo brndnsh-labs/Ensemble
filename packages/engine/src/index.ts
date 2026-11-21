@@ -59,7 +59,7 @@ export type { Heard, SoloCandidate, SoloPick, Sounding } from "./players/solo/cr
 export { bySoloCritic, likeness, SOLO_FEATURES } from "./players/solo/critique.ts";
 export { SOLO_INSTRUMENTS } from "./players/solo/instruments.ts";
 export type { SoloChoice } from "./players/solo/play.ts";
-export { soloPart } from "./players/solo/play.ts";
+export { soloPart, soloRoles } from "./players/solo/play.ts";
 export type { Slot } from "./players/solo/slots.ts";
 export type * from "./players/solo/style.ts";
 export { validateSoloStyle } from "./players/solo/validate.ts";

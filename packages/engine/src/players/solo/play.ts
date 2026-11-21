@@ -16,8 +16,10 @@ import type { Player, PlayerContext, WrittenNote } from "../../perform/notes.ts"
 import { heldRng } from "../../perform/notes.ts";
 import type { GlidePoint, PitchMove } from "../../perform/pitch.ts";
 import { JUMP } from "../../perform/pitch.ts";
-import type { PlanBar } from "../../plan/types.ts";
+import type { Plan, PlanBar } from "../../plan/types.ts";
 import type { Rng } from "../../rng.ts";
+import { createRng } from "../../rng.ts";
+import type { StylePack } from "../../style/types.ts";
 import { TIER_MID } from "../../style/types.ts";
 import type { ToneRole } from "../../theory/chord.ts";
 import { mod12, pitchClass } from "../../theory/pitch.ts";
@@ -139,25 +141,7 @@ export function soloPart(
       fell = false;
     }
     const lead = intoPass(first, world.slots[s - 1]);
-    if (slot.index === 0) {
-      // One form for the chorus. With no idea yet to pick up, it opens on a statement.
-      const forms = writtenFor(
-        world.solo.forms.filter(
-          (option) =>
-            option.weight > 0 && (memory.motif !== null || cells(option.phrases)[0] === "s"),
-        ),
-        slot.count,
-      );
-      const drawn = rng
-        .fork("form", first.pass, first.section.occurrence)
-        .weighted(forms.length > 0 ? forms : [{ weight: 1, phrases: "s" }], (f) => f.weight);
-      // A chorus shorter than the form keeps how it opens and how it closes.
-      const letters = cells(drawn.phrases) as Role[];
-      form =
-        slot.count >= letters.length
-          ? letters
-          : [letters[0]!, ...letters.slice(letters.length - (slot.count - 1))].slice(0, slot.count);
-    }
+    if (slot.index === 0) form = chorusForm(world, rng, slot, memory.motif !== null);
     const role = form[slot.index % form.length] ?? "s";
 
     const phrases = phrasesFor(
@@ -245,6 +229,52 @@ export function soloPart(
 }
 
 export const playSolo: Player = (context) => soloPart(context);
+
+/**
+ * What the phrases of a chorus are for: one form drawn for the chorus, by its pass and
+ * its section, from those the style writes for a chorus of its length. With no idea yet
+ * to pick up, it opens on a statement. A chorus shorter than the form keeps how it opens
+ * and how it closes.
+ */
+function chorusForm(world: World, rng: Rng, slot: Slot, hasIdea: boolean): readonly Role[] {
+  const first = slot.bars[0]!;
+  const forms = writtenFor(
+    world.solo.forms.filter(
+      (option) => option.weight > 0 && (hasIdea || cells(option.phrases)[0] === "s"),
+    ),
+    slot.count,
+  );
+  const drawn = rng
+    .fork("form", first.pass, first.section.occurrence)
+    .weighted(forms.length > 0 ? forms : [{ weight: 1, phrases: "s" }], (f) => f.weight);
+  const letters = cells(drawn.phrases) as Role[];
+  return slot.count >= letters.length
+    ? letters
+    : [letters[0]!, ...letters.slice(letters.length - (slot.count - 1))].slice(0, slot.count);
+}
+
+/**
+ * What the form asked of each phrase of a take's solos, by the index of the phrase's
+ * first bar: the letters the soloist played them for. A take is its chart, style,
+ * options and seed, and the form is drawn from the seed and the plan alone; the idea in
+ * hand when a chorus starts is there once a phrase of the solo that is not the climb to
+ * the top note has been played, as the soloist remembers it.
+ */
+export function soloRoles(plan: Plan, style: StylePack, seed: number | string): Map<number, Role> {
+  const world = worldOf(plan, style, new Map());
+  const rng = createRng(seed).fork("seat", "solo");
+  const roles = new Map<number, Role>();
+  let form: readonly Role[] = ["s"];
+  let solo = -1;
+  let hasIdea = false;
+  for (const slot of world.slots) {
+    if (slot.solo !== solo) [solo, hasIdea] = [slot.solo, false];
+    if (slot.index === 0) form = chorusForm(world, rng, slot, hasIdea);
+    if (!slot.peak) hasIdea = true;
+    roles.set(slot.bars[0]!.index, form[slot.index % form.length] ?? "s");
+  }
+  return roles;
+}
 
 /**
  * The forms written for a chorus of this many phrases; failing that the longest that

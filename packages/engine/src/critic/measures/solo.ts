@@ -24,6 +24,7 @@ import {
   lineBars,
   phrasesOf,
   pickupsOf,
+  rhythmsAgain,
   SOLO_FEATURES,
 } from "../../players/solo/critique.ts";
 import type { World } from "../../players/solo/slots.ts";
@@ -146,23 +147,45 @@ function wholeSolos(reading: Reading): Sounding[][][] {
   return result;
 }
 
-/** Each phrase of three notes or more after a solo's first, and the earlier one it says again a pulse away, if any. */
+/** Each phrase of a solo after its first, and the earlier idea it says again a pulse away, if it does. */
 export interface DisplacedPhrase {
   readonly phrase: Heard;
   readonly of: Heard | null;
   readonly by: 1 | -1 | null;
+  /** The earlier phrase's notes said again, and each as it is said now (`displacedFrom`). */
+  readonly source: readonly Sounding[];
+  readonly notes: readonly Sounding[];
+  /** The line goes the same way too (`Displacement.line`); otherwise the rhythm alone is moved. */
+  readonly line: boolean;
+  /**
+   * Some earlier phrase's rhythm is played here a pulse late, whatever its line and
+   * whatever else it is like: an answer carrying a moved idea's rhythm on.
+   */
+  readonly carriesLate: boolean;
 }
 const displaced = new WeakMap<Reading, DisplacedPhrase[]>();
 function displacements(reading: Reading): DisplacedPhrase[] {
   const known = displaced.get(reading);
   if (known) return known;
-  const found = reading.solos.flatMap((solo) =>
-    solo.flatMap((phrase, i): DisplacedPhrase[] => {
+  const found = reading.solos.flatMap((solo) => {
+    const all = solo.flatMap((phrase) => phrase.notes).sort((a, b) => a.tick - b.tick);
+    return solo.flatMap((phrase, i): DisplacedPhrase[] => {
       if (i === 0 || body(phrase).length < 3) return [];
-      const heard = displacedFrom(phrase, solo.slice(0, i));
-      return [{ phrase, of: heard?.of ?? null, by: heard?.by ?? null }];
-    }),
-  );
+      const heard = displacedFrom(phrase, solo.slice(0, i), all);
+      const carriesLate = rhythmsAgain(phrase, solo.slice(0, i), all).some((one) => one.by === 1);
+      return [
+        {
+          phrase,
+          of: heard?.of ?? null,
+          by: heard?.by ?? null,
+          source: heard?.source ?? [],
+          notes: heard?.notes ?? [],
+          line: heard?.line ?? false,
+          carriesLate,
+        },
+      ];
+    });
+  });
   displaced.set(reading, found);
   return found;
 }
@@ -170,11 +193,12 @@ function displacements(reading: Reading): DisplacedPhrase[] {
 /**
  * The phrases of a take's solos that say an earlier one again a beat early or
  * late, read from the notes (`displacedFrom`): what the `solo.displaced`
- * measure counts, for a property or a page that wants to find them.
+ * measure counts (`line`), and those that play only its rhythm moved, for a
+ * property or a page that wants to find them.
  */
 export function displacedPhrases(take: Take, style: StylePack): DisplacedPhrase[] {
   const reading = read(take, style);
-  return reading ? displacements(reading).filter((one) => one.by !== null) : [];
+  return reading ? displacements(reading).filter((one) => one.by !== null || one.carriesLate) : [];
 }
 
 const seconds = (reading: Reading, ticks: number) => ticks / reading.world.ticksPerSecond;
@@ -348,7 +372,16 @@ export const soloMeasures: readonly Measure[] = [
     "Sometimes an idea comes back a beat early or a beat late, the same rhythm and contour falling across the bar differently: the share of phrases (of three notes or more, after a solo's first) that say an earlier phrase of the solo again moved by one of the bar's pulses.",
     (reading) => {
       const phrases = displacements(reading);
-      return share(phrases.filter((one) => one.by !== null).length, phrases.length);
+      return share(phrases.filter((one) => one.line).length, phrases.length);
+    },
+  ),
+  measure(
+    "displaced-early",
+    "share",
+    "Of the ideas said again a beat away (solo.displaced), the share said a beat early: an idea that opens on the one cannot go early without crossing the barline, which is a pickup's ground, so most go late.",
+    (reading) => {
+      const moved = displacements(reading).filter((one) => one.line);
+      return share(moved.filter((one) => one.by === -1).length, moved.length);
     },
   ),
   measure(

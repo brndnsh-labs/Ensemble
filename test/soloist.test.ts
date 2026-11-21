@@ -20,6 +20,7 @@ import {
   pulseTicks,
   render,
   SOLO_INSTRUMENTS,
+  soloRoles,
   swing,
   tierOf,
   timedNotes,
@@ -902,47 +903,82 @@ const DISPLACED: Readonly<Record<string, number>> = {
   acoustic: 0.003,
 };
 
-test("an idea comes back a beat early or late: in every style some phrases say an earlier one of the solo again, the same rhythm and contour moved by one of the bar's pulses; only at the levels the style says; never the top of a chorus, the solo's first or last phrase, nor the tune's last; and the idea so moved stays inside its own phrase's bars and the tune, led in by no pickup", () => {
+test("an idea comes back a beat early or late: in every style some phrases say an earlier one of the solo again, the same rhythm and contour moved by one of the bar's pulses, only where the form asks what the style says; never the top of a chorus, the solo's first or last phrase, nor the tune's last, and never late in a section's last bar (nor an answer that carries a moved rhythm there); every note of the idea so moved inside its own phrase's bars and the tune, led in by no pickup, a chord tone where it falls on a beat (SO-33), and as long as it was, shaken where it was shaken, its last note a pulse shorter at most", () => {
+  const failures = new Map<string, string[]>();
+  const fail = (clause: string, where: string) =>
+    failures.set(clause, [...(failures.get(clause) ?? []), where]);
   for (const style of STYLES) {
     const floor = DISPLACED[style.id];
     if (floor === undefined) continue;
+    const { roles } = style.solo.habits.displace;
     let [phrases, moved] = [0, 0];
     for (const { chart, options, take } of soloTakes().filter((jam) => jam.style === style)) {
       const counted = MEASURES.find((measure) => measure.id === "solo.displaced")!.of(take, style);
       if (!counted) continue;
       phrases += counted.cases;
       const end = take.plan.bars.findLast((bar) => bar.kind === "music")!;
-      for (const { phrase, of, by } of displacedPhrases(take, style)) {
-        moved++;
-        const { slot, notes } = phrase;
-        const where = `${style.id}, ${chart.file} ${JSON.stringify(options)}, bar ${slot.bars[0]!.index}`;
-        assert.ok(of && by, `${where}: a displaced phrase with nothing it repeats`);
-        const levels = style.solo.habits.displace.levels;
-        assert.ok(
-          !levels || levels.includes(slot.level.name),
-          `${where}: displaced at the ${slot.level.name} level`,
-        );
-        assert.notEqual(slot.index, 0, `${where}: the top of a chorus moved`);
-        assert.ok(!slot.first && !slot.last, `${where}: the solo's first or last phrase moved`);
+      const asked = soloRoles(take.plan, style, options.seed ?? 0);
+      const harmony = harmonyOf(take);
+      const events = new Map(notesOf(take, "solo").map((note) => [note.tick, note]));
+      for (const { phrase, of, by, source, notes, line, carriesLate } of displacedPhrases(
+        take,
+        style,
+      )) {
+        const { slot } = phrase;
+        const where = `${style.id}, ${chart.file} ${JSON.stringify(options)}, bar index ${slot.bars[0]!.index}`;
         const lastBar = slot.bars.at(-1)!;
-        assert.equal(lastBar.ending, null, `${where}: the tune's last phrase moved`);
-        assert.ok(
-          notes.every((note) => note.tick >= slot.bars[0]!.start),
-          `${where}: led into before its barline`,
-        );
+        // A rhythm moved late, the idea's line or an answer's, never ends a section.
+        if (carriesLate && lastBar.barInSection === lastBar.section.bars - 1) {
+          fail("late in a section's last bar", where);
+        }
+        if (!line) continue;
+        moved++;
+        if (!of || !by) fail("nothing it repeats", where);
+        const role = asked.get(slot.bars[0]!.index);
+        if (roles && (!role || !roles.includes(role)))
+          fail(`for a letter it is not for`, `${where} (${role})`);
+        if (slot.index === 0) fail("the top of a chorus", where);
+        if (slot.first || slot.last) fail("the solo's first or last phrase", where);
+        if (lastBar.ending !== null) fail("the tune's last phrase", where);
+        if (notes.some((note) => note.tick < slot.bars[0]!.start))
+          fail("before its barline", where);
         const stops = Math.min(lastBar.start + lastBar.ticks, end.start + end.ticks);
-        assert.ok(
-          notes.every((note) => note.ends <= stops),
-          `${where}: a note past the end of its phrase`,
-        );
+        if (notes.some((note) => note.ends > stops || note.tick >= stops)) {
+          fail("past the end of its phrase", where);
+        }
+        notes.forEach((note, i) => {
+          const at = `${where}, tick ${note.tick}`;
+          if (onPulse(note.bar.meter, note.tick - note.bar.start)) {
+            const chord = harmony.findLast((arrival) => arrival.tick <= note.tick)?.chord;
+            const tones = chord
+              ? chordTones(chord.quality).map(
+                  (tone) => (pitchClass(chord.root) + tone.interval) % 12,
+                )
+              : [];
+            if (chord && !tones.includes(note.pitch % 12)) fail("off the chord on a beat", at);
+          }
+          const was = source[i]!;
+          const pulse = pulseTicks(note.bar.meter)[0]!;
+          const give = i === notes.length - 1 ? pulse : 0;
+          if (note.ends - note.tick < was.ends - was.tick - give - POCKET) fail("cut short", at);
+          const shaken = (one: { tick: number }) =>
+            events.get(one.tick)?.move?.vibrato !== undefined;
+          if (shaken(was) && !shaken(note) && i < notes.length - 1) fail("its shake lost", at);
+        });
       }
     }
-    assert.ok(phrases > enough(300), `${style.id}: only ${phrases} phrases`);
-    assert.ok(
-      moved >= Math.max(1, phrases * floor),
-      `${style.id}: ${moved} of ${phrases} phrases an idea displaced (${((100 * moved) / phrases).toFixed(1)}%), under ${100 * floor}%`,
-    );
+    if (phrases <= enough(300)) fail("phrases enough", `${style.id}: only ${phrases}`);
+    if (moved < Math.max(1, phrases * floor)) {
+      fail(
+        "some displaced",
+        `${style.id}: ${moved} of ${phrases} (${((100 * moved) / phrases).toFixed(1)}%), under ${100 * floor}%`,
+      );
+    }
   }
+  const said = [...failures].map(
+    ([clause, wheres]) => `${clause}: ${wheres.length}, e.g. ${wheres.slice(0, 2).join("; ")}`,
+  );
+  assert.equal(said.length, 0, said.join("\n"));
 });
 
 test("a horn breathes: the alto never plays eight seconds without half a second of air, as heard", () => {

@@ -149,58 +149,96 @@ export interface Displacement {
   readonly of: Heard;
   /** A pulse late (1) or early (-1). */
   readonly by: 1 | -1;
+  /** The notes of the earlier phrase that are said again, in order. */
+  readonly source: readonly Sounding[];
+  /** Each of them as it is said now, wherever in the solo it falls: inside the phrase or not. */
+  readonly notes: readonly Sounding[];
+  /**
+   * The line goes the same way too: the idea said again. Otherwise only its rhythm is
+   * (an answer turned from a moved idea): not counted as the idea displaced.
+   */
+  readonly line: boolean;
 }
 
 /**
  * Whether a phrase is an earlier one of its solo said again a pulse early or
- * late, as a listener would match them: the same rhythm (every note struck the
- * same distance from the one before), the same contour (four moves in five the
- * same way, up, down or the same note: a note fitted to the chord now under it
- * may turn), and the whole of it moved by one of the bar's
- * pulses (the quarter in 4/4, the dotted quarter in 6/8 and 12/8) from where it
- * fell in its bar, so that it falls across the bar differently; and no earlier
- * phrase whose rhythm it plays where that one fell. Three notes at
- * least: fewer are not an idea. The phrase's own notes, without a pickup into
- * it; the earlier one's with or without the pickups inside it.
+ * late, as a listener would match them: every note of the earlier one (three
+ * or more; fewer are not an idea) struck again the same distance after the one
+ * before, the whole moved by one of the bar's pulses (the quarter in 4/4, the
+ * dotted quarter in 6/8 and 12/8) from where it fell in its bar, so that it
+ * falls across the bar differently, the phrase's own notes all among them; the
+ * same contour (four moves in five the same way, up, down or the same note: a
+ * note fitted to the chord now under it may turn); and no earlier phrase whose
+ * rhythm it plays where that one fell. The notes said again are looked for in
+ * the whole solo (`all`), not only in the phrase's bars, so a note of the idea
+ * that falls outside them is still the idea's. The earlier phrase is taken
+ * with or without the pickups inside it, the phrase without a pickup into it.
  */
-export function displacedFrom(heard: Heard, earlier: readonly Heard[]): Displacement | null {
+export function displacedFrom(
+  heard: Heard,
+  earlier: readonly Heard[],
+  all: readonly Sounding[],
+): Displacement | null {
+  const found = rhythmsAgain(heard, earlier, all);
+  // A rhythm played again where it fell before is not moved, whatever its line does.
+  if (found.length === 0 || found.some((one) => one.inBar === 0)) return null;
+  // The idea itself if it is there; else its rhythm alone, with another line.
+  const away = found.filter((one) => one.by !== null);
+  const moved = away.find((one) => one.line) ?? away[0];
+  return moved
+    ? { of: moved.of, by: moved.by!, source: moved.source, notes: moved.notes, line: moved.line }
+    : null;
+}
+
+/** An earlier phrase whose rhythm a phrase plays again, and where. */
+export interface RhythmAgain {
+  readonly of: Heard;
+  readonly source: readonly Sounding[];
+  readonly notes: readonly Sounding[];
+  /** Ticks into the bar it is moved by, from where it fell. */
+  readonly inBar: number;
+  /** A pulse late (1), a pulse early (-1), or moved some other way (null). */
+  readonly by: 1 | -1 | null;
+  /** Its line goes the same way too, four moves in five. */
+  readonly line: boolean;
+}
+
+/**
+ * Every earlier phrase of the solo (with or without the pickups inside it, three
+ * notes or more) whose notes are all struck again the same distances apart, the
+ * phrase's own notes among them, looked for in the whole solo: what
+ * `displacedFrom` chooses among.
+ */
+export function rhythmsAgain(
+  heard: Heard,
+  earlier: readonly Heard[],
+  all: readonly Sounding[],
+): RhythmAgain[] {
+  const said = body(heard);
+  if (said.length === 0) return [];
+  const { meter, ticks } = said[0]!.bar;
+  const pulse = pulseTicks(meter)[0]!;
+  const at = new Map(all.map((note) => [note.tick, note]));
   const contour = (notes: readonly Sounding[]) =>
     notes.slice(1).map((note, i) => Math.sign(note.pitch - notes[i]!.pitch));
-  /**
-   * Where one set of notes falls against another in the same rhythm, in ticks into the
-   * bar, and whether its line goes the same way; null if the rhythm is not the same.
-   */
-  const against = (said: readonly Sounding[], notes: readonly Sounding[]) => {
-    const ticks = said[0]!.bar.ticks;
-    if (notes.length !== said.length || notes.some((note) => note.bar.ticks !== ticks)) return null;
-    const moved = said[0]!.tick - notes[0]!.tick;
-    if (!notes.every((note, i) => said[i]!.tick - note.tick === moved)) return null;
-    // Fitted to the chords now under it a note may move the other way: four moves in five
-    // the same way is the same line.
-    const [shape, was] = [contour(said), contour(notes)];
-    const same = shape.filter((move, i) => move === was[i]).length;
-    return { at: ((moved % ticks) + ticks) % ticks, line: same * 5 >= shape.length * 4 };
-  };
-  // The phrase, and the earlier ones, with and without the pickups inside them.
-  const versions = (one: Heard) => [body(one), idea(one)];
-  const falls = versions(heard).flatMap((said) => {
-    if (said.length < 3 || said.some((note) => note.bar.ticks !== said[0]!.bar.ticks)) return [];
-    return [...earlier]
-      .reverse()
-      .flatMap((other) =>
-        versions(other).map((notes) => ({ said, other, at: against(said, notes) })),
-      );
-  });
-  // A rhythm played again where it fell before is not moved, whatever its line does.
-  if (falls.some(({ at }) => at?.at === 0)) return null;
-  for (const { said, other, at } of falls) {
-    if (!at?.line) continue;
-    const { meter, ticks } = said[0]!.bar;
-    const pulse = pulseTicks(meter)[0]!;
-    if (at.at === pulse) return { of: other, by: 1 };
-    if (at.at === ticks - pulse) return { of: other, by: -1 };
+  const found: RhythmAgain[] = [];
+  for (const other of [...earlier].reverse()) {
+    for (const source of [idea(other), body(other)]) {
+      if (source.length < 3 || source.some((note) => note.bar.ticks !== ticks)) continue;
+      const moved = said[0]!.tick - source[0]!.tick;
+      const notes = source.map((note) => at.get(note.tick + moved));
+      if (!notes.every((note): note is Sounding => note !== undefined)) continue;
+      if (!said.every((note) => notes.includes(note))) continue;
+      // Fitted to the chords now under it a note may move the other way: four moves in
+      // five the same way is the same line.
+      const [shape, was] = [contour(notes), contour(source)];
+      const same = shape.filter((move, i) => move === was[i]).length;
+      const inBar = ((moved % ticks) + ticks) % ticks;
+      const by = inBar === pulse ? 1 : inBar === ticks - pulse ? -1 : null;
+      found.push({ of: other, source, notes, inBar, by, line: same * 5 >= shape.length * 4 });
+    }
   }
-  return null;
+  return found;
 }
 
 const beat = (note: Sounding) => onPulse(note.bar.meter, note.tick - note.bar.start);
