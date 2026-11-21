@@ -1155,11 +1155,13 @@ const BREATHING_KINDS: readonly PlanOptions[] = [
 /** A take lasts within this share of the same take at the tempo as set: at 120, a mean between 119.3 and 120.7. */
 const MEAN_WITHIN = 0.006;
 
-/** A style as it ships, and as it would be if it breathed the most any style may: the rules hold at any amount. */
-const breathingAs = (style: StylePack): StylePack[] => [
-  style,
-  { ...style, feel: { ...style.feel, breathe: BREATHE_MOST } },
-];
+/**
+ * A style that breathes as it ships; one at nought as if it breathed the most any style may, so
+ * every arc is held to the rules at some amount (and a style at nought is held steady by the
+ * property on takes that do not ask, and by the one on its bytes).
+ */
+const breathingAs = (style: StylePack): StylePack[] =>
+  style.feel.breathe > 0 ? [style] : [{ ...style, feel: { ...style.feel, breathe: BREATHE_MOST } }];
 
 test("a take that does not ask to breathe keeps the tempo as set in every bar", () => {
   for (const { chart, take } of takes()) {
