@@ -26,7 +26,7 @@ pnpm check        # typecheck, lint, the engine suite
 pnpm smoke        # the browser journeys against the built app (needs Google Chrome)
 ```
 
-A push to `main` is checked, built into an image and released to the test site; production is released by hand from the same workflow (`.github/workflows/ci.yml`).
+A push to `main` is checked, built into an image and released to the test site, then to production once the browser journeys have passed against the test site (`.github/workflows/ci.yml`).
 
 ## Licence
 

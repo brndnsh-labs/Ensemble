@@ -83,9 +83,9 @@
     ]
   },
   "brakes": [
-    "a production release, or anything done on the Docker host",
+    "running the release by hand (it puts production on a named commit), or anything done on the Docker host",
     "anything that would publish a secret, a private address, a network detail or a private email (the repository is public)",
-    "the release path: the release job in `.github/workflows/ci.yml`, `hosting/`, `scripts/image.sh`, repository secrets and variables, branch protection",
+    "the release path: the release in `.github/workflows/` (`ci.yml`'s release jobs, `release.yml`) and `.github/actions/release/`, `hosting/`, `scripts/image.sh`, repository secrets and variables, branch protection",
     "a sample pack's source or licence: `scripts/packs/sources.ts`, a pack's `LICENCE` file, the credits",
     "what the app keeps in the browser: the stored lists (`packages/app/src/stored.ts` and the keys and shapes kept through it) and the service worker (`packages/app/service-worker.js`, `offline.ts`)",
     "loosening a gate: raising a time budget or a scorecard tolerance, accepting a scorecard drop, deleting or weakening a property"
@@ -98,10 +98,11 @@
   "backend_overrides": {
     "auto_merge": true
   },
-  // A merge to `main` is the release to the test site (CI does it), so there is no
-  // test command. Production is the same workflow run by hand, on Brandon's word.
+  // A merge to `main` is the release, to the test site and then to production (CI does
+  // it), so there is no test command. The production command is the same workflow run
+  // by hand, on Brandon's word: it puts production on a named commit, to put it back.
   "deploy": {
     "test": "",
-    "prod": "gh workflow run ci -f production=true"
+    "prod": "gh workflow run ci -f commit=<all 40 characters of the commit to put production on>"
   }
 }
