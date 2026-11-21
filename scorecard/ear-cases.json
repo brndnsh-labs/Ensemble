@@ -28,13 +28,18 @@
       "answered": {
         "section": "2026-11-14: gate 1 feedback, loudness",
         "note": "Written levels trimmed 15% (61% to 95% across the energy range), the blues high-tier hat played at its working level, and band.backbeat-level, band.notes-near-the-top and drums.cymbal-under-backbeat added to keep it there.",
-        "commit": "fb0a2645",
+        "commit": "dcb3fc06",
         "logged": [
           "written levels, bottom of the energy range: 72 -> 61 %",
           "written levels, top of the energy range: 112 -> 95 %"
+        ],
+        "measures": [
+          "band.backbeat-level",
+          "band.notes-near-the-top",
+          "drums.cymbal-under-backbeat"
         ]
       },
-      "doubt": "Not a direct quote: PLAN's feedback line says it unquoted, and DECISIONS paraphrases ('slammed through Logic's instruments'). The rock section quotes 'accented as hard as the backbeat it slammed' as 'the thing heard at gate 1 in the blues', which may be his words about the hat. The trim itself was his choice (no quote).",
+      "doubt": "Not a direct quote: PLAN's feedback line says it unquoted, and DECISIONS paraphrases ('slammed through Logic's instruments'). The rock section quotes 'accented as hard as the backbeat it slammed' as 'the thing heard at gate 1 in the blues', which may be his words about the hat. The trim itself was his choice (no quote). The levels were trimmed in fb0a2645; the three measures that keep them there entered the scorecard in the next commit that rewrote it, dcb3fc06, which is the one read here.",
       "reported": true
     },
     {
@@ -466,7 +471,8 @@
         "logged": [
           "bass.notes-per-bar-in-six: ? -> 3.52 notes a bar (All Blues and Footprints as jazz; 2 to 5)",
           "chords.strikes-per-bar-in-six: ? -> 2.47 strikes a bar (1 to 4)"
-        ]
+        ],
+        "property": "in a bar of dotted pulses the drummer's time is on the eighths"
       },
       "doubt": "Styles: the study's fifties changes and folk tune were later played as rock and acoustic (meter-study-2); in the first study the styles of those two clips are not stated."
     },
@@ -524,7 +530,8 @@
         "commit": "3477a642",
         "logged": [
           "the late four's lateness in twelve: 0.34 -> 0.17 s late (at 58; four's is 0.18 s at 85)"
-        ]
+        ],
+        "property": "neo-soul: in six and twelve the whole band is on the triplet's eighths"
       },
       "doubt": "He did not name the late four; it was the engineer's likeliest cause of the drag. The seat is drums by that reading."
     },
@@ -559,7 +566,8 @@
           "notes a second (the property 'the soloist is not sparse'), blues: 1.46 -> ? notes a second (floor 1.65)",
           "notes a second (the property 'the soloist is not sparse'), reggae: 0.8 -> ? notes a second (floor 0.9)",
           "the default against what he heard as sparse: 13% to 32% more notes a second"
-        ]
+        ],
+        "property": "the soloist is not sparse"
       },
       "doubt": "The quote is PLAN's, with an ellipsis in the original; DECISIONS paraphrases it. 'all' because the fix and the property cover every style; the words name none."
     },
