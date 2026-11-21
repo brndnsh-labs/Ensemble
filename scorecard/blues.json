@@ -324,7 +324,7 @@
     "inTarget": 1
   },
   "chords.struck-with-the-soloist": {
-    "mean": 0.2158,
+    "mean": 0.2156,
     "p10": 0.1697,
     "p90": 0.2538,
     "inTarget": 1
@@ -342,9 +342,9 @@
     "inTarget": 1
   },
   "chords.breaths-over-the-line": {
-    "mean": 1.2133,
+    "mean": 1.2132,
     "p10": 0.9351,
-    "p90": 1.5192,
+    "p90": 1.5208,
     "inTarget": 1
   },
   "chords.breaths-answered": {
@@ -384,9 +384,9 @@
     "inTarget": 0.9828
   },
   "solo.beats-on-chord-tones": {
-    "mean": 0.8816,
+    "mean": 0.8823,
     "p10": 0.8125,
-    "p90": 0.9425,
+    "p90": 0.9451,
     "inTarget": 1
   },
   "solo.phrase-ends-on-chord-tones": {
@@ -396,14 +396,14 @@
     "inTarget": 1
   },
   "solo.phrases-related": {
-    "mean": 0.6947,
+    "mean": 0.6965,
     "p10": 0.5,
     "p90": 0.875,
     "inTarget": 1
   },
   "solo.phrase-likeness": {
-    "mean": 0.618,
-    "p10": 0.5385,
+    "mean": 0.6184,
+    "p10": 0.5384,
     "p90": 0.7316,
     "inTarget": null
   },
@@ -419,6 +419,12 @@
     "p90": 0,
     "inTarget": null
   },
+  "solo.bursts": {
+    "mean": 0.0069,
+    "p10": 0,
+    "p90": 0,
+    "inTarget": null
+  },
   "solo.displaced-early": {
     "mean": 0,
     "p10": 0,
@@ -426,7 +432,7 @@
     "inTarget": null
   },
   "solo.bars-that-rhyme": {
-    "mean": 0.8706,
+    "mean": 0.8704,
     "p10": 0.76,
     "p90": 0.9697,
     "inTarget": 1
@@ -468,19 +474,19 @@
     "inTarget": null
   },
   "solo.notes-per-second-last": {
-    "mean": 2.4048,
+    "mean": 2.4175,
     "p10": 1.7083,
     "p90": 3.0813,
     "inTarget": null
   },
   "solo.builds": {
-    "mean": 2.0697,
-    "p10": 1.38,
+    "mean": 2.0804,
+    "p10": 1.4259,
     "p90": 3.0717,
-    "inTarget": 0.7833
+    "inTarget": 0.8
   },
   "solo.rises": {
-    "mean": 4.5202,
+    "mean": 4.5185,
     "p10": 3.4589,
     "p90": 5.7626,
     "inTarget": 1
@@ -510,7 +516,7 @@
     "inTarget": 1
   },
   "solo.steps": {
-    "mean": 0.8327,
+    "mean": 0.8334,
     "p10": 0.7761,
     "p90": 0.8864,
     "inTarget": null
@@ -528,9 +534,9 @@
     "inTarget": null
   },
   "solo.trills": {
-    "mean": 0.0096,
+    "mean": 0.0095,
     "p10": 0,
-    "p90": 0.0198,
+    "p90": 0.0192,
     "inTarget": 1
   },
   "solo.repeated-notes": {
@@ -546,8 +552,8 @@
     "inTarget": null
   },
   "solo.cost": {
-    "mean": 1.5368,
-    "p10": 1.287,
+    "mean": 1.5356,
+    "p10": 1.2855,
     "p90": 1.77,
     "inTarget": 0.9167
   },

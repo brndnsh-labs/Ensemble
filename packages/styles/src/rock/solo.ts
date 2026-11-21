@@ -379,6 +379,23 @@ export const rockSolo: SoloStyle = {
   // up (rock's space is jazz's, 0.25, SO-11). To move the default, change these two numbers.
   busier: { lift: 0.5, room: 0.4 },
 
+  // Straight eighths, doubled: sixteenths. The busy level already has bursts of sixteenths
+  // (ST-rock-22), and a pickup of them into a busy bar runs two beats, so double time is
+  // longer than that: three quarters of a bar to a bar. A flurry before the climax: only in
+  // the climb to the top note; on a rock ballad, only toward the top of the setting.
+  //
+  // None for now (Brandon, 2026-11-21): held to a fourth into a run and a fifth inside it, a
+  // run this long does not fit a phrase's register in rock's pentatonic, so none was ever
+  // played. The chance says so; the rest is what a rock run was written as, for whoever
+  // takes it up.
+  doubleTime: {
+    perPulse: 4,
+    chance: 0,
+    bars: { shortest: 0.75, longest: 1 },
+    climbOnly: true,
+    slow: { from: 0.75, longest: 1 },
+  },
+
   habits: {
     // A lick said again, as it was, 0.40 (ST-rock-24).
     riff: 0.4,

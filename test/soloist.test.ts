@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { PlanBar, Seat, Take } from "@ensemble/engine";
 import {
+  burstPhrases,
   chordFamily,
   chordScale,
   chordTones,
@@ -970,6 +971,188 @@ test("an idea comes back a beat early or late: in the styles that do it most som
         `${style.id}: ${moved} of ${phrases} (${((100 * moved) / phrases).toFixed(1)}%), under ${100 * floor}%`,
       );
     }
+  }
+  const said = [...failures].map(
+    ([clause, wheres]) => `${clause}: ${wheres.length}, e.g. ${wheres.slice(0, 2).join("; ")}`,
+  );
+  assert.equal(said.length, 0, said.join("\n"));
+});
+
+/**
+ * The styles whose soloist plays double time on some of its own charts at the top of the
+ * setting: at least one burst over them.
+ */
+// Rock is written to play it but, held to a fourth into the run and a fifth inside it, its
+// three quarters of a bar of sixteenths through a pentatonic do not fit a phrase's register:
+// on its own charts it plays none (DECISIONS.md, double time).
+const DOUBLES = ["jazz", "blues"];
+
+test("double time is earned, late, short, rare and playable, and it lands: a run at twice the style's running subdivision only in a style that plays it (the climb alone where the style says), in a solo's last chorus and never its first phrase, at the busiest level (or the climb) straight after a phrase at the busiest level, out of the line's own notes without a breath (no rest of a pulse in the two before it), after a phrase with no empty bar and at least the first chorus's notes a beat, come to by a fourth at most (a fifth into the climb) and no move inside it wider than a fifth; on the doubled grid as heard from a pulse to a pulse, half a bar to two bars (on a ballad, only toward the top of the setting and no longer than the style says), never faster than the instrument's fastest; one way (straight, or a pulse at a time in sequence), a chord tone on every pulse, landing on a chord tone on a pulse, held a pulse; one at most a solo, none at the bottom of the setting, and some at its top in the styles that play it most", () => {
+  const failures = new Map<string, string[]>();
+  const fail = (clause: string, where: string) =>
+    failures.set(clause, [...(failures.get(clause) ?? []), where]);
+  for (const style of STYLES) {
+    const { doubleTime, levels, tempo, space } = style.solo;
+    const busiest = levels.at(-1)!.name;
+    const plays = doubleTime.chance > 0;
+    // Every take with the soloist at the default, and a style that plays double time on its
+    // own charts at the ends of the setting.
+    const jams = [
+      ...soloTakes()
+        .filter((jam) => jam.style === style)
+        .map((jam) => ({
+          take: jam.take,
+          where: `${jam.chart.file} ${JSON.stringify(jam.options)}`,
+        })),
+      ...(plays
+        ? atSettings(style).flatMap((takes) =>
+            takes.map((take, i) => ({ take, where: `setting ${SETTINGS[i]}` })),
+          )
+        : []),
+    ];
+    let atTop = 0;
+    for (const { take, where: said } of jams) {
+      const setting = take.plan.soloDensity ?? 0.5;
+      const found = burstPhrases(take, style);
+      if (setting === 1) atTop += found.length;
+      if (found.length === 0) continue;
+      const voice = notesOf(take, "solo")[0]!.voice ?? "";
+      const instrument = SOLO_INSTRUMENTS[voice]!;
+      const perSecond = (take.plan.quarters * PPQ) / 60;
+      const harmony = harmonyOf(take);
+      const perSolo = new Map<number, number>();
+      for (const { phrase, previous, burst, solo } of found) {
+        const { slot } = phrase;
+        const { notes, landing, before, step } = burst;
+        const first = notes[0]!;
+        const bar = first.bar;
+        const where = `${style.id}, ${said}, bar index ${bar.index}`;
+        perSolo.set(slot.solo, (perSolo.get(slot.solo) ?? 0) + 1);
+        if (!plays) fail("in a style that does not play it", where);
+        if (doubleTime.climbOnly && !slot.peak) fail("outside the climb", where);
+        if (setting === 0) fail("at the bottom of the setting", where);
+        // Late.
+        if (slot.chorus !== slot.of - 1) fail("before the solo's last chorus", where);
+        if (slot.first) fail("the solo's first phrase", where);
+        // Earned.
+        if (slot.level.name !== busiest && !slot.peak) fail("not at the busiest level", where);
+        if (previous?.slot.level.name !== busiest) fail("after a phrase not at the busiest", where);
+        const breath = space.breath * 0.9 * perSecond;
+        const heard = (note: { bar: PlanBar; tick: number }) =>
+          note.bar.start +
+          (note.bar.meter.unit === 4 && note.tick - note.bar.start < note.bar.ticks
+            ? swing(note.tick - note.bar.start, style.feel)
+            : note.tick - note.bar.start);
+        if (!before || heard(first) - heard({ bar: before.bar, tick: before.ends }) >= breath) {
+          fail("out of a breath", where);
+        }
+        // Out of the line: no silence of a pulse or more in the two pulses before it.
+        const pulse0 = pulseTicks(bar.meter)[0]!;
+        const sounding = solo.flatMap((one) => one.notes).filter((note) => note.tick < first.tick);
+        let reach = first.tick - 2 * pulse0;
+        for (const note of sounding) {
+          if (note.ends <= reach) continue;
+          if (note.tick - reach >= pulse0 - POCKET) fail("a rest in the two pulses before", where);
+          reach = Math.max(reach, note.ends);
+        }
+        if (first.tick - reach >= pulse0 - POCKET) fail("a rest in the two pulses before", where);
+        // Earned on the notes: the phrase before has no empty bar, and at least the notes a
+        // beat of the solo's first chorus.
+        const own = (one: typeof phrase) =>
+          one.notes.filter((note) => note.tick >= one.slot.bars[0]!.start);
+        const beats = (one: typeof phrase) =>
+          one.slot.bars.reduce((sum, b) => sum + b.ticks, 0) / PPQ;
+        const opening = solo.slice(0, solo.indexOf(phrase)).filter((one) => one.slot.chorus === 0);
+        const rate =
+          opening.reduce((sum, one) => sum + own(one).length, 0) /
+          Math.max(
+            1,
+            opening.reduce((sum, one) => sum + beats(one), 0),
+          );
+        if (previous) {
+          const notesBefore = own(previous);
+          if (
+            previous.slot.bars.some((b) => !notesBefore.some((note) => note.bar.index === b.index))
+          ) {
+            fail("after a phrase with an empty bar", where);
+          }
+          if (notesBefore.length / beats(previous) < rate - 1e-9) {
+            fail("after a phrase thinner than the first chorus", where);
+          }
+        }
+        // No leap into it, nor inside it.
+        if (before && Math.abs(first.pitch - before.pitch) > (slot.peak ? 7 : 5)) {
+          fail("leaps in", `${where}: ${before.pitch} to ${first.pitch}`);
+        }
+        const all = [...notes, landing];
+        if (all.slice(1).some((note, j) => Math.abs(note.pitch - all[j]!.pitch) > 7)) {
+          fail("leaps inside", where);
+        }
+        // On the grid, from a pulse to a pulse, half a bar to two bars.
+        const pulse = pulseTicks(bar.meter)[0]!;
+        if (!onPulse(bar.meter, first.tick - bar.start)) fail("not from a pulse", where);
+        if (!onPulse(landing.bar.meter, landing.tick - landing.bar.start)) {
+          fail("not landing on a pulse", where);
+        }
+        [...notes, landing].forEach((note, j) => {
+          if (Math.abs(heard(note) - heard(first) - j * step) > 2) {
+            fail("off the doubled grid", `${where}, tick ${note.tick}`);
+          }
+        });
+        const long = heard(landing) - heard(first);
+        const slow = (4 * pulse) / perSecond > tempo.slowBar;
+        const longest = slow && doubleTime.slow ? doubleTime.slow.longest : doubleTime.bars.longest;
+        if (long < doubleTime.bars.shortest * bar.ticks - 2) fail("shorter than half a bar", where);
+        if (long > longest * bar.ticks + 2) fail("longer than the style's longest", where);
+        if (slow && doubleTime.slow && setting < doubleTime.slow.from) {
+          fail("on a ballad, under the top of the setting", where);
+        }
+        // Playable.
+        const quickest = Math.min(
+          ...[...notes, landing].slice(1).map((note, j) => heard(note) - heard(notes[j]!)),
+        );
+        if (perSecond / quickest > instrument.fastest + 0.01) {
+          fail(
+            "faster than the instrument's fastest",
+            `${where}: ${(perSecond / quickest).toFixed(2)} a second on ${voice}`,
+          );
+        }
+        // It goes somewhere, a chord tone on every pulse, and lands.
+        // One way: straight, or as a sequence of pulses, each pulse's notes going one way (all
+        // of them the same way), each pulse starting further on than the one before, and the
+        // landing further on than every note of the run.
+        const line = [...notes, landing];
+        const way = Math.sign(landing.pitch - first.pitch);
+        const onBeat = (note: (typeof line)[number]) =>
+          onPulse(note.bar.meter, note.tick - note.bar.start);
+        const opens = line.filter(onBeat);
+        const inside = notes
+          .slice(1)
+          .flatMap((note, j) => (onBeat(note) ? [] : [Math.sign(note.pitch - notes[j]!.pitch)]));
+        const turns = inside.some((move) => move === 0 || move !== inside[0]);
+        const backs = opens
+          .slice(1)
+          .some((note, j) => Math.sign(note.pitch - opens[j]!.pitch) !== way);
+        const short = notes.some((note) => Math.sign(landing.pitch - note.pitch) !== way);
+        if (way === 0 || turns || backs || short) fail("not one way", where);
+        for (const note of line) {
+          if (!onPulse(note.bar.meter, note.tick - note.bar.start)) continue;
+          const chord = harmony.findLast((arrival) => arrival.tick <= note.tick)?.chord;
+          const tones = chord
+            ? chordTones(chord.quality).map((tone) => (pitchClass(chord.root) + tone.interval) % 12)
+            : [];
+          if (chord && !tones.includes(note.pitch % 12)) {
+            fail(
+              note === landing ? "landing off the chord" : "off the chord on a pulse",
+              `${where}, tick ${note.tick}`,
+            );
+          }
+        }
+        if (landing.ends - landing.tick < pulse - POCKET) fail("landing not held", where);
+      }
+      for (const [, count] of perSolo) if (count > 1) fail("more than one a solo", said);
+    }
+    if (DOUBLES.includes(style.id) && atTop === 0) fail("none at the top of the setting", style.id);
   }
   const said = [...failures].map(
     ([clause, wheres]) => `${clause}: ${wheres.length}, e.g. ${wheres.slice(0, 2).join("; ")}`,

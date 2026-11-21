@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { PlanBar, Take } from "@ensemble/engine";
 import {
+  burstPhrases,
   isCompound,
   PPQ,
   parse,
@@ -339,7 +340,7 @@ const jazzPlayed = (): Jam[] => [
 ];
 
 test(
-  'jazz: the whole band plays eighths only: in a bar of quarter-note beats nothing between a beat and its swung "and"; in a bar of dotted pulses, its own triplet, nothing between the eighths and nothing swings them, the fills and the soloist too',
+  'jazz: the whole band plays eighths only: in a bar of quarter-note beats nothing between a beat and its swung "and"; in a bar of dotted pulses, its own triplet, nothing between the eighths and nothing swings them, the fills and the soloist too (but for runs in double time in a solo, held to a property of their own)',
   only("jazz"),
   () => {
     let compoundNotes = 0;
@@ -351,13 +352,21 @@ test(
       ...soloistTakes().filter(compoundOwn),
       ...jazzPlayed().filter(compoundOwn),
     ]) {
+      const doubled = new Set(
+        (jazz ? burstPhrases(take, jazz) : []).flatMap(({ burst }) =>
+          burst.notes.map((note) => note.tick),
+        ),
+      );
       for (const note of (["drums", "bass", "chords", "solo"] as const).flatMap((seat) =>
         notesOf(take, seat),
       )) {
         const bar = take.plan.bars.findLast((candidate) => candidate.start <= note.tick)!;
         if (bar.kind !== "music" || (bar.meter.unit !== 4 && !isCompound(bar.meter))) continue;
         const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}: the ${note.seat} (${note.voice})`;
-        assert.equal((note.tick - bar.start) % (2 * STEP), 0, `${where} between the eighths`);
+        const run = note.seat === "solo" && doubled.has(note.tick);
+        if (!run) {
+          assert.equal((note.tick - bar.start) % (2 * STEP), 0, `${where} between the eighths`);
+        }
         if (!isCompound(bar.meter)) continue;
         compoundNotes++;
         assert.ok(Math.abs(note.offset) <= POCKET, `${where} moved ${note.offset}`);

@@ -24,14 +24,14 @@ import { TIER_MID } from "../../style/types.ts";
 import type { ToneRole } from "../../theory/chord.ts";
 import { mod12, pitchClass } from "../../theory/pitch.ts";
 import type { Heard, SoloCandidate, SoloPick, Sounding } from "./critique.ts";
-import { bassStruck, bySoloCritic, SOLO_FEATURES } from "./critique.ts";
+import { bassStruck, bySoloCritic, runOf, SOLO_FEATURES } from "./critique.ts";
 import { EIGHTH, isChordTone, onlyPasses } from "./harmony.ts";
 import { soloVoice } from "./instruments.ts";
 import { placeOf, spotsOf } from "./line.ts";
 import type { Memory, PassPickup, Phrase } from "./phrases.ts";
 import { opensPass, passPickup, phrasesFor } from "./phrases.ts";
 import type { Slot, World } from "./slots.ts";
-import { worldOf } from "./slots.ts";
+import { doubleChanceOf, fourPulses, levelIndex, worldOf } from "./slots.ts";
 import type { Form, Role } from "./style.ts";
 
 /** The shortest note: half a sixteenth (SO-19). */
@@ -109,6 +109,11 @@ export function soloPart(
   let solo = -1;
   /** The last line before this one fell. */
   let fell = false;
+  /** This solo has played its run in double time. */
+  let doubled = false;
+  /** What the solo played: its first chorus's notes and beats, and the phrase before's. */
+  let firstChorus = { notes: 0, beats: 0 };
+  let lastPhrase: PlayedPhrase | null = null;
   /** A pickup into the top of a pass, made from the pass before (`passPickup`). */
   const intoPass = (bar: PlanBar, previous: Slot | undefined): PassPickup | null => {
     if (!opensPass(plan, bar)) return null;
@@ -139,6 +144,9 @@ export function soloPart(
       memory = { ...NOTHING, restEnds: memory.restEnds };
       earlier = [];
       fell = false;
+      doubled = false;
+      firstChorus = { notes: 0, beats: 0 };
+      lastPhrase = null;
     }
     const lead = intoPass(first, world.slots[s - 1]);
     if (slot.index === 0) form = chorusForm(world, rng, slot, memory.motif !== null);
@@ -151,6 +159,9 @@ export function soloPart(
       memory,
       heldRng(rng, "phrase", "phrase", first),
       lead?.first ?? null,
+      doubled || !earned(lastPhrase, firstChorus)
+        ? null
+        : doubleTimeAt(world, s, heldRng(rng, "double time", "phrase", first)),
     );
     // The pass before's pickup into this phrase is played as it was made, whichever is chosen.
     const leading = lead ? writeLead(lead, first) : [];
@@ -160,20 +171,25 @@ export function soloPart(
     const realised = offered.map((phrase) => realise(world, phrase, accent, from));
     const keeps = offered.map(
       (phrase, i) =>
-        !phrase.inPlace || keepsLengths(realise(world, phrase.inPlace, accent, from), realised[i]!),
+        (!phrase.inPlace ||
+          keepsLengths(realise(world, phrase.inPlace, accent, from), realised[i]!)) &&
+        (!phrase.burst || landsHeld(world, phrase.burst.lands, realised[i]!)),
     );
     const phrases = offered.filter((_, i) => keeps[i]);
     const notes = realised.filter((_, i) => keeps[i]);
-    const candidates = phrases.map(
-      (phrase, i): SoloCandidate => ({
+    const candidates = phrases.map((phrase, i): SoloCandidate => {
+      const heard = [...leading, ...notes[i]!].map((note) => sounding(world, note));
+      const run = runOf(world, heard);
+      return {
         kind: phrase.kind,
         slot,
-        notes: [...leading, ...notes[i]!].map((note) => sounding(world, note)),
+        notes: heard,
+        ...(run && { run }),
         earlier,
         ...(phrase.inPlace && { moved: true }),
         world,
-      }),
-    );
+      };
+    });
     const chosen = choose(candidates);
     const at = Math.max(0, candidates.indexOf(chosen));
     report?.({ slot, role, candidates: score(candidates, SOLO_FEATURES, weights), chosen });
@@ -186,7 +202,15 @@ export function soloPart(
     // And how a guitarist's left hand plays it: a landing slid into, a note hammered on or
     // pulled off.
     const played = slurs(world, phrase, slideInto(world, phrase, horned.notes, rng), rng);
+    lastPhrase = playedIn(slot, played);
+    if (slot.chorus === 0) {
+      firstChorus = {
+        notes: firstChorus.notes + lastPhrase.notes,
+        beats: firstChorus.beats + lastPhrase.beats,
+      };
+    }
     fell = horned.fell;
+    if (phrase.burst) doubled = true;
     const opens = slot.bars[0]!.start;
     for (const note of played) {
       // A pickup struck before the phrase's first bar leads into it, from wherever it is played.
@@ -197,13 +221,15 @@ export function soloPart(
     // what was played where the form asked for one stated, changed, set apart or brought
     // back. Said again or answered, the idea stays what it was.
     const stated = memory.motif === null || phrase.fresh || "svcb".includes(role);
+    // A phrase with a run in double time is remembered as the line it doubles.
+    const kept = phrase.plain ?? phrase;
     earlier = [...earlier, candidates[at]!];
     memory = {
       // The climb to the top note is a use of the idea, not a new one. An idea said a beat
       // away is remembered where it was: what follows is made from it as it was stated.
-      motif: slot.peak ? memory.motif : stated ? (phrase.inPlace ?? phrase) : memory.motif,
-      theme: memory.theme ?? phrase,
-      opening: slot.index === 0 ? phrase : memory.opening,
+      motif: slot.peak ? memory.motif : stated ? (phrase.inPlace ?? kept) : memory.motif,
+      theme: memory.theme ?? kept,
+      opening: slot.index === 0 ? kept : memory.opening,
       rest: last?.pitch ?? memory.rest,
       highest: Math.max(memory.highest, ...played.map((note) => note.pitch)),
       restEnds: last ? last.tick + last.duration : memory.restEnds,
@@ -222,6 +248,68 @@ export function soloPart(
 }
 
 export const playSolo: Player = (context) => soloPart(context);
+
+/**
+ * Whether the phrase in a slot is offered a run in double time, and how long it may be in
+ * bars: late in a solo (its last chorus, never its first phrase), earned (at the style's
+ * busiest level, or the climb to the top note, straight after a phrase at the busiest level),
+ * where the style plays it (the climb alone where it says so), never where the tune ends; on a
+ * ballad only from the setting the style says; then as often as the style and the setting say,
+ * drawn by the phrase's place. Null where not. Whether one will go, and at what speed, is the
+ * phrase's own (`burstOf`).
+ */
+function doubleTimeAt(world: World, s: number, draw: Rng): number | null {
+  const { plan, solo, slots } = world;
+  const slot = slots[s]!;
+  const before = slots[s - 1];
+  const { doubleTime } = solo;
+  const busiest = solo.levels.length - 1;
+  if (slot.chorus !== slot.of - 1 || slot.first || slot.bars.at(-1)!.ending !== null) return null;
+  if (doubleTime.climbOnly && !slot.peak) return null;
+  if (levelIndex(solo, slot.level) !== busiest && !slot.peak) return null;
+  if (!before || before.solo !== slot.solo || levelIndex(solo, before.level) !== busiest)
+    return null;
+  const slow = fourPulses(plan, slot.bars[0]!) > solo.tempo.slowBar ? doubleTime.slow : null;
+  if (slow && (plan.soloDensity ?? 0.5) < slow.from) return null;
+  if (!draw.chance(doubleChanceOf(plan, solo))) return null;
+  return slow ? slow.longest : doubleTime.bars.longest;
+}
+
+/** What a phrase of the solo played: its notes struck in its own bars, its beats, its empty bars. */
+interface PlayedPhrase {
+  readonly notes: number;
+  readonly beats: number;
+  readonly empty: boolean;
+}
+
+function playedIn(slot: Slot, notes: readonly SoloNote[]): PlayedPhrase {
+  const own = notes.filter((note) => note.tick >= slot.bars[0]!.start);
+  return {
+    notes: own.length,
+    beats: slot.bars.reduce((sum, bar) => sum + bar.ticks, 0) / PPQ,
+    empty: slot.bars.some((bar) => !own.some((note) => note.bar === bar)),
+  };
+}
+
+/**
+ * Whether the phrase before has earned a run in double time, judged on what it played: no
+ * empty bar, and at least the notes a beat the solo played in its first chorus.
+ */
+function earned(before: PlayedPhrase | null, first: { notes: number; beats: number }): boolean {
+  if (before === null || before.empty || first.beats === 0) return false;
+  return before.notes / before.beats >= first.notes / first.beats;
+}
+
+/**
+ * Whether a run in double time lands held: the note it runs into sounds a pulse at least, as
+ * heard, once its breath is taken.
+ */
+function landsHeld(world: World, at: number, notes: readonly SoloNote[]): boolean {
+  const note = notes.find((one) => one.tick === at && !one.lead);
+  if (!note) return false;
+  const pulse = pulseTicks(note.bar.meter)[0]!;
+  return soundsFor(world, note.bar, note.tick, note.duration) >= pulse;
+}
 
 /**
  * Whether an idea said a beat away is as long as where it was: the same notes, each

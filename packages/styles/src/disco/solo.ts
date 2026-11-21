@@ -377,6 +377,17 @@ export const discoSolo: SoloStyle = {
   // four tenths of its room given up. To move the default, change these two numbers.
   busier: { lift: 0.5, room: 0.4 },
 
+  // None: the line already runs in sixteenths (ST-disco-23, funk's sixteenths made legato);
+  // doubled it is thirty-seconds, thirteen notes a second and more at disco's tempos, past
+  // every instrument's `fastest`, so a chance written here could never be played.
+  doubleTime: {
+    perPulse: 8,
+    chance: 0,
+    bars: { shortest: 0.5, longest: 1 },
+    climbOnly: true,
+    slow: null,
+  },
+
   habits: {
     // A figure said again, as it was, 0.35 (ST-disco-25).
     riff: 0.35,

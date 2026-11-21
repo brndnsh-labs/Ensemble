@@ -4,14 +4,19 @@
 // read back and judged by the same features, and the scorecard's number for a
 // solo is the one the soloist chose by.
 
+import type { Meter } from "../../chart/types.ts";
 import { PPQ } from "../../chart/types.ts";
 import { choose } from "../../critic/choose.ts";
 import type { Feature } from "../../critic/types.ts";
-import { onPulse, pulseTicks } from "../../perform/meter.ts";
+import { swing } from "../../perform/feel.ts";
+import { STEP } from "../../perform/grid.ts";
+import { isCompound, onPulse, pulseTicks } from "../../perform/meter.ts";
 import type { PlanBar } from "../../plan/types.ts";
+import type { FeelStyle } from "../../style/types.ts";
 import { mod12 } from "../../theory/pitch.ts";
 import { isChordTone, ranked } from "./harmony.ts";
 import type { Slot, World } from "./slots.ts";
+import type { SoloStyle } from "./style.ts";
 
 /** A note of the solo as it sounds: where it is struck on the grid and when it stops. */
 export interface Sounding {
@@ -25,7 +30,25 @@ export interface Sounding {
 export interface Heard {
   readonly slot: Slot;
   readonly notes: readonly Sounding[];
+  /**
+   * Where the phrase has a run in double time (`burstsIn`), its notes as the line runs: the
+   * run read at the line's own rate, each other note of it, where the line's own rhythm
+   * would strike it. What the critic counts and matches rhythms by, so that a burst is
+   * judged as the line it doubles; its pitches are judged as they are played. Left out, the
+   * notes themselves.
+   */
+  readonly run?: Run;
 }
+
+/** A phrase's notes as the line runs, and the bars a burst runs through. */
+export interface Run {
+  readonly notes: readonly Sounding[];
+  readonly bars: ReadonlySet<number>;
+}
+
+/** A phrase as the line runs (`Heard.run`). */
+const asRun = (heard: Heard): Heard =>
+  heard.run ? { slot: heard.slot, notes: heard.run.notes } : heard;
 
 /** One whole phrase in its place: what the critic chooses between. */
 export interface SoloCandidate extends Heard {
@@ -36,6 +59,122 @@ export interface SoloCandidate extends Heard {
   /** It says an idea a pulse early or late, and is matched to what came before as that. */
   readonly moved?: boolean;
   readonly world: World;
+}
+
+/**
+ * The notes a pulse of double time in a bar (`SoloStyle.doubleTime`): the style's own in a
+ * bar of quarters, six (twice a pulse's three eighths) in a bar of dotted pulses; none in a
+ * bar whose pulses are not all one length.
+ */
+export function doubledIn(solo: SoloStyle, meter: Meter): number | null {
+  const pulses = pulseTicks(meter);
+  if (pulses.some((pulse) => pulse !== pulses[0])) return null;
+  return isCompound(meter) ? 6 : solo.doubleTime.perPulse;
+}
+
+/** Where a note on the written grid is heard in its bar, once the band's swing has bent it. */
+export function heardIn(bar: PlanBar, tick: number, feel: FeelStyle): number {
+  const within = tick - bar.start;
+  return bar.meter.unit === 4 && within < bar.ticks ? swing(within, feel) : within;
+}
+
+/** A run of the solo in double time, and the note it lands on. */
+export interface Burst {
+  /** Its notes, in order, without the note it lands on. */
+  readonly notes: readonly Sounding[];
+  /** The note it runs into: the last of its notes so close together. */
+  readonly landing: Sounding;
+  /** The note before it, if any. */
+  readonly before: Sounding | null;
+  /** The ticks, as heard, between two notes in double time in its bar. */
+  readonly step: number;
+  /** Its notes a pulse. */
+  readonly perPulse: number;
+}
+
+/**
+ * The runs of a solo's notes in double time, as heard: notes come one after another no more
+ * than half as far apart again as double time's step (`doubledIn`), for three quarters of the
+ * style's shortest run or more. Nothing a style writes as a line comes so close for so long
+ * (rock's sixteenths into a busy bar from a pickup are two beats, under its shortest run of
+ * three quarters of a bar). The run's last note is the one it lands on.
+ */
+export function burstsIn(world: World, notes: readonly Sounding[]): Burst[] {
+  const bursts: Burst[] = [];
+  const heard = (note: Sounding) => note.bar.start + heardIn(note.bar, note.tick, world.feel);
+  let chain: Sounding[] = [];
+  const close = () => {
+    const first = chain[0];
+    if (first) {
+      const perPulse = doubledIn(world.solo, first.bar.meter)!;
+      const pulse = pulseTicks(first.bar.meter)[0]!;
+      const pulses = first.bar.ticks / pulse;
+      const shortest = world.solo.doubleTime.bars.shortest * pulses * perPulse;
+      if (chain.length - 1 >= Math.ceil(0.75 * shortest)) {
+        const at = notes.indexOf(first);
+        bursts.push({
+          notes: chain.slice(0, -1),
+          landing: chain.at(-1)!,
+          before: notes[at - 1] ?? null,
+          step: pulse / perPulse,
+          perPulse,
+        });
+      }
+    }
+    chain = [];
+  };
+  notes.forEach((note, i) => {
+    const before = notes[i - 1];
+    const perPulse = doubledIn(world.solo, note.bar.meter);
+    const near =
+      before !== undefined &&
+      perPulse !== null &&
+      doubledIn(world.solo, before.bar.meter) !== null &&
+      before.bar.meter.beats === note.bar.meter.beats &&
+      before.bar.meter.unit === note.bar.meter.unit &&
+      heard(note) - heard(before) <= (1.5 * pulseTicks(note.bar.meter)[0]!) / perPulse;
+    if (near) {
+      if (chain.length === 0) chain.push(before);
+      chain.push(note);
+    } else {
+      close();
+    }
+  });
+  close();
+  return bursts;
+}
+
+/**
+ * A phrase's notes as the line runs (`Heard.run`), where it has a burst in double time:
+ * each other note of the run, struck where the line's own grid is heard nearest it, and the
+ * note it lands on, and the bars the run goes through. Undefined where it has none.
+ */
+export function runOf(world: World, notes: readonly Sounding[]): Run | undefined {
+  const bursts = burstsIn(world, notes);
+  if (bursts.length === 0) return undefined;
+  const skipped = new Set<Sounding>();
+  const placed = new Map<Sounding, Sounding>();
+  const bars = new Set<number>();
+  for (const burst of bursts) {
+    burst.notes.forEach((note, i) => {
+      bars.add(note.bar.index);
+      if (i % 2 === 1) {
+        skipped.add(note);
+        return;
+      }
+      const at = heardIn(note.bar, note.tick, world.feel);
+      let best = 0;
+      for (let grid = 0; grid < note.bar.ticks; grid += STEP) {
+        const off = Math.abs(heardIn(note.bar, note.bar.start + grid, world.feel) - at);
+        if (off < Math.abs(heardIn(note.bar, note.bar.start + best, world.feel) - at)) best = grid;
+      }
+      placed.set(note, { ...note, tick: note.bar.start + best });
+    });
+  }
+  return {
+    notes: notes.filter((note) => !skipped.has(note)).map((note) => placed.get(note) ?? note),
+    bars,
+  };
 }
 
 /** A phrase's notes without the pickup into it. */
@@ -150,7 +289,7 @@ export function likeness(a: Heard, b: Heard, moved = false): number {
     }
     return most;
   };
-  const [one, two] = [moves(idea(a)), moves(idea(b))];
+  const [one, two] = [moves(idea(asRun(a))), moves(idea(asRun(b)))];
   if (one.length === 0 || two.length === 0) return 0;
   const inPlace = best(one, two, (bar, step) => `${bar}:${step}`);
   if (!moved) return inPlace;
@@ -286,6 +425,8 @@ const held = (note: Sounding) => note.ends - note.tick >= PPQ * 0.75;
 export function lineBars(heard: Heard): string[] {
   const bars = new Map<number, number[]>();
   for (const note of body(heard)) {
+    // A bar a run in double time goes through is the phrase's flurry, not a bar of its line.
+    if (heard.run?.bars.has(note.bar.index)) continue;
     bars.set(note.bar.index, [...(bars.get(note.bar.index) ?? []), note.tick]);
   }
   return [...bars.values()]
@@ -334,7 +475,8 @@ export const SOLO_FEATURES: readonly Feature<SoloCandidate>[] = [
       const bars = candidate.slot.bars;
       const fours = bars.reduce((sum, bar) => sum + bar.ticks, 0) / (4 * PPQ);
       const want = candidate.slot.level.notesPerBar * (fours / bars.length);
-      return Math.abs(body(candidate).length / bars.length - want) / want;
+      // A run in double time counts as the line it doubles.
+      return Math.abs(body(asRun(candidate)).length / bars.length - want) / want;
     },
   },
   {
@@ -447,12 +589,12 @@ export const SOLO_FEATURES: readonly Feature<SoloCandidate>[] = [
     id: "note-for-note",
     says: "The share of the phrase's notes that one of the three phrases before it played at the same place in its bars on the same pitch: said again that soon, an idea wants changing. For a style that develops a line; a riff style means to say it again.",
     of: (candidate) => {
-      const notes = idea(candidate);
+      const notes = idea(asRun(candidate));
       if (notes.length === 0) return 0;
       const first = notes[0]!.bar.index;
       let most = 0;
       for (const other of candidate.earlier.slice(-3)) {
-        const theirs = idea(other);
+        const theirs = idea(asRun(other));
         const from = theirs[0]?.bar.index ?? 0;
         const placed = new Set(
           theirs.map(
@@ -540,5 +682,8 @@ export function phrasesOf(world: World, notes: readonly Sounding[]): Heard[] {
     if (at === undefined) continue;
     sorted[at]!.push(note);
   }
-  return world.slots.map((slot, i) => ({ slot, notes: sorted[i]! }));
+  return world.slots.map((slot, i) => {
+    const run = runOf(world, sorted[i]!);
+    return run ? { slot, notes: sorted[i]!, run } : { slot, notes: sorted[i]! };
+  });
 }

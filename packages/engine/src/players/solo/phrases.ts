@@ -16,6 +16,7 @@ import type { Plan, PlanBar } from "../../plan/types.ts";
 import type { Rng } from "../../rng.ts";
 import type { ToneRole } from "../../theory/chord.ts";
 import { pitchClass } from "../../theory/pitch.ts";
+import { burstOf } from "./burst.ts";
 import { climb, EIGHTH, isChordTone, landing, onlyPasses } from "./harmony.ts";
 import type { LineBar, Spot } from "./line.ts";
 import { contourOf, settled, spotsOf, writeBends, writeLine } from "./line.ts";
@@ -70,6 +71,14 @@ export interface Phrase {
    * as it was stated and the shift is not carried on.
    */
   readonly inPlace?: Phrase;
+  /**
+   * This phrase has a run in double time in it (`burst.ts`), and this is the phrase it
+   * doubles: what the solo remembers if this one is played, so that what follows is made
+   * from the line as it runs and no burst is said again.
+   */
+  readonly plain?: Phrase;
+  /** Where its run in double time starts, and the tick of the note it lands on. */
+  readonly burst?: { readonly from: number; readonly lands: number };
 }
 
 export interface Placed {
@@ -79,6 +88,8 @@ export interface Placed {
   readonly lead?: boolean;
   /** Semitones under the note that a string is struck at and pushed up from (SO-53). */
   readonly bend?: number;
+  /** A note of a run in double time. */
+  readonly burst?: boolean;
 }
 
 export interface Memory {
@@ -185,6 +196,11 @@ export function phrasesFor(
   rng: Rng,
   /** The note a pickup made by the pass before leads to: the phrase opens on it, on the one. */
   led: number | null = null,
+  /**
+   * The longest run in double time, in bars, where this phrase is offered one (`burst.ts`):
+   * each phrase made is offered with a run in it too, first, where one will go.
+   */
+  burst: number | null = null,
 ): Phrase[] {
   const { instrument } = world;
   // The rhythms are those written for the phrase's meter, where the style has written any.
@@ -776,9 +792,18 @@ export function phrasesFor(
   const kept = phrases.filter(honours);
   const fallback =
     kept.length > 0 ? kept : [statement({ name: "statement", make: "new", oneRhythm: true }, 9)];
-  return fallback.map((phrase) =>
+  const written = fallback.map((phrase) =>
     withPickup(world, phrase, memory, rng, opensPass(world.plan, slot.bars[0]!)),
   );
+  if (burst === null) return written;
+  // A run in double time is offered first, beside the phrase it doubles: the slot drew it,
+  // and it wins a tie. An idea said a beat away is not doubled as well.
+  return written.flatMap((phrase, n) => {
+    const doubled = phrase.inPlace
+      ? null
+      : burstOf(world, phrase, { longest: burst, ending }, rng.fork("burst", n));
+    return doubled ? [doubled, phrase] : [phrase];
+  });
 }
 
 /** A note that says another chord, where it would be heard as more than passing: on a beat or held. */

@@ -399,6 +399,16 @@ export const acousticSolo: SoloStyle = {
   // 108. To move the default, change these two numbers.
   busier: { lift: 0.6, room: 0.3 },
 
+  // None: a sung line in quarters and eighths (ST-acoustic-26). Its eighths doubled would be
+  // sixteenths.
+  doubleTime: {
+    perPulse: 4,
+    chance: 0,
+    bars: { shortest: 0.5, longest: 1 },
+    climbOnly: true,
+    slow: null,
+  },
+
   habits: {
     // A riff repeated 0.25; a chromatic approach 0.05; no enclosures (ST-acoustic-28).
     riff: 0.25,

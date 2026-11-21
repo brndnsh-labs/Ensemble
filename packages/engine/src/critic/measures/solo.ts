@@ -14,10 +14,11 @@ import type { Arrival } from "../../perform/harmony.ts";
 import { contextOf } from "../../perform/harmony.ts";
 import { onPulse } from "../../perform/meter.ts";
 import type { NoteEvent } from "../../perform/notes.ts";
-import type { Heard, SoloCandidate, Sounding } from "../../players/solo/critique.ts";
+import type { Burst, Heard, SoloCandidate, Sounding } from "../../players/solo/critique.ts";
 import {
   bassStruck,
   body,
+  burstsIn,
   closest,
   displacedFrom,
   likeness,
@@ -84,10 +85,21 @@ function read(take: Take, style: StylePack): Reading | null {
       const before = solos[phrase.slot.solo]!;
       return { ...phrase, kind: "", earlier: before.slice(0, before.indexOf(phrase)), world };
     });
-    const costs = score(candidates, SOLO_FEATURES, style.critic.weights.solo ?? {}).map(
-      (scored) => scored.cost,
-    );
-    reading = { world, events, notes, phrases, solos: solos.filter(Boolean), costs };
+    // Costed when a measure asks: most readers of a take want its notes, not its costs.
+    let costs: number[] | undefined;
+    reading = {
+      world,
+      events,
+      notes,
+      phrases,
+      solos: solos.filter(Boolean),
+      get costs() {
+        costs ??= score(candidates, SOLO_FEATURES, style.critic.weights.solo ?? {}).map(
+          (scored) => scored.cost,
+        );
+        return costs;
+      },
+    };
   }
   readings.set(take, reading);
   return reading;
@@ -205,6 +217,42 @@ function displacements(reading: Reading): DisplacedPhrase[] {
 export function displacedPhrases(take: Take, style: StylePack): DisplacedPhrase[] {
   const reading = read(take, style);
   return reading ? displacements(reading).filter((one) => one.by !== null || one.carriesLate) : [];
+}
+
+/** A run in double time in a phrase of a solo, and the phrase of the solo before it. */
+export interface BurstPhrase {
+  readonly phrase: Heard;
+  readonly previous: Heard | null;
+  readonly burst: Burst;
+  /** Every phrase of its solo, in order. */
+  readonly solo: readonly Heard[];
+}
+const bursting = new WeakMap<Reading, BurstPhrase[]>();
+function bursts(reading: Reading): BurstPhrase[] {
+  const known = bursting.get(reading);
+  if (known) return known;
+  const found = reading.solos.flatMap((solo) =>
+    solo.flatMap((phrase, i) =>
+      burstsIn(reading.world, phrase.notes).map((burst) => ({
+        phrase,
+        previous: solo[i - 1] ?? null,
+        burst,
+        solo,
+      })),
+    ),
+  );
+  bursting.set(reading, found);
+  return found;
+}
+
+/**
+ * The runs in double time in a take's solos, read from the notes (`burstsIn`), each with
+ * its phrase and the phrase before it: what `solo.bursts` counts, for a property or a page
+ * that wants to find them.
+ */
+export function burstPhrases(take: Take, style: StylePack): BurstPhrase[] {
+  const reading = read(take, style);
+  return reading ? bursts(reading) : [];
 }
 
 const seconds = (reading: Reading, ticks: number) => ticks / reading.world.ticksPerSecond;
@@ -379,6 +427,16 @@ export const soloMeasures: readonly Measure[] = [
     (reading) => {
       const phrases = displacements(reading);
       return share(phrases.filter((one) => one.line).length, phrases.length);
+    },
+  ),
+  measure(
+    "bursts",
+    "share",
+    "Late in a solo, now and then, the line runs in double time for half a bar to two bars and lands: the share of a solo's phrases (with any note) that have a run in double time.",
+    (reading) => {
+      const phrases = reading.phrases.filter((phrase) => phrase.notes.length > 0);
+      const burst = new Set(bursts(reading).map((one) => one.phrase));
+      return share(burst.size, phrases.length);
     },
   ),
   measure(
