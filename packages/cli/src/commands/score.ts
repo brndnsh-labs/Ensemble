@@ -3,6 +3,11 @@
 // Each measure is reported as a distribution over many takes, with the share
 // inside the style's target band and the worst takes named so they can be
 // rendered and listened to. With --check, a drop past the tolerance fails.
+//
+// A run over a style's whole library also sorts the change in hand against what
+// Brandon has passed by ear (`../passed.ts`): inside every measure's range, or
+// the measures it took outside one, which is what sends a change to his ear.
+// The change is what moved since the branch left main (or since --since).
 
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
@@ -11,6 +16,8 @@ import { MEASURES, regressions, render, scorecard, toBaseline } from "@ensemble/
 import { STYLES, styleById, styleIds } from "@ensemble/styles";
 import type { Command } from "../command.ts";
 import { UsageError } from "../command.ts";
+import type { EarCase, Sorted } from "../passed.ts";
+import { baselineAt, CASES, git, hasHistory, readCases, sortChange } from "../passed.ts";
 
 /**
  * The kinds of take a seed is played as, in rotation. A timed jam goes through
@@ -31,17 +38,27 @@ const KINDS: readonly { name: string; options: Omit<TakeOptions, "seed"> }[] = [
 /** How far the share of takes in a target band may fall before --check fails. */
 const TOLERANCE = 0.05;
 
+/** The count of takes the accepted scorecards are made with: only a run of this many is set against them by ear. */
+const SEEDS = 200;
+
+/** What a change is sorted against: his verdicts, and the commit the change is measured from. */
+type Passed =
+  | { readonly cases: readonly EarCase[]; readonly base: string }
+  | { readonly unread: string };
+
 export const scoreCommand: Command = {
   summary: "the critic's scorecard across many seeds",
-  usage: "[chart...] [--style S] [--seeds N] [--baseline file.json] [--check | --update] [--json]",
+  usage:
+    "[chart...] [--style S] [--seeds N] [--baseline file.json] [--since ref] [--check | --update] [--json]",
   run(args) {
     const { positionals, values } = parseArgs({
       args,
       allowPositionals: true,
       options: {
         style: { type: "string", short: "s" },
-        seeds: { type: "string", short: "n", default: "200" },
+        seeds: { type: "string", short: "n", default: String(SEEDS) },
         baseline: { type: "string", short: "b" },
+        since: { type: "string" },
         check: { type: "boolean", default: false },
         update: { type: "boolean", default: false },
         json: { type: "boolean", default: false },
@@ -59,21 +76,52 @@ export const scoreCommand: Command = {
       : positionals.length > 0 || values.baseline
         ? [STYLES[0]!.id]
         : STYLES.map((style) => style.id);
+    // Only the run the accepted scorecards are made from can be set against them.
+    const whole = positionals.length === 0 && !values.baseline && seeds === SEEDS && !values.json;
+    const passed = whole ? passedFrom(values.since) : null;
     let worst = 0;
+    const sorted: Sorted[] = [];
     for (const id of ids) {
       if (id !== ids[0]) console.log("");
-      worst = Math.max(worst, scoreStyle(id, positionals, seeds, values));
+      const scored = scoreStyle(id, positionals, seeds, values, passed);
+      worst = Math.max(worst, scored.code);
+      if (scored.sorted) sorted.push(scored.sorted);
+    }
+    if (passed && "unread" in passed) {
+      console.log(`\nagainst what he has passed by ear: not read (${passed.unread})`);
+    } else if (sorted.length > 1) {
+      const out = sorted.filter((s) => s.outside.length > 0).map((s) => s.style);
+      console.log(
+        out.length === 0
+          ? "\nby ear: every style inside what he has passed"
+          : `\nby ear: outside what he has passed in ${out.join(", ")} (the measures are named above)`,
+      );
     }
     return worst;
   },
 };
+
+/** His verdicts and the commit to measure from: where the branch left main, or the one named. */
+function passedFrom(since: string | undefined): Passed {
+  if (!existsSync(CASES)) return { unread: `no ${CASES} here` };
+  if (!hasHistory()) return { unread: "git's history is not here to read" };
+  const base = since
+    ? git(["rev-parse", "--verify", "--quiet", "--end-of-options", `${since}^{commit}`])
+    : git(["merge-base", "HEAD", "origin/main"]);
+  if (!base) {
+    if (since) throw new UsageError(`--since: no commit "${since}"`);
+    return { unread: "no origin/main to measure from; name a commit with --since" };
+  }
+  return { cases: readCases(), base: base.trim() };
+}
 
 function scoreStyle(
   styleId: string,
   positionals: readonly string[],
   seeds: number,
   values: { baseline?: string; check: boolean; update: boolean; json: boolean },
-): number {
+  passed: Passed | null,
+): { code: number; sorted?: Sorted } {
   const style = styleById(styleId)!;
   {
     // No charts named: every library chart written for this style.
@@ -97,24 +145,29 @@ function scoreStyle(
     else console.log(report(style.name, takes.length, charts.length, lines));
 
     const baselinePath = values.baseline ?? `scorecard/${styleId}.json`;
+    let code = 0;
     if (values.update) {
       writeFileSync(baselinePath, `${JSON.stringify(toBaseline(lines), null, 2)}\n`);
       console.log(`\nbaseline written: ${baselinePath}`);
-      return 0;
-    }
-    if (existsSync(baselinePath)) {
+    } else if (existsSync(baselinePath)) {
       const baseline = JSON.parse(readFileSync(baselinePath, "utf8")) as Baseline;
       console.log(`\n${movement(lines, baseline, baselinePath)}`);
       const problems = regressions(lines, baseline, TOLERANCE);
       if (values.check && problems.length > 0) {
         console.error(`\nworse than the accepted baseline (${baselinePath}):`);
         for (const problem of problems) console.error(`  ${problem}`);
-        return 1;
+        code = 1;
       }
     } else if (values.check) {
       throw new UsageError(`no baseline at ${baselinePath}; write one with --update`);
     }
-    return 0;
+    if (!passed || "unread" in passed) return { code };
+    // Measured from the scorecard in git, not the one on disk: accepting a new
+    // baseline must not make the change it accepts look like no change.
+    const before = baselineAt(passed.base, styleId) ?? {};
+    const sorted = sortChange(styleId, passed.cases, before, toBaseline(lines));
+    console.log(`\n${byEar(sorted, lines, passed.base)}`);
+    return { code, sorted };
   }
 }
 
@@ -189,5 +242,51 @@ function movement(lines: readonly ScoreLine[], baseline: Baseline, path: string)
     out.push(`  ${line.id}: mean ${f(was.mean)} -> ${f(line.mean)}${target}`);
   }
   if (out.length === 1) out.push("  no movement");
+  return out.join("\n");
+}
+
+/** The change in hand, sorted against what he has passed: inside, or the measures it took outside. */
+function byEar(sorted: Sorted, lines: readonly ScoreLine[], base: string): string {
+  const units = new Map(lines.map((line) => [line.id, line.unit]));
+  const f = (id: string, value: number) => {
+    const unit = units.get(id) ?? "ratio";
+    // A share's range is widened past nought or the whole only on paper.
+    return format(unit === "share" ? Math.min(1, Math.max(0, value)) : value, unit);
+  };
+  const out = [
+    `against what he has passed by ear (${CASES}; the change is what moved since ${base.slice(0, 8)}):`,
+  ];
+  if (sorted.passes === 0) out.push("  no verdict of passed is recorded for this style");
+  if (sorted.outside.length === 0) {
+    out.push(
+      sorted.moved === 0
+        ? "  inside what was passed: nothing moved"
+        : `  inside what was passed: ${sorted.moved} ${sorted.moved === 1 ? "measure" : "measures"} moved, none out of its range`,
+    );
+  } else {
+    out.push("  outside what was passed, for his ear:");
+    for (const o of sorted.outside) {
+      const now = o.now === null ? "" : f(o.id, o.now);
+      const passes = o.range ? `${o.range.passes} ${o.range.passes === 1 ? "pass" : "passes"}` : "";
+      const range = o.range
+        ? `${f(o.id, o.range.low)} to ${f(o.id, o.range.high)} (${passes})`
+        : "";
+      const was = o.was === null ? "" : f(o.id, o.was);
+      const says = {
+        toward: o.fence
+          ? `${now}, back toward the ${f(o.id, o.fence.refused)} he refused (${o.fence.case}); the nearest he has passed is ${f(o.id, o.fence.nearest)}; was ${was}`
+          : "",
+        left: `${now}, passed from ${range}; was ${was}`,
+        further: `${now}, further outside ${range}; was ${was}`,
+        unvouched: `${now}, was ${was}; no pass of his covers this measure`,
+        new: `${now}, new with this change: no band he has passed had it`,
+        gone: `no longer measured (no take has it to read); was ${was}`,
+      }[o.why];
+      out.push(`    ${o.id}: ${says}`);
+    }
+  }
+  if (sorted.already.length > 0) {
+    out.push(`  outside before this change, and no further for it: ${sorted.already.join(", ")}`);
+  }
   return out.join("\n");
 }

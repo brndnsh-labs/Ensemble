@@ -18,74 +18,31 @@
 // recordings) is listed and left: the critic reads notes. It reads git, so it
 // wants the repository's history (a shallow clone has none to read).
 
-import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import type { Baseline, BaselineLine } from "@ensemble/engine";
 import { styleById, styleIds } from "@ensemble/styles";
 import type { Command } from "../command.ts";
 import { UsageError } from "../command.ts";
+import type { EarCase, Kind } from "../passed.ts";
+import {
+  baselineAt,
+  CASES,
+  hasHistory,
+  isOwn,
+  passedBands,
+  readCases,
+  spread,
+  stylesOf,
+  TELLS,
+} from "../passed.ts";
 
-const CASES = "scorecard/ear-cases.json";
-
-type Kind = "passed" | "not-right" | "chose" | "left";
-
-interface EarCase {
-  readonly id: string;
-  /** The day he said it. */
-  readonly date: string;
-  /** His words, as written down at the time. */
-  readonly words: string;
-  /** True where the record gives his meaning in its own words, not his. */
-  readonly reported?: boolean;
-  /** Where they are written: a file and the section's heading. */
-  readonly source: string;
-  readonly seat: "soloist" | "bass" | "chords" | "drums" | "band" | "audio";
-  /** Style ids, or "all". */
-  readonly styles: readonly string[];
-  readonly kind: Kind;
-  /** Whether the notes carry what he judged, or only the sound does. */
-  readonly medium: "notes" | "sound";
-  readonly heard: string;
-  /** The commit that wrote his words down. The band he heard is the one before it. */
-  readonly recorded: string;
-  /** For "not-right": what answered it. */
-  readonly answered?: {
-    readonly section: string;
-    readonly note: string;
-    /** The commit whose scorecards are the band that answered him; the one before it is the band he refused. */
-    readonly commit?: string;
-    /** Measures the record names for this fault. */
-    readonly measures?: readonly string[];
-    /** Numbers written down at the time that no scorecard holds. */
-    readonly logged?: readonly string[];
-    /** A property that holds the answer in place now, by how its name begins. A scorecard cannot show one. */
-    readonly property?: string;
-  };
-}
-
-/**
- * How far a mean must move, against the spread of takes the measure has, to
- * tell two bands apart; and how far outside the means he has passed a band
- * must sit to be outside what he passed.
- */
-const TELLS = 0.25;
 /**
  * A target objected to the band he refused when the answer put more of the takes
  * inside it by more than this: the size of move that fails `score --check` the
  * other way.
  */
 const OBJECTS = 0.05;
-
-/** The measures that are a seat's own, by the start of their names. The band's are everyone's. */
-const OWN: Readonly<Record<EarCase["seat"], string | null>> = {
-  soloist: "solo.",
-  bass: "bass.",
-  chords: "chords.",
-  drums: "drums.",
-  band: null,
-  audio: null,
-};
 
 export const earsCommand: Command = {
   summary: "Brandon's verdicts by ear, beside what the critic measured at the time",
@@ -102,7 +59,7 @@ export const earsCommand: Command = {
       throw new UsageError(`no style "${values.style}" (styles: ${styleIds().join(", ")})`);
     }
     if (!existsSync(CASES)) throw new UsageError(`no ${CASES}; run from the repository's root`);
-    if (git(["rev-parse", "--verify", "--quiet", "HEAD~1"]) === null) {
+    if (!hasHistory()) {
       throw new UsageError("the scorecards' history is read from git, and there is none here");
     }
     const cases = readCases();
@@ -117,79 +74,6 @@ export const earsCommand: Command = {
     return 0;
   },
 };
-
-function readCases(): EarCase[] {
-  const file = JSON.parse(readFileSync(CASES, "utf8")) as { cases: EarCase[] };
-  const known = new Set(styleIds());
-  for (const c of file.cases) {
-    for (const style of c.styles) {
-      if (style !== "all" && !known.has(style)) {
-        throw new UsageError(`${CASES}: case "${c.id}" names a style "${style}" that is not one`);
-      }
-    }
-    if (!(c.seat in OWN)) throw new UsageError(`${CASES}: case "${c.id}" has no seat "${c.seat}"`);
-    // These go to git as arguments: a commit's name and nothing else.
-    for (const commit of [c.recorded, c.answered?.commit]) {
-      if (commit !== undefined && !/^[0-9a-f]{7,40}$/.test(commit)) {
-        throw new UsageError(`${CASES}: case "${c.id}" names "${commit}", which is not a commit`);
-      }
-    }
-  }
-  return file.cases;
-}
-
-const stylesOf = (c: EarCase): readonly string[] =>
-  c.styles.includes("all") ? styleIds() : c.styles;
-
-/**
- * Whether a measure is one a verdict was about: the seat's own, or one the record
- * names. A verdict on the whole band is about every measure, unless the record
- * names the ones it meant: then only those, since something always moves somewhere.
- */
-const isOwn = (c: EarCase, id: string): boolean => {
-  const start = OWN[c.seat];
-  const named = c.answered?.measures ?? [];
-  if (named.includes(id)) return true;
-  return start === null ? named.length === 0 : id.startsWith(start);
-};
-
-// ── the scorecards as they stood ────────────────────────────────────────────
-
-function git(args: readonly string[]): string | null {
-  try {
-    return execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
-  } catch {
-    return null;
-  }
-}
-
-const read = new Map<string, Baseline | null>();
-
-/** A style's accepted scorecard at a commit, or null where it had none yet. */
-function baselineAt(commit: string, style: string): Baseline | null {
-  const key = `${commit}:scorecard/${style}.json`;
-  if (!read.has(key)) {
-    const text = git(["show", key]);
-    read.set(key, text === null ? null : (JSON.parse(text) as Baseline));
-  }
-  return read.get(key) ?? null;
-}
-
-const times = new Map<string, number>();
-
-/** When a commit was made, in seconds; 0 for one git does not know. */
-function madeAt(commit: string): number {
-  if (!times.has(commit)) times.set(commit, Number(git(["log", "-1", "--format=%ct", commit])));
-  return times.get(commit) || 0;
-}
-
-/**
- * The spread of takes a measure has, for judging a move against. A measure that
- * hardly varies (a share near nought, eight strokes in every bar) is given a
- * floor, so that a hundredth's drift in it does not tell two bands apart.
- */
-const spread = (line: BaselineLine): number =>
-  Math.max(line.p90 - line.p10, Math.abs(line.mean) * 0.25, 0.05);
 
 // ── what he has passed: the span of each measure over those bands ──────────
 
@@ -217,62 +101,24 @@ interface Span {
   readonly unheard: readonly string[];
 }
 
-/**
- * A pass vouches for the measures of the seat it was about (a pass of the band,
- * for all of them), and only when it came after the last time he found that
- * seat not right: before that, he had passed the very band he then refused.
- */
+/** Today's accepted scorecard for a style, set against the range of each measure over what he has passed. */
 function passedSpan(style: string, cases: readonly EarCase[]): Span {
-  const notes = cases.filter((c) => c.medium === "notes" && stylesOf(c).includes(style));
-  const passes = notes
-    .filter((c) => c.kind === "passed")
-    .map((c) => ({ c, at: madeAt(c.recorded), baseline: baselineAt(`${c.recorded}^`, style) }))
-    .filter((pass) => pass.baseline !== null);
-  /**
-   * When each seat was last put right, by the start of its measures' names; "" is
-   * the band as a whole. A fault in the band that names its measures puts only
-   * those right, under their own names.
-   */
-  const putRight = new Map<string, number>();
-  for (const c of notes) {
-    if (c.kind !== "not-right" || !c.answered?.commit) continue;
-    const start = OWN[c.seat];
-    const named = c.answered.measures ?? [];
-    const at = madeAt(c.answered.commit);
-    for (const key of start === null && named.length > 0 ? named : [start ?? ""]) {
-      putRight.set(key, Math.max(putRight.get(key) ?? 0, at));
-    }
-  }
+  const bands = passedBands(style, cases);
   const path = `scorecard/${style}.json`;
   const today = existsSync(path) ? (JSON.parse(readFileSync(path, "utf8")) as Baseline) : {};
   const measures: Passed[] = [];
   const unheard: string[] = [];
   for (const [id, line] of Object.entries(today)) {
-    const since = Math.max(
-      putRight.get(id.slice(0, id.indexOf(".") + 1)) ?? 0,
-      putRight.get(id) ?? 0,
-      putRight.get("") ?? 0,
-    );
-    const lines = passes
-      .filter((pass) => pass.at > since && isOwn(pass.c, id))
-      .map((pass) => pass.baseline?.[id])
-      .filter((was) => was !== undefined);
-    if (lines.length === 0) {
+    const range = bands.range(id);
+    if (!range) {
       unheard.push(id);
       continue;
     }
-    const slack = (TELLS * lines.reduce((sum, was) => sum + spread(was), 0)) / lines.length;
-    const low = Math.min(...lines.map((was) => was.mean)) - slack;
-    const high = Math.max(...lines.map((was) => was.mean)) + slack;
-    const where = line.mean < low ? "below" : line.mean > high ? "above" : ("inside" as const);
-    measures.push({ id, low, high, passes: lines.length, today: line.mean, where });
+    const where =
+      line.mean < range.low ? "below" : line.mean > range.high ? "above" : ("inside" as const);
+    measures.push({ id, ...range, today: line.mean, where });
   }
-  return {
-    style,
-    passes: passes.map((pass) => ({ id: pass.c.id, date: pass.c.date, commit: pass.c.recorded })),
-    measures,
-    unheard,
-  };
+  return { style, passes: bands.passes, measures, unheard };
 }
 
 // ── a fault he named: does anything measured tell it from its answer? ───────
