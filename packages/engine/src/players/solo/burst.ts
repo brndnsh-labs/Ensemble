@@ -151,13 +151,11 @@ function run(
     placed.push({ bar, tick, hold, onset: j, pool, lands: leans || arrives });
   }
 
-  // The phrase's register, and under it room for a run to come up from: on the way to the
-  // top note, as far as two octaves under it; elsewhere a fourth under the phrase's
-  // floor. Never over the phrase's ceiling, which keeps every phrase but the climb clear of
-  // the top note (SO-07).
-  const { high } = slot;
-  const floor = world.instrument.range[0];
-  const low = Math.max(floor, slot.peak ? slot.top - 24 : slot.low - 5);
+  // The phrase's own register (SO-12): never over its ceiling, which keeps every phrase but
+  // the climb clear of the top note (SO-07), nor under its floor, which keeps a run out of
+  // the comp's hand: let down under it, a run in rock had the piano's voices at or over its
+  // note in 9% of the piano's strikes under it, against 1% under the line anywhere else.
+  const { low, high } = slot;
   const leap = slot.peak ? 17 : 12;
   const inside = (pitch: number) => pitch >= low && pitch <= high;
   const ranks = at === line.length - 1 ? ask.ending : world.solo.arrive;
