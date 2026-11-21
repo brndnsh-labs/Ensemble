@@ -471,6 +471,9 @@ export const bluesSolo: SoloStyle = {
       // Walked in by the scale.
       approach: false,
     },
+    // The call said again a beat late, laid back over the IV, now and then; a beat early less
+    // often, since a blues phrase leans back.
+    displace: { chance: 0.35, early: 0.3 },
     // On a guitar: the blue third pushed up into the third, the flat 7th into the root
     // (SO-53, ST-blues-41).
     bend: { third: 0.65, rootOrFifth: 0.45, around: 1, elsewhere: 0.5 },

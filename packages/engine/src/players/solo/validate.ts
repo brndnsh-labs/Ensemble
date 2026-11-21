@@ -280,6 +280,13 @@ export function validateSoloStyle(solo: SoloStyle): string[] {
     }
   };
   pickups(solo.habits.pickup.figures, "habits, pickup", STEPS, 4);
+  const { displace } = solo.habits;
+  chance(displace.chance, "habits, displace");
+  chance(displace.early, "habits, displace early");
+  for (const level of displace.levels ?? []) known(level, "habits, displace");
+  for (const role of displace.roles ?? []) {
+    say(ROLES.includes(role), `habits, displace: "${role}" is not a letter of a form.`);
+  }
   chance(solo.habits.bend.third, "habits, bend into a third");
   chance(solo.habits.bend.rootOrFifth, "habits, bend into a root or fifth");
   chance(solo.habits.bend.elsewhere, "habits, bend elsewhere");

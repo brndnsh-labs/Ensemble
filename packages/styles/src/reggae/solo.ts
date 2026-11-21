@@ -359,6 +359,9 @@ export const reggaeSolo: SoloStyle = {
       rising: 0.6,
       approach: false,
     },
+    // A reggae line starts after the One (ST-reggae-25), so an idea moved is mostly moved
+    // later, seldom earlier toward the One. Not the opening idea brought back (`b`).
+    displace: { chance: 0.2, early: 0.2, roles: ["r", "v"] },
     // No bends (ST-reggae-27): on a guitar too, the line is sung, not bent.
     bend: { third: 0, rootOrFifth: 0, around: 0, elsewhere: 0 },
     // No slide: the notes give reggae none, and the line is sung (ST-reggae-27).

@@ -154,34 +154,47 @@ export interface Displacement {
 /**
  * Whether a phrase is an earlier one of its solo said again a pulse early or
  * late, as a listener would match them: the same rhythm (every note struck the
- * same distance from the one before), the same contour (each move the same way,
- * up, down or the same note), and the whole of it moved by one of the bar's
+ * same distance from the one before), the same contour (four moves in five the
+ * same way, up, down or the same note: a note fitted to the chord now under it
+ * may turn), and the whole of it moved by one of the bar's
  * pulses (the quarter in 4/4, the dotted quarter in 6/8 and 12/8) from where it
- * fell in its bar, so that it falls across the bar differently. Three notes at
+ * fell in its bar, so that it falls across the bar differently; and no earlier
+ * phrase it says again where that one fell. Three notes at
  * least: fewer are not an idea. The phrase's own notes, without a pickup into
  * it; the earlier one's with or without the pickups inside it.
  */
 export function displacedFrom(heard: Heard, earlier: readonly Heard[]): Displacement | null {
-  const said = body(heard);
-  if (said.length < 3) return null;
-  const { meter, ticks } = said[0]!.bar;
-  if (said.some((note) => note.bar.ticks !== ticks)) return null;
-  const pulse = pulseTicks(meter)[0]!;
   const contour = (notes: readonly Sounding[]) =>
     notes.slice(1).map((note, i) => Math.sign(note.pitch - notes[i]!.pitch));
-  const shape = contour(said);
-  for (const other of [...earlier].reverse()) {
-    for (const notes of [idea(other), body(other)]) {
-      if (notes.length !== said.length) continue;
-      const moved = said[0]!.tick - notes[0]!.tick;
-      if (!notes.every((note, i) => said[i]!.tick - note.tick === moved)) continue;
-      if (notes.some((note) => note.bar.ticks !== ticks)) continue;
-      const inBar = ((moved % ticks) + ticks) % ticks;
-      const by = inBar === pulse ? 1 : inBar === ticks - pulse ? -1 : 0;
-      if (by === 0) continue;
-      const was = contour(notes);
-      if (shape.every((move, i) => move === was[i])) return { of: other, by };
-    }
+  /** Where one set of notes falls against another it says again, in ticks into the bar; null if it does not. */
+  const against = (said: readonly Sounding[], notes: readonly Sounding[]): number | null => {
+    const ticks = said[0]!.bar.ticks;
+    if (notes.length !== said.length || notes.some((note) => note.bar.ticks !== ticks)) return null;
+    const moved = said[0]!.tick - notes[0]!.tick;
+    if (!notes.every((note, i) => said[i]!.tick - note.tick === moved)) return null;
+    // Fitted to the chords now under it a note may move the other way: four moves in five
+    // the same way is the same line.
+    const [shape, was] = [contour(said), contour(notes)];
+    const same = shape.filter((move, i) => move === was[i]).length;
+    return same * 5 >= shape.length * 4 ? ((moved % ticks) + ticks) % ticks : null;
+  };
+  // The phrase, and the earlier ones, with and without the pickups inside them.
+  const versions = (one: Heard) => [body(one), idea(one)];
+  const falls = versions(heard).flatMap((said) => {
+    if (said.length < 3 || said.some((note) => note.bar.ticks !== said[0]!.bar.ticks)) return [];
+    return [...earlier]
+      .reverse()
+      .flatMap((other) =>
+        versions(other).map((notes) => ({ said, other, at: against(said, notes) })),
+      );
+  });
+  // An idea said again where it fell before is not moved, whatever else it is like.
+  if (falls.some(({ at }) => at === 0)) return null;
+  for (const { said, other, at } of falls) {
+    const { meter, ticks } = said[0]!.bar;
+    const pulse = pulseTicks(meter)[0]!;
+    if (at === pulse) return { of: other, by: 1 };
+    if (at === ticks - pulse) return { of: other, by: -1 };
   }
   return null;
 }

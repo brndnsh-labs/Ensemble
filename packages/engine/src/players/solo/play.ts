@@ -183,13 +183,30 @@ export function soloPart(
     );
     const chosen = choose(candidates);
     const at = Math.max(0, candidates.indexOf(chosen));
-    report?.({ slot, role, candidates: score(candidates, SOLO_FEATURES, weights), chosen });
+    // An idea said again bar for bar may be said a beat early or late instead, as the slot
+    // drew it (habits.displace): decided after the choice, so the critic chose the idea and
+    // the player says it where it falls. It takes no pickup, from this pass or the last.
+    const twin = phrases[at]!.displaced;
+    const phrase = twin ?? phrases[at]!;
+    const realised = twin ? realise(world, twin, accent) : notes[at]!;
+    const heardAs: SoloCandidate = twin
+      ? {
+          ...candidates[at]!,
+          kind: twin.kind,
+          notes: realised.map((note) => sounding(world, note)),
+        }
+      : candidates[at]!;
+    report?.({
+      slot,
+      role,
+      candidates: score(candidates, SOLO_FEATURES, weights),
+      chosen: heardAs,
+    });
 
-    const phrase = phrases[at]!;
     // How the horn plays the phrase chosen: what it does with the pitch of the notes it
     // arrives on and of the notes it leaves. Drawn by place, after the choice, so the
     // phrase is the one the critic chose whatever it does.
-    const horned = hornMoves(world, slot, notes[at]!, rng, fell);
+    const horned = hornMoves(world, slot, realised, rng, fell);
     // And how a guitarist's left hand plays it: a landing slid into, a note hammered on or
     // pulled off.
     const played = slurs(world, phrase, slideInto(world, phrase, horned.notes, rng), rng);
@@ -204,7 +221,7 @@ export function soloPart(
     // what was played where the form asked for one stated, changed, set apart or brought
     // back. Said again or answered, the idea stays what it was.
     const stated = memory.motif === null || phrase.fresh || "svcb".includes(role);
-    earlier = [...earlier, candidates[at]!];
+    earlier = [...earlier, heardAs];
     memory = {
       // The climb to the top note is a use of the idea, not a new one.
       motif: slot.peak ? memory.motif : stated ? phrase : memory.motif,

@@ -892,17 +892,17 @@ test("a pickup spells the chord it is played over: each note of a pickup into a 
  * soloist: each style does it, the ones whose line is built on a riff or a call seldom.
  */
 const DISPLACED: Readonly<Record<string, number>> = {
-  jazz: 0.005,
-  blues: 0.005,
-  rock: 0.005,
-  funk: 0.005,
-  disco: 0.005,
-  neosoul: 0.005,
-  reggae: 0.005,
-  acoustic: 0.005,
+  jazz: 0.02,
+  blues: 0.015,
+  rock: 0.01,
+  funk: 0.02,
+  disco: 0.006,
+  neosoul: 0.02,
+  reggae: 0.015,
+  acoustic: 0.003,
 };
 
-test("an idea comes back a beat early or late: in every style some phrases say an earlier one of the solo again, the same rhythm and contour moved by one of the bar's pulses; never the top of a chorus, the solo's first or last phrase, nor the tune's last; and the idea so moved stays inside its own phrase's bars and the tune, led in by no pickup", () => {
+test("an idea comes back a beat early or late: in every style some phrases say an earlier one of the solo again, the same rhythm and contour moved by one of the bar's pulses; only at the levels the style says; never the top of a chorus, the solo's first or last phrase, nor the tune's last; and the idea so moved stays inside its own phrase's bars and the tune, led in by no pickup", () => {
   for (const style of STYLES) {
     const floor = DISPLACED[style.id];
     if (floor === undefined) continue;
@@ -917,6 +917,11 @@ test("an idea comes back a beat early or late: in every style some phrases say a
         const { slot, notes } = phrase;
         const where = `${style.id}, ${chart.file} ${JSON.stringify(options)}, bar ${slot.bars[0]!.index}`;
         assert.ok(of && by, `${where}: a displaced phrase with nothing it repeats`);
+        const levels = style.solo.habits.displace.levels;
+        assert.ok(
+          !levels || levels.includes(slot.level.name),
+          `${where}: displaced at the ${slot.level.name} level`,
+        );
         assert.notEqual(slot.index, 0, `${where}: the top of a chorus moved`);
         assert.ok(!slot.first && !slot.last, `${where}: the solo's first or last phrase moved`);
         const lastBar = slot.bars.at(-1)!;

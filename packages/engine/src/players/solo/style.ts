@@ -419,6 +419,29 @@ export interface SoloStyle {
       readonly approach: boolean;
     };
     /**
+     * An idea said again bar for bar (a way that makes `again`, by any move) is
+     * placed a beat early or a beat late, so it falls across the bar
+     * differently: the same rhythm and contour moved by one of the bar's own
+     * pulses (the quarter in 4/4, the dotted quarter in 6/8 and 12/8), its
+     * notes fitted to the chords now under them (SO-33) and its bends kept.
+     * Drawn once for a phrase, after the critic has chosen it, as the hand's
+     * moves are. Never at a chorus's top, in a solo's first or last phrase, on
+     * the way to the top note or where the tune ends; never pulled before the
+     * phrase's first bar or pushed past its last, and never late in a
+     * section's last bar; a displaced idea takes no pickup. Where it fits only
+     * the other way it goes that way, and where it fits neither it stays put.
+     */
+    readonly displace: {
+      /** The chance a phrase said again bar for bar is said a beat away. At none, never. */
+      readonly chance: number;
+      /** Of those, the share said a beat early: the rest are a beat late. */
+      readonly early: number;
+      /** The levels it is done at, by name. Left out, every level. */
+      readonly levels?: readonly string[];
+      /** The letters of a form it is done for. Left out, every one. */
+      readonly roles?: readonly Role[];
+    };
+    /**
      * A string pushed up into a note, on an instrument whose hand can (SO-53).
      * Only into a note a phrase lands on: one struck where the chord changes,
      * or the last before a breath. Left at no chance, the style does not bend.

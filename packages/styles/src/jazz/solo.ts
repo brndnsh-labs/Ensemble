@@ -535,6 +535,10 @@ export const jazzSolo: SoloStyle = {
       // approaches a landing that way.
       approach: true,
     },
+    // An idea said again a beat early or late is how a bebop player develops a motif: the
+    // style that does it most, anticipated as often as delayed. Not the bridge's return (`b`),
+    // which is heard where it was.
+    displace: { chance: 0.6, early: 0.5, roles: ["r", "v"] },
     // No bends (ST-jazz-37); a guitar shakes a note held a half note or longer (SO-52).
     bend: { third: 0, rootOrFifth: 0, around: 0, elsewhere: 0 },
     // No slide: the notes give jazz none, as they give it no bend (ST-jazz-37).
