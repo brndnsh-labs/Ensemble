@@ -424,6 +424,10 @@ export const acousticSolo: SoloStyle = {
       rising: 0.6,
       approach: false,
     },
+    // Seldom: a singer-songwriter's line is a sung melody, said again where it was sung.
+    // Early 0.4 where it could go either way; in the takes the suite makes none is moved. Not
+    // the opening idea brought back (`b`).
+    displace: { chance: 0.2, early: 0.4, roles: ["r", "v"] },
     // No whole-step bends and no scoops (ST-acoustic-28); the acoustic guitars' hands do not bend,
     // and on an instrument that can the line is still sung, not bent.
     bend: { third: 0, rootOrFifth: 0, around: 0, elsewhere: 0 },

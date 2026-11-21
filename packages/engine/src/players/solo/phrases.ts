@@ -11,7 +11,7 @@
 
 import { swing } from "../../perform/feel.ts";
 import { cells, STEP } from "../../perform/grid.ts";
-import { isCompound, lastPulse, onPulse } from "../../perform/meter.ts";
+import { isCompound, lastPulse, onPulse, pulseTicks } from "../../perform/meter.ts";
 import type { Plan, PlanBar } from "../../plan/types.ts";
 import type { Rng } from "../../rng.ts";
 import type { ToneRole } from "../../theory/chord.ts";
@@ -58,6 +58,18 @@ export interface Phrase {
   readonly fresh: boolean;
   /** A phrase the hand gets lyrical in (KF-B-10): it may bend, and slide. */
   readonly lyrical: boolean;
+  /**
+   * The same idea said a beat early or late (`habits.displace`), offered beside
+   * this one for the critic to judge. Only on an idea said again bar for bar,
+   * where the draw for the slot said so and it fits.
+   */
+  readonly displaced?: Phrase;
+  /**
+   * This is an idea said a beat away, and this the idea where it was: what the
+   * solo remembers if this one is played, so what follows is made from the idea
+   * as it was stated and the shift is not carried on.
+   */
+  readonly inPlace?: Phrase;
 }
 
 export interface Placed {
@@ -161,6 +173,8 @@ interface Ask {
   readonly given?: (bar: number, spot: Spot) => number | undefined;
   /** Whether that note was bent into when it was last said: it is said the same way again. */
   readonly bent?: (bar: number, spot: Spot) => boolean | undefined;
+  /** Every note on a beat is a chord tone, as a landing is: an idea moved onto the beat (SO-33). */
+  readonly beatsLand?: boolean;
 }
 
 export function phrasesFor(
@@ -232,6 +246,7 @@ export function phrasesFor(
       // tune's: a tune comes to rest, it does not stop on the top.
       climbsTo: slot.peak && !final ? { to: slot.top, above: memory.highest } : null,
       given,
+      beatsLand: ask.beatsLand ?? false,
       // The way up to the top note moves, whatever the style's riffs do.
       riffs: slot.peak ? "sequence" : solo.habits.riffIs,
       rng: rng.fork("habits"),
@@ -411,6 +426,126 @@ export function phrasesFor(
     });
   };
 
+  /**
+   * Whether an idea said again here is said a beat away, and which way first, in
+   * sixteenths: none (0) at a chorus's top, in the solo's first or last phrase, on the
+   * way to the top note, where the tune ends, where the pass before leads into the
+   * phrase, in a phrase whose bars are not all one length, and wherever the style's
+   * letters of a form leave it out. Drawn once for the phrase.
+   */
+  const shift = ((): number => {
+    const { chance, early, roles } = solo.habits.displace;
+    if (chance <= 0 || slot.index === 0 || slot.first || slot.last || slot.peak || final) return 0;
+    if (led !== null || slot.bars.some((bar) => bar.ticks !== slot.bars[0]!.ticks)) return 0;
+    if (roles && !roles.includes(role)) return 0;
+    const draw = rng.fork("displace");
+    if (!draw.chance(chance)) return 0;
+    const pulse = Math.round(pulseTicks(slot.bars[0]!.meter)[0]! / STEP);
+    return draw.fork("early").chance(early) ? -pulse : pulse;
+  })();
+  // A section's last bar keeps its landing where the band turns: not pushed late there.
+  // (The first draw is drawn by the style's share; the other way is tried where it fails.)
+  const closing = slot.bars.at(-1)!;
+  const lateAllowed = closing.barInSection < closing.section.bars - 1;
+
+  /**
+   * A phrase's bars said a beat away (`by` sixteenths, early below 0): every note it
+   * strikes, as laid in this slot, moved by that much, its rhythm and its line the same
+   * and its pitches and bends those it would have had where it was, fitted to the
+   * chords now under them (SO-33). A note carried over a barline stops at it, as every
+   * note but a tie does. Null where it does not fit: a note pulled before the phrase's
+   * first bar or pushed past its last, one that lands under no chord or without the
+   * room an end bar keeps for its breath, or more air than the phrase may leave.
+   */
+  const displaced = (kind: string, plans: readonly BarPlan[], ask: Ask, by: number) => {
+    const bars = slot.bars.map((_, i) => plans[i] ?? REST);
+    const laid = lineBars(world, slot, bars);
+    const first = slot.bars[0]!.start;
+    const last = slot.bars.at(-1)!;
+    const end = last.start + last.ticks;
+    const moved = laid.flatMap((line, b) =>
+      line.spots.map((spot, k) => ({
+        b,
+        spot,
+        tick: spot.tick + by * STEP,
+        // The note an end bar lands on: its bar stays an end bar wherever it is moved to.
+        lands: bars[b]!.part === "E" && k === line.spots.length - 1,
+      })),
+    );
+    if (moved.length === 0 || moved.some((note) => note.tick < first || note.tick >= end)) {
+      return null;
+    }
+    const barAt = (tick: number) => slot.bars.findLastIndex((bar) => bar.start <= tick);
+    const placed = slot.bars.map((bar, b) => {
+      const notes = moved.filter((note) => barAt(note.tick) === b);
+      if (notes.length === 0) return { plan: REST, notes };
+      const symbols = new Array<string>(Math.round(bar.ticks / STEP)).fill(".");
+      let crosses = false;
+      notes.forEach((note, n) => {
+        const at = Math.round((note.tick - bar.start) / STEP);
+        const held = Math.max(1, Math.round(note.spot.hold / STEP));
+        // The idea's last note may stop at the barline: it gives up a pulse at most.
+        if (at + held > symbols.length && note !== moved.at(-1)) crosses = true;
+        const until = Math.min(
+          symbols.length,
+          at + held,
+          notes[n + 1] ? Math.round((notes[n + 1]!.tick - bar.start) / STEP) : symbols.length,
+        );
+        symbols[at] = "x";
+        for (let k = at + 1; k < until; k++) symbols[k] = "-";
+      });
+      if (crosses) return null;
+      const part: Part = notes.some((note) => note.lands) ? "E" : "L";
+      return { plan: { part, cell: symbols.join(""), ...PLAIN }, notes };
+    });
+    // A note held over the barline it is moved across is not held to its length: it is
+    // not moved there. (The last may stop at the barline, a pulse short at most, and the
+    // breath after it is judged when it is played.)
+    if (placed.some((bar) => bar === null)) return null;
+    const laidOut = placed as { plan: BarPlan; notes: typeof moved }[];
+    const empty = laidOut.filter((bar) => bar.plan.part === "R").length;
+    if (empty > emptyAllowed || (memory.endedEmpty && laidOut[0]!.plan.part === "R")) return null;
+    // Each moved note keeps the pitch and the bend it had where it was.
+    const source = (b: number, spot: Spot) => {
+      const note = laidOut[b]?.notes[spot.onset];
+      return note && { b: note.b, spot: { ...spot, onset: note.spot.onset } };
+    };
+    const phrase = compose(
+      `${kind}, a beat ${by < 0 ? "early" : "late"}`,
+      laidOut.map((bar) => bar.plan),
+      {
+        ...ask,
+        beatsLand: true,
+        given: (b, spot) => {
+          const was = source(b, spot);
+          return was && ask.given?.(was.b, was.spot);
+        },
+        bent: (b, spot) => {
+          const was = source(b, spot);
+          return was && ask.bent?.(was.b, was.spot);
+        },
+      },
+    );
+    // Every note it had, or it is not the idea.
+    return phrase.line.length === moved.length ? phrase : null;
+  };
+
+  /**
+   * The idea said again bar for bar, with the same said a beat away where the slot draws
+   * it. Only the idea whole: one with a new ending, grown, or turned is something else.
+   */
+  const remade = (kind: string, plans: readonly BarPlan[], ask: Ask): Phrase => {
+    const phrase = compose(kind, plans, ask);
+    if (shift === 0) return phrase;
+    // The way drawn, else the other where the style goes that way at all.
+    const { early } = solo.habits.displace;
+    const may = (by: number) => (by < 0 ? early > 0 : lateAllowed && early < 1);
+    const twin =
+      (may(shift) ? displaced(kind, plans, ask, shift) : null) ??
+      (may(-shift) ? displaced(kind, plans, ask, -shift) : null);
+    return twin ? { ...phrase, displaced: { ...twin, inPlace: phrase } } : phrase;
+  };
+
   // ── the ways of making a phrase ──────────────────────────────────────────
   const motif = memory.motif;
   /** Something new. Each new statement in a list has its own draws, by its number there. */
@@ -469,7 +604,7 @@ export function phrasesFor(
     move: (pitch: number, spot: Spot) => number,
   ): Phrase => {
     const from = layout(idea);
-    return compose(kind, barsOf(idea, from), {
+    return remade(kind, barsOf(idea, from), {
       contour: shaped("arch"),
       ending,
       given: remembered(idea, from, move),
@@ -583,9 +718,14 @@ export function phrasesFor(
       }
     }
   };
+  // An idea drawn to be said a beat away is offered so, first, and where it was after it:
+  // the critic judges both, and the draw's way wins a tie.
   const offer = (ways: readonly Way[]): (Phrase | null)[] => {
     let fresh = 0;
-    return ways.map((way) => made(way, way.make === "new" ? fresh++ : 0));
+    return ways.flatMap((way) => {
+      const phrase = made(way, way.make === "new" ? fresh++ : 0);
+      return phrase?.displaced ? [phrase.displaced, phrase] : [phrase];
+    });
   };
 
   // The top note's phrase has its own ways, whatever the form asked for; a solo's first
@@ -813,6 +953,8 @@ function leadIn(world: World, into: Into, draw: Rng): Placed[] | null {
  * is not drawn again.
  */
 function withPickup(world: World, phrase: Phrase, memory: Memory, rng: Rng, led: boolean): Phrase {
+  // An idea said a beat away comes in where it is moved to, and takes no pickup.
+  if (phrase.inPlace) return phrase;
   const { plan } = world;
   const { slot } = phrase;
   const leads: Placed[] = [];

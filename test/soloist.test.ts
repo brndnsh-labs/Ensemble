@@ -9,6 +9,7 @@ import {
   chordScale,
   chordTones,
   contextOf,
+  displacedPhrases,
   isCompound,
   MEASURES,
   onPulse,
@@ -19,6 +20,7 @@ import {
   pulseTicks,
   render,
   SOLO_INSTRUMENTS,
+  soloRoles,
   swing,
   tierOf,
   timedNotes,
@@ -881,6 +883,98 @@ test("a pickup spells the chord it is played over: each note of a pickup into a 
   // there is little or nothing on a beat to judge.
   const judging = STYLES.filter((style) => !["neosoul", "reggae"].includes(style.id)).length;
   assert.ok(judged >= enough(5) * judging, `only ${judged} pickup notes on a beat or held`);
+});
+
+// ── an idea said again a beat early or late ─────────────────────────────────
+
+/**
+ * The least share of a style's phrases (of three notes or more, after a solo's first) that
+ * say an earlier idea of the solo again a pulse early or late, over every take with the
+ * soloist, about half what the two-seed takes play. A style left out plays so few that a
+ * floor would be a coin toss: an idea moves only where every note keeps its length without
+ * crossing a barline and the critic, judging it beside the idea where it was, prefers it.
+ */
+const DISPLACED: Readonly<Record<string, number>> = {
+  jazz: 0.01,
+  blues: 0.006,
+  funk: 0.005,
+};
+
+test("an idea comes back a beat early or late: in the styles that do it most some phrases say an earlier one of the solo again, the same rhythm and contour moved by one of the bar's pulses, only where the form asks what the style says; never the top of a chorus, the solo's first or last phrase, nor the tune's last, and never late in a section's last bar (nor an answer that carries a moved rhythm there); every note of the idea so moved inside its own phrase's bars and the tune, led in by no pickup, a chord tone where it falls on a beat (SO-33), and as long as it was, shaken where it was shaken, its last note a pulse shorter at most", () => {
+  const failures = new Map<string, string[]>();
+  const fail = (clause: string, where: string) =>
+    failures.set(clause, [...(failures.get(clause) ?? []), where]);
+  for (const style of STYLES) {
+    const floor = DISPLACED[style.id];
+    const { roles } = style.solo.habits.displace;
+    let [phrases, moved] = [0, 0];
+    for (const { chart, options, take } of soloTakes().filter((jam) => jam.style === style)) {
+      const counted = MEASURES.find((measure) => measure.id === "solo.displaced")!.of(take, style);
+      if (!counted) continue;
+      phrases += counted.cases;
+      const end = take.plan.bars.findLast((bar) => bar.kind === "music")!;
+      const asked = soloRoles(take.plan, style, options.seed ?? 0);
+      const harmony = harmonyOf(take);
+      const events = new Map(notesOf(take, "solo").map((note) => [note.tick, note]));
+      for (const { phrase, source, notes, line, carriesLate } of displacedPhrases(take, style)) {
+        const { slot } = phrase;
+        const where = `${style.id}, ${chart.file} ${JSON.stringify(options)}, bar index ${slot.bars[0]!.index}`;
+        const lastBar = slot.bars.at(-1)!;
+        // A rhythm moved late, the idea's line or an answer's, never ends a section.
+        if (carriesLate && lastBar.barInSection === lastBar.section.bars - 1) {
+          fail("late in a section's last bar", where);
+        }
+        if (!line) continue;
+        moved++;
+        const role = asked.get(slot.bars[0]!.index);
+        if (roles && (!role || !roles.includes(role)))
+          fail(`for a letter it is not for`, `${where} (${role})`);
+        if (slot.index === 0) fail("the top of a chorus", where);
+        if (slot.first || slot.last) fail("the solo's first or last phrase", where);
+        if (lastBar.ending !== null) fail("the tune's last phrase", where);
+        if ([...notes, ...phrase.notes].some((note) => note.tick < slot.bars[0]!.start)) {
+          fail("before its barline", where);
+        }
+        const stops = Math.min(lastBar.start + lastBar.ticks, end.start + end.ticks);
+        if (notes.some((note) => note.ends > stops || note.tick >= stops)) {
+          fail("past the end of its phrase", where);
+        }
+        notes.forEach((note, i) => {
+          const at = `${where}, tick ${note.tick}`;
+          if (onPulse(note.bar.meter, note.tick - note.bar.start)) {
+            const chord = harmony.findLast((arrival) => arrival.tick <= note.tick)?.chord;
+            const tones = chord
+              ? chordTones(chord.quality).map(
+                  (tone) => (pitchClass(chord.root) + tone.interval) % 12,
+                )
+              : [];
+            if (chord && !tones.includes(note.pitch % 12)) fail("off the chord on a beat", at);
+          }
+          const was = source[i]!;
+          const pulse = pulseTicks(note.bar.meter)[0]!;
+          const give = i === notes.length - 1 ? pulse : 0;
+          if (note.ends - note.tick < was.ends - was.tick - give - POCKET) fail("cut short", at);
+          // Shaken where it was, unless the hand gave the note another device of its own
+          // there (a horn's scoop is one device to a landing, SO-57), drawn by its place.
+          const move = (one: { tick: number }) => events.get(one.tick)?.move;
+          if (move(was)?.vibrato !== undefined && move(note) === undefined) {
+            fail("its shake lost", at);
+          }
+        });
+      }
+    }
+    if (phrases <= enough(300)) fail("phrases enough", `${style.id}: only ${phrases}`);
+    if (floor !== undefined && moved < Math.max(1, phrases * floor)) {
+      fail(
+        "some displaced",
+        `${style.id}: ${moved} of ${phrases} (${((100 * moved) / phrases).toFixed(1)}%), under ${100 * floor}%`,
+      );
+    }
+  }
+  const said = [...failures].map(
+    ([clause, wheres]) => `${clause}: ${wheres.length}, e.g. ${wheres.slice(0, 2).join("; ")}`,
+  );
+  assert.equal(said.length, 0, said.join("\n"));
 });
 
 test("a horn breathes: the alto never plays eight seconds without half a second of air, as heard", () => {

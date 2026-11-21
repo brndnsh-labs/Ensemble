@@ -7,7 +7,7 @@
 import { PPQ } from "../../chart/types.ts";
 import { choose } from "../../critic/choose.ts";
 import type { Feature } from "../../critic/types.ts";
-import { onPulse } from "../../perform/meter.ts";
+import { onPulse, pulseTicks } from "../../perform/meter.ts";
 import type { PlanBar } from "../../plan/types.ts";
 import { mod12 } from "../../theory/pitch.ts";
 import { isChordTone, ranked } from "./harmony.ts";
@@ -33,6 +33,8 @@ export interface SoloCandidate extends Heard {
   readonly kind: string;
   /** The phrases of this solo already played, oldest first. */
   readonly earlier: readonly Heard[];
+  /** It says an idea a pulse early or late, and is matched to what came before as that. */
+  readonly moved?: boolean;
   readonly world: World;
 }
 
@@ -106,10 +108,14 @@ export function pickupsOf(world: World, notes: readonly Sounding[]): Set<Soundin
  * half alike; the same phrase moved up the scale is wholly alike. A lick that
  * comes back a bar or two later in its phrase is still the same lick, so the
  * phrases are lined up bar against bar every way and the best match counts.
+ *
+ * `moved` says the first phrase was made by saying an idea a pulse early or
+ * late: it is then also lined up a pulse either side, since it is still that
+ * idea. Only then: two phrases that have nothing to do with each other often
+ * line up a pulse apart by chance, and are not alike for it.
  */
-export function likeness(a: Heard, b: Heard): number {
-  const moves = (heard: Heard) => {
-    const notes = idea(heard);
+export function likeness(a: Heard, b: Heard, moved = false): number {
+  const moves = (notes: readonly Sounding[]) => {
     const first = notes[0]?.bar.index ?? 0;
     return notes.map((note, i) => ({
       bar: note.bar.index - first,
@@ -117,31 +123,159 @@ export function likeness(a: Heard, b: Heard): number {
       move: i === 0 ? null : note.pitch - notes[i - 1]!.pitch,
     }));
   };
-  const [one, two] = [moves(a), moves(b)];
-  if (one.length === 0 || two.length === 0) return 0;
-  const placed = new Map(one.map((note) => [`${note.bar}:${note.step}`, note.move]));
-  let best = 0;
-  for (let late = -3; late <= 3; late++) {
-    let shared = 0;
-    let moving = 0;
-    let agree = 0;
-    for (const note of two) {
-      const other = placed.get(`${note.bar + late}:${note.step}`);
-      if (other === undefined) continue;
-      shared++;
-      if (note.move === null || other === null) continue;
-      moving++;
-      if (Math.sign(note.move) === Math.sign(other) && Math.abs(note.move - other) <= 2) agree++;
+  type Moves = ReturnType<typeof moves>;
+  /** The best match of two phrases' notes, lined up bar against bar every way; `key` says where a note is. */
+  const best = (
+    these: Moves,
+    those: Moves,
+    key: (bar: number, step: number) => string | number,
+    shift = 0,
+  ): number => {
+    const placed = new Map(these.map((note) => [key(note.bar, note.step), note.move]));
+    let most = 0;
+    for (let late = -3; late <= 3; late++) {
+      let shared = 0;
+      let moving = 0;
+      let agree = 0;
+      for (const note of those) {
+        const other = placed.get(key(note.bar + late, note.step + shift));
+        if (other === undefined) continue;
+        shared++;
+        if (note.move === null || other === null) continue;
+        moving++;
+        if (Math.sign(note.move) === Math.sign(other) && Math.abs(note.move - other) <= 2) agree++;
+      }
+      const rhythm = shared / (these.length + those.length - shared);
+      most = Math.max(most, rhythm * (0.5 + 0.5 * (moving === 0 ? 0 : agree / moving)));
     }
-    const rhythm = shared / (one.length + two.length - shared);
-    best = Math.max(best, rhythm * (0.5 + 0.5 * (moving === 0 ? 0 : agree / moving)));
-  }
-  return best;
+    return most;
+  };
+  const [one, two] = [moves(idea(a)), moves(idea(b))];
+  if (one.length === 0 || two.length === 0) return 0;
+  const inPlace = best(one, two, (bar, step) => `${bar}:${step}`);
+  if (!moved) return inPlace;
+  // A pulse either side. Moved, a bar's notes may all fall in its later half, where a
+  // pickup would be, so here the phrases are taken whole, pickups inside them and all;
+  // and a moved note may cross a barline, so a note is placed by its distance from the
+  // phrase's first bar, which is only one place when every bar is as long as the next.
+  const [whole, other] = [body(a), body(b)];
+  const ticks = whole[0]!.bar.ticks;
+  if ([...whole, ...other].some((note) => note.bar.ticks !== ticks)) return inPlace;
+  const pulse = pulseTicks(whole[0]!.bar.meter)[0]!;
+  const along = (bar: number, step: number) => bar * ticks + step;
+  return Math.max(
+    inPlace,
+    best(moves(whole), moves(other), along, pulse),
+    best(moves(whole), moves(other), along, -pulse),
+  );
 }
 
-/** The likeness of a phrase to the earlier phrase of its solo most like it. Null for the first. */
-export function closest(heard: Heard, earlier: readonly Heard[]): number | null {
-  return earlier.length === 0 ? null : Math.max(...earlier.map((other) => likeness(heard, other)));
+/**
+ * The likeness of a phrase to the earlier phrase of its solo most like it. Null for the
+ * first. `moved`: the phrase is an idea said a pulse away (see `likeness`).
+ */
+export function closest(heard: Heard, earlier: readonly Heard[], moved = false): number | null {
+  return earlier.length === 0
+    ? null
+    : Math.max(...earlier.map((other) => likeness(heard, other, moved)));
+}
+
+/** An earlier phrase of the solo, and which way a phrase says it again a pulse away from where it was. */
+export interface Displacement {
+  readonly of: Heard;
+  /** A pulse late (1) or early (-1). */
+  readonly by: 1 | -1;
+  /** The notes of the earlier phrase that are said again, in order. */
+  readonly source: readonly Sounding[];
+  /** Each of them as it is said now, wherever in the solo it falls: inside the phrase or not. */
+  readonly notes: readonly Sounding[];
+  /**
+   * The line goes the same way too: the idea said again. Otherwise only its rhythm is
+   * (an answer turned from a moved idea): not counted as the idea displaced.
+   */
+  readonly line: boolean;
+}
+
+/**
+ * Whether a phrase is an earlier one of its solo said again a pulse early or
+ * late, as a listener would match them: every note of the earlier one (three
+ * or more; fewer are not an idea) struck again the same distance after the one
+ * before, the whole moved by one of the bar's pulses (the quarter in 4/4, the
+ * dotted quarter in 6/8 and 12/8) from where it fell in its bar, so that it
+ * falls across the bar differently, the phrase's own notes all among them; the
+ * same contour (four moves in five the same way, up, down or the same note: a
+ * note fitted to the chord now under it may turn); and no earlier phrase whose
+ * rhythm it plays where that one fell. The notes said again are looked for in
+ * the whole solo (`all`), not only in the phrase's bars, so a note of the idea
+ * that falls outside them is still the idea's. The earlier phrase is taken
+ * with or without the pickups inside it, the phrase without a pickup into it.
+ */
+export function displacedFrom(
+  heard: Heard,
+  earlier: readonly Heard[],
+  all: readonly Sounding[],
+): Displacement | null {
+  const found = rhythmsAgain(heard, earlier, all);
+  // A rhythm played again where it fell before is not moved, whatever its line does.
+  if (found.length === 0 || found.some((one) => one.inBar === 0)) return null;
+  // The idea itself if it is there; else its rhythm alone, with another line.
+  const away = found.filter((one) => one.by !== null);
+  const moved = away.find((one) => one.line) ?? away[0];
+  return moved
+    ? { of: moved.of, by: moved.by!, source: moved.source, notes: moved.notes, line: moved.line }
+    : null;
+}
+
+/** An earlier phrase whose rhythm a phrase plays again, and where. */
+export interface RhythmAgain {
+  readonly of: Heard;
+  readonly source: readonly Sounding[];
+  readonly notes: readonly Sounding[];
+  /** Ticks into the bar it is moved by, from where it fell. */
+  readonly inBar: number;
+  /** A pulse late (1), a pulse early (-1), or moved some other way (null). */
+  readonly by: 1 | -1 | null;
+  /** Its line goes the same way too, four moves in five. */
+  readonly line: boolean;
+}
+
+/**
+ * Every earlier phrase of the solo (with or without the pickups inside it, three
+ * notes or more) whose notes are all struck again the same distances apart, the
+ * phrase's own notes among them, looked for in the whole solo: what
+ * `displacedFrom` chooses among.
+ */
+export function rhythmsAgain(
+  heard: Heard,
+  earlier: readonly Heard[],
+  all: readonly Sounding[],
+): RhythmAgain[] {
+  const said = body(heard);
+  if (said.length === 0) return [];
+  const { meter, ticks } = said[0]!.bar;
+  const pulse = pulseTicks(meter)[0]!;
+  const at = new Map(all.map((note) => [note.tick, note]));
+  const contour = (notes: readonly Sounding[]) =>
+    notes.slice(1).map((note, i) => Math.sign(note.pitch - notes[i]!.pitch));
+  const found: RhythmAgain[] = [];
+  for (const other of [...earlier].reverse()) {
+    for (const source of [idea(other), body(other)]) {
+      if (source.length < 3 || source.some((note) => note.bar.ticks !== ticks)) continue;
+      const moved = said[0]!.tick - source[0]!.tick;
+      const notes = source.map((note) => at.get(note.tick + moved));
+      if (!notes.every((note): note is Sounding => note !== undefined)) continue;
+      if (!said.every((note) => notes.includes(note))) continue;
+      // Fitted to the chords now under it a note may move: four moves in five that do not
+      // turn the other way (a note said again may become a step, or a step a note said
+      // again) is the same line.
+      const [shape, was] = [contour(notes), contour(source)];
+      const same = shape.filter((move, i) => move * was[i]! >= 0).length;
+      const inBar = ((moved % ticks) + ticks) % ticks;
+      const by = inBar === pulse ? 1 : inBar === ticks - pulse ? -1 : null;
+      found.push({ of: other, source, notes, inBar, by, line: same * 5 >= shape.length * 4 });
+    }
+  }
+  return found;
 }
 
 const beat = (note: Sounding) => onPulse(note.bar.meter, note.tick - note.bar.start);
@@ -190,7 +324,8 @@ export const SOLO_FEATURES: readonly Feature<SoloCandidate>[] = [
     id: "lost-the-thread",
     says: "How little of the phrase comes from anything played earlier in the solo: a new idea every time is wandering. The top of a chorus is where a new idea may start, so there it counts half.",
     of: (candidate) =>
-      (1 - (closest(candidate, candidate.earlier) ?? 1)) * (candidate.slot.index === 0 ? 0.5 : 1),
+      (1 - (closest(candidate, candidate.earlier, candidate.moved) ?? 1)) *
+      (candidate.slot.index === 0 ? 0.5 : 1),
   },
   {
     id: "off-the-density",

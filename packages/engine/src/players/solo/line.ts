@@ -62,6 +62,8 @@ export interface LineAsk {
   readonly climbsTo: { readonly to: number; readonly above: number } | null;
   /** Pitches already decided, by position in the line: an idea remembered. */
   readonly given: ReadonlyMap<number, number>;
+  /** Every note on a beat lands, a chord tone: an idea moved onto the beat (SO-33). */
+  readonly beatsLand?: boolean;
   /**
    * How a riff bar says the bar before it: moved along the line as a sequence,
    * or note for note (SO-33).
@@ -210,7 +212,13 @@ export function writeLine(world: World, bars: readonly LineBar[], ask: LineAsk):
     const beforeRest = next !== undefined && next.tick - (spot.tick + spot.hold) >= PPQ;
     // A stabbed bar opens on a note worth saying again: a chord tone (SO-35).
     const opensStab = bars[barOf(i)]!.stab && firstOfBar.includes(i);
-    const lands = i === 0 || last || spot.lands || beforeRest || opensStab;
+    const lands =
+      i === 0 ||
+      last ||
+      spot.lands ||
+      beforeRest ||
+      opensStab ||
+      (ask.beatsLand === true && onBeat(spot));
     // Where the tune ends, a remembered idea gives way: the last note rests by rule.
     const given = last && ask.final ? undefined : ask.given.get(i);
     if (given !== undefined) {

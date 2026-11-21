@@ -150,19 +150,19 @@
     "inTarget": null
   },
   "chords.top-small-leaps": {
-    "mean": 0.3412,
+    "mean": 0.3413,
     "p10": 0.1429,
     "p90": 0.55,
     "inTarget": null
   },
   "chords.top-leaps": {
-    "mean": 0.0187,
+    "mean": 0.0186,
     "p10": 0,
     "p90": 0.1129,
     "inTarget": 1
   },
   "chords.top-movement": {
-    "mean": 2.1115,
+    "mean": 2.1111,
     "p10": 1.0794,
     "p90": 3.4375,
     "inTarget": 1
@@ -186,7 +186,7 @@
     "inTarget": 0.985
   },
   "chords.lowest-note": {
-    "mean": 52.763,
+    "mean": 52.7635,
     "p10": 49.7292,
     "p90": 56.5411,
     "inTarget": 0.7
@@ -198,8 +198,8 @@
     "inTarget": 1
   },
   "chords.written-tensions": {
-    "mean": 0.9941,
-    "p10": 0.9793,
+    "mean": 0.9942,
+    "p10": 0.9813,
     "p90": 1,
     "inTarget": 1
   },
@@ -246,7 +246,7 @@
     "inTarget": null
   },
   "chords.off-the-beat": {
-    "mean": 0.729,
+    "mean": 0.7291,
     "p10": 0.5217,
     "p90": 1,
     "inTarget": null
@@ -264,37 +264,37 @@
     "inTarget": 0.7907
   },
   "chords.in-the-soloists-register": {
-    "mean": 0.095,
+    "mean": 0.0951,
     "p10": 0.0365,
     "p90": 0.1765,
     "inTarget": null
   },
   "chords.overlap": {
-    "mean": 0.5134,
+    "mean": 0.5139,
     "p10": 0.3654,
     "p90": 0.6667,
     "inTarget": null
   },
   "chords.overlap-over-chance": {
-    "mean": -0.0827,
+    "mean": -0.0821,
     "p10": -0.182,
     "p90": 0.0434,
     "inTarget": null
   },
   "chords.struck-with-the-soloist": {
-    "mean": 0.0956,
+    "mean": 0.096,
     "p10": 0.027,
     "p90": 0.1547,
     "inTarget": null
   },
   "chords.breaths-over-the-line": {
-    "mean": 1.5236,
+    "mean": 1.5207,
     "p10": 0.9626,
     "p90": 2.003,
     "inTarget": null
   },
   "chords.answers-louder": {
-    "mean": 2.7671,
+    "mean": 2.763,
     "p10": 0.9416,
     "p90": 4.4479,
     "inTarget": 0.8372
@@ -330,21 +330,33 @@
     "inTarget": 1
   },
   "solo.phrases-related": {
-    "mean": 0.6728,
+    "mean": 0.6713,
     "p10": 0.5,
     "p90": 0.8182,
     "inTarget": null
   },
   "solo.phrase-likeness": {
-    "mean": 0.635,
+    "mean": 0.6336,
     "p10": 0.5177,
     "p90": 0.7521,
     "inTarget": null
   },
   "solo.phrase-same-as-last": {
-    "mean": 0.2058,
+    "mean": 0.2042,
     "p10": 0,
     "p90": 0.3636,
+    "inTarget": null
+  },
+  "solo.displaced": {
+    "mean": 0.0015,
+    "p10": 0,
+    "p90": 0,
+    "inTarget": null
+  },
+  "solo.displaced-early": {
+    "mean": 0,
+    "p10": 0,
+    "p90": 0,
     "inTarget": null
   },
   "solo.bars-that-rhyme": {
@@ -378,7 +390,7 @@
     "inTarget": 1
   },
   "solo.longest-silence": {
-    "mean": 4.2991,
+    "mean": 4.311,
     "p10": 3,
     "p90": 5.4167,
     "inTarget": null
@@ -474,9 +486,9 @@
     "inTarget": 0.9833
   },
   "solo.cost": {
-    "mean": 1.6797,
+    "mean": 1.6823,
     "p10": 1.3448,
-    "p90": 2.0958,
+    "p90": 2.1026,
     "inTarget": null
   },
   "solo.worst-phrase": {

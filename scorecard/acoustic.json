@@ -353,6 +353,12 @@
     "p90": 0.2857,
     "inTarget": null
   },
+  "solo.displaced": {
+    "mean": 0,
+    "p10": 0,
+    "p90": 0,
+    "inTarget": null
+  },
   "solo.bars-that-rhyme": {
     "mean": 0.835,
     "p10": 0.6,
