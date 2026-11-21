@@ -21,6 +21,7 @@
     "gate:4": "sh scripts/gate-4.sh",
     "gate:5": "sh scripts/gate-5.sh",
     "score": "node scripts/budget.ts 120 node packages/cli/src/main.ts score --check",
+    "ears": "node packages/cli/src/main.ts ears",
     "packs:fetch": "node scripts/packs/fetch.ts",
     "packs:cut": "node scripts/packs/cut.ts",
     "audition": "node scripts/serve.ts",

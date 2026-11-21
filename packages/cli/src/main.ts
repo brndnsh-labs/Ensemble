@@ -3,6 +3,7 @@
 
 import type { Command } from "./command.ts";
 import { UsageError } from "./command.ts";
+import { earsCommand } from "./commands/ears.ts";
 import { fmtCommand } from "./commands/fmt.ts";
 import { parseCommand } from "./commands/parse.ts";
 import { renderCommand } from "./commands/render.ts";
@@ -15,6 +16,7 @@ const commands: Readonly<Record<string, Command>> = {
   render: renderCommand,
   replay: replayCommand,
   score: scoreCommand,
+  ears: earsCommand,
 };
 
 function usage(): string {
