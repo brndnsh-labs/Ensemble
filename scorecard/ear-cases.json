@@ -739,6 +739,19 @@
       "seat": "soloist",
       "styles": ["jazz", "blues", "neosoul", "reggae", "acoustic"],
       "heard": "The test site at f5c66b1c, and out/solo-held/: jazz (Take the A Train), the blues (jazz blues in F), neo-soul, reggae and acoustic, main before the held note and after on the same seed, each idea's note lengths beside its answer's."
+    },
+    {
+      "id": "tempo-breathing-sounds-good",
+      "date": "2026-11-21",
+      "words": "tempo breathing sounds good",
+      "source": "docs/decisions/critic.md: his ear on the tempo that breathes; his eye on the dark pass (2026-11-21, #2239, #2265)",
+      "kind": "passed",
+      "medium": "sound",
+      "recorded": "45a637f7",
+      "doubt": "Marked as outside the critic because nothing the scorecards measure carries it: they score the steady band, and the option moves only when the notes sound, not which notes. He did not say which clips he played, nor answer the questions put (does it feel like a band leaning in, could he play along, does the average above the set tempo matter) one by one. Not tried on his phone.",
+      "seat": "band",
+      "styles": ["jazz", "blues", "rock", "acoustic"],
+      "heard": "out/tempo-breathes/: jazz (Autumn Leaves at 132), the blues, rock and acoustic, one chart each on one seed, steady and with the option on; jazz and rock also at double the amount; disco, which does not breathe, beside main. Rendered from the branch that merged as e7091a41."
     }
   ],
   "leftOut": [
