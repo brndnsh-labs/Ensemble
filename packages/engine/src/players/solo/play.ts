@@ -170,6 +170,7 @@ export function soloPart(
         slot,
         notes: [...leading, ...notes[i]!].map((note) => sounding(world, note)),
         earlier,
+        ...(phrase.inPlace && { moved: true }),
         world,
       }),
     );

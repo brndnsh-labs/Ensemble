@@ -33,6 +33,8 @@ export interface SoloCandidate extends Heard {
   readonly kind: string;
   /** The phrases of this solo already played, oldest first. */
   readonly earlier: readonly Heard[];
+  /** It says an idea a pulse early or late, and is matched to what came before as that. */
+  readonly moved?: boolean;
   readonly world: World;
 }
 
@@ -104,11 +106,15 @@ export function pickupsOf(world: World, notes: readonly Sounding[]): Set<Soundin
  * how many of those shared notes move the same way (same direction, within a
  * whole step of the same size). The same rhythm with the line turned over is
  * half alike; the same phrase moved up the scale is wholly alike. A lick that
- * comes back a bar or two later in its phrase is still the same lick, and so is
- * one said a beat early or late, so the phrases are lined up bar against bar
- * every way, and a pulse either side, and the best match counts.
+ * comes back a bar or two later in its phrase is still the same lick, so the
+ * phrases are lined up bar against bar every way and the best match counts.
+ *
+ * `moved` says the first phrase was made by saying an idea a pulse early or
+ * late: it is then also lined up a pulse either side, since it is still that
+ * idea. Only then: two phrases that have nothing to do with each other often
+ * line up a pulse apart by chance, and are not alike for it.
  */
-export function likeness(a: Heard, b: Heard): number {
+export function likeness(a: Heard, b: Heard, moved = false): number {
   const moves = (notes: readonly Sounding[]) => {
     const first = notes[0]?.bar.index ?? 0;
     return notes.map((note, i) => ({
@@ -117,24 +123,22 @@ export function likeness(a: Heard, b: Heard): number {
       move: i === 0 ? null : note.pitch - notes[i - 1]!.pitch,
     }));
   };
-  const [one, two] = [moves(idea(a)), moves(idea(b))];
-  if (one.length === 0 || two.length === 0) return 0;
-  const ticks = idea(a)[0]!.bar.ticks;
-  const at = (bar: number, step: number) => bar * ticks + step;
-  /** The best match of two phrases' notes, lined up bar against bar every way and moved `shift` ticks. */
+  type Moves = ReturnType<typeof moves>;
+  /** The best match of two phrases' notes, lined up bar against bar every way; `key` says where a note is. */
   const best = (
-    these: ReturnType<typeof moves>,
-    those: ReturnType<typeof moves>,
-    shift: number,
+    these: Moves,
+    those: Moves,
+    key: (bar: number, step: number) => string | number,
+    shift = 0,
   ): number => {
-    const placed = new Map(these.map((note) => [at(note.bar, note.step), note.move]));
+    const placed = new Map(these.map((note) => [key(note.bar, note.step), note.move]));
     let most = 0;
     for (let late = -3; late <= 3; late++) {
       let shared = 0;
       let moving = 0;
       let agree = 0;
       for (const note of those) {
-        const other = placed.get(at(note.bar + late, note.step) + shift);
+        const other = placed.get(key(note.bar + late, note.step + shift));
         if (other === undefined) continue;
         shared++;
         if (note.move === null || other === null) continue;
@@ -146,17 +150,34 @@ export function likeness(a: Heard, b: Heard): number {
     }
     return most;
   };
-  // And a pulse either side: an idea said a beat early or late is still that idea. Moved,
-  // a bar's notes may all fall in its later half, where a pickup would be, so here the
-  // phrases are taken whole, pickups inside them and all.
-  const pulse = pulseTicks(idea(a)[0]!.bar.meter)[0]!;
-  const [whole, other] = [moves(body(a)), moves(body(b))];
-  return Math.max(best(one, two, 0), best(whole, other, pulse), best(whole, other, -pulse));
+  const [one, two] = [moves(idea(a)), moves(idea(b))];
+  if (one.length === 0 || two.length === 0) return 0;
+  const inPlace = best(one, two, (bar, step) => `${bar}:${step}`);
+  if (!moved) return inPlace;
+  // A pulse either side. Moved, a bar's notes may all fall in its later half, where a
+  // pickup would be, so here the phrases are taken whole, pickups inside them and all;
+  // and a moved note may cross a barline, so a note is placed by its distance from the
+  // phrase's first bar, which is only one place when every bar is as long as the next.
+  const [whole, other] = [body(a), body(b)];
+  const ticks = whole[0]!.bar.ticks;
+  if ([...whole, ...other].some((note) => note.bar.ticks !== ticks)) return inPlace;
+  const pulse = pulseTicks(whole[0]!.bar.meter)[0]!;
+  const along = (bar: number, step: number) => bar * ticks + step;
+  return Math.max(
+    inPlace,
+    best(moves(whole), moves(other), along, pulse),
+    best(moves(whole), moves(other), along, -pulse),
+  );
 }
 
-/** The likeness of a phrase to the earlier phrase of its solo most like it. Null for the first. */
-export function closest(heard: Heard, earlier: readonly Heard[]): number | null {
-  return earlier.length === 0 ? null : Math.max(...earlier.map((other) => likeness(heard, other)));
+/**
+ * The likeness of a phrase to the earlier phrase of its solo most like it. Null for the
+ * first. `moved`: the phrase is an idea said a pulse away (see `likeness`).
+ */
+export function closest(heard: Heard, earlier: readonly Heard[], moved = false): number | null {
+  return earlier.length === 0
+    ? null
+    : Math.max(...earlier.map((other) => likeness(heard, other, moved)));
 }
 
 /** An earlier phrase of the solo, and which way a phrase says it again a pulse away from where it was. */
@@ -303,7 +324,8 @@ export const SOLO_FEATURES: readonly Feature<SoloCandidate>[] = [
     id: "lost-the-thread",
     says: "How little of the phrase comes from anything played earlier in the solo: a new idea every time is wandering. The top of a chorus is where a new idea may start, so there it counts half.",
     of: (candidate) =>
-      (1 - (closest(candidate, candidate.earlier) ?? 1)) * (candidate.slot.index === 0 ? 0.5 : 1),
+      (1 - (closest(candidate, candidate.earlier, candidate.moved) ?? 1)) *
+      (candidate.slot.index === 0 ? 0.5 : 1),
   },
   {
     id: "off-the-density",
