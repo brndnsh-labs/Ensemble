@@ -40,6 +40,8 @@ export const disco: StylePack = {
   // The full default arc (ST-disco-32).
   arc: {
     ...DEFAULT_ARC,
+    // Now and then a breakdown to the kick and the bass: the comp out of a section where the band
+    // plays alone (docs/decisions/styles.md, who is in).
     layOut: { seats: ["chords"], under: "band", span: "section", below: 0.75, chance: 0.2 },
   },
   ending: {
