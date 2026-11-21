@@ -6,6 +6,7 @@ import { UsageError } from "./command.ts";
 import { earsCommand } from "./commands/ears.ts";
 import { fmtCommand } from "./commands/fmt.ts";
 import { parseCommand } from "./commands/parse.ts";
+import { readCommand } from "./commands/read.ts";
 import { renderCommand } from "./commands/render.ts";
 import { replayCommand } from "./commands/replay.ts";
 import { scoreCommand } from "./commands/score.ts";
@@ -15,6 +16,7 @@ const commands: Readonly<Record<string, Command>> = {
   fmt: fmtCommand,
   render: renderCommand,
   replay: replayCommand,
+  read: readCommand,
   score: scoreCommand,
   ears: earsCommand,
 };

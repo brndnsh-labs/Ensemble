@@ -74,6 +74,8 @@ pnpm -s ensemble render library/blues-12-bar-a.chart --out take.mid [--save take
     [--solo | --solo-instrument alto-sax] [--solo-density 0.75] [--solo-from-top] \
     [--tempo 96] [--energy 0.3] [--key Bb] [--without bass] [--no-count-in]
 pnpm -s ensemble replay take.json --out take.mid
+pnpm -s ensemble read   library/blues-12-bar-a.chart [the take flags of render] [--bars 13-24] [--seats solo,bass] [--timing]
+                        # the take as a transcription: each bar, each seat's notes, roles and moves, for reading
 pnpm -s ensemble score  [chart...] [--style blues] [--seeds 200] [--update | --check]
 ```
 
