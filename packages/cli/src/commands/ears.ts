@@ -59,6 +59,8 @@ interface EarCase {
     readonly measures?: readonly string[];
     /** Numbers written down at the time that no scorecard holds. */
     readonly logged?: readonly string[];
+    /** A property that holds the answer in place now, by how its name begins. A scorecard cannot show one. */
+    readonly property?: string;
   };
 }
 
@@ -414,6 +416,7 @@ function report(
   );
   const tally = new Map<Verdict, number>();
   let caughtNow = 0;
+  let held = 0;
   for (const f of faults) {
     const c = f.case;
     out.push(`${c.id}  (${c.date}, ${c.seat})`);
@@ -434,6 +437,10 @@ function report(
     const v = verdict(f);
     tally.set(v, (tally.get(v) ?? 0) + 1);
     out.push(`  => ${VERDICT[v]}`);
+    if (c.answered?.property) {
+      held++;
+      out.push(`  => held now by a property: "${c.answered.property}"`);
+    }
     const caught = f.styles.filter((s) => s.caught.length > 0);
     if (caught.length > 0) {
       caughtNow++;
@@ -453,6 +460,7 @@ function report(
   out.push(
     `  ${caughtNow} of ${faults.length} would be caught today by the span of what he has passed.`,
   );
+  out.push(`  ${held} of ${faults.length} are held today by a property, which no scorecard shows.`);
 
   out.push("", "WHAT HE HAS PASSED: each measure's span over the bands he passed, and today's", "");
   for (const span of spans) {
