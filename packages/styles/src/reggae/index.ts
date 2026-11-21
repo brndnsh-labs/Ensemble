@@ -40,6 +40,7 @@ export const reggae: StylePack = {
     swing: { unit: "sixteenth", amount: 20 },
     lean: { bass: 8, chords: 5, solo: 12 },
     humanize: 30,
+    // None: the hat keeps the grid as the reference (AU-74) and the arc is played at half depth.
     breathe: 0,
   },
   arc: {

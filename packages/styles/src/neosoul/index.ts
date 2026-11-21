@@ -24,6 +24,7 @@ export const neosoul: StylePack = {
     swing: { unit: "sixteenth", amount: 45 },
     lean: { bass: 32, chords: 25, solo: 25 },
     humanize: 60,
+    // None: a two-bar drum loop, like a sampled break (ST-neosoul-08), is a machine's pulse.
     breathe: 0,
   },
   // The full default arc (ST-neosoul-42).
