@@ -158,8 +158,9 @@ export interface DisplacedPhrase {
   /** The line goes the same way too (`Displacement.line`); otherwise the rhythm alone is moved. */
   readonly line: boolean;
   /**
-   * Some earlier phrase's rhythm is played here a pulse late, whatever its line and
-   * whatever else it is like: an answer carrying a moved idea's rhythm on.
+   * The rhythm of some earlier phrase not itself heard as a moved idea is played here a
+   * pulse late, whatever its line and whatever else it is like: an answer carrying a moved
+   * idea's rhythm on.
    */
   readonly carriesLate: boolean;
 }
@@ -169,10 +170,15 @@ function displacements(reading: Reading): DisplacedPhrase[] {
   if (known) return known;
   const found = reading.solos.flatMap((solo) => {
     const all = solo.flatMap((phrase) => phrase.notes).sort((a, b) => a.tick - b.tick);
+    // The phrases already heard as an idea moved: a phrase said where the idea was stated
+    // is a pulse from them, and carries nothing on.
+    const moved = new Set<Heard>();
     return solo.flatMap((phrase, i): DisplacedPhrase[] => {
       if (i === 0 || body(phrase).length < 3) return [];
       const heard = displacedFrom(phrase, solo.slice(0, i), all);
-      const carriesLate = rhythmsAgain(phrase, solo.slice(0, i), all).some((one) => one.by === 1);
+      if (heard?.line) moved.add(phrase);
+      const stated = solo.slice(0, i).filter((other) => !moved.has(other));
+      const carriesLate = rhythmsAgain(phrase, stated, all).some((one) => one.by === 1);
       return [
         {
           phrase,

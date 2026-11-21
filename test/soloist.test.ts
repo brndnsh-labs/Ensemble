@@ -954,9 +954,12 @@ test("an idea comes back a beat early or late: in the styles that do it most som
           const pulse = pulseTicks(note.bar.meter)[0]!;
           const give = i === notes.length - 1 ? pulse : 0;
           if (note.ends - note.tick < was.ends - was.tick - give - POCKET) fail("cut short", at);
-          const shaken = (one: { tick: number }) =>
-            events.get(one.tick)?.move?.vibrato !== undefined;
-          if (shaken(was) && !shaken(note)) fail("its shake lost", at);
+          // Shaken where it was, unless the hand gave the note another device of its own
+          // there (a horn's scoop is one device to a landing, SO-57), drawn by its place.
+          const move = (one: { tick: number }) => events.get(one.tick)?.move;
+          if (move(was)?.vibrato !== undefined && move(note) === undefined) {
+            fail("its shake lost", at);
+          }
         });
       }
     }
