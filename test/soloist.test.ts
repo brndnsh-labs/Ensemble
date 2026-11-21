@@ -982,9 +982,12 @@ test("an idea comes back a beat early or late: in the styles that do it most som
  * The styles whose soloist plays double time on some of its own charts at the top of the
  * setting: at least one burst over them.
  */
-const DOUBLES = ["jazz", "blues", "rock"];
+// Rock is written to play it but, held to a fourth into the run and a fifth inside it, its
+// three quarters of a bar of sixteenths through a pentatonic do not fit a phrase's register:
+// on its own charts it plays none (DECISIONS.md, double time).
+const DOUBLES = ["jazz", "blues"];
 
-test("double time is earned, late, short, rare and playable, and it lands: a run at twice the style's running subdivision only in a style that plays it (the climb alone where the style says), in a solo's last chorus and never its first phrase, at the busiest level (or the climb) straight after a phrase at the busiest level, out of the line's own notes without a breath; on the doubled grid as heard from a pulse to a pulse, half a bar to two bars (on a ballad, only toward the top of the setting and no longer than the style says), never faster than the instrument's fastest; one way (straight, or a pulse at a time in sequence), a chord tone on every pulse, landing on a chord tone on a pulse, held a pulse; one at most a solo, none at the bottom of the setting, and some at its top in the styles that play it most", () => {
+test("double time is earned, late, short, rare and playable, and it lands: a run at twice the style's running subdivision only in a style that plays it (the climb alone where the style says), in a solo's last chorus and never its first phrase, at the busiest level (or the climb) straight after a phrase at the busiest level, out of the line's own notes without a breath (no rest of a pulse in the two before it), after a phrase with no empty bar and at least the first chorus's notes a beat, come to by a fourth at most (a fifth into the climb) and no move inside it wider than a fifth; on the doubled grid as heard from a pulse to a pulse, half a bar to two bars (on a ballad, only toward the top of the setting and no longer than the style says), never faster than the instrument's fastest; one way (straight, or a pulse at a time in sequence), a chord tone on every pulse, landing on a chord tone on a pulse, held a pulse; one at most a solo, none at the bottom of the setting, and some at its top in the styles that play it most", () => {
   const failures = new Map<string, string[]>();
   const fail = (clause: string, where: string) =>
     failures.set(clause, [...(failures.get(clause) ?? []), where]);
@@ -1018,7 +1021,7 @@ test("double time is earned, late, short, rare and playable, and it lands: a run
       const perSecond = (take.plan.quarters * PPQ) / 60;
       const harmony = harmonyOf(take);
       const perSolo = new Map<number, number>();
-      for (const { phrase, previous, burst } of found) {
+      for (const { phrase, previous, burst, solo } of found) {
         const { slot } = phrase;
         const { notes, landing, before, step } = burst;
         const first = notes[0]!;
@@ -1042,6 +1045,48 @@ test("double time is earned, late, short, rare and playable, and it lands: a run
             : note.tick - note.bar.start);
         if (!before || heard(first) - heard({ bar: before.bar, tick: before.ends }) >= breath) {
           fail("out of a breath", where);
+        }
+        // Out of the line: no silence of a pulse or more in the two pulses before it.
+        const pulse0 = pulseTicks(bar.meter)[0]!;
+        const sounding = solo.flatMap((one) => one.notes).filter((note) => note.tick < first.tick);
+        let reach = first.tick - 2 * pulse0;
+        for (const note of sounding) {
+          if (note.ends <= reach) continue;
+          if (note.tick - reach >= pulse0 - POCKET) fail("a rest in the two pulses before", where);
+          reach = Math.max(reach, note.ends);
+        }
+        if (first.tick - reach >= pulse0 - POCKET) fail("a rest in the two pulses before", where);
+        // Earned on the notes: the phrase before has no empty bar, and at least the notes a
+        // beat of the solo's first chorus.
+        const own = (one: typeof phrase) =>
+          one.notes.filter((note) => note.tick >= one.slot.bars[0]!.start);
+        const beats = (one: typeof phrase) =>
+          one.slot.bars.reduce((sum, b) => sum + b.ticks, 0) / PPQ;
+        const opening = solo.slice(0, solo.indexOf(phrase)).filter((one) => one.slot.chorus === 0);
+        const rate =
+          opening.reduce((sum, one) => sum + own(one).length, 0) /
+          Math.max(
+            1,
+            opening.reduce((sum, one) => sum + beats(one), 0),
+          );
+        if (previous) {
+          const notesBefore = own(previous);
+          if (
+            previous.slot.bars.some((b) => !notesBefore.some((note) => note.bar.index === b.index))
+          ) {
+            fail("after a phrase with an empty bar", where);
+          }
+          if (notesBefore.length / beats(previous) < rate - 1e-9) {
+            fail("after a phrase thinner than the first chorus", where);
+          }
+        }
+        // No leap into it, nor inside it.
+        if (before && Math.abs(first.pitch - before.pitch) > (slot.peak ? 7 : 5)) {
+          fail("leaps in", `${where}: ${before.pitch} to ${first.pitch}`);
+        }
+        const all = [...notes, landing];
+        if (all.slice(1).some((note, j) => Math.abs(note.pitch - all[j]!.pitch) > 7)) {
+          fail("leaps inside", where);
         }
         // On the grid, from a pulse to a pulse, half a bar to two bars.
         const pulse = pulseTicks(bar.meter)[0]!;

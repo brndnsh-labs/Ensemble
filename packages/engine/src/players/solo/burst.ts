@@ -132,6 +132,17 @@ function run(
   const heard = (spot: Spot) => spot.bar.start + heardIn(spot.bar, spot.tick, world.feel);
   if (from - heard(before.spot) <= 1.5 * step) return null;
   if (line.some((note, i) => i < at && note.spot.tick >= from && note.lead)) return null;
+  // Out of the line, not out of a breath: no silence of a pulse or more in the two pulses
+  // before it.
+  const pulse = pulseTicks(before.spot.bar.meter)[0]!;
+  let reach = from - 2 * pulse;
+  for (const note of line) {
+    if (note.spot.tick >= from) break;
+    if (note.spot.tick + note.spot.hold <= reach) continue;
+    if (note.spot.tick - reach >= pulse) return null;
+    reach = Math.max(reach, note.spot.tick + note.spot.hold);
+  }
+  if (from - reach >= pulse) return null;
 
   // Its spots, even as heard: a pulse is where it is written, swung or not.
   const count = Math.round(span / step);
@@ -157,7 +168,17 @@ function run(
   // the comp's hand: let down under it, a run in rock had the piano's voices at or over its
   // note in 9% of the piano's strikes under it, against 1% under the line anywhere else.
   const { low, high } = slot;
-  const leap = slot.peak ? 17 : 12;
+  // Come to from the line's last note by a fourth at most (a fifth into the climb), and inside
+  // the run, and into its landing, no move wider than a fifth (AU-35, SO-02): it is a run, not
+  // a line of leaps. Where the register will not carry it so, no run is offered.
+  const leap = slot.peak ? 7 : 5;
+  const smooth = (pitches: readonly number[] | null, into: number | null): boolean => {
+    if (pitches === null || into === null || pitches.length === 0) return false;
+    const start = pitches[0]!;
+    if (start === before.pitch || Math.abs(start - before.pitch) > leap) return false;
+    const all = [...pitches, into];
+    return all.slice(1).every((pitch, j) => Math.abs(pitch - all[j]!) <= 7);
+  };
   const inside = (pitch: number) => pitch >= low && pitch <= high;
   const ranks = at === line.length - 1 ? ask.ending : world.solo.arrive;
   const { perRank } = world.solo.landing;
@@ -171,10 +192,7 @@ function run(
       pitches.unshift(next);
       cur = next;
     }
-    // Come to from the line's last note by no more than an octave (on the way to the top
-    // note, an octave and a fourth: down, to run up from there), and not on its pitch.
-    const start = pitches[0]!;
-    return Math.abs(start - before.pitch) > leap || start === before.pitch ? null : pitches;
+    return pitches;
   };
   /** The run on from the line's last note, a rung at a time, the way it goes. */
   const on = (): number[] | null => {
@@ -199,8 +217,9 @@ function run(
    * The run as a sequence, where the register will not carry it straight: each pulse's notes
    * a run from a chord tone, all of them the way the whole goes (`inner` the same as `way`) or
    * all the other way (a rising sequence of falling fours), each pulse starting on the chord
-   * tone after the one the pulse before started on (KF-B-11's sequence, a pulse long), so that
-   * the whole goes one way in a narrower room.
+   * tone after the one the pulse before started on (a pattern moved along a pulse at a time, as
+   * the climb's bars may be one bar in sequence, SO-05), so that the whole goes one way in a
+   * narrower room. Only where no move of it is wider than a fifth (`smooth`).
    */
   const sequence = (start: number, inner: 1 | -1): number[] | null => {
     const pitches: number[] = [];
@@ -239,6 +258,7 @@ function run(
     // Up to the top note, walked back down from it; or a sequence up to it, from the chord
     // tone nearest the line's last note that brings it a step or two under the top.
     pitches = back(lands.pitch);
+    if (!smooth(pitches, lands.pitch)) pitches = null;
     const starts = placed[0]!.pool.ladder
       .filter((pitch) => allowed(placed[0]!, pitch) && pitch !== before.pitch)
       .filter((pitch) => Math.abs(pitch - before.pitch) <= leap && inside(pitch))
@@ -247,7 +267,7 @@ function run(
       for (const start of pitches === null ? starts : []) {
         const run = sequence(start, inner);
         const far = run && Math.max(...run);
-        if (run && far !== null && far < lands.pitch && lands.pitch - far <= 5) {
+        if (run && far !== null && far < lands.pitch && smooth(run, lands.pitch)) {
           pitches = run;
           break;
         }
@@ -257,20 +277,20 @@ function run(
     // On from the line's last note, into a chord tone a step or two on the way it was going.
     pitches = on();
     landed = onFrom(pitches);
-    if (pitches === null || landed === null) {
+    if (!smooth(pitches, landed)) {
       // Or, where the register will not carry it that far, from where it can start: it
-      // lands at the edge of the phrase's register the way it goes, and starts an octave
-      // at most from the line's last note.
+      // lands at the edge of the phrase's register the way it goes.
       landed = way > 0 ? landIn(high, high - 4, high) : landIn(low, low, low + 4);
       pitches = landed === null ? null : back(landed);
     }
     for (const inner of inners) {
-      if (pitches !== null && landed !== null) break;
+      if (smooth(pitches, landed)) break;
       // Or as a sequence on from the line's last note.
       const start = onward(placed[0]!, before.pitch, way);
       pitches = start === undefined ? null : sequence(start, inner);
       landed = onFrom(pitches);
     }
+    if (!smooth(pitches, landed)) pitches = null;
   }
   if (pitches === null || landed === null) return null;
 

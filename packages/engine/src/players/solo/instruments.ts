@@ -24,6 +24,11 @@ const SLIDE = { fret: 0.0285, oneFret: 0.057 } as const;
  * line is known to be slower than that. The alto, a guitar picked with a plectrum and the
  * vibraphone (two mallets by turns, as a drummer's two sticks) take it.
  *
+ * The ceiling is on the run's grid as the band's swing places it, even notes, not on the notes
+ * as the feel plays them: the player's own placement (humanize, lean) moves single notes a few
+ * milliseconds, so one gap between two notes of a run may come as quick as about 11.4 a second
+ * where the grid's is 10.67.
+ *
  * The steel and nylon guitars take less: a fingerpicked or flatpicked lead on them is asked no
  * more than acoustic's busiest line, a sixteenth pair (`.xx-`) at acoustic's fastest, 120.
  */

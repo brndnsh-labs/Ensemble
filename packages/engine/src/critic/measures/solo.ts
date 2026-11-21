@@ -224,6 +224,8 @@ export interface BurstPhrase {
   readonly phrase: Heard;
   readonly previous: Heard | null;
   readonly burst: Burst;
+  /** Every phrase of its solo, in order. */
+  readonly solo: readonly Heard[];
 }
 const bursting = new WeakMap<Reading, BurstPhrase[]>();
 function bursts(reading: Reading): BurstPhrase[] {
@@ -235,6 +237,7 @@ function bursts(reading: Reading): BurstPhrase[] {
         phrase,
         previous: solo[i - 1] ?? null,
         burst,
+        solo,
       })),
     ),
   );

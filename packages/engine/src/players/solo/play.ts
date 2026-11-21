@@ -111,6 +111,9 @@ export function soloPart(
   let fell = false;
   /** This solo has played its run in double time. */
   let doubled = false;
+  /** What the solo played: its first chorus's notes and beats, and the phrase before's. */
+  let firstChorus = { notes: 0, beats: 0 };
+  let lastPhrase: PlayedPhrase | null = null;
   /** A pickup into the top of a pass, made from the pass before (`passPickup`). */
   const intoPass = (bar: PlanBar, previous: Slot | undefined): PassPickup | null => {
     if (!opensPass(plan, bar)) return null;
@@ -142,6 +145,8 @@ export function soloPart(
       earlier = [];
       fell = false;
       doubled = false;
+      firstChorus = { notes: 0, beats: 0 };
+      lastPhrase = null;
     }
     const lead = intoPass(first, world.slots[s - 1]);
     if (slot.index === 0) form = chorusForm(world, rng, slot, memory.motif !== null);
@@ -154,7 +159,9 @@ export function soloPart(
       memory,
       heldRng(rng, "phrase", "phrase", first),
       lead?.first ?? null,
-      doubled ? null : doubleTimeAt(world, s, heldRng(rng, "double time", "phrase", first)),
+      doubled || !earned(lastPhrase, firstChorus)
+        ? null
+        : doubleTimeAt(world, s, heldRng(rng, "double time", "phrase", first)),
     );
     // The pass before's pickup into this phrase is played as it was made, whichever is chosen.
     const leading = lead ? writeLead(lead, first) : [];
@@ -195,6 +202,13 @@ export function soloPart(
     // And how a guitarist's left hand plays it: a landing slid into, a note hammered on or
     // pulled off.
     const played = slurs(world, phrase, slideInto(world, phrase, horned.notes, rng), rng);
+    lastPhrase = playedIn(slot, played);
+    if (slot.chorus === 0) {
+      firstChorus = {
+        notes: firstChorus.notes + lastPhrase.notes,
+        beats: firstChorus.beats + lastPhrase.beats,
+      };
+    }
     fell = horned.fell;
     if (phrase.burst) doubled = true;
     const opens = slot.bars[0]!.start;
@@ -259,6 +273,31 @@ function doubleTimeAt(world: World, s: number, draw: Rng): number | null {
   if (slow && (plan.soloDensity ?? 0.5) < slow.from) return null;
   if (!draw.chance(doubleChanceOf(plan, solo))) return null;
   return slow ? slow.longest : doubleTime.bars.longest;
+}
+
+/** What a phrase of the solo played: its notes struck in its own bars, its beats, its empty bars. */
+interface PlayedPhrase {
+  readonly notes: number;
+  readonly beats: number;
+  readonly empty: boolean;
+}
+
+function playedIn(slot: Slot, notes: readonly SoloNote[]): PlayedPhrase {
+  const own = notes.filter((note) => note.tick >= slot.bars[0]!.start);
+  return {
+    notes: own.length,
+    beats: slot.bars.reduce((sum, bar) => sum + bar.ticks, 0) / PPQ,
+    empty: slot.bars.some((bar) => !own.some((note) => note.bar === bar)),
+  };
+}
+
+/**
+ * Whether the phrase before has earned a run in double time, judged on what it played: no
+ * empty bar, and at least the notes a beat the solo played in its first chorus.
+ */
+function earned(before: PlayedPhrase | null, first: { notes: number; beats: number }): boolean {
+  if (before === null || before.empty || first.beats === 0) return false;
+  return before.notes / before.beats >= first.notes / first.beats;
 }
 
 /**
