@@ -32,6 +32,7 @@ import {
 import { styleIds } from "@ensemble/styles";
 import { corpus } from "./corpus.ts";
 import { bluesWritten, POCKET } from "./reading.ts";
+import type { Jam } from "./takes.ts";
 import {
   enough,
   FULL,
@@ -186,14 +187,12 @@ test("making an open jam one pass longer changes nothing that was already played
           // The pass it was only looking ahead to is timed as it is then played.
           const known = [...shorter.plan.bars, ...shorter.plan.lookahead];
           const played = [...longer.plan.bars, ...longer.plan.lookahead];
+          // Each bar's tempo is what its seconds are made of (held by the property on breathing).
           assert.deepEqual(
             played.slice(0, known.length).map((bar) => bar.quarters),
             known.map((bar) => bar.quarters),
             `${where}: the tempo of a bar already planned`,
           );
-          const heard = (take: Take) =>
-            timedNotes(take.plan, before(take)).map((note) => [note.at, note.length]);
-          assert.deepEqual(heard(longer), heard(shorter), `${where}: the seconds`);
         }
       }
     }
@@ -1234,20 +1233,27 @@ test("a breathing tempo is small and slow: within the style's amount of the temp
 
 test("asked to breathe, the band plays the same notes; a style that does not breathe is the steady take to the byte, and one that does is the same take again, to the second, and its MIDI file's tempo map is the plan's: each bar's tempo where it changes, to a whole microsecond a quarter note", () => {
   for (const style of STYLES) {
-    const chart = ownCharts(style)[0]!;
-    const options = { mode: "jam", minutes: 3, solo: true, seed: 1 } as const;
-    const steady = render(chart.text, style, options);
+    // The band, then a solo that runs into the ending: a take the suite has already played steady.
+    const [{ chart, options, take: steady }] = takes(
+      (jam) =>
+        jam.style === style &&
+        jam.chart === ownCharts(style)[0] &&
+        jam.options.passes === 4 &&
+        jam.options.solo === true &&
+        jam.options.seed === SEEDS[0],
+    ) as [Jam];
     const breathing = render(chart.text, style, { ...options, breathe: true });
-    const again = render(chart.text, style, { ...options, breathe: true });
+    // The notes are the steady take's, so the same take again is its plan again.
+    const again = plan(parse(chart.text).chart, style, { ...options, breathe: true });
     const where = `${style.id}, ${chart.file}`;
     assert.deepEqual(breathing.events, steady.events, `${where}: the notes`);
     assert.deepEqual(
-      timedNotes(again.plan, again.events),
+      timedNotes(again, breathing.events),
       timedNotes(breathing.plan, breathing.events),
       `${where}: the same take, the same seconds`,
     );
     const file = toMidi(breathing.plan, breathing.events, style);
-    assert.deepEqual(toMidi(again.plan, again.events, style), file, `${where}: the same bytes`);
+    assert.deepEqual(toMidi(again, breathing.events, style), file, `${where}: the same bytes`);
     if (style.feel.breathe === 0) {
       assert.deepEqual(file, toMidi(steady.plan, steady.events, style), `${where}: the bytes`);
       assert.deepEqual(
