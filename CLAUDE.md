@@ -62,7 +62,7 @@ node scripts/look.ts <out.png> <width>x<height> <address> [dark] [click:Text | w
                         # look at the app in headless Chrome and save a picture; for checking work, not a test
 pnpm audition [--host 0.0.0.0] [--port 8765]   # serve the audition page at /tools/audition/: play a take from the packs
 pnpm levels [style...]  # each seat's loudness and the soloist's against the band, rendered and measured; before an ear is asked
-pnpm render:audio <name> chart=<file> [style=] [seed=] [passes=] [solo=alto-sax] [density=0.75] [fromtop=1] [only=bass] [live=1]
+pnpm render:audio <name> chart=<file> [style=] [seed=] [passes=] [solo=alto-sax] [density=0.75] [fromtop=1] [breathe=1] [only=bass] [live=1]
                          # render a take to out/audio/<name>.wav in headless Chrome; live=1 plays it in real time and counts late notes
 ```
 
@@ -73,7 +73,7 @@ pnpm -s ensemble parse  library/blues-12-bar-a.chart
 pnpm -s ensemble fmt    library/blues-12-bar-a.chart [--write]
 pnpm -s ensemble render library/blues-12-bar-a.chart --out take.mid [--save take.json] \
     [--style blues] [--seed 1] [--minutes 3 | --passes 4] [--song] \
-    [--solo | --solo-instrument alto-sax] [--solo-density 0.75] [--solo-from-top] \
+    [--solo | --solo-instrument alto-sax] [--solo-density 0.75] [--solo-from-top] [--breathe] \
     [--tempo 96] [--energy 0.3] [--key Bb] [--without bass] [--no-count-in]
 pnpm -s ensemble replay take.json --out take.mid
 pnpm -s ensemble read   library/blues-12-bar-a.chart [the take flags of render] [--bars 13-24] [--seats solo,bass] [--timing]

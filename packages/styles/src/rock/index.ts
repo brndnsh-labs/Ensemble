@@ -32,6 +32,7 @@ export const rock: StylePack = {
     swing: { unit: "eighth", amount: 0 },
     lean: { bass: 0, chords: 3, solo: 4 },
     humanize: 35,
+    breathe: 0,
   },
   // The full default arc: verse at the working level, chorus hot, intro and breakdown quiet
   // (ST-rock-31).

@@ -40,6 +40,7 @@ export const reggae: StylePack = {
     swing: { unit: "sixteenth", amount: 20 },
     lean: { bass: 8, chords: 5, solo: 12 },
     humanize: 30,
+    breathe: 0,
   },
   arc: {
     ...DEFAULT_ARC,

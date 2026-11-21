@@ -24,6 +24,7 @@ export const blues: StylePack = {
     // Bass a hair behind for weight; piano lazy; the lead furthest back.
     lean: { bass: 2, chords: 6, solo: 8 },
     humanize: 35,
+    breathe: 0,
   },
   arc: DEFAULT_ARC,
   ending: {

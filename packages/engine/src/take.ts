@@ -9,6 +9,7 @@ import type { Diagnostic } from "./chart/types.ts";
 import { PPQ } from "./chart/types.ts";
 import type { PerformanceEvent } from "./perform/notes.ts";
 import { perform } from "./perform/perform.ts";
+import { quartersAt } from "./perform/time.ts";
 import { planBars } from "./plan/plan.ts";
 import type { Plan, PlanOptions } from "./plan/types.ts";
 import type { Seat, StylePack } from "./style/types.ts";
@@ -95,7 +96,7 @@ export function render(text: string, style: StylePack, options: TakeOptions): Ta
     ...(before.open ? { passes: Math.max(before.passes ?? 1, Math.floor(endAfter) + 1) } : {}),
   });
   const told = whole(text, style, options);
-  const join = toldAt - (JOIN_LEAD * told.plan.quarters * PPQ) / 60;
+  const join = toldAt - (JOIN_LEAD * quartersAt(told.plan, toldAt) * PPQ) / 60;
   const time = (event: PerformanceEvent) =>
     event.kind === "note" ? event.tick + event.offset : event.tick;
   return {

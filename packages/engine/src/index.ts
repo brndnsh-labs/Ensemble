@@ -33,6 +33,7 @@ export * from "./perform/pitch.ts";
 export * from "./perform/time.ts";
 export * from "./plan/arc.ts";
 export * from "./plan/plan.ts";
+export * from "./plan/tempo.ts";
 export * from "./plan/types.ts";
 export type { BassCandidate, BassPick, WalkPlace } from "./players/bass/critique.ts";
 export { BASS_FEATURES, byBassCritic } from "./players/bass/critique.ts";

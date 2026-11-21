@@ -3,7 +3,7 @@
 // faster than real time and hands the file back.
 //
 //   node scripts/render-audio.ts <name> chart=jazz-blues-f.chart [style=jazz] [seed=1] \
-//       [passes=4] [solo=alto-sax] [density=0..1] [fromtop=1] [layers=1] [only=bass,drums] \
+//       [passes=4] [solo=alto-sax] [density=0..1] [fromtop=1] [breathe=1] [layers=1] [only=bass,drums] \
 //       [mix='{...}'] [live=1]
 //
 // The file is written to out/audio/<name>.wav, with <name>.json beside it.

@@ -20,6 +20,7 @@ export const funk: StylePack = {
     // Bass and guitar ahead of the drums; the horn on the grid, on top of the pocket (ST-funk-03).
     lean: { bass: -5, chords: -3, solo: 0 },
     humanize: 25,
+    breathe: 0,
   },
   arc: DEFAULT_ARC,
   ending: {

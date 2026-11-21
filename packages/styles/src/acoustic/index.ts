@@ -24,6 +24,7 @@ export const acoustic: StylePack = {
     swing: { unit: "eighth", amount: 15 },
     lean: { bass: 5, chords: 0, solo: 0 },
     humanize: 30,
+    breathe: 0,
   },
   // The full default arc (ST-acoustic-36): what changes along it is the texture.
   arc: DEFAULT_ARC,

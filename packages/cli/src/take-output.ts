@@ -20,6 +20,7 @@ export const TAKE_FLAGS = {
   "solo-instrument": { type: "string" },
   "solo-density": { type: "string" },
   "solo-from-top": { type: "boolean", default: false },
+  breathe: { type: "boolean", default: false },
   tempo: { type: "string", short: "t" },
   energy: { type: "string", short: "e" },
   key: { type: "string", short: "k" },
@@ -29,7 +30,7 @@ export const TAKE_FLAGS = {
 
 /** The take flags as shown in a usage line. */
 export const TAKE_USAGE =
-  "[--style S] [--seed N] [--minutes M | --passes P] [--song] [--solo] [--solo-instrument NAME] [--solo-density 0..1] [--solo-from-top] [--tempo BPM] [--energy 0..1] [--key K] [--without seat,seat] [--no-count-in]";
+  "[--style S] [--seed N] [--minutes M | --passes P] [--song] [--solo] [--solo-instrument NAME] [--solo-density 0..1] [--solo-from-top] [--tempo BPM] [--breathe] [--energy 0..1] [--key K] [--without seat,seat] [--no-count-in]";
 
 /** The take flags' values as `parseArgs` gives them. */
 export interface TakeFlags {
@@ -42,6 +43,7 @@ export interface TakeFlags {
   readonly "solo-instrument"?: string | undefined;
   readonly "solo-density"?: string | undefined;
   readonly "solo-from-top"?: boolean | undefined;
+  readonly breathe?: boolean | undefined;
   readonly tempo?: string | undefined;
   readonly energy?: string | undefined;
   readonly key?: string | undefined;
@@ -117,6 +119,8 @@ export function takeOf(
     ...(minutes === undefined ? {} : { minutes }),
     ...(passes === undefined ? {} : { passes }),
     ...(tempo === undefined ? {} : { tempo }),
+    // The tempo breathes with the arc; left out, it is the tempo set in every bar.
+    ...(values.breathe === true ? { breathe: true } : {}),
     ...(energy === undefined ? {} : { energy }),
     ...(key ? { key } : {}),
   };

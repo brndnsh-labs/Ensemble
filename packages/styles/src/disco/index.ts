@@ -34,6 +34,7 @@ export const disco: StylePack = {
     swing: { unit: "sixteenth", amount: 0 },
     lean: { bass: -2, chords: 0, solo: 4 },
     humanize: 15,
+    breathe: 0,
   },
   // The full default arc (ST-disco-32).
   arc: DEFAULT_ARC,

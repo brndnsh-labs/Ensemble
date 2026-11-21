@@ -29,6 +29,7 @@ export const jazz: StylePack = {
     // The bass a hair ahead, on top of the ride; the piano laid back; the horn furthest back.
     lean: { bass: -2, chords: 8, solo: 10 },
     humanize: 40,
+    breathe: 0,
   },
   // The head is played a tier under the blowing: in two, on the hat, and the move to the
   // ride and the walk is the band opening up (ST-jazz-09, ST-jazz-50). A louder section of

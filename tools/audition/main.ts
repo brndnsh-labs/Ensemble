@@ -84,6 +84,8 @@ async function perform(): Promise<Performance> {
     // gives it the lead from the first pass.
     ...(params.has("density") ? { soloDensity: Number(params.get("density")) } : {}),
     ...(params.get("fromtop") === "1" ? { soloFromTop: true } : {}),
+    // `breathe=1` lets the tempo breathe with the arc, as the CLI's --breathe does.
+    ...(params.get("breathe") === "1" ? { breathe: true } : {}),
   });
   const only = params.get("only")?.split(",");
   // `packs=chords:electric-piano` puts another instrument in a seat: for hearing a pack

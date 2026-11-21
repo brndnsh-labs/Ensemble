@@ -5,6 +5,7 @@ import { PPQ } from "../chart/types.ts";
 import { tempoPulse } from "../perform/meter.ts";
 import type { PerformanceEvent } from "../perform/notes.ts";
 import { asStruck, CURVE_STEP, pitchCurve } from "../perform/pitch.ts";
+import { quartersAt } from "../perform/time.ts";
 import type { Plan } from "../plan/types.ts";
 import { SOLO_INSTRUMENTS } from "../players/solo/instruments.ts";
 import type { Seat, StylePack } from "../style/types.ts";
@@ -53,8 +54,16 @@ export function toMidi(
   style: StylePack,
   instruments?: TakeOptions["instruments"],
 ): Uint8Array {
-  // A MIDI file's tempo is quarter notes a minute, whatever the pulse the figure counts.
-  const conductor: SmfMeta[] = [{ tick: 0, type: "tempo", bpm: plan.quarters }];
+  // A MIDI file's tempo is quarter notes a minute, whatever the pulse the figure counts. A take
+  // that breathes says each bar's where it changes, so the file keeps the time that was heard.
+  const conductor: SmfMeta[] = [
+    { tick: 0, type: "tempo", bpm: plan.bars[0]?.quarters ?? plan.quarters },
+  ];
+  for (const [i, bar] of plan.bars.entries()) {
+    if (i > 0 && bar.quarters !== plan.bars[i - 1]!.quarters) {
+      conductor.push({ tick: bar.start, type: "tempo", bpm: bar.quarters });
+    }
+  }
   let meter = "";
   for (const bar of plan.bars) {
     const signature = `${bar.meter.beats}/${bar.meter.unit}`;
@@ -83,10 +92,10 @@ export function toMidi(
     chords: [],
     solo: [],
   };
-  const secondsPerTick = 60 / (plan.quarters * PPQ);
+  const secondsPerTickAt = (tick: number) => 60 / (quartersAt(plan, tick) * PPQ);
   let soloProgram: number | undefined;
   // A note not struck is said as part of the note before it: one note-on, the pitch bent.
-  for (const event of asStruck(events, secondsPerTick)) {
+  for (const event of asStruck(events, secondsPerTickAt)) {
     if (event.kind === "marker") {
       // Sections and landmarks are markers a DAW can show; chords and pass counts are text.
       const isLandmark = event.marker !== "chord" && event.marker !== "pass";
@@ -116,6 +125,7 @@ export function toMidi(
         controls[event.seat].push({ tick: start + sounds, number: EXPRESSION, value: 127 });
       }
       if (event.move) {
+        const secondsPerTick = secondsPerTickAt(start);
         // The same curve the sound follows, said as pitch bend wherever it has moved 3 cents.
         const curve = pitchCurve(event.move, secondsPerTick, sounds * secondsPerTick);
         let said = Number.NaN;
