@@ -92,7 +92,9 @@ function gcd(a: number, b: number): number {
  * Where a tick from the barline is, in the bar's own counting. A quarter-note
  * pulse: `3`, `3e`, `3&`, `3a`, and the triplet's middle and last `3t`, `3l`.
  * A dotted-quarter pulse: `2`, `2la`, `2li`, and a sixteenth after any of them
- * `2+`, `2la+`, `2li+`. Anything else: the pulse and the fraction of it, `3+5/12`.
+ * `2+`, `2la+`, `2li+`, in compound time only (the header's legend is the meter's:
+ * a dotted pulse in 7/8 is not counted la-li). Anything else: the pulse and the
+ * fraction of it, `3+5/12`.
  */
 export function position(meter: Meter, tickInBar: number): string {
   const pulses = pulseTicks(meter);
@@ -112,7 +114,7 @@ export function position(meter: Meter, tickInBar: number): string {
       360: "a",
     };
     if (into in quarter) return `${n}${quarter[into]}`;
-  } else if (length === PPQ * 1.5) {
+  } else if (length === PPQ * 1.5 && isCompound(meter)) {
     const dotted: Record<number, string> = {
       0: "",
       120: "+",
@@ -503,8 +505,12 @@ function drumPieces(
   const pieces: string[] = [];
   for (const name of names) {
     const strokes = byName.get(name)!;
-    const levels = strokes.map((p) => p.note.velocity).sort((a, b) => a - b);
-    const median = levels[Math.floor((levels.length - 1) / 2)]!;
+    // The ghost snare prints under the snare, but an accent is against the voice's own strokes.
+    const levels = strokes
+      .filter((p) => p.note.voice !== "ghostSnare")
+      .map((p) => p.note.velocity)
+      .sort((a, b) => a - b);
+    const median = levels[Math.floor((levels.length - 1) / 2)] ?? 0;
     strokes.forEach((p, i) => {
       const at = where(p.at) + offset(p.note);
       const ghost = p.note.voice === "ghostSnare";

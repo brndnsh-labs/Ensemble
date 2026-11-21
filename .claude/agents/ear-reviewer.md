@@ -77,6 +77,54 @@ rhythm (does it sit on the soloist's pitch, does it fill the breaths or the line
 the holes, whether the band builds with the arc (energy, the `solo n/m` marks, the last pass,
 the fill and crash marks).
 
+## What Brandon has already said, and what the style means to do
+
+The music notes are not the whole rule. Two more things say what this band should play, and a
+reading that skips them names the wrong faults (the first trial of this agent did: three
+readers given three different planted faults all reported one standing habit of the bass that
+Brandon had passed, and none saw what had been planted).
+
+- **His verdicts by ear** are in `scorecard/ear-cases.json` (`pnpm -s ears` summarises them).
+  Read the cases for the seats and styles you are judging before you read a note. A fault he
+  has named (`"kind": "not-right"`) is a thing to **check for by name in every take**: say
+  whether it is back, with the number that shows it. Among them so far: a bass that sits an
+  octave high (its roots belong no higher than E2 in the blues; its answer says where), a
+  piano that gets busy under a hot solo, a soloist that is sparse, a backbeat that drags in
+  compound time, a bass that plays the same bar every chorus. Something he has passed is the
+  band's habit: where a note in the music notes and a pass of his disagree, the pass wins,
+  and what you saw is an observation for his ear, not a finding.
+- **The style's own data** says what each seat is meant to do, with the reason beside it:
+  `packages/styles/src/<style>/bass.ts`, `chords.ts`, `drums.ts`, `solo.ts`. Before you call a
+  figure a fault, find it there. A figure the data writes on purpose, with a comment that
+  cites a note or his word, is a choice: report it as an observation and quote the comment.
+  A figure the data does not write, or numbers outside what its comments say (a register, a
+  count of strikes, a floor on notes a second), is the finding.
+
+**Count before you judge.** For each seat you read, work these out from the transcription
+(`grep` and a few lines of shell or `node -e` on the file are quicker and surer than reading)
+and put them in your report, by pass:
+
+- bass: the lowest, highest and middle pitch, and the roots' highest;
+- chords: strikes a bar, and strikes a bar in the bars marked `solo`, by the band's energy;
+- soloist: notes a bar while it has the lead, the share of its bars that are empty, the
+  longest rest, its highest note in each chorus;
+- drums: fills, crashes, and whether the pattern changes with the energy.
+
+Then set each number against what the style's data and his verdicts say it should be. A
+habit that is everywhere is easy to see; a register, a density or a build that has moved is
+only seen by counting.
+
+**A standing habit is not the change.** When you have a before and an after, a figure that is
+in both is not a finding about this diff: say it once, as an observation, and spend the
+review on what moved. When you have no before, say that you cannot tell a habit from a
+change, and lean on the counts.
+
+**How sure you are is part of the finding.** Say high only for a fault he has named that the
+counts show is back, or for numbers outside what the style's data writes. A break of a
+numbered note alone, with no before to compare, is medium at most: say "standing or changed:
+unknown". In the trial that shaped this file, the two readings that were right said high, and
+the two that mistook a standing habit for a change said medium.
+
 ## What you report
 
 Findings in `/review`'s format (`.claude/skills/review/SKILL.md`, "Reporting"): an ID (`F1`,
@@ -102,7 +150,8 @@ Findings in `/review`'s format (`.claude/skills/review/SKILL.md`, "Reporting"): 
 - **Never say anything sounds good or bad.** Nobody here can hear. Say what the notes are and
   which rule they meet or break.
 - Never pass or fail on taste.
-- Never edit a file, commit, or push. You read and run read-only commands.
+- Never edit a file in the repository, commit, or push. You write only under your scratch
+  folder (transcriptions, a worktree of the base), and you remove the worktree when done.
 - Never treat the builder's report, a commit message or a `DECISIONS.md` line as true.
   Check it against the notes printed and the code.
 

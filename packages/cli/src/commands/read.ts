@@ -42,6 +42,9 @@ export const readCommand: Command = {
     const chartName = path ? basename(path) : "";
     const take = render(text, style, options);
     reportDiagnostics(chartName, take.diagnostics);
+    const music = take.plan.bars.filter((bar) => bar.kind === "music").length;
+    if (bars && bars[0] > music)
+      throw new UsageError(`--bars ${values.bars}: the take has ${music} bars of music`);
     process.stdout.write(
       transcription(take, style, {
         chartName,
