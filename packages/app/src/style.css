@@ -6,13 +6,19 @@
    blue-violet of a duplicated band chart; the paper is cool, not cream. */
 :root {
   color-scheme: light dark;
+  /* The paper and the ink, here and in the dark block below, are also set inline in
+     index.html for the first paint: the two places must agree. */
   --paper: #eef0f4;
   --ink: #1e1a4f;
   --faint: #5f5d86;
+  /* A hairline between things that are told apart without it: rows, a menu's lines. */
   --rule: #c5c6d6;
+  /* A line that carries meaning (a bar line, the edge of a box to type in or press), at
+     three to one on the paper. */
+  --line: #8887a6;
   --marker: #ffe53b;
   --on-marker: #1e1a4f;
-  --pencil: #cf3d35;
+  --pencil: #c5352d;
   /* The ink as it prints on a spot colour: the same in either theme, since the colour
      under it is. A spot colour is always a field with this printed on it, never the
      colour of type on paper. */
@@ -86,6 +92,7 @@
     --ink: #eceaff;
     --faint: #9b99c2;
     --rule: #3a3760;
+    --line: #625f88;
     --marker: #ffd83b;
     --pencil: #ff8176;
   }
@@ -207,6 +214,12 @@ fieldset {
   margin: 0;
   padding: 0;
   border: 0;
+}
+
+/* Text chosen is marked with the highlighter, not the browser's own blue. */
+::selection {
+  background: var(--marker);
+  color: var(--on-marker);
 }
 
 /* On a spot colour the ring is the press ink, which shows on all eight. */
@@ -1642,12 +1655,12 @@ button:active:not(:disabled, .row-play, .last-play, .go, .player, .opt, .menu-li
   align-items: center;
   min-width: 0;
   padding: 0 0.14em;
-  border-left: max(1px, 0.03em) solid var(--rule);
+  border-left: max(1px, 0.03em) solid var(--line);
   isolation: isolate;
 }
 
 .bar:last-child {
-  border-right: max(1px, 0.03em) solid var(--rule);
+  border-right: max(1px, 0.03em) solid var(--line);
 }
 
 /* The highlighter: a stroke of marker, not a tidy box. */
@@ -2469,7 +2482,7 @@ button:active:not(:disabled, .row-play, .last-play, .go, .player, .opt, .menu-li
   position: relative;
   flex: 1;
   min-height: 0;
-  border: 2px solid var(--rule);
+  border: 2px solid var(--line);
 }
 
 .source:focus-within {
@@ -3205,7 +3218,7 @@ button.mark[aria-expanded="true"] {
   height: 44px;
   padding: 0;
   overflow: hidden;
-  border: 2px solid var(--rule);
+  border: 2px solid var(--line);
   background: none;
 }
 

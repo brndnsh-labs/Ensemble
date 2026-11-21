@@ -4,12 +4,29 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="color-scheme" content="light dark" />
+    <!-- The app has a dark theme of its own: Dark Reader is asked to leave the page alone. -->
+    <meta name="darkreader-lock" />
     <meta name="theme-color" content="#eef0f4" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#15132b" media="(prefers-color-scheme: dark)" />
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./icon-180.png" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <title>Ensemble</title>
+    <!-- The first paint, before the stylesheet arrives, is already paper and ink in the
+         system's scheme. These four colours must agree with --paper and --ink in
+         src/style.css: its first :root block and its prefers-color-scheme: dark block. -->
+    <style>
+      html {
+        background: #eef0f4;
+        color: #1e1a4f;
+      }
+      @media (prefers-color-scheme: dark) {
+        html {
+          background: #15132b;
+          color: #eceaff;
+        }
+      }
+    </style>
   </head>
   <body>
     <div id="app"></div>
