@@ -426,7 +426,9 @@ export const funkSolo: SoloStyle = {
       approach: true,
     },
     // A riff moved across the bar is a funk device, but the One is the groove's: a quarter of
-    // the ideas said again, early as often as late. Not the opening riff brought back (`b`).
+    // the ideas said again consider it. Drawn early as often as late where it could go either
+    // way; in practice about one in twelve goes early, since a riff opens on the One and
+    // early would cross the barline, a pickup's ground. Not the opening riff brought back (`b`).
     displace: { chance: 0.25, early: 0.5, roles: ["r", "v"] },
     // No bends (ST-funk-32); a guitar shakes a note held a dotted half or longer (SO-52).
     bend: { third: 0, rootOrFifth: 0, around: 0, elsewhere: 0 },

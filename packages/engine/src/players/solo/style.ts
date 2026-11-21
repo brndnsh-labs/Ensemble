@@ -421,24 +421,30 @@ export interface SoloStyle {
     /**
      * An idea said again bar for bar (a way that makes `again`, by any move) is
      * placed a beat early or a beat late, so it falls across the bar
-     * differently: the same rhythm and contour moved by one of the bar's own
-     * pulses (the quarter in 4/4, the dotted quarter in 6/8 and 12/8), its
-     * notes fitted to the chords now under them (SO-33) and its bends kept.
-     * Drawn once for a phrase, after the critic has chosen it, as the hand's
-     * moves are. Never at a chorus's top, in a solo's first or last phrase, on
-     * the way to the top note or where the tune ends; never pulled before the
-     * phrase's first bar or pushed past its last, and never late in a
-     * section's last bar; a displaced idea takes no pickup. Where it fits only
-     * the other way it goes that way, if the style goes that way at all (an
-     * `early` of 0 or 1 is one way only); where it fits neither it stays put.
+     * differently: the same rhythm, lengths and contour moved by one of the
+     * bar's own pulses (the quarter in 4/4, the dotted quarter in 6/8 and
+     * 12/8), its notes fitted to the chords now under them, a chord tone on
+     * every beat (SO-33), its bends and shakes kept. Drawn once for a phrase;
+     * the idea so moved is offered beside the idea where it was, and the critic
+     * judges both. Never at a chorus's top, in a solo's first or last phrase,
+     * on the way to the top note or where the tune ends; never pulled before
+     * the phrase's first bar or pushed past its last, never held across a
+     * barline it was not held across, never late in a section's last bar, and
+     * never with a pickup. Where it fits only the other way it goes that way,
+     * if the style goes that way at all (an `early` of 0 or 1 is one way
+     * only); where it fits neither it is not offered. What the solo remembers
+     * is the idea where it was.
      */
     readonly displace: {
       /** The chance a phrase said again bar for bar is said a beat away. At none, never. */
       readonly chance: number;
-      /** Of those, the share said a beat early: the rest are a beat late. */
+      /**
+       * Of those, the share drawn a beat early: the rest are drawn late. It is the
+       * share among ideas that can go either way: an idea that opens on the one
+       * cannot go early without crossing the barline, a pickup's ground, so far
+       * fewer go early than this says (`solo.displaced-early` reads it).
+       */
       readonly early: number;
-      /** The levels it is done at, by name. Left out, every level. */
-      readonly levels?: readonly string[];
       /** The letters of a form it is done for. Left out, every one. */
       readonly roles?: readonly Role[];
     };

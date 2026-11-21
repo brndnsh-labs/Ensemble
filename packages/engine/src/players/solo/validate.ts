@@ -283,7 +283,6 @@ export function validateSoloStyle(solo: SoloStyle): string[] {
   const { displace } = solo.habits;
   chance(displace.chance, "habits, displace");
   chance(displace.early, "habits, displace early");
-  for (const level of displace.levels ?? []) known(level, "habits, displace");
   for (const role of displace.roles ?? []) {
     say(ROLES.includes(role), `habits, displace: "${role}" is not a letter of a form.`);
   }

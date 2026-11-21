@@ -104,12 +104,12 @@ export function pickupsOf(world: World, notes: readonly Sounding[]): Set<Soundin
  * how many of those shared notes move the same way (same direction, within a
  * whole step of the same size). The same rhythm with the line turned over is
  * half alike; the same phrase moved up the scale is wholly alike. A lick that
- * comes back a bar or two later in its phrase is still the same lick, so the
- * phrases are lined up bar against bar every way and the best match counts.
+ * comes back a bar or two later in its phrase is still the same lick, and so is
+ * one said a beat early or late, so the phrases are lined up bar against bar
+ * every way, and a pulse either side, and the best match counts.
  */
 export function likeness(a: Heard, b: Heard): number {
-  const moves = (heard: Heard) => {
-    const notes = idea(heard);
+  const moves = (notes: readonly Sounding[]) => {
     const first = notes[0]?.bar.index ?? 0;
     return notes.map((note, i) => ({
       bar: note.bar.index - first,
@@ -117,26 +117,41 @@ export function likeness(a: Heard, b: Heard): number {
       move: i === 0 ? null : note.pitch - notes[i - 1]!.pitch,
     }));
   };
-  const [one, two] = [moves(a), moves(b)];
+  const [one, two] = [moves(idea(a)), moves(idea(b))];
   if (one.length === 0 || two.length === 0) return 0;
-  const placed = new Map(one.map((note) => [`${note.bar}:${note.step}`, note.move]));
-  let best = 0;
-  for (let late = -3; late <= 3; late++) {
-    let shared = 0;
-    let moving = 0;
-    let agree = 0;
-    for (const note of two) {
-      const other = placed.get(`${note.bar + late}:${note.step}`);
-      if (other === undefined) continue;
-      shared++;
-      if (note.move === null || other === null) continue;
-      moving++;
-      if (Math.sign(note.move) === Math.sign(other) && Math.abs(note.move - other) <= 2) agree++;
+  const ticks = idea(a)[0]!.bar.ticks;
+  const at = (bar: number, step: number) => bar * ticks + step;
+  /** The best match of two phrases' notes, lined up bar against bar every way and moved `shift` ticks. */
+  const best = (
+    these: ReturnType<typeof moves>,
+    those: ReturnType<typeof moves>,
+    shift: number,
+  ): number => {
+    const placed = new Map(these.map((note) => [at(note.bar, note.step), note.move]));
+    let most = 0;
+    for (let late = -3; late <= 3; late++) {
+      let shared = 0;
+      let moving = 0;
+      let agree = 0;
+      for (const note of those) {
+        const other = placed.get(at(note.bar + late, note.step) + shift);
+        if (other === undefined) continue;
+        shared++;
+        if (note.move === null || other === null) continue;
+        moving++;
+        if (Math.sign(note.move) === Math.sign(other) && Math.abs(note.move - other) <= 2) agree++;
+      }
+      const rhythm = shared / (these.length + those.length - shared);
+      most = Math.max(most, rhythm * (0.5 + 0.5 * (moving === 0 ? 0 : agree / moving)));
     }
-    const rhythm = shared / (one.length + two.length - shared);
-    best = Math.max(best, rhythm * (0.5 + 0.5 * (moving === 0 ? 0 : agree / moving)));
-  }
-  return best;
+    return most;
+  };
+  // And a pulse either side: an idea said a beat early or late is still that idea. Moved,
+  // a bar's notes may all fall in its later half, where a pickup would be, so here the
+  // phrases are taken whole, pickups inside them and all.
+  const pulse = pulseTicks(idea(a)[0]!.bar.meter)[0]!;
+  const [whole, other] = [moves(body(a)), moves(body(b))];
+  return Math.max(best(one, two, 0), best(whole, other, pulse), best(whole, other, -pulse));
 }
 
 /** The likeness of a phrase to the earlier phrase of its solo most like it. Null for the first. */
@@ -229,10 +244,11 @@ export function rhythmsAgain(
       const notes = source.map((note) => at.get(note.tick + moved));
       if (!notes.every((note): note is Sounding => note !== undefined)) continue;
       if (!said.every((note) => notes.includes(note))) continue;
-      // Fitted to the chords now under it a note may move the other way: four moves in
-      // five the same way is the same line.
+      // Fitted to the chords now under it a note may move: four moves in five that do not
+      // turn the other way (a note said again may become a step, or a step a note said
+      // again) is the same line.
       const [shape, was] = [contour(notes), contour(source)];
-      const same = shape.filter((move, i) => move === was[i]).length;
+      const same = shape.filter((move, i) => move * was[i]! >= 0).length;
       const inBar = ((moved % ticks) + ticks) % ticks;
       const by = inBar === pulse ? 1 : inBar === ticks - pulse ? -1 : null;
       found.push({ of: other, source, notes, inBar, by, line: same * 5 >= shape.length * 4 });

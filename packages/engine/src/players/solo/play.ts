@@ -144,7 +144,7 @@ export function soloPart(
     if (slot.index === 0) form = chorusForm(world, rng, slot, memory.motif !== null);
     const role = form[slot.index % form.length] ?? "s";
 
-    const phrases = phrasesFor(
+    const offered = phrasesFor(
       world,
       slot,
       role,
@@ -155,7 +155,15 @@ export function soloPart(
     // The pass before's pickup into this phrase is played as it was made, whichever is chosen.
     const leading = lead ? writeLead(lead, first) : [];
     const from = leading[0]?.tick;
-    const notes = phrases.map((phrase) => realise(world, phrase, accent, from));
+    // An idea said a beat away keeps every note's length and shake, its last note a pulse
+    // shorter at most for its breath; where it cannot, it is not offered (SO-08, SO-17).
+    const realised = offered.map((phrase) => realise(world, phrase, accent, from));
+    const keeps = offered.map(
+      (phrase, i) =>
+        !phrase.inPlace || keepsLengths(realise(world, phrase.inPlace, accent, from), realised[i]!),
+    );
+    const phrases = offered.filter((_, i) => keeps[i]);
+    const notes = realised.filter((_, i) => keeps[i]);
     const candidates = phrases.map(
       (phrase, i): SoloCandidate => ({
         kind: phrase.kind,
@@ -167,30 +175,13 @@ export function soloPart(
     );
     const chosen = choose(candidates);
     const at = Math.max(0, candidates.indexOf(chosen));
-    // An idea said again bar for bar may be said a beat early or late instead, as the slot
-    // drew it (habits.displace): decided after the choice, so the critic chose the idea and
-    // the player says it where it falls. It takes no pickup, from this pass or the last.
-    const twin = phrases[at]!.displaced;
-    const phrase = twin ?? phrases[at]!;
-    const realised = twin ? realise(world, twin, accent) : notes[at]!;
-    const heardAs: SoloCandidate = twin
-      ? {
-          ...candidates[at]!,
-          kind: twin.kind,
-          notes: realised.map((note) => sounding(world, note)),
-        }
-      : candidates[at]!;
-    report?.({
-      slot,
-      role,
-      candidates: score(candidates, SOLO_FEATURES, weights),
-      chosen: heardAs,
-    });
+    report?.({ slot, role, candidates: score(candidates, SOLO_FEATURES, weights), chosen });
 
+    const phrase = phrases[at]!;
     // How the horn plays the phrase chosen: what it does with the pitch of the notes it
     // arrives on and of the notes it leaves. Drawn by place, after the choice, so the
     // phrase is the one the critic chose whatever it does.
-    const horned = hornMoves(world, slot, realised, rng, fell);
+    const horned = hornMoves(world, slot, notes[at]!, rng, fell);
     // And how a guitarist's left hand plays it: a landing slid into, a note hammered on or
     // pulled off.
     const played = slurs(world, phrase, slideInto(world, phrase, horned.notes, rng), rng);
@@ -205,10 +196,11 @@ export function soloPart(
     // what was played where the form asked for one stated, changed, set apart or brought
     // back. Said again or answered, the idea stays what it was.
     const stated = memory.motif === null || phrase.fresh || "svcb".includes(role);
-    earlier = [...earlier, heardAs];
+    earlier = [...earlier, candidates[at]!];
     memory = {
-      // The climb to the top note is a use of the idea, not a new one.
-      motif: slot.peak ? memory.motif : stated ? phrase : memory.motif,
+      // The climb to the top note is a use of the idea, not a new one. An idea said a beat
+      // away is remembered where it was: what follows is made from it as it was stated.
+      motif: slot.peak ? memory.motif : stated ? (phrase.inPlace ?? phrase) : memory.motif,
       theme: memory.theme ?? phrase,
       opening: slot.index === 0 ? phrase : memory.opening,
       rest: last?.pitch ?? memory.rest,
@@ -229,6 +221,23 @@ export function soloPart(
 }
 
 export const playSolo: Player = (context) => soloPart(context);
+
+/**
+ * Whether an idea said a beat away is as long as where it was: the same notes, each
+ * sounding as long and shaken where it was shaken, but the last, which may give up a
+ * pulse for the breath after it.
+ */
+function keepsLengths(was: readonly SoloNote[], now: readonly SoloNote[]): boolean {
+  const [from, to] = [was.filter((note) => !note.lead), now.filter((note) => !note.lead)];
+  if (from.length !== to.length) return false;
+  return to.every((note, i) => {
+    const before = from[i]!;
+    const last = i === to.length - 1;
+    const give = last ? pulseTicks(note.bar.meter)[0]! : 0;
+    const shaken = before.move?.vibrato === undefined || note.move?.vibrato !== undefined;
+    return note.duration >= before.duration - give && (last || shaken);
+  });
+}
 
 /**
  * What the phrases of a chorus are for: one form drawn for the chorus, by its pass and

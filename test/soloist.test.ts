@@ -890,26 +890,22 @@ test("a pickup spells the chord it is played over: each note of a pickup into a 
 /**
  * The least share of a style's phrases (of three notes or more, after a solo's first) that
  * say an earlier idea of the solo again a pulse early or late, over every take with the
- * soloist: each style does it, the ones whose line is built on a riff or a call seldom.
+ * soloist, about half what the two-seed takes play. A style left out plays so few that a
+ * floor would be a coin toss: an idea moves only where every note keeps its length without
+ * crossing a barline and the critic, judging it beside the idea where it was, prefers it.
  */
 const DISPLACED: Readonly<Record<string, number>> = {
-  jazz: 0.02,
-  blues: 0.015,
-  rock: 0.01,
-  funk: 0.02,
-  disco: 0.006,
-  neosoul: 0.02,
-  reggae: 0.015,
-  acoustic: 0.003,
+  jazz: 0.01,
+  blues: 0.006,
+  funk: 0.01,
 };
 
-test("an idea comes back a beat early or late: in every style some phrases say an earlier one of the solo again, the same rhythm and contour moved by one of the bar's pulses, only where the form asks what the style says; never the top of a chorus, the solo's first or last phrase, nor the tune's last, and never late in a section's last bar (nor an answer that carries a moved rhythm there); every note of the idea so moved inside its own phrase's bars and the tune, led in by no pickup, a chord tone where it falls on a beat (SO-33), and as long as it was, shaken where it was shaken, its last note a pulse shorter at most", () => {
+test("an idea comes back a beat early or late: in the styles that do it most some phrases say an earlier one of the solo again, the same rhythm and contour moved by one of the bar's pulses, only where the form asks what the style says; never the top of a chorus, the solo's first or last phrase, nor the tune's last, and never late in a section's last bar (nor an answer that carries a moved rhythm there); every note of the idea so moved inside its own phrase's bars and the tune, led in by no pickup, a chord tone where it falls on a beat (SO-33), and as long as it was, shaken where it was shaken, its last note a pulse shorter at most", () => {
   const failures = new Map<string, string[]>();
   const fail = (clause: string, where: string) =>
     failures.set(clause, [...(failures.get(clause) ?? []), where]);
   for (const style of STYLES) {
     const floor = DISPLACED[style.id];
-    if (floor === undefined) continue;
     const { roles } = style.solo.habits.displace;
     let [phrases, moved] = [0, 0];
     for (const { chart, options, take } of soloTakes().filter((jam) => jam.style === style)) {
@@ -968,7 +964,7 @@ test("an idea comes back a beat early or late: in every style some phrases say a
       }
     }
     if (phrases <= enough(300)) fail("phrases enough", `${style.id}: only ${phrases}`);
-    if (moved < Math.max(1, phrases * floor)) {
+    if (floor !== undefined && moved < Math.max(1, phrases * floor)) {
       fail(
         "some displaced",
         `${style.id}: ${moved} of ${phrases} (${((100 * moved) / phrases).toFixed(1)}%), under ${100 * floor}%`,

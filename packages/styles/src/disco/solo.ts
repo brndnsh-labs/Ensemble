@@ -406,7 +406,9 @@ export const discoSolo: SoloStyle = {
       approach: false,
     },
     // Seldom: a disco line rides the four on the floor and its riffs sit where they were
-    // stated. Early as often as late. Not the opening idea brought back (`b`).
+    // stated. Drawn early as often as late where it could go either way; in the takes the
+    // suite makes none is moved: its figures run to the barline. Not the opening idea
+    // brought back (`b`).
     displace: { chance: 0.15, early: 0.5, roles: ["r", "v"] },
     // On a guitar, a bend into the 3rd 0.30 and into the root 0.20 (ST-disco-25), in phrases
     // the hand gets lyrical in, as the blues and rock have it.
