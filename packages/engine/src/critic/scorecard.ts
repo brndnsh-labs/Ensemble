@@ -33,7 +33,12 @@ export interface ScoreLine {
   readonly target: Target | null;
   /** Share of measured takes inside the target band. Null when the style sets no target. */
   readonly inTarget: number | null;
-  /** The takes furthest outside the band (or the lowest, with no band), worst first. */
+  /** True for a cost: the measure says less is better, so its worst takes are worth naming with no band. */
+  readonly lowerIsBetter: boolean;
+  /**
+   * The takes furthest outside the band, worst first. With no band, the lowest;
+   * or the highest, for a measure of which less is better.
+   */
   readonly worst: readonly { readonly label: string; readonly value: number }[];
 }
 
@@ -63,7 +68,9 @@ export function scorecard(
     const miss = (value: number) =>
       target
         ? Math.max(0, (target.min ?? -Infinity) - value, value - (target.max ?? Infinity))
-        : -value;
+        : measure.lowerIsBetter
+          ? value
+          : -value;
     const worst = [...values].sort((a, b) => miss(b.value) - miss(a.value)).slice(0, 3);
     lines.push({
       id: measure.id,
@@ -79,6 +86,7 @@ export function scorecard(
       pooled: measure.unit === "share" && cases > 0 ? hits / cases : null,
       target,
       inTarget: target ? values.filter((v) => miss(v.value) === 0).length / values.length : null,
+      lowerIsBetter: measure.lowerIsBetter === true,
       worst,
     });
   }

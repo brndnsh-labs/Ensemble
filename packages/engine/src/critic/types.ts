@@ -27,6 +27,11 @@ export interface Measure {
    */
   readonly idiom?: boolean;
   /**
+   * A cost: the less of it the better. With no target, the scorecard's worst
+   * takes are then the highest and not the lowest.
+   */
+  readonly lowerIsBetter?: boolean;
+  /**
    * - `share`: a fraction of cases, 0 to 1
    * - `semitones`, `per bar`, `per beat`, `velocity`: a mean in those units
    * - `pitch`: a mean MIDI note number

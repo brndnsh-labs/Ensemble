@@ -158,7 +158,8 @@ function report(style: string, takes: number, charts: number, lines: readonly Sc
       `  mean ${f(line.mean)}   lowest ${f(line.min)}   1 in 10 below ${f(line.p10)}   middle ${f(line.median)}   1 in 10 above ${f(line.p90)}   highest ${f(line.max)}`,
     );
     if (line.pooled !== null) out.push(`  all cases together: ${f(line.pooled)}`);
-    if (line.inTarget !== null && line.inTarget < 1) {
+    // Worth naming: takes outside the band, or with no band the costliest takes.
+    if (line.inTarget === null ? line.lowerIsBetter : line.inTarget < 1) {
       for (const worst of line.worst) out.push(`  worst: ${f(worst.value)}  ${worst.label}`);
     }
     out.push("");

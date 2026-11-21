@@ -200,7 +200,7 @@ Known and not yet handled in stage 4: the head out is not played light; in compo
 
 **Models** (agreed with Brandon to stretch quota): Sonnet for mechanical work and small fixes with a property written first; Opus for well-specified builds and for adversarial reviews; Fable for open design problems and the main thread. What things cost, for scale: voicing build (Opus) 270k tokens, rhythm build (Fable) 525k, chord review (Opus) 240k, soloist build (Fable) 630k, piano around the soloist (Opus) 445k, soloist review (Opus) 270k, test-file split (Sonnet) 65k, bass variety (Opus) 445k. Every independent review found audible bugs the builder's own checks missed: keep doing one per seat, and give the reviewer its own copy of the repo (`git clone` the local repo into the scratch folder, `pnpm install --offline` twice) so it can run while a build is under way.
 
-Small things noticed and not done: the scorecard's worst-takes list has no lower-is-better flag, so `solo.cost` carries a ceiling target to make its list point the right way; the suite is at about 7.6 s of 10 since the bass began choosing by the phrase; `test/band.test.ts` is still the slowest file (its first test renders and replays the whole library), and the bass's own cost per take (four times what it was) is the place to look if the budget tightens.
+Small things noticed and not done: the suite is at about 7.6 s of 10 since the bass began choosing by the phrase; `test/band.test.ts` is still the slowest file (its first test renders and replays the whole library), and the bass's own cost per take (four times what it was) is the place to look if the budget tightens.
 
 **Things learned that the next session should not relearn**
 

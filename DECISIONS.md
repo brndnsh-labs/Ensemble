@@ -2957,3 +2957,9 @@ The issue asked for the reviewer to name a known fault from a transcription alon
 - **What that false alarm is**: a real disagreement between the notes and the band since the soloist was made busier, which he heard and passed. The notes are stale there, not the band. To be filed, with his nod, as a correction to the notes.
 - **Narrowed from the issue**: the reading of one take in every style, each finding checked by hand, was done for the blues only (the control). It will be done by use: `/review` sends every diff under the players and the styles to this agent, with the base to compare against, which is the reading that tells a habit from a change.
 - **From the code review, fixed**: the la-li spelling only in compound time (it had reached a dotted pulse in 7/8, which the legend does not explain); an accent judged against the voice's own strokes, not the ghosts printed beside them; `--bars` past the end says how long the take is; the agent's "read-only" said truthfully (it writes in its scratch folder).
+
+## a measure can say that less of it is better (2026-11-20, #2247)
+
+- `Measure.lowerIsBetter`, set on `solo.cost` and `solo.worst-phrase` (the two measures in the unit of cost). With no target, the scorecard's worst takes for such a measure are the highest, and the report prints them; it printed a worst list only for a measure with a target. Neo-soul, reggae and acoustic, which never had a ceiling on `solo.cost`, now have their costliest solos named, and every style its costliest single phrases.
+- **The five ceilings on `solo.cost` stay** (blues, jazz, funk, rock, disco), though the issue drafted their removal. They were set to point the list and are not targets for the music, but `score --check` has held the share of takes under them ever since, and taking a check away is loosening a gate: Brandon's call, not a tidy-up. Their comments now say so.
+- No value moved in any style: only lists were added.

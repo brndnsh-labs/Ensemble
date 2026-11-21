@@ -96,8 +96,9 @@ export const rockCritic: CriticStyle = {
     // outside what is delivered, so the scorecard names a solo with none or with a crowd.
     "solo.bends": { min: 0.02, max: 0.3, kind: "measured" },
     "solo.shakes": { min: 0.3, max: 0.9, kind: "measured" },
-    // Not a target for the music: a ceiling one take in ten sits above today, so that the
-    // scorecard names the worst solos, which are the ones to go and listen to.
+    // Not a target for the music: a ceiling one take in ten sat above when it was set, so that
+    // the scorecard would name the worst solos. The measure names them by itself now (#2247);
+    // the ceiling stays because `score --check` has held the share under it since.
     "solo.cost": { max: 2.45, kind: "measured" },
   },
   weights: {

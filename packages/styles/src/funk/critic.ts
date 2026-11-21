@@ -148,8 +148,9 @@ export const funkCritic: CriticStyle = {
     // The horn mostly hits the one: a take's share of phrases led into is 21% on the mean
     // today, and never as much as half (SO-39's ceiling, for a style that seldom leads in).
     "solo.entered-early": { max: 0.45, kind: "intent", minCases: 6 },
-    // Not a target for the music: a ceiling one take in ten sits above today, so that the
-    // scorecard names the worst solos, which are the ones to go and listen to.
+    // Not a target for the music: a ceiling one take in ten sat above when it was set, so that
+    // the scorecard would name the worst solos. The measure names them by itself now (#2247);
+    // the ceiling stays because `score --check` has held the share under it since.
     "solo.cost": { max: 2.4, kind: "measured" },
     // ── band ──
   },
