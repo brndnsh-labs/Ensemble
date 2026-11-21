@@ -141,6 +141,7 @@ export function PlayView(props: Props) {
       soloInstrument,
       soloDensity: settings.soloDensity,
       soloFromTop: settings.soloFromTop,
+      breathe: settings.breathe,
       instruments: choices.instruments,
     }),
     [
@@ -154,6 +155,7 @@ export function PlayView(props: Props) {
       soloInstrument,
       settings.soloDensity,
       settings.soloFromTop,
+      settings.breathe,
       choices.instruments,
     ],
   );
@@ -473,6 +475,37 @@ export function PlayView(props: Props) {
                     ))}
                   </select>
                 </label>
+              </li>
+            )}
+            {/* How the band keeps time, settled before Play: steady unless the player chose otherwise. */}
+            {idle && (
+              <li className="menu-choice">
+                <span id="tempo-feel-label">Tempo</span>
+                <fieldset className="opts" aria-labelledby="tempo-feel-label" disabled={song}>
+                  <button
+                    type="button"
+                    className="opt"
+                    aria-pressed={song || !settings.breathe}
+                    onClick={() => change({ ...settings, breathe: false })}
+                  >
+                    Steady
+                    <small>As set, every bar</small>
+                  </button>
+                  <button
+                    type="button"
+                    className="opt"
+                    aria-pressed={!song && settings.breathe}
+                    onClick={() => change({ ...settings, breathe: true })}
+                  >
+                    Breathes
+                    <small>Pushes as the band builds</small>
+                  </button>
+                </fieldset>
+                {song ? (
+                  <small>Played once through as a song, the tempo stays as set.</small>
+                ) : style.feel.breathe === 0 ? (
+                  <small>{style.name} keeps the tempo steady either way.</small>
+                ) : null}
               </li>
             )}
             {/* The takes kept of this chart: performances of it, so this is where they are found. */}

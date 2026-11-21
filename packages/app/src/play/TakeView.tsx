@@ -178,6 +178,7 @@ function TakeStage({
           A take kept {dayOf(take.kept)}: {heard.style.name} in {keyToString(heard.chart.key)},{" "}
           {Math.round(plan.tempo)} bpm, {clock(seconds(plan))}
           {soloWords(recipe.options) && `, ${soloWords(recipe.options)}`}
+          {recipe.options.breathe && ", the tempo breathing"}
         </p>
       }
       players={players}
