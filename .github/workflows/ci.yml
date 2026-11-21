@@ -64,6 +64,11 @@ jobs:
       - name: The scorecards
         run: pnpm score
 
+      # Every ear case names a file and a heading that are there. Only the check: the rest
+      # of `ears` reads the scorecards' history, and this checkout is one commit deep.
+      - name: The ear cases' sources
+        run: pnpm ears --check
+
       # Builds the app itself and runs the journeys in the runner's own Chrome.
       - name: The browser smoke journeys
         run: pnpm smoke

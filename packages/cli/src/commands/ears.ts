@@ -17,6 +17,11 @@
 // A verdict about the sound (a sample, a level, how a move sounds on these
 // recordings) is listed and left: the critic reads notes. It reads git, so it
 // wants the repository's history (a shallow clone has none to read).
+//
+// First it checks that every verdict's `source` (and every one left out) names a
+// file that exists and a `## ` or `### ` heading in it, word for word, and that
+// an answer's `section` is a heading in the record; a miss fails the command,
+// naming the case. `--check` does only that and reads no history, for CI.
 
 import { existsSync, readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
@@ -46,19 +51,24 @@ const OBJECTS = 0.05;
 
 export const earsCommand: Command = {
   summary: "Brandon's verdicts by ear, beside what the critic measured at the time",
-  usage: "[--style S] [--json]",
+  usage: "[--style S] [--json] [--check]",
   run(args) {
     const { values } = parseArgs({
       args,
       options: {
         style: { type: "string", short: "s" },
         json: { type: "boolean", default: false },
+        check: { type: "boolean", default: false },
       },
     });
     if (values.style && !styleById(values.style)) {
       throw new UsageError(`no style "${values.style}" (styles: ${styleIds().join(", ")})`);
     }
     if (!existsSync(CASES)) throw new UsageError(`no ${CASES}; run from the repository's root`);
+    const misses = unsourced();
+    for (const miss of misses) console.error(miss);
+    if (misses.length > 0) return 1;
+    if (values.check) return 0;
     if (!hasHistory()) {
       throw new UsageError("the scorecards' history is read from git, and there is none here");
     }
@@ -74,6 +84,60 @@ export const earsCommand: Command = {
     return 0;
   },
 };
+
+// ── where his words are written: every source names a heading that is there ──
+
+/** The files whose headings an answer's `section` may name. */
+const RECORD = ["DECISIONS.md"];
+
+const headings = new Map<string, ReadonlySet<string> | null>();
+
+/** A file's `## ` and `### ` headings, word for word; null where there is no such file. */
+function headingsOf(path: string): ReadonlySet<string> | null {
+  if (!headings.has(path)) {
+    const text = existsSync(path) ? readFileSync(path, "utf8") : null;
+    const found = text?.split("\n").flatMap((line) => {
+      const m = /^#{2,3} (.+?)\s*$/.exec(line);
+      return m ? [m[1]!] : [];
+    });
+    headings.set(path, found ? new Set(found) : null);
+  }
+  return headings.get(path)!;
+}
+
+/** Each source written as "<file>: <heading>" whose file or heading is not there, said with its case. */
+function unsourced(): string[] {
+  const file = JSON.parse(readFileSync(CASES, "utf8")) as {
+    cases: readonly EarCase[];
+    leftOut?: readonly { words: string; source: string }[];
+  };
+  const misses: string[] = [];
+  const miss = (who: string, what: string, why: string) =>
+    misses.push(`${CASES}: ${who}: ${what}: ${why}`);
+  const named = [
+    ...file.cases.map((c) => ({ who: `case "${c.id}"`, source: c.source })),
+    ...(file.leftOut ?? []).map((l) => ({ who: `left out "${l.words}"`, source: l.source })),
+  ];
+  for (const { who, source } of named) {
+    const at = source.indexOf(": ");
+    const path = at < 0 ? source : source.slice(0, at);
+    const heading = at < 0 ? "" : source.slice(at + 2);
+    const there = headingsOf(path);
+    if (!there) miss(who, `source "${source}"`, `no file ${path}`);
+    else if (!there.has(heading)) miss(who, `source "${source}"`, `no heading in ${path} reads so`);
+  }
+  for (const c of file.cases) {
+    const section = c.answered?.section;
+    if (section !== undefined && !RECORD.some((path) => headingsOf(path)?.has(section))) {
+      miss(
+        `case "${c.id}"`,
+        `answered.section "${section}"`,
+        `no heading in ${RECORD.join(", ")} reads so`,
+      );
+    }
+  }
+  return misses;
+}
 
 // ── what he has passed: the span of each measure over those bands ──────────
 

@@ -43,7 +43,8 @@ pnpm test:full          # the same on six seeds (three times the push budget: 84
 pnpm score              # every style's scorecard against its accepted baseline (2-minute budget)
                         # on a branch it also sorts the change against what Brandon has passed by ear: inside, or the measures outside
 pnpm ears               # Brandon's verdicts by ear (scorecard/ear-cases.json) beside the scorecards as they stood in git: which
-                        # measures told a band he refused from its answer, and where today's sits against what he has passed
+                        # measures told a band he refused from its answer, and where today's sits against what he has passed;
+                        # it fails first on a case whose source names a file or heading that is not there (`--check`: only that, as CI runs it)
 pnpm goldens            # rewrite the golden takes (then say why in DECISIONS.md)
 pnpm gate:1             # write a gate's audition files to out/gate-1/ (also gate:2, gate:3, gate:4)
 pnpm ensemble <command> # the CLI; runs TypeScript directly on Node 26, no build step
