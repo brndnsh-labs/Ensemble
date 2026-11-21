@@ -145,3 +145,12 @@ Brandon asked what could be decided ahead to make the work more autonomous, and 
 
 Brandon's direction: what is in flight and what shipped is on the issues and pull requests; `PLAN.md`'s "Resume here" is no longer kept (two sessions at once had both been editing it). `docs/`, `PLAN.md` as the map and this file stay in the repo, versioned with the code and read for free. The pipeline's rules (`.cycle/overlays/doctrine-preamble.md`, `done.md`, `scout-lenses.md`) and `CLAUDE.md` say so (529f9d2b). This file is to be split up later.
 
+
+## things learned, once kept in PLAN.md's Resume here (2026-11-21, #2259)
+
+Lessons on how the work is done, moved here word for word when "Resume here" was retired. They were headed "Things learned that the next session should not relearn".
+
+- Seats are delegated whole (style type, player, data, validation) with a written brief in `prompts/`; the main session owns the planner, feel, critic framework, tests, docs, and commits. Agents report "properties I believe always hold", which become the property tests, and each new property is checked by breaking the rule on purpose.
+- A brief can over-specify. "Bars where the soloist lays out must be note for note what they were" was mine, and it produced a hand that jumped home when the solo ended. Ask for the musical property, not the byte identity, unless the identity is the point.
+- A bug found on one kind of take usually lives outside the suite's kinds. The soloist's bugs were all outside four-pass jams at the stock tempo; `soloistTakes` in `test/takes.ts` is the wider set.
+- Check `git status` after committing: a hidden error from `git add` once left a commit with the wrong contents.
