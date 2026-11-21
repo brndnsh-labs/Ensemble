@@ -359,6 +359,12 @@
     "p90": 0,
     "inTarget": null
   },
+  "solo.bursts": {
+    "mean": 0,
+    "p10": 0,
+    "p90": 0,
+    "inTarget": null
+  },
   "solo.bars-that-rhyme": {
     "mean": 0.8375,
     "p10": 0.6842,

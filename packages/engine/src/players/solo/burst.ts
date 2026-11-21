@@ -44,7 +44,8 @@ function onward(spot: Spot, from: number, way: 1 | -1): number | undefined {
 /**
  * The phrase with a run in double time in it, or null where none will go: no end bar landing
  * on a held note on a pulse with line before it, a bar under N.C., a run that would leave the
- * phrase's register before it has lasted half a bar, or one quicker than the instrument plays.
+ * phrase's register however it went before it had lasted its shortest, or one quicker than the
+ * instrument plays.
  */
 export function burstOf(world: World, phrase: Phrase, ask: BurstAsk, rng: Rng): Phrase | null {
   const { slot } = phrase;
