@@ -407,8 +407,9 @@ export const neosoulSolo: SoloStyle = {
     },
     // An idea said again behind where it was is the style's laid-back feel written into the
     // phrase, mostly late (early 0.2 where it could go either way). Its long notes reach the
-    // barline (SO-17): a beat late, such a note is held over it, into a chord it is a tone of;
-    // about one phrase in a hundred is moved. Not the opening idea brought back (`b`).
+    // barline (SO-17): a beat late, one that sounds past the barline is held over it, into a
+    // chord it is a tone of; about one phrase in a hundred is moved. Not the opening idea
+    // brought back (`b`).
     displace: { chance: 0.35, early: 0.2, roles: ["r", "v"], holds: true },
     // On a guitar, a bend into the root 0.08 (ST-neosoul-33, SO-53), in phrases the hand gets
     // lyrical in, as every guitar style has it. Its move into the 3rd is not a bend: the notes

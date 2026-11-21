@@ -353,15 +353,21 @@ export function displacedFrom(
   heard: Heard,
   earlier: readonly Heard[],
   all: readonly Sounding[],
+  /** Earlier phrases already heard as an idea moved: one said where they fell is that idea moved again. */
+  movedBefore: ReadonlySet<Heard> = new Set(),
 ): Displacement | null {
   const found = rhythmsAgain(heard, earlier, all);
-  // A rhythm played again where it fell before is not moved, whatever its line does.
-  if (found.length === 0 || found.some((one) => one.inBar === 0)) return null;
+  // A rhythm played again where it fell before is not moved, whatever its line does; unless
+  // it fell there in a phrase that was itself the idea moved, and the idea is here too, moved
+  // a pulse from where it was stated.
+  const lineAway = found.some((one) => one.by !== null && one.line);
+  const inPlace = (one: RhythmAgain) => one.inBar === 0 && !(lineAway && movedBefore.has(one.of));
+  if (found.length === 0 || found.some(inPlace)) return null;
   // The idea itself if it is there; else its rhythm alone, with another line.
   const away = found.filter((one) => one.by !== null);
-  const moved = away.find((one) => one.line) ?? away[0];
-  return moved
-    ? { of: moved.of, by: moved.by!, source: moved.source, notes: moved.notes, line: moved.line }
+  const best = away.find((one) => one.line) ?? away[0];
+  return best
+    ? { of: best.of, by: best.by!, source: best.source, notes: best.notes, line: best.line }
     : null;
 }
 

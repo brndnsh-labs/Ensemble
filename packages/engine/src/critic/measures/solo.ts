@@ -28,7 +28,6 @@ import {
   rhythmsAgain,
   SOLO_FEATURES,
 } from "../../players/solo/critique.ts";
-import { movedIdeasOf } from "../../players/solo/play.ts";
 import type { World } from "../../players/solo/slots.ts";
 import { worldOf } from "../../players/solo/slots.ts";
 import type { StylePack } from "../../style/types.ts";
@@ -188,7 +187,7 @@ function displacements(reading: Reading): DisplacedPhrase[] {
     const moved = new Set<Heard>();
     return solo.flatMap((phrase, i): DisplacedPhrase[] => {
       if (i === 0 || body(phrase).length < 3) return [];
-      const heard = displacedFrom(phrase, solo.slice(0, i), all);
+      const heard = displacedFrom(phrase, solo.slice(0, i), all, moved);
       if (heard?.line) moved.add(phrase);
       const stated = solo.slice(0, i).filter((other) => !moved.has(other));
       const carriesLate = rhythmsAgain(phrase, stated, all).some((one) => one.by === 1);
@@ -449,15 +448,14 @@ export const soloMeasures: readonly Measure[] = [
       return share(moved.filter((one) => one.by === -1).length, moved.length);
     },
   ),
-  measure(
-    "moved-played",
-    "share",
-    "Of the phrases where the soloist drew an idea said again whole to be said a beat early or late, the share where it was: the rest were not moved because the idea would not fit moved (a note pulled out of the phrase, a note that could not keep its length), or the critic preferred another phrase. Read from what the soloist did when it played the take, not from the notes, which cannot show a phrase not played.",
-    (reading) => {
-      const moved = movedIdeasOf(reading.world.plan);
-      return moved && moved.drawn > 0 ? share(moved.played, moved.drawn) : null;
-    },
-  ),
+  {
+    id: "solo.moved-played",
+    seat: "solo",
+    unit: "share",
+    says: "Of the phrases where the soloist drew an idea said again whole to be said a beat early or late, the share where it was: the rest were not moved because the idea would not fit moved (a note pulled out of the phrase, a note that could not keep its length), or the critic preferred another phrase. Read from the take's record of what the soloist drew, since the notes cannot show a phrase not played.",
+    // Read from the take's record of the soloist's draws (`Take.moved`), not from its notes.
+    of: (take) => share(take.moved.filter((idea) => idea.played).length, take.moved.length),
+  },
   measure(
     "bars-that-rhyme",
     "share",

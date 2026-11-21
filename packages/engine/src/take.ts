@@ -8,9 +8,10 @@ import { transpose } from "./chart/transpose.ts";
 import type { Diagnostic } from "./chart/types.ts";
 import { PPQ } from "./chart/types.ts";
 import type { PerformanceEvent } from "./perform/notes.ts";
-import { perform } from "./perform/perform.ts";
+import { performed } from "./perform/perform.ts";
 import { planBars } from "./plan/plan.ts";
 import type { Plan, PlanOptions } from "./plan/types.ts";
+import type { MovedIdea } from "./players/solo/play.ts";
 import type { Seat, StylePack } from "./style/types.ts";
 import type { Key } from "./theory/pitch.ts";
 
@@ -71,6 +72,12 @@ export interface Take {
   readonly diagnostics: readonly Diagnostic[];
   readonly plan: Plan;
   readonly events: readonly PerformanceEvent[];
+  /**
+   * The phrases where the soloist drew an idea to say a beat away, and what became of each
+   * (`solo.moved-played`): what the take's notes cannot show. Not kept with a take: a take
+   * made again from its recipe makes it again.
+   */
+  readonly moved: readonly MovedIdea[];
 }
 
 /** The roadmap of a performance, without playing it. */
@@ -104,6 +111,11 @@ export function render(text: string, style: StylePack, options: TakeOptions): Ta
       ...untold.events.filter((event) => time(event) < join),
       ...told.events.filter((event) => time(event) >= join),
     ],
+    // Each phrase as the take plays it: from the jam as it was going to be up to the join.
+    moved: [
+      ...untold.moved.filter((idea) => idea.tick < join),
+      ...told.moved.filter((idea) => idea.tick >= join),
+    ],
   };
 }
 
@@ -115,10 +127,6 @@ function whole(text: string, style: StylePack, options: TakeOptions): Take {
     options.soloInstrument === undefined
       ? style
       : { ...style, solo: { ...style.solo, instrument: options.soloInstrument } };
-  return {
-    chart,
-    diagnostics: parsed.diagnostics,
-    plan: roadmap,
-    events: perform(roadmap, played, options.seed),
-  };
+  const { events, moved } = performed(roadmap, played, options.seed);
+  return { chart, diagnostics: parsed.diagnostics, plan: roadmap, events, moved };
 }

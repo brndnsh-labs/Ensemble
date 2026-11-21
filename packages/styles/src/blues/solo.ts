@@ -485,9 +485,10 @@ export const bluesSolo: SoloStyle = {
     // phrases that say it again bar for bar consider it; the critic judges it beside the
     // call where it was). Drawn early 0.3 of the time where it could go either way; in
     // practice none goes early, since a blues call opens on the one and early would cross
-    // the barline into a pickup's ground. A call's inner bars hold notes to the barline: a
-    // beat late, such a note is held over it (the blues ties, SO-38), into a chord it is a
-    // tone of; about one phrase in a hundred and fifty is moved.
+    // the barline into a pickup's ground. The line ties nothing over the barline (`tie` 0,
+    // above), but a moved call may hold a note over it: one that, a beat late, sounds past the
+    // barline (SO-38 and ST-blues-42 give the blues a tie) and is a tone of the chord it is
+    // held into. About one phrase in two hundred is moved.
     displace: { chance: 0.35, early: 0.3, holds: true },
     // On a guitar: the blue third pushed up into the third, the flat 7th into the root
     // (SO-53, ST-blues-41).

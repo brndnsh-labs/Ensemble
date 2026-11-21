@@ -34,24 +34,23 @@ import type { Slot, World } from "./slots.ts";
 import { doubleChanceOf, fourPulses, levelIndex, worldOf } from "./slots.ts";
 import type { Form, Role } from "./style.ts";
 
-/** Of a take's phrases drawn to say an idea a beat away, how many were, and how many were offered so. */
-export interface MovedIdeas {
-  /** Phrases where an idea said again whole was drawn to be said a beat early or late. */
-  readonly drawn: number;
-  /** Of those, the phrases where a moved idea was made and offered to the critic. */
-  readonly offered: number;
-  /** Of those, the phrases where the moved idea was played. */
-  readonly played: number;
-}
-const MOVED = new WeakMap<Plan, MovedIdeas>();
-
 /**
- * What the soloist did with the ideas it drew to say a beat away, the last time it played
- * this plan: for the scorecard (`solo.moved-played`), which reads a take's notes and
- * cannot see a phrase that was drawn and not played. Undefined for a plan it has not played.
+ * A phrase of a solo where an idea said again whole was drawn to be said a beat early or
+ * late, and what became of it: the scorecard's `solo.moved-played` reads these, since the
+ * notes cannot show a phrase that was drawn and not played.
  */
-export function movedIdeasOf(plan: Plan): MovedIdeas | undefined {
-  return MOVED.get(plan);
+export interface MovedIdea {
+  /** Where the phrase starts. */
+  readonly tick: number;
+  /** The idea was played a beat away. */
+  readonly played: boolean;
+  /** Its notes held over a barline: where each is struck, and the barline it is held over. */
+  readonly held: readonly { readonly tick: number; readonly barline: number }[];
+  /**
+   * Played a beat away, each of its notes: where it is struck, and the pitch it has in the
+   * idea it says again (`Phrase.idea`).
+   */
+  readonly notes: readonly { readonly tick: number; readonly was: number }[];
 }
 
 /** The shortest note: half a sixteenth (SO-19). */
@@ -74,6 +73,8 @@ interface SoloNote {
   readonly ends: boolean;
   /** Its length in the rhythm, in ticks. */
   readonly value: number;
+  /** How long it lasts as a note of the line, what a shake is judged by: its rhythm, its space, or where it is stopped. */
+  readonly lasts?: number;
   /** A note of a pickup into the phrase. */
   readonly lead: boolean;
 }
@@ -113,6 +114,8 @@ export function soloPart(
   context: PlayerContext,
   pick?: SoloPick,
   report?: (choice: SoloChoice) => void,
+  /** Told of each phrase drawn to say an idea a beat away, and what became of it. */
+  moved?: (idea: MovedIdea) => void,
 ): WrittenNote[] {
   const { plan, style, rng, heard } = context;
   const world = worldOf(plan, style, bassStruck((heard.bass ?? []).flat()));
@@ -123,7 +126,6 @@ export function soloPart(
   const accent = style.chords.ending.velocity + style.chords.ending.accent;
 
   const written: WrittenNote[] = [];
-  const moved = { drawn: 0, offered: 0, played: 0 };
   let memory: Memory = NOTHING;
   let earlier: Heard[] = [];
   let form: readonly Role[] = ["s"];
@@ -174,6 +176,9 @@ export function soloPart(
     const role = form[slot.index % form.length] ?? "s";
 
     let drawn = false;
+    // Where the pass before's pickup into this phrase starts, if it leads in: a phrase's
+    // first breath is taken from there.
+    const from = lead ? realiseLead(world, lead, first)[0]?.tick : undefined;
     const offered = phrasesFor(
       world,
       slot,
@@ -184,31 +189,28 @@ export function soloPart(
       doubled || !earned(lastPhrase, firstChorus)
         ? null
         : doubleTimeAt(world, s, heldRng(rng, "double time", "phrase", first)),
-      () => {
-        drawn = true;
+      {
+        drawn: () => {
+          drawn = true;
+        },
+        // The idea where it was, as it sounds: its own lengths, not stopped at a change of
+        // this slot's it is not a tone of (a moved note is checked against the chords it
+        // is moved onto).
+        sounds: (phrase) =>
+          realise(world, phrase, accent, from, true)
+            .filter((note) => !note.lead)
+            .map((note) => ({ duration: note.duration, value: note.lasts ?? note.value })),
       },
     );
     // The pass before's pickup into this phrase is played as it was made, whichever is chosen.
     const leading = lead ? writeLead(lead, first) : [];
-    const from = leading[0]?.tick;
     // An idea said a beat away keeps every note's length and shake, its last note a pulse
     // shorter at most for its breath; where it cannot, it is not offered (SO-08, SO-17).
     const realised = offered.map((phrase) => realise(world, phrase, accent, from));
     const keeps = offered.map(
       (phrase, i) =>
         (!phrase.inPlace ||
-          keepsLengths(
-            // An idea with a note held over the barline is held to the idea's own lengths:
-            // where it was, a note this slot's chords would stop at a change is not the measure.
-            realise(
-              world,
-              phrase.inPlace,
-              accent,
-              from,
-              phrase.bars.some((bar) => bar.held),
-            ),
-            realised[i]!,
-          )) &&
+          keepsLengths(realise(world, phrase.inPlace, accent, from, true), realised[i]!)) &&
         (!phrase.burst || landsHeld(world, phrase.burst.lands, realised[i]!)),
     );
     const phrases = offered.filter((_, i) => keeps[i]);
@@ -232,9 +234,24 @@ export function soloPart(
 
     const phrase = phrases[at]!;
     if (drawn) {
-      moved.drawn++;
-      if (phrases.some((one) => one.inPlace)) moved.offered++;
-      if (phrase.inPlace) moved.played++;
+      // A note held over a barline: one sounding past the end of its bar into a bar held into.
+      const { inPlace } = phrase;
+      const held = inPlace
+        ? phrase.line.flatMap(({ spot }) => {
+            const barline = spot.bar.start + spot.bar.ticks;
+            const into = phrase.bars[slot.bars.indexOf(spot.bar) + 1];
+            return into?.held && spot.tick + spot.hold > barline
+              ? [{ tick: spot.tick, barline }]
+              : [];
+          })
+        : [];
+      const said = inPlace
+        ? phrase.line.map((note, k) => ({
+            tick: note.spot.tick,
+            was: phrase.idea?.[k] ?? inPlace.line[k]!.pitch,
+          }))
+        : [];
+      moved?.({ tick: first.start, played: inPlace !== undefined, held, notes: said });
     }
     // How the horn plays the phrase chosen: what it does with the pitch of the notes it
     // arrives on and of the notes it leaves. Drawn by place, after the choice, so the
@@ -285,7 +302,6 @@ export function soloPart(
     const lead = intoPass(next, world.slots.at(-1));
     if (lead) writeLead(lead, next);
   }
-  MOVED.set(plan, moved);
   return written;
 }
 
@@ -366,7 +382,12 @@ function keepsLengths(was: readonly SoloNote[], now: readonly SoloNote[]): boole
     const last = i === to.length - 1;
     const give = last ? pulseTicks(note.bar.meter)[0]! : 0;
     const shaken = before.move?.vibrato === undefined || note.move?.vibrato !== undefined;
-    return note.duration >= before.duration - give && shaken;
+    // Neither shorter nor longer: within a sixteenth of it, both ways.
+    return (
+      note.duration >= before.duration - give - STEP &&
+      note.duration <= before.duration + STEP &&
+      shaken
+    );
   });
 }
 
@@ -582,19 +603,17 @@ function realise(
     const inSlot = slot.bars.indexOf(bar);
     const over = tick + spot.hold > bar.start + bar.ticks ? slot.bars[inSlot + 1] : undefined;
     const endsIn = over ?? bar;
-    // A moved idea's note held over the barline (`displace.holds`) is the note it was where
-    // the idea was. Struck in a line bar, it ends a line where a rest follows it, not because
-    // the next note is in the bar it is held into; the landing of an end bar ends its line
-    // and takes its breath, as it did where it was.
     const held = over !== undefined && phrase.bars[inSlot + 1]?.held === true;
-    const lands = held && phrase.bars[inSlot]?.part === "E";
-    const endsLine =
-      !next ||
-      next.spot.tick - (tick + spot.hold) >= PPQ ||
-      (next.spot.bar !== bar && !(held && !lands && next.spot.bar === over));
-    const part = lands ? "E" : phrase.bars[over ? inSlot + 1 : inSlot]?.part;
-    let duration = spot.hold;
-    if (endsLine && (part === "E" || !next) && !lead) {
+    const endsLine = !next || next.spot.tick - (tick + spot.hold) >= PPQ || next.spot.bar !== bar;
+    const part = phrase.bars[over ? inSlot + 1 : inSlot]?.part;
+    // An idea said a beat away sounds as long as it did where it was (`Phrase.sounds`): its
+    // breaths are where they were, a pulse on; its last note may give up a pulse to the end
+    // of the phrase.
+    const at = i - phrase.pickup.length;
+    const kept = lead ? undefined : phrase.sounds?.[at];
+    const keptLength = kept !== undefined && at < phrase.line.length - 1;
+    let duration = keptLength ? Math.min(kept.duration, space) : spot.hold;
+    if (!keptLength && endsLine && (part === "E" || !next) && !lead) {
       // The breath is taken by shortening the note that sounds into it, never by leaving it
       // out. It is a breath as heard: measured after the swing has moved the note's end.
       const bend = (at: number) => (bar.meter.unit === 4 ? swing(at, world.feel) : at);
@@ -607,8 +626,9 @@ function realise(
       duration = Math.min(duration, Math.max(EIGHTH, Math.floor(breathed + lungs - tick - STEP)));
     }
     // In the rhythm the note is as long as its space, however the hand lifts off it.
-    let value = duration;
-    if (duration >= space) {
+    let value = keptLength ? Math.min(kept.value, space) : duration;
+    if (kept !== undefined && !keptLength) duration = Math.min(duration, kept.duration);
+    if (!keptLength && duration >= space) {
       value = space;
       duration = Math.round(space * touch.legato);
     }
@@ -663,6 +683,7 @@ function realise(
         velocity,
         ...move,
         value: spot.hold,
+        lasts: value,
         ends,
         lead: lead === true,
       },

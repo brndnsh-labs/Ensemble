@@ -550,9 +550,11 @@ export const jazzSolo: SoloStyle = {
     // style that does it most, 0.6 of the phrases that could. Drawn early as often as late
     // where it could go either way; in practice about one in seven goes early, since an idea
     // that opens on the one cannot go early without crossing the barline, a pickup's ground.
-    // Not the bridge's return (`b`), which is heard where it was. A note a beat late would
-    // carry over the barline is held over it (a line that ties, SO-38), into a chord it is a
-    // tone of.
+    // Not the bridge's return (`b`), which is heard where it was. A note that, a beat late,
+    // sounds over the barline is held over it (a line that ties, SO-38), into a chord it is a
+    // tone of; few are, since a bebop line's notes are short and breathe before the barline.
+    // An idea whose moved notes would leap where it stepped (a chord tone on each beat it is
+    // moved onto) is not moved: more than half of those it would move otherwise.
     displace: { chance: 0.6, early: 0.5, roles: ["r", "v"], holds: true },
     // No bends (ST-jazz-37); a guitar shakes a note held a half note or longer (SO-52).
     bend: { third: 0, rootOrFifth: 0, around: 0, elsewhere: 0 },

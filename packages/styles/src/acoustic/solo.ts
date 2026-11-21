@@ -435,9 +435,10 @@ export const acousticSolo: SoloStyle = {
       approach: false,
     },
     // Seldom: a singer-songwriter's line is a sung melody, said again where it was sung.
-    // Early 0.4 where it could go either way. A sung note a beat late is held over the barline
-    // where it is a tone of the chord it is held into; about one phrase in two hundred is
-    // moved. Not the opening idea brought back (`b`).
+    // Early 0.4 where it could go either way. A sung note that, a beat late, sounds past the
+    // barline is held over it where it is a tone of the chord it is held into; still about one
+    // phrase in eight hundred is moved, since a sung line mostly breathes before the barline
+    // and its moved notes must keep the idea's lengths. Not the opening idea brought back (`b`).
     displace: { chance: 0.2, early: 0.4, roles: ["r", "v"], holds: true },
     // No whole-step bends and no scoops (ST-acoustic-28); the acoustic guitars' hands do not bend,
     // and on an instrument that can the line is still sung, not bent.
