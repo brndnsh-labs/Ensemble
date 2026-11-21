@@ -12,13 +12,30 @@ import type { BassStyle, Figure } from "@ensemble/engine";
 
 type Line = BassStyle["lines"]["mid"];
 
-/** The five riffs, as the band plays them when it is hot (BA-38, ST-funk-15). */
+/**
+ * The riffs, as the band plays them when it is hot. The first five are the
+ * notes' own (BA-38, ST-funk-15). Each is a front half and a back half; the
+ * next four are one of the notes' front halves on another's back half, joined
+ * where the two meet as a riff of the notes meets itself there: the fifth's
+ * flat seventh going up to the octave on 3, as it does in its own riff, and the
+ * second's front half into the octave on 3, as in its own. Four only: six and
+ * twelve have their own, drawn under the same name (`riffs`), so a section in
+ * a chart that changes meter takes its riff in each meter's list by itself.
+ */
 const RIFFS = [
   "R..m R.8. m.R. .78.",
   "R... m.R. 8..R .m5.",
   "R..m ..R8 ..R. .7.m",
   "R.8. m.R. ..R. m.8.",
   "R... ...7 8.R. .5..",
+  // The fifth's front half, the second's back half.
+  "R... ...7 8..R .m5.",
+  // The second's front half, the fifth's back half.
+  "R... m.R. 8.R. .5..",
+  // The fourth's front half, the third's back half.
+  "R.8. m.R. ..R. .7.m",
+  // The first's front half, the fourth's back half.
+  "R..m R.8. ..R. m.8.",
 ] as const;
 
 /** A riff with some of its strokes left out, written back in beats. */
@@ -91,8 +108,9 @@ const touch = {
 //
 // The levels thin as in four: the working level leaves out the dead notes on a
 // pulse's last eighth (four's "a"), quiet keeps the roots. The riffs are listed
-// in the same order as four's and drawn under the same name, so a section that
-// plays four's first riff plays the first here.
+// in the order of four's first five and drawn under the same name; four has
+// four more of its own since (#2242), so the draw no longer matches them place
+// for place.
 
 /** The five riffs in twelve, hot. */
 const RIFFS_IN_TWELVE = [

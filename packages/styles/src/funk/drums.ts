@@ -13,9 +13,15 @@ import type { DrumStyle, DrumTime, FillShape, GrooveOption } from "@ensemble/eng
 // ── the time ────────────────────────────────────────────────────────────────
 
 /**
- * The five kicks, one per section, each with the One and none on 2 or 4
+ * The kicks, one per section, each with the One and none on 2 or 4
  * (ST-funk-06). The weights are low, mid, high: the busier kicks come in as
  * the band gets louder.
+ *
+ * The first five are the notes' own (ST-funk-06, DR-47). Each is a front half
+ * (beats 1 and 2: the statement an answer bar keeps, DR-05) and a back half
+ * (beats 3 and 4: what it turns); the next three are the notes' front halves
+ * on another of the notes' back halves, which keeps the rule. Four only: six
+ * and twelve have their own.
  */
 const KICKS = [
   { lines: { kick: "x... ...x ..x. ...." }, weights: [3, 3, 2] },
@@ -23,6 +29,12 @@ const KICKS = [
   { lines: { kick: "x... ..x. ..x. ...." }, weights: [3, 2, 1] },
   { lines: { kick: "x..x .... ..x. .x.." }, weights: [1, 2, 3] },
   { lines: { kick: "x... .... xx.. .x.." }, weights: [1, 2, 3] },
+  // The fourth's front half, the first's back half: three strokes.
+  { lines: { kick: "x..x .... ..x. ...." }, weights: [2, 2, 1] },
+  // The first's front half, the second's back half: four strokes.
+  { lines: { kick: "x... ...x ..x. .x.." }, weights: [1, 2, 2] },
+  // The third's front half, the fifth's back half: five, the busiest, held for the louder band.
+  { lines: { kick: "x... ..x. xx.. .x.." }, weights: [0, 1, 2] },
 ] as const;
 
 function kicks(tier: 0 | 1 | 2): GrooveOption[] {

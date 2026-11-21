@@ -64,6 +64,19 @@ const stab: VoicingKind = {
 // notes' guitar played the line unchanged for the whole section, which on a
 // one-bar vamp is sixteen identical bars; the drummer already turns his bar
 // and fills there, and this is the guitar's part of the same breath.
+//
+// The last four lines are the notes' funk keyboard riffs (CH-46, ST-funk-24),
+// one a section, played as the guitar plays a line (CH-47, ST-funk-27): their
+// stabs where the keyboard stabs, leaned on where the keyboard leans (98 on an
+// "and", 88 elsewhere: the guitar's 100 and 86), and the scratches the guitar's
+// levels give the strokes between. The keyboard's own thinning (quiet the "and"s
+// alone, the working level one stab dropped) is not the guitar's and is not
+// taken. Every guitar line has a stab on the "and" of 4 to lean into a change on
+// (ST-funk-38), as each of the notes' own three does: the first, second and
+// fourth riffs, which have none in the last eighth, are given it there, a plain
+// stab as in the notes' lines; the third's stab on the "a" of 4 is already there,
+// and is also the turn's flick, so its turn is its line.
+// Four only: six and twelve have their own lines, below.
 
 /**
  * A stab rings 0.9 of a sixteenth (ST-funk-27); a scratch is half a sixteenth
@@ -99,6 +112,12 @@ const rhythm: RhythmBook = {
         line("three against four", "x..x ..x. .x.x X.x.", "x..x ..x. .x.x X.xx"),
         // Stabs on the "and"s and around the backbeat (ST-funk-27).
         line("ands", "..x. X..x .x.. X.x.", "..x. X..x .x.. X.xx"),
+        // The funk keyboard's four stab riffs on the guitar, each with its stab into the next bar
+        // (CH-46, ST-funk-24, ST-funk-38; above).
+        line("keys one", "..X. .x.x ...x .xx.", "..X. .x.x ...x .xxx"),
+        line("keys two", ".x.. x..x .x.. x.x.", ".x.. x..x .x.. x.xx"),
+        line("keys three", "..X. ..X. ..X. .x.x", "..X. ..X. ..X. .x.x"),
+        line("keys four", "x..x ..X. ..X. x.x.", "x..x ..X. ..X. x.xx"),
       ],
       answers: [],
       busy: { from: 6, to: 7 },
@@ -114,6 +133,10 @@ const rhythm: RhythmBook = {
         line("backbeat", "~.~x X.x. ~.~x X.x.", "~.~x X.x. ~.~x X.xx"),
         line("three against four", "x.~x ~.x. ~x~x X.x.", "x.~x ~.x. ~x~x X.xx"),
         line("ands", "~.x. X.~x ~x~. X.x.", "~.x. X.~x ~x~. X.xx"),
+        line("keys one", "~.X. ~x~x ~.~x ~xx.", "~.X. ~x~x ~.~x ~xxx"),
+        line("keys two", "~x~. x.~x ~x~. x.x.", "~x~. x.~x ~x~. x.xx"),
+        line("keys three", "~.X. ~.X. ~.X. ~x~x", "~.X. ~.X. ~.X. ~x~x"),
+        line("keys four", "x.~x ~.X. ~.X. x.x.", "x.~x ~.X. ~.X. x.xx"),
       ],
       answers: [],
       busy: { from: 10, to: 11 },
@@ -128,6 +151,10 @@ const rhythm: RhythmBook = {
         line("backbeat", "~~~x X~x~ ~~~x X~x~", "~~~x X~x~ ~~~x X~xx"),
         line("three against four", "x~~x ~~x~ ~x~x X~x~", "x~~x ~~x~ ~x~x X~xx"),
         line("ands", "~~x~ X~~x ~x~~ X~x~", "~~x~ X~~x ~x~~ X~xx"),
+        line("keys one", "~~X~ ~x~x ~~~x ~xx~", "~~X~ ~x~x ~~~x ~xxx"),
+        line("keys two", "~x~~ x~~x ~x~~ x~x~", "~x~~ x~~x ~x~~ x~xx"),
+        line("keys three", "~~X~ ~~X~ ~~X~ ~x~x", "~~X~ ~~X~ ~~X~ ~x~x"),
+        line("keys four", "x~~x ~~X~ ~~X~ x~x~", "x~~x ~~X~ ~~X~ x~xx"),
       ],
       answers: [],
       busy: { from: 16, to: 16 },
