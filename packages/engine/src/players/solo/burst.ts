@@ -10,7 +10,7 @@ import { onPulse, pulseTicks } from "../../perform/meter.ts";
 import type { PlanBar } from "../../plan/types.ts";
 import type { Rng } from "../../rng.ts";
 import type { ToneRole } from "../../theory/chord.ts";
-import { doubledIn } from "./critique.ts";
+import { doubledIn, heardIn } from "./critique.ts";
 import { isChordTone, landing } from "./harmony.ts";
 import type { Spot } from "./line.ts";
 import type { Phrase, Placed } from "./phrases.ts";
@@ -119,11 +119,14 @@ function run(
   const covered = slot.bars.filter((bar) => bar.start < to && bar.start + bar.ticks > from);
   const parts = covered.map((bar) => phrase.bars[slot.bars.indexOf(bar)]?.part);
   if (parts.some((part) => part !== "L" && part !== "E")) return null;
-  // Straight out of the line's own notes: one struck in the pulse before it.
+  // Straight out of the line's own notes: one struck in the pulse before it, and heard far
+  // enough before the run's first note that the run is heard to start on its pulse.
   const before = line.findLast((note) => note.spot.tick < from);
   if (!before || before.lead || before.spot.tick < from - pulseTicks(before.spot.bar.meter)[0]!) {
     return null;
   }
+  const heard = (spot: Spot) => spot.bar.start + heardIn(spot.bar, spot.tick, world.feel);
+  if (from - heard(before.spot) <= 1.5 * step) return null;
   if (line.some((note, i) => i < at && note.spot.tick >= from && note.lead)) return null;
 
   // Its spots, even as heard: a pulse is where it is written, swung or not.
