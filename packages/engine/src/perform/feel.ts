@@ -45,6 +45,26 @@ export function swing(tickInBar: number, feel: FeelStyle): number {
   return base + bent;
 }
 
+/**
+ * Where on the straight grid to write a note so that, once swung, it is heard at a place in
+ * the bar: `swing` the other way. A note written there off the grid lines keeps its place in
+ * line, as `swing` keeps it.
+ */
+export function unswing(heardInBar: number, feel: FeelStyle): number {
+  const amount = Math.min(100, Math.max(0, feel.swing.amount));
+  if (amount === 0) return heardInBar;
+  const pair = feel.swing.unit === "eighth" ? PPQ : PPQ / 2;
+  const half = pair / 2;
+  const offbeat = pair * (0.5 + amount / 600);
+  const base = Math.floor(heardInBar / pair) * pair;
+  const within = heardInBar - base;
+  const straight =
+    within < offbeat
+      ? (within / offbeat) * half
+      : half + ((within - offbeat) / (pair - offbeat)) * half;
+  return base + straight;
+}
+
 export function applyFeel(
   notes: readonly WrittenNote[],
   plan: Plan,

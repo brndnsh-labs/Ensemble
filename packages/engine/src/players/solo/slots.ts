@@ -143,6 +143,33 @@ export function busyOf(plan: Plan, solo: SoloStyle): { lift: number; room: numbe
 }
 
 /**
+ * The most the player's setting at its top asks of a style that plays double time at all: the
+ * chance a phrase that may take a burst is offered one. A style that never plays it does not
+ * at any setting.
+ */
+export const MOST_DOUBLE = 1;
+
+/**
+ * How often a phrase that may take a burst in double time is offered one: the style's own at
+ * the middle of the player's setting, none at its bottom, the engine's most at its top (where
+ * the style plays it at all), in a straight line between.
+ */
+export function doubleChanceOf(plan: Plan, solo: SoloStyle): number {
+  const setting = plan.soloDensity ?? 0.5;
+  const own = solo.doubleTime.chance;
+  if (setting <= 0.5 || own <= 0) return own * Math.min(1, setting / 0.5);
+  return own + (Math.max(own, MOST_DOUBLE) - own) * ((setting - 0.5) / 0.5);
+}
+
+/**
+ * A bar's four pulses in seconds: tempo is felt in the pulse, not the bar, so a bar of
+ * six-eight is as quick as a bar of four at the same pulse, and a bar of three as slow.
+ */
+export function fourPulses(plan: Plan, bar: PlanBar): number {
+  return ((bar.ticks / PPQ) * (60 / plan.quarters) * 4) / pulseTicks(bar.meter).length;
+}
+
+/**
  * Where a phrase stands among the phrases of its solo for a part of a lift, 0
  * to 1: the n-th phrase's place on the golden-ratio sequence, which spreads
  * any share of them evenly through the solo, and keeps every phrase lifted at
@@ -324,11 +351,7 @@ function slotsOf(plan: Plan, solo: SoloStyle, instrument: SoloInstrument): Slot[
       0,
       solo.levels.findIndex((level) => level.name === name),
     );
-  // Tempo is felt in the pulse, not the bar: a bar is judged as four of its pulses, so a
-  // bar of six-eight is as quick as a bar of four at the same pulse, and a bar of three
-  // as slow.
-  const fourPulses = (bar: PlanBar) =>
-    ((bar.ticks / PPQ) * (60 / plan.quarters) * 4) / pulseTicks(bar.meter).length;
+  // Tempo is felt in the pulse, not the bar (`fourPulses`).
   const busy = busyOf(plan, solo);
   const home = instrument.home + solo.lift;
   const top = Math.min(instrument.range[1] - 1, home + solo.arc.peak.above);
@@ -374,7 +397,7 @@ function slotsOf(plan: Plan, solo: SoloStyle, instrument: SoloInstrument): Slot[
     // The band's energy and the tempo each move the density a step, a step in all; the
     // peak is never made sparser (SO-06). Energy does not move the register.
     const tier = tierOf(bars[0]!.seats.solo ?? bars[0]!.energy);
-    const seconds = fourPulses(bars[0]!);
+    const seconds = fourPulses(plan, bars[0]!);
     // However hot the band, a solo opens with room: its first stage is not made busier.
     const opening = stage === stages[0] && !peak;
     const byEnergy = tier === "low" ? -1 : tier === "high" && !opening ? 1 : 0;

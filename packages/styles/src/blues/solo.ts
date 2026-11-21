@@ -445,7 +445,7 @@ export const bluesSolo: SoloStyle = {
   // heard. A flurry before the climax: only in the climb to the top note.
   doubleTime: {
     perPulse: 6,
-    chance: 0,
+    chance: 0.7,
     bars: { shortest: 0.5, longest: 1 },
     climbOnly: true,
     slow: null,

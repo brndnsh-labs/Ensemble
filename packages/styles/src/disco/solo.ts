@@ -382,7 +382,7 @@ export const discoSolo: SoloStyle = {
   // what the alto or a guitar is asked anywhere (`fastest`), so it is never offered there.
   doubleTime: {
     perPulse: 8,
-    chance: 0,
+    chance: 0.1,
     bars: { shortest: 0.5, longest: 1 },
     climbOnly: true,
     slow: null,

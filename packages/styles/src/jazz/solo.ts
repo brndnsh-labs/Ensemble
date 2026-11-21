@@ -511,7 +511,7 @@ export const jazzSolo: SoloStyle = {
   // line is at its busiest, and on a ballad only toward the top of the setting and short.
   doubleTime: {
     perPulse: 4,
-    chance: 0,
+    chance: 0.3,
     bars: { shortest: 0.5, longest: 2 },
     climbOnly: false,
     slow: { from: 0.75, longest: 0.5 },

@@ -37,11 +37,18 @@ export interface Heard {
    * judged as the line it doubles; its pitches are judged as they are played. Left out, the
    * notes themselves.
    */
-  readonly run?: readonly Sounding[];
+  readonly run?: Run;
+}
+
+/** A phrase's notes as the line runs, and the bars a burst runs through. */
+export interface Run {
+  readonly notes: readonly Sounding[];
+  readonly bars: ReadonlySet<number>;
 }
 
 /** A phrase as the line runs (`Heard.run`). */
-const asRun = (heard: Heard): Heard => (heard.run ? { ...heard, notes: heard.run } : heard);
+const asRun = (heard: Heard): Heard =>
+  heard.run ? { slot: heard.slot, notes: heard.run.notes } : heard;
 
 /** One whole phrase in its place: what the critic chooses between. */
 export interface SoloCandidate extends Heard {
@@ -138,15 +145,17 @@ export function burstsIn(world: World, notes: readonly Sounding[]): Burst[] {
 /**
  * A phrase's notes as the line runs (`Heard.run`), where it has a burst in double time:
  * each other note of the run, struck where the line's own grid is heard nearest it, and the
- * note it lands on. Undefined where it has none.
+ * note it lands on, and the bars the run goes through. Undefined where it has none.
  */
-export function runOf(world: World, notes: readonly Sounding[]): Sounding[] | undefined {
+export function runOf(world: World, notes: readonly Sounding[]): Run | undefined {
   const bursts = burstsIn(world, notes);
   if (bursts.length === 0) return undefined;
   const skipped = new Set<Sounding>();
   const placed = new Map<Sounding, Sounding>();
+  const bars = new Set<number>();
   for (const burst of bursts) {
     burst.notes.forEach((note, i) => {
+      bars.add(note.bar.index);
       if (i % 2 === 1) {
         skipped.add(note);
         return;
@@ -160,7 +169,10 @@ export function runOf(world: World, notes: readonly Sounding[]): Sounding[] | un
       placed.set(note, { ...note, tick: note.bar.start + best });
     });
   }
-  return notes.filter((note) => !skipped.has(note)).map((note) => placed.get(note) ?? note);
+  return {
+    notes: notes.filter((note) => !skipped.has(note)).map((note) => placed.get(note) ?? note),
+    bars,
+  };
 }
 
 /** A phrase's notes without the pickup into it. */
@@ -410,7 +422,9 @@ const held = (note: Sounding) => note.ends - note.tick >= PPQ * 0.75;
 /** The bars of a phrase that carry a line (three notes or more), each as the gaps between its attacks. */
 export function lineBars(heard: Heard): string[] {
   const bars = new Map<number, number[]>();
-  for (const note of body(asRun(heard))) {
+  for (const note of body(heard)) {
+    // A bar a run in double time goes through is the phrase's flurry, not a bar of its line.
+    if (heard.run?.bars.has(note.bar.index)) continue;
     bars.set(note.bar.index, [...(bars.get(note.bar.index) ?? []), note.tick]);
   }
   return [...bars.values()]
