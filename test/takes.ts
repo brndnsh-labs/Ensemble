@@ -363,6 +363,8 @@ export function notesOf(take: Take, seat?: Seat): NoteEvent[] {
 export interface SmfTrackSummary {
   name: string;
   readonly tempos: number[];
+  /** Each tempo as the file says it: where (in ticks) and how long a quarter note lasts (in microseconds). */
+  readonly tempoMap: { readonly tick: number; readonly micros: number }[];
   readonly channels: Set<number>;
   noteOns: number;
   noteOffs: number;
@@ -391,16 +393,20 @@ export function readSmf(bytes: Uint8Array): SmfSummary {
     const track: SmfTrackSummary = {
       name: "",
       tempos: [],
+      tempoMap: [],
       channels: new Set(),
       noteOns: 0,
       noteOffs: 0,
     };
     let ended = false;
+    let tick = 0;
     while (at < end) {
       if (ended) throw new Error(`track ${t}: events after end of track`);
       // Delta time: a variable-length quantity.
-      while (bytes[at]! & 0x80) at++;
-      at++;
+      let delta = 0;
+      while (bytes[at]! & 0x80) delta = (delta << 7) | (bytes[at++]! & 0x7f);
+      delta = (delta << 7) | bytes[at++]!;
+      tick += delta;
       const status = bytes[at]!;
       if (status === 0xff) {
         const type = bytes[at + 1]!;
@@ -409,9 +415,9 @@ export function readSmf(bytes: Uint8Array): SmfSummary {
         const data = bytes.subarray(at + 3, at + 3 + length);
         if (type === 0x03) track.name ||= new TextDecoder().decode(data);
         if (type === 0x51) {
-          track.tempos.push(
-            Math.round(60_000_000 / ((data[0]! << 16) | (data[1]! << 8) | data[2]!)),
-          );
+          const micros = (data[0]! << 16) | (data[1]! << 8) | data[2]!;
+          track.tempos.push(Math.round(60_000_000 / micros));
+          track.tempoMap.push({ tick, micros });
         }
         if (type === 0x2f) ended = true;
         at += 3 + length;

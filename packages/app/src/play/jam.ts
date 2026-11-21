@@ -15,7 +15,6 @@ import type {
 } from "@ensemble/engine";
 import {
   chordText,
-  PPQ,
   parse,
   planBar,
   pulseStarts,
@@ -24,6 +23,7 @@ import {
   seatChoice,
   secondsAt,
   tempoRange,
+  tickAt,
   timedNotes,
   transpose,
 } from "@ensemble/engine";
@@ -50,6 +50,8 @@ export interface JamSetup {
   readonly soloDensity: number;
   /** In a jam, the soloist leads from the first time round. */
   readonly soloFromTop: boolean;
+  /** In a jam, the tempo breathes with the band's arc, by the style's amount. */
+  readonly breathe: boolean;
   /** The instrument a seat is played on, where the player chose one of the style's others. */
   readonly instruments: HowPlayed["instruments"];
 }
@@ -89,6 +91,8 @@ export function takeOptions(setup: JamSetup): HowPlayed {
     // a song once through, the take is the one it was before the settings existed.
     ...(setup.band.solo && setup.soloDensity !== 0.5 ? { soloDensity: setup.soloDensity } : {}),
     ...(setup.band.solo && setup.soloFromTop && !setup.song ? { soloFromTop: true } : {}),
+    // A song keeps no arc and a style that does not breathe keeps the tempo either way.
+    ...(setup.breathe && !setup.song && setup.style.feel.breathe > 0 ? { breathe: true } : {}),
     ...(setup.instruments && Object.keys(setup.instruments).length > 0
       ? { instruments: setup.instruments }
       : {}),
@@ -229,12 +233,10 @@ export interface Place {
   readonly beat: number;
 }
 
-export const ticksAt = (plan: Plan, seconds: number): number =>
-  (seconds * plan.quarters * PPQ) / 60;
-
 /** The bar and beat sounding at a second of the performance. Undefined before it starts and after it ends. */
 export function placeAt(plan: Plan, seconds: number): Place | undefined {
-  const tick = ticksAt(plan, seconds);
+  // Each bar at its own tempo, where the take breathes.
+  const tick = tickAt(plan, seconds);
   if (tick < 0 || tick >= plan.ticks) return undefined;
   let low = 0;
   let high = plan.bars.length - 1;
@@ -315,7 +317,7 @@ export function turnForHome(
   const { bar } = place;
   if (bar.kind === "tail" || bar.lastPass || bar.ending) return undefined;
   const pass = bar.kind === "count-in" ? 0 : bar.pass;
-  const earliest = ticksAt(plan, after + TOP_MARGIN);
+  const earliest = tickAt(plan, after + TOP_MARGIN);
   // An open jam's roadmap carries the pass after the last one played, which is enough to find a top in.
   const top = [...plan.bars, ...plan.lookahead].find(
     (b) =>

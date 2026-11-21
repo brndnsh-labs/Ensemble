@@ -24,6 +24,8 @@ export const blues: StylePack = {
     // Bass a hair behind for weight; piano lazy; the lead furthest back.
     lean: { bass: 2, chords: 6, solo: 8 },
     humanize: 35,
+    // A percent either way (docs/decisions/engine.md, the tempo breathes): a shuffle band leaning into its last choruses.
+    breathe: 0.01,
   },
   arc: DEFAULT_ARC,
   ending: {

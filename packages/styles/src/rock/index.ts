@@ -32,6 +32,8 @@ export const rock: StylePack = {
     swing: { unit: "eighth", amount: 0 },
     lean: { bass: 0, chords: 3, solo: 4 },
     humanize: 35,
+    // Three quarters of a percent either way (docs/decisions/engine.md, the tempo breathes): a band driving into its loud passes.
+    breathe: 0.0075,
   },
   // The full default arc: verse at the working level, chorus hot, intro and breakdown quiet
   // (ST-rock-31).

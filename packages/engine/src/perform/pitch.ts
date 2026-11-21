@@ -110,7 +110,8 @@ export function pitchCurve(move: PitchMove, secondsPerTick: number, seconds: num
  */
 export function asStruck(
   events: readonly PerformanceEvent[],
-  secondsPerTick: number,
+  /** Seconds a tick lasts where a tick falls: the bar's tempo. */
+  secondsPerTick: (tick: number) => number,
 ): PerformanceEvent[] {
   if (!events.some((event) => event.kind === "note" && event.slur)) return [...events];
   const out: PerformanceEvent[] = [];
@@ -135,7 +136,7 @@ export function asStruck(
     const move: PitchMove = {
       glide: [
         { at: 0, semitones: from },
-        { at: into - JUMP / secondsPerTick, semitones: from },
+        { at: into - JUMP / secondsPerTick(event.tick + event.offset), semitones: from },
         { at: into, semitones: 0 },
       ],
       ...(vibrato ? { vibrato: { ...vibrato, from: vibrato.from + into } } : {}),

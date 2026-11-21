@@ -3,6 +3,7 @@
 // knows which one made it.
 
 import type { ChordSpan, Meter, SectionRole, SourceRange } from "../chart/types.ts";
+import { secondsAt } from "../perform/time.ts";
 import type { EndingGesture, Seat, Tier } from "../style/types.ts";
 import type { Key } from "../theory/pitch.ts";
 
@@ -53,6 +54,12 @@ export interface PlanOptions {
    * It moves the soloist alone: the band plays what it would have played.
    */
   readonly soloDensity?: number;
+  /**
+   * The tempo breathes with the arc: each bar's a little quicker as the jam builds and a little
+   * slower as it comes down, by the style's own amount (`FeelStyle.breathe`), and never inside a
+   * bar. Default false: the tempo as set, in every bar, for someone practising to it.
+   */
+  readonly breathe?: boolean;
   /** A bar of sticks before the first bar. Default true. */
   readonly countIn?: boolean;
   /** Seats to leave out entirely. Default: none. */
@@ -139,6 +146,12 @@ export interface PlanBar {
     readonly length: number;
   };
 
+  /**
+   * Quarter notes a minute in this bar: `Plan.quarters`, the tempo as set, unless the take
+   * breathes (`PlanOptions.breathe`). Everything that turns ticks into seconds reads it.
+   */
+  readonly quarters: number;
+
   /** What to play and how loud: 0 to 1, after every lift. */
   readonly energy: number;
   /**
@@ -168,12 +181,14 @@ export interface Plan {
   /**
    * The tempo as a musician reads it: pulses a minute, in the pulse of the
    * chart's meter (a dotted quarter in 6/8 and 12/8, a quarter in 4/4 and 6/4).
+   * The tempo as set: where the take breathes, each bar has its own (`PlanBar.quarters`).
    */
   readonly tempo: number;
   /**
-   * Quarter notes a minute: what a tick is timed by, since a tick is a 480th
-   * of a quarter note in every meter. The tempo itself wherever the pulse is a
-   * quarter; half as much again where it is a dotted quarter.
+   * Quarter notes a minute at the tempo as set, since a tick is a 480th of a
+   * quarter note in every meter. The tempo itself wherever the pulse is a
+   * quarter; half as much again where it is a dotted quarter. The players write
+   * to it; time is kept by each bar's own (`PlanBar.quarters`, `secondsAt`).
    */
   readonly quarters: number;
   /** Every bar that is played, in order. */
@@ -201,6 +216,7 @@ export function planBar(plan: Plan, index: number): PlanBar | undefined {
   return index < plan.bars.length ? plan.bars[index] : plan.lookahead[index - plan.bars.length];
 }
 
+/** How long the performance lasts, in seconds. */
 export function seconds(plan: Plan): number {
-  return (plan.ticks / 480) * (60 / plan.quarters);
+  return secondsAt(plan, plan.ticks);
 }

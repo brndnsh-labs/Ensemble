@@ -68,6 +68,12 @@ export interface FeelStyle {
   readonly lean: Readonly<Record<PitchedSeat, number>>;
   /** 0 to 100. At 100 a note moves at most 9 ms and its velocity at most 10. */
   readonly humanize: number;
+  /**
+   * How far the tempo breathes with the arc when a take asks it to (`PlanOptions.breathe`): the
+   * most a bar's tempo moves from the tempo as set, as a share of it, either way. 0 for a band
+   * played to a grid or a machine's pulse; never more than 0.02 (`BREATHE_MOST`).
+   */
+  readonly breathe: number;
 }
 
 export interface ArcStyle {

@@ -1,6 +1,7 @@
 // Checks a style pack for mistakes the type system cannot see. The compiler
 // guarantees the shape; this guarantees the data means something.
 
+import { BREATHE_MOST } from "../plan/tempo.ts";
 import { validateBassStyle } from "../players/bass/validate.ts";
 import { validateChordStyle } from "../players/chords/validate.ts";
 import { validateDrumStyle } from "../players/drums/validate.ts";
@@ -35,6 +36,10 @@ export function validateStyle(style: StylePack): string[] {
   }
   check(feel.swing.amount >= 0 && feel.swing.amount <= 100, "feel: swing amount is 0 to 100");
   check(feel.humanize >= 0 && feel.humanize <= 100, "feel: humanize is 0 to 100");
+  check(
+    feel.breathe >= 0 && feel.breathe <= BREATHE_MOST,
+    `feel: the tempo breathes 0 to ${BREATHE_MOST} of itself either way`,
+  );
   for (const [seat, ms] of Object.entries(feel.lean)) {
     check(Math.abs(ms) <= 60, `feel: a lean of ${ms} ms on ${seat} is latency, not a pocket`);
   }

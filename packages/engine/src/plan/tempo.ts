@@ -1,0 +1,69 @@
+// The tempo as it breathes: a band asked to (`PlanOptions.breathe`) pushes a
+// little as the jam builds and eases back as it comes down. Each bar has one
+// tempo, decided from its own pass's level on the arc (read at the pass's middle,
+// so no phrase inside it moves the tempo) against the opening pass's, and the
+// tempo of the bar before. Nothing later is read, so an open jam made longer and
+// a jam told to finish keep the time of what was played. Without the option
+// every bar is at the tempo as set.
+
+import type { Meter } from "../chart/types.ts";
+import { tempoRange } from "../style/meters.ts";
+import type { ArcStyle, StylePack } from "../style/types.ts";
+
+/** The most any style breathes, either way, as a share of the tempo as set. */
+export const BREATHE_MOST = 0.02;
+
+/** The most the tempo moves from one bar to the next, as a share of the tempo as set. */
+export const TEMPO_STEP = 0.0025;
+
+/**
+ * How far a style breathes at a tempo, as a share of it: the style's amount, held inside the
+ * style's limits for the meter. A band set near the top of its range has no push left and one
+ * near the floor nothing to settle into, so the amount is the smaller of the two room it has,
+ * both ways alike, and nothing at a limit or past one.
+ */
+export function breatheAmount(style: StylePack, meter: Meter, tempo: number): number {
+  const { min, max } = tempoRange(style, meter);
+  const room = Math.min(max / tempo - 1, 1 - min / tempo);
+  return Math.max(0, Math.min(style.feel.breathe, BREATHE_MOST, room));
+}
+
+/**
+ * The highest a pass of the arc reaches, read at a pass's middle: what asks for the whole of a
+ * style's amount. An open jam's arc is its lift's cap; a timed jam's the highest of its peak,
+ * its settled level, its breath and the middle of its last pass's lift.
+ */
+export function arcHighest(arc: ArcStyle, open: boolean): number {
+  const shape = arc.timed;
+  const highest = open
+    ? arc.passLift.cap
+    : Math.max(shape.climax, shape.settle, shape.breath, (shape.lastFrom + shape.lastTo) / 2);
+  return highest * arc.depth;
+}
+
+/**
+ * Each bar's tempo as a share above (or below) the tempo as set, in the order the bars are
+ * played. `wanted` is each bar's target, a share: its pass's level on the arc against the
+ * opening pass's, scaled so that the arc's highest pass asks for the whole amount. The tempo
+ * walks toward it by no more than `TEMPO_STEP` a bar, so a change at the top of a pass takes a
+ * few bars. The first bar is the tempo as set.
+ */
+export function breaths(wanted: readonly number[]): number[] {
+  const out: number[] = [];
+  let now = 0;
+  for (const target of wanted) {
+    now += Math.max(-TEMPO_STEP, Math.min(TEMPO_STEP, target - now));
+    out.push(now);
+  }
+  return out;
+}
+
+/**
+ * Quarter notes a minute for a bar a share off the tempo as set. A bar at the tempo as set
+ * is that exactly; any other is held to a whole microsecond a quarter note, which is what a
+ * MIDI file can say, so the exported file's tempo map is the one that was played.
+ */
+export function barQuarters(quarters: number, share: number): number {
+  if (share === 0) return quarters;
+  return 60_000_000 / Math.round(60_000_000 / (quarters * (1 + share)));
+}

@@ -402,8 +402,10 @@ export function transcription(take: Take, style: StylePack, read: ReadOptions): 
   if (options.without && options.without.length > 0)
     said.push(`without ${options.without.join(", ")}`);
   if (options.countIn === false) said.push("no count-in");
+  if (options.breathe) said.push("the tempo breathes");
   out.push(said.join("; "));
   if (timing) {
+    // At the tempo set: a bar that breathes stretches its ticks by its own tempo.
     const ms = 60000 / (plan.quarters * PPQ);
     out.push(
       `timing: @+N after a note is where it was played, in ticks from the grid; a tick is ${Number(ms.toFixed(3))} ms (${PPQ} to the quarter)`,
@@ -450,6 +452,10 @@ export function transcription(take: Take, style: StylePack, read: ReadOptions): 
     }
     if (meterName(bar.meter) !== meterName(meter)) head.push(meterName(bar.meter));
     if (keyToString(bar.key) !== keyToString(key)) head.push(`key ${keyToString(bar.key)}`);
+    // A take that breathes: the bar's own tempo, where it is not the tempo set.
+    if (bar.quarters !== plan.quarters) {
+      head.push(`${num((bar.quarters / plan.quarters) * plan.tempo)} bpm`);
+    }
     head.push(...marksOf(bar, bar.index === lastPassAt));
     out.push(head.join(" · "));
 
