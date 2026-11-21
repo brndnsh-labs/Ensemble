@@ -2,7 +2,7 @@
 name: cycle
 description: Build and ship ensemble work end to end — read the issue, build it, run the gates, review it at the depth its risk deserves, fix what review finds, and open the PR (queuing server-side auto-merge for a safe story). Stops only on a brake or a real judgment call. Usage `/cycle #<n>` · `/cycle next` · `/cycle --all` · `/cycle <plain-English idea>` · add `--deploy`.
 ---
-<!-- cycle:rendered template=skills/cycle.md.tmpl hash=578cbfaa4db5 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/cycle.md.tmpl hash=5546e6e159b7 — managed by the-cycle; edit the template, not this file -->
 
 # /cycle — build and ship
 
@@ -61,7 +61,7 @@ green gate, or CI transition for about 30 minutes, stop and report what's stuck.
 
 ## Shipping here
 
-- `DECISIONS.md` gets the entry for any call made along the way (in the PR, not after it), and `PLAN.md` "Resume here" is updated when the state of the work moved.
+- `DECISIONS.md` gets the entry for any call made along the way (in the PR, not after it). The state of the work goes on the issue and the PR, not in `PLAN.md`.
 - **Whether a change that can be heard waits on his ear is measured, not assumed** (DOCTRINE, "Measured before asked"): paste the last block of each moved style's `pnpm score` report ("against what he has passed by ear") into the PR body. Inside in every style, no new kind of sound, and not the one in five: `Closes #<n>`, and the closing comment says "inside what he has passed".
 - **Work that waits on Brandon's ear or eye does not close on merge.** Write `part of #<n>` in the PR body, not `Closes #<n>`. Once it has merged, set the issue to `status:needs-ear` and comment where the page is (`out/<name>/`) and what was measured. `/unblock` closes it on his verdict.
 - The PR body reports scorecard movement and which goldens changed, in numbers, and makes no claim about how it sounds.
