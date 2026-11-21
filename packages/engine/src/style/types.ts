@@ -117,6 +117,37 @@ export interface ArcStyle {
    * high tier is a different groove that a band would not flip into mid-take.
    */
   readonly liftsCrossHigh: boolean;
+  /**
+   * A band builds by who is in as well as by how hard (#2240): in a jam, now and then, one
+   * seat sits out a section or a pass at a low point of the arc, and everyone is back for the
+   * top. Left out, the style keeps everyone in.
+   */
+  readonly layOut?: LayOutStyle;
+}
+
+/**
+ * Where and how often a jam lays a seat out. The planner holds the rest whatever the style
+ * says: never the opening two passes, the last pass or the peak; never a jam shorter than four
+ * passes, a song, a chart with an arrangement of its own, a level the player holds, or a band
+ * of two seats; never the soloist; at most one seat, and at most one lay-out in four passes.
+ */
+export interface LayOutStyle {
+  /** The seats that may sit out, one at a time. Those not named hold the band together. */
+  readonly seats: readonly Exclude<Seat, "solo">[];
+  /**
+   * Under the soloist's chorus (the jazz piano strolling: the band thins under the line), or
+   * only where the band plays without one (a breakdown).
+   */
+  readonly under: "solo" | "band";
+  /** For the whole pass, or for one section of it: the pass's lowest, by its own level. */
+  readonly span: "pass" | "section";
+  /**
+   * How high on the arc a pass may be, read at its middle: 0 no higher than the opening pass,
+   * 1 as high as the peak (which is never chosen).
+   */
+  readonly below: number;
+  /** The chance a pass that may lay a seat out does, where none has in the three before it. */
+  readonly chance: number;
 }
 
 export type EndingGesture =
