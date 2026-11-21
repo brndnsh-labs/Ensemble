@@ -153,6 +153,10 @@ export const funkCritic: CriticStyle = {
     // the ceiling stays because `score --check` has held the share under it since.
     "solo.cost": { max: 2.4, kind: "measured" },
     // ── band ──
+    // A hundred takes in four, each its first section's groove at the working level: 55 were a groove
+    // no take before had played when it was first read (gate 4 counted 57 on one chart). A floor
+    // a margin under it: a pool a figure smaller reads under it.
+    "band.new-grooves": { min: 0.5, kind: "measured" },
   },
   weights: {
     // What a phrase of the solo costs. Each was set to zero in turn over 120 takes (ME-10);

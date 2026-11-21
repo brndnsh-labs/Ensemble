@@ -55,8 +55,19 @@ export function scorecard(
     const values: { label: string; value: number }[] = [];
     let hits = 0;
     let cases = 0;
-    for (const { label, take } of takes) {
-      const measured = measure.of(take, style);
+    // A measure of the run is one value, read over every take at once.
+    const measuredAt = measure.across
+      ? [
+          {
+            label: "the whole run",
+            measured: measure.across(
+              takes.map((t) => t.take),
+              style,
+            ),
+          },
+        ]
+      : takes.map(({ label, take }) => ({ label, measured: measure.of(take, style) }));
+    for (const { label, measured } of measuredAt) {
       if (!measured || !Number.isFinite(measured.value)) continue;
       hits += measured.value * measured.cases;
       cases += measured.cases;

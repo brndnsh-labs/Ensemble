@@ -56,6 +56,12 @@ export interface Measure {
    * Null when the take has nothing of this kind to measure.
    */
   of(take: Take, style: StylePack): Measurement | null;
+  /**
+   * A measure of the takes together, not of any one: how many different
+   * grooves a hundred seeds draw. Where it is given, the scorecard reports this
+   * one value for the run, and `of` has nothing to say of a take alone.
+   */
+  across?(takes: readonly Take[], style: StylePack): Measurement | null;
 }
 
 export interface Measurement {

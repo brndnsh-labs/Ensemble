@@ -575,6 +575,12 @@
     "p90": 4.1658,
     "inTarget": null
   },
+  "band.new-grooves": {
+    "mean": 0.55,
+    "p10": 0.55,
+    "p90": 0.55,
+    "inTarget": 1
+  },
   "band.backbeat-swell": {
     "mean": 8.3683,
     "p10": 7.2637,
