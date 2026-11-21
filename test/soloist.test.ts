@@ -892,8 +892,9 @@ test("a pickup spells the chord it is played over: each note of a pickup into a 
  * The least share of a style's phrases (of three notes or more, after a solo's first) that
  * say an earlier idea of the solo again a pulse early or late, over every take with the
  * soloist, about half what the two-seed takes play. A style left out plays so few that a
- * floor would be a coin toss: an idea moves only where every note keeps its length without
- * crossing a barline and the critic, judging it beside the idea where it was, prefers it.
+ * floor would be a coin toss: an idea moves only where every note keeps its length and its
+ * shape (held over a barline only where the style holds it there, and then only into a
+ * chord it is a tone of) and the critic, judging it beside the idea where it was, prefers it.
  */
 const DISPLACED: Readonly<Record<string, number>> = {
   jazz: 0.01,
@@ -901,13 +902,30 @@ const DISPLACED: Readonly<Record<string, number>> = {
   funk: 0.005,
 };
 
-test("an idea comes back a beat early or late: in the styles that do it most some phrases say an earlier one of the solo again, the same rhythm and contour moved by one of the bar's pulses, only where the form asks what the style says; never the top of a chorus, the solo's first or last phrase, nor the tune's last, and never late in a section's last bar (nor an answer that carries a moved rhythm there); every note of the idea so moved inside its own phrase's bars and the tune, led in by no pickup, a chord tone where it falls on a beat (SO-33), and as long as it was, shaken where it was shaken, its last note a pulse shorter at most", () => {
+/**
+ * The styles that tie nothing over the barline, a moved idea's note no more than any
+ * other, whatever their data says: funk (ST-funk-33), rock (ST-rock-24) and disco (its
+ * riffs ride the four on the floor; `solo.barlines-tied` none by intent).
+ */
+const NEVER_HOLD: readonly string[] = ["funk", "rock", "disco"];
+
+/**
+ * The least count of a moved idea's notes held over a barline, on six seeds, in the
+ * styles that hold them often enough for a floor: about half what they play (neo-soul 9).
+ * Jazz, the blues, reggae and acoustic hold so few that a floor would be a coin toss.
+ */
+const HELD: Readonly<Record<string, number>> = {
+  neosoul: 4,
+};
+
+test("an idea comes back a beat early or late: in the styles that do it most some phrases say an earlier one of the solo again, the same rhythm and contour moved by one of the bar's pulses, only where the form asks what the style says; never the top of a chorus, the solo's first or last phrase, nor the tune's last, and never late in a section's last bar (nor an answer that carries a moved rhythm there); every note of the idea so moved inside its own phrase's bars and the tune, led in by no pickup, a chord tone where it falls on a beat (SO-33), and as long as it was, shaken where it was shaken, its last note a pulse shorter at most and an idea main's rules refuse, moved by the stricter ones, no note longer by more than a sixteenth and each move within a whole step of the idea's; a note held over a barline only in a style that holds one there (never in funk, rock or disco), only where it sounds across it, and then a tone of every chord it is held into (SO-02, SO-33), and some held so in the styles that hold; and every idea so moved heard as one", () => {
   const failures = new Map<string, string[]>();
   const fail = (clause: string, where: string) =>
     failures.set(clause, [...(failures.get(clause) ?? []), where]);
   for (const style of STYLES) {
+    let held = 0;
     const floor = DISPLACED[style.id];
-    const { roles } = style.solo.habits.displace;
+    const { roles, holds } = style.solo.habits.displace;
     let [phrases, moved] = [0, 0];
     for (const { chart, options, take } of soloTakes().filter((jam) => jam.style === style)) {
       const counted = MEASURES.find((measure) => measure.id === "solo.displaced")!.of(take, style);
@@ -917,7 +935,37 @@ test("an idea comes back a beat early or late: in the styles that do it most som
       const asked = soloRoles(take.plan, style, options.seed ?? 0);
       const harmony = harmonyOf(take);
       const events = new Map(notesOf(take, "solo").map((note) => [note.tick, note]));
-      for (const { phrase, source, notes, line, carriesLate } of displacedPhrases(take, style)) {
+      const found = displacedPhrases(take, style);
+      // The soloist's own record, of the ideas it moved that main's rules refuse (the ideas
+      // main moves are played as main plays them): every note it held over a barline sounds
+      // across it, its shape is the idea's, and it is heard as an idea moved.
+      const fresh = new Set(take.moved.filter((one) => one.newly).map((one) => one.tick));
+      for (const idea of take.moved) {
+        if (!idea.played || !idea.newly) continue;
+        const at = `${style.id}, ${chart.file} ${JSON.stringify(options)}, tick ${idea.tick}`;
+        if (!found.some((one) => one.line && one.phrase.slot.bars[0]!.start === idea.tick)) {
+          fail("a moved idea not heard as one", at);
+        }
+        // Its shape: each move within a whole step of the idea's where it was, as the soloist
+        // would have said it there (SO-24, SO-33): moved, a note is fitted to the chords now
+        // under it, and may move a little, not leap where the idea stepped.
+        idea.notes.forEach((one, k) => {
+          const [now, before, then] = [events.get(one.tick), idea.notes[k - 1], one.was];
+          if (!now) fail("a moved note not played", `${at}, note at ${one.tick}`);
+          if (!now || !before) return;
+          const was = events.get(before.tick);
+          const change = was ? now.pitch - was.pitch - (then - before.was) : 0;
+          if (Math.abs(change) > 2)
+            fail("its shape broken", `${at}, note at ${one.tick} (${change})`);
+        });
+        for (const one of idea.held) {
+          const note = events.get(one.tick);
+          if (!note || note.tick + note.duration <= one.barline + POCKET) {
+            fail("held over a barline it does not sound across", `${at}, note at ${one.tick}`);
+          }
+        }
+      }
+      for (const { phrase, source, notes, line, carriesLate } of found) {
         const { slot } = phrase;
         const where = `${style.id}, ${chart.file} ${JSON.stringify(options)}, bar index ${slot.bars[0]!.index}`;
         const lastBar = slot.bars.at(-1)!;
@@ -954,7 +1002,34 @@ test("an idea comes back a beat early or late: in the styles that do it most som
           const was = source[i]!;
           const pulse = pulseTicks(note.bar.meter)[0]!;
           const give = i === notes.length - 1 ? pulse : 0;
-          if (note.ends - note.tick < was.ends - was.tick - give - POCKET) fail("cut short", at);
+          // As long as it was, within a sixteenth either way; the last a pulse shorter at most.
+          const [now, then] = [note.ends - note.tick, was.ends - was.tick];
+          if (now < then - give - PPQ / 4 - POCKET) fail("cut short", at);
+          if (fresh.has(slot.bars[0]!.start) && now > then + PPQ / 4 + POCKET) {
+            fail("held longer than it was", at);
+          }
+
+          // Held over its barline: only where the style holds a moved idea's note there, and
+          // a tone of every chord that arrives while it sounds on (none is N.C.).
+          const barline = note.bar.start + note.bar.ticks;
+          if (note.ends > barline + POCKET) {
+            if (!holds || NEVER_HOLD.includes(style.id)) {
+              fail("held over a barline in a style that holds none", at);
+            }
+            held++;
+            for (const arrival of harmony) {
+              if (arrival.tick < barline || arrival.tick >= note.ends - POCKET) continue;
+              if (!arrival.changed && arrival.chord !== null) continue;
+              const tones = arrival.chord
+                ? chordTones(arrival.chord.quality).map(
+                    (tone) => (pitchClass(arrival.chord!.root) + tone.interval) % 12,
+                  )
+                : [];
+              if (!tones.includes(note.pitch % 12)) {
+                fail("held over the barline into a chord it is not a tone of", at);
+              }
+            }
+          }
           // Shaken where it was, unless the hand gave the note another device of its own
           // there (a horn's scoop is one device to a landing, SO-57), drawn by its place.
           const move = (one: { tick: number }) => events.get(one.tick)?.move;
@@ -965,6 +1040,10 @@ test("an idea comes back a beat early or late: in the styles that do it most som
       }
     }
     if (phrases <= enough(300)) fail("phrases enough", `${style.id}: only ${phrases}`);
+    const holdsSome = HELD[style.id];
+    if (holdsSome !== undefined && held < Math.max(1, enough(holdsSome))) {
+      fail("some held over the barline", `${style.id}: only ${held}`);
+    }
     if (floor !== undefined && moved < Math.max(1, phrases * floor)) {
       fail(
         "some displaced",

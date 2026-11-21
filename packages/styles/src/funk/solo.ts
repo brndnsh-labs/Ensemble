@@ -439,7 +439,8 @@ export const funkSolo: SoloStyle = {
     // the ideas said again consider it. Drawn early as often as late where it could go either
     // way; in practice about one in six goes early, since a riff opens on the One and
     // early would cross the barline, a pickup's ground. Not the opening riff brought back (`b`).
-    displace: { chance: 0.25, early: 0.5, roles: ["r", "v"] },
+    // Nothing is held over the barline (ST-funk-33), a moved riff no more than any other.
+    displace: { chance: 0.25, early: 0.5, roles: ["r", "v"], holds: false },
     // No bends (ST-funk-32); a guitar shakes a note held a dotted half or longer (SO-52).
     bend: { third: 0, rootOrFifth: 0, around: 0, elsewhere: 0 },
     // No slide: the notes give funk none, as they give it no bend (ST-funk-32).

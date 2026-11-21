@@ -187,7 +187,7 @@ function displacements(reading: Reading): DisplacedPhrase[] {
     const moved = new Set<Heard>();
     return solo.flatMap((phrase, i): DisplacedPhrase[] => {
       if (i === 0 || body(phrase).length < 3) return [];
-      const heard = displacedFrom(phrase, solo.slice(0, i), all);
+      const heard = displacedFrom(phrase, solo.slice(0, i), all, moved);
       if (heard?.line) moved.add(phrase);
       const stated = solo.slice(0, i).filter((other) => !moved.has(other));
       const carriesLate = rhythmsAgain(phrase, stated, all).some((one) => one.by === 1);
@@ -448,6 +448,14 @@ export const soloMeasures: readonly Measure[] = [
       return share(moved.filter((one) => one.by === -1).length, moved.length);
     },
   ),
+  {
+    id: "solo.moved-played",
+    seat: "solo",
+    unit: "share",
+    says: "Of the phrases where the soloist drew an idea said again whole to be said a beat early or late, the share where it was: the rest were not moved because the idea would not fit moved (a note pulled out of the phrase, a note that could not keep its length), or the critic preferred another phrase. Read from the take's record of what the soloist drew, since the notes cannot show a phrase not played.",
+    // Read from the take's record of the soloist's draws (`Take.moved`), not from its notes.
+    of: (take) => share(take.moved.filter((idea) => idea.played).length, take.moved.length),
+  },
   measure(
     "bars-that-rhyme",
     "share",
@@ -774,13 +782,18 @@ export const soloMeasures: readonly Measure[] = [
   idiom(
     "barlines-tied",
     "share",
-    "Of the barlines a run crosses (a note on the last eighth of the bar, running straight on), the share where that note is held over the barline and the downbeat is not struck: a line that does not treat the barline as a wall (SO-38).",
+    "Of the barlines a run crosses (a note on the last eighth of the bar, running straight on), the share where that note is held over the barline and the downbeat is not struck: a line that does not treat the barline as a wall (SO-38). A note of an idea said a beat away is the idea's, held as long as it was where it was stated, and is not counted either way.",
     (reading) => {
+      const moved = new Set(
+        displacements(reading)
+          .filter((one) => one.line)
+          .flatMap((one) => one.notes),
+      );
       let crossed = 0;
       let tied = 0;
       reading.notes.forEach((note, i) => {
         const end = note.bar.start + note.bar.ticks;
-        if (note.tick !== end - PPQ / 2) return;
+        if (note.tick !== end - PPQ / 2 || moved.has(note)) return;
         const next = reading.notes[i + 1];
         const over = note.ends > end + PPQ / 4;
         if (!over && next?.tick !== end) return;
