@@ -497,6 +497,12 @@
     "p90": 1,
     "inTarget": null
   },
+  "solo.moved-played": {
+    "mean": 0.1289,
+    "p10": 0,
+    "p90": 0.5,
+    "inTarget": null
+  },
   "solo.bars-that-rhyme": {
     "mean": 0.6909,
     "p10": 0.4853,
@@ -624,7 +630,7 @@
     "inTarget": 0.975
   },
   "solo.barlines-tied": {
-    "mean": 0.1845,
+    "mean": 0.1853,
     "p10": 0,
     "p90": 0.3333,
     "inTarget": 1
