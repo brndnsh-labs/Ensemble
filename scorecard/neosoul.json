@@ -312,7 +312,7 @@
     "inTarget": 1
   },
   "solo.thirds-and-sevenths-on-changes": {
-    "mean": 0.7165,
+    "mean": 0.7168,
     "p10": 0.5556,
     "p90": 0.8667,
     "inTarget": null
@@ -348,7 +348,7 @@
     "inTarget": null
   },
   "solo.displaced": {
-    "mean": 0.0026,
+    "mean": 0.0015,
     "p10": 0,
     "p90": 0,
     "inTarget": null
@@ -372,7 +372,7 @@
     "inTarget": null
   },
   "solo.long-breaths": {
-    "mean": 0.0009,
+    "mean": 0,
     "p10": 0,
     "p90": 0,
     "inTarget": 1
@@ -390,7 +390,7 @@
     "inTarget": 1
   },
   "solo.longest-silence": {
-    "mean": 4.3334,
+    "mean": 4.3168,
     "p10": 3,
     "p90": 5.4167,
     "inTarget": null

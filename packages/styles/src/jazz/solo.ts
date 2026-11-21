@@ -537,7 +537,7 @@ export const jazzSolo: SoloStyle = {
     },
     // An idea said again a beat early or late is how a bebop player develops a motif: the
     // style that does it most, 0.6 of the phrases that could. Drawn early as often as late
-    // where it could go either way; in practice about one in eight goes early, since an idea
+    // where it could go either way; in practice about one in seven goes early, since an idea
     // that opens on the one cannot go early without crossing the barline, a pickup's ground.
     // Not the bridge's return (`b`), which is heard where it was.
     displace: { chance: 0.6, early: 0.5, roles: ["r", "v"] },

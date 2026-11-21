@@ -318,13 +318,13 @@
     "inTarget": 1
   },
   "solo.thirds-and-sevenths-on-changes": {
-    "mean": 0.4842,
+    "mean": 0.4854,
     "p10": 0.3617,
     "p90": 0.6102,
     "inTarget": 0.9844
   },
   "solo.beats-on-chord-tones": {
-    "mean": 0.8709,
+    "mean": 0.8707,
     "p10": 0.8254,
     "p90": 0.9326,
     "inTarget": 1
@@ -342,7 +342,7 @@
     "inTarget": null
   },
   "solo.phrase-likeness": {
-    "mean": 0.6912,
+    "mean": 0.6916,
     "p10": 0.5732,
     "p90": 0.7757,
     "inTarget": null
@@ -360,13 +360,13 @@
     "inTarget": null
   },
   "solo.bars-that-rhyme": {
-    "mean": 0.8477,
-    "p10": 0.6364,
+    "mean": 0.8462,
+    "p10": 0.6087,
     "p90": 1,
     "inTarget": null
   },
   "solo.empty-bars": {
-    "mean": 0.1546,
+    "mean": 0.1543,
     "p10": 0.0625,
     "p90": 0.2292,
     "inTarget": null
@@ -390,7 +390,7 @@
     "inTarget": 1
   },
   "solo.longest-silence": {
-    "mean": 3.1254,
+    "mean": 3.1206,
     "p10": 2.4447,
     "p90": 4.125,
     "inTarget": null
@@ -414,7 +414,7 @@
     "inTarget": 0.8214
   },
   "solo.rises": {
-    "mean": 2.292,
+    "mean": 2.2882,
     "p10": 0.9089,
     "p90": 3.7863,
     "inTarget": null
@@ -432,7 +432,7 @@
     "inTarget": null
   },
   "solo.high-points-deserved": {
-    "mean": 0.8169,
+    "mean": 0.8182,
     "p10": 0.6667,
     "p90": 1,
     "inTarget": null
@@ -444,7 +444,7 @@
     "inTarget": null
   },
   "solo.steps": {
-    "mean": 0.7742,
+    "mean": 0.7745,
     "p10": 0.6966,
     "p90": 0.8571,
     "inTarget": null
@@ -468,15 +468,15 @@
     "inTarget": 0.9375
   },
   "solo.repeated-notes": {
-    "mean": 0.0107,
+    "mean": 0.0106,
     "p10": 0,
     "p90": 0.027,
     "inTarget": null
   },
   "solo.short-notes": {
-    "mean": 0.579,
+    "mean": 0.5789,
     "p10": 0.44,
-    "p90": 0.7007,
+    "p90": 0.6934,
     "inTarget": 1
   },
   "solo.barlines-tied": {
@@ -498,7 +498,7 @@
     "inTarget": 0.9219
   },
   "solo.cost": {
-    "mean": 2.0087,
+    "mean": 2.0091,
     "p10": 1.7252,
     "p90": 2.3049,
     "inTarget": null

@@ -897,7 +897,7 @@ test("a pickup spells the chord it is played over: each note of a pickup into a 
 const DISPLACED: Readonly<Record<string, number>> = {
   jazz: 0.01,
   blues: 0.006,
-  funk: 0.01,
+  funk: 0.005,
 };
 
 test("an idea comes back a beat early or late: in the styles that do it most some phrases say an earlier one of the solo again, the same rhythm and contour moved by one of the bar's pulses, only where the form asks what the style says; never the top of a chorus, the solo's first or last phrase, nor the tune's last, and never late in a section's last bar (nor an answer that carries a moved rhythm there); every note of the idea so moved inside its own phrase's bars and the tune, led in by no pickup, a chord tone where it falls on a beat (SO-33), and as long as it was, shaken where it was shaken, its last note a pulse shorter at most", () => {
@@ -956,7 +956,7 @@ test("an idea comes back a beat early or late: in the styles that do it most som
           if (note.ends - note.tick < was.ends - was.tick - give - POCKET) fail("cut short", at);
           const shaken = (one: { tick: number }) =>
             events.get(one.tick)?.move?.vibrato !== undefined;
-          if (shaken(was) && !shaken(note) && i < notes.length - 1) fail("its shake lost", at);
+          if (shaken(was) && !shaken(note)) fail("its shake lost", at);
         });
       }
     }

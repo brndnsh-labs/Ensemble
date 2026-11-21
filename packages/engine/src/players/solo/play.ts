@@ -224,8 +224,8 @@ export const playSolo: Player = (context) => soloPart(context);
 
 /**
  * Whether an idea said a beat away is as long as where it was: the same notes, each
- * sounding as long and shaken where it was shaken, but the last, which may give up a
- * pulse for the breath after it.
+ * sounding as long and shaken where it was shaken; the last may give up a pulse for the
+ * breath after it, and is still shaken if it was.
  */
 function keepsLengths(was: readonly SoloNote[], now: readonly SoloNote[]): boolean {
   const [from, to] = [was.filter((note) => !note.lead), now.filter((note) => !note.lead)];
@@ -235,7 +235,7 @@ function keepsLengths(was: readonly SoloNote[], now: readonly SoloNote[]): boole
     const last = i === to.length - 1;
     const give = last ? pulseTicks(note.bar.meter)[0]! : 0;
     const shaken = before.move?.vibrato === undefined || note.move?.vibrato !== undefined;
-    return note.duration >= before.duration - give && (last || shaken);
+    return note.duration >= before.duration - give && shaken;
   });
 }
 
