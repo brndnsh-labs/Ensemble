@@ -213,6 +213,7 @@ export function planBars(
           open,
           ends,
           without,
+          ...(told === undefined ? {} : { told }),
           ...(climax === undefined ? {} : { climax }),
           ...(breath === undefined ? {} : { breath }),
           rise,
@@ -752,6 +753,8 @@ interface Shape {
   readonly open: boolean;
   readonly ends: boolean;
   readonly without: ReadonlySet<Seat>;
+  /** The pass the band was told to finish on. */
+  readonly told?: number;
   readonly climax?: number;
   readonly breath?: number;
   readonly rise: (pass: number) => number | undefined;
@@ -765,7 +768,8 @@ interface Shape {
  * seats, and the soloist are left alone, and at most one pass in four thins. Each pass draws
  * from the seed by its own number, and only what the passes before it drew can stop it, so a
  * jam made longer, or told to finish, keeps every lay-out it had played. The pass it is told
- * to finish on is its last, and everyone is in for it.
+ * to finish on is its last, and everyone is in for it from its second phrase, where the band
+ * can first have been told.
  */
 function layOuts(
   drafts: readonly Draft[],
@@ -792,7 +796,8 @@ function layOuts(
   let last = Number.NEGATIVE_INFINITY;
   for (const [pass, bars] of byPass) {
     if (pass < LAY_OUT_FROM || pass === peak || pass - last < LAY_OUT_EVERY) continue;
-    if (shape.ends && pass === shape.passes - 1) continue;
+    const toldHere = pass === shape.told;
+    if (shape.ends && pass === shape.passes - 1 && !toldHere) continue;
     const soloing = (i: number) => solos[i] !== null && !shape.without.has("solo");
     if (data.under === "solo" ? !bars.every(soloing) : bars.some(soloing)) continue;
     const rise = shape.rise(pass);
@@ -820,7 +825,15 @@ function layOuts(
         : new Set([
             draw.pick([...levels].filter(([, level]) => level === lowest).map(([run]) => run)),
           ]);
-    for (const i of bars) if (chosen.has(drafts[i]!.run)) outs[i] = seat;
+    const top = drafts[bars[0]!]!.run;
+    for (const i of bars) {
+      if (!chosen.has(drafts[i]!.run)) continue;
+      // Told to finish on a pass a seat was to sit out from its top: the band was told at a
+      // phrase top after it, so the seat sits out the first phrase as it was going to, and is in
+      // from the second for the ending. One that was to go out later in the pass stays in.
+      if (toldHere && (drafts[i]!.run !== top || drafts[i]!.phrase.index > 0)) continue;
+      outs[i] = seat;
+    }
     last = pass;
   }
   return outs;

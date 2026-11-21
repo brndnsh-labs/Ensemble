@@ -1359,7 +1359,7 @@ const WHO_KINDS: readonly PlanOptions[] = [
 ];
 const WHO_SEEDS = Array.from({ length: FULL ? 24 : 4 }, (_, i) => i + 1);
 
-test("who is in: now and then a jam lays one seat out, by its style's say, for a whole section or pass and never mid-phrase; never the drums or the bass, never two seats at once, never the opening two passes, the last pass or the peak, at most once in four passes and never in a jam planned shorter than four; a band of two, a level the player holds, a song and a chart with an arrangement of its own keep everyone in; a jam made longer or told to finish keeps every lay-out it had, and everyone is in for its last pass", () => {
+test("who is in: now and then a jam lays one seat out, by its style's say, for a whole section or pass and never mid-phrase; never the drums or the bass, never two seats at once, never the opening two passes, the last pass or the peak, at most once in four passes and never in a jam planned shorter than four; a band of two, a level the player holds, a song and a chart with an arrangement of its own keep everyone in; a jam made longer or told to finish keeps every lay-out it had, and everyone is in for its last pass from its second phrase (its first only as it had set out to play it)", () => {
   for (const style of STYLES) {
     const data = style.arc.layOut;
     const { layOut: _, ...steady } = style.arc;
@@ -1432,7 +1432,8 @@ test("who is in: now and then a jam lays one seat out, by its style's say, for a
           }
           if (out.length > 0) {
             // Told to finish on a pass a seat sits out of: everything before it as it was, and
-            // that pass, the last, with everyone in.
+            // that pass, the last, with everyone in from its second phrase (the band is told at a
+            // phrase top after the pass's first), and in its first only as it was going to be.
             const endAfter = out[0]!;
             const told = plan(chart, style, { ...options, endAfter });
             const kept = (p: Plan) =>
@@ -1440,12 +1441,18 @@ test("who is in: now and then a jam lays one seat out, by its style's say, for a
                 .filter((bar) => bar.kind === "music" && bar.pass < endAfter)
                 .map((bar) => bar.seats);
             assert.deepEqual(kept(told), kept(roadmap), `${where}: told on ${endAfter}`);
-            assert.equal(
-              laidOut(told).size > 0 &&
-                [...laidOut(told).keys()].some((bar) => bar.pass === endAfter),
-              false,
-              `${where}: out of the last pass`,
-            );
+            for (const [bar, seats] of laidOut(told)) {
+              if (bar.pass !== endAfter) continue;
+              const was = [...outs].find(([other]) => other.index === bar.index)?.[1];
+              const first =
+                bar.section.occurrence ===
+                  told.bars.find((b) => b.kind === "music" && b.pass === endAfter)!.section
+                    .occurrence && bar.phrase.index === 0;
+              assert.ok(
+                first && was?.join() === seats.join(),
+                `${where}: out of the last pass at bar ${bar.index}`,
+              );
+            }
           }
           if (outs.size > 0 && seen === outs.size) {
             // The first take that thins: a band of two keeps both, and a level the player holds has no low point to thin at.
