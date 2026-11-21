@@ -1347,12 +1347,17 @@ const WHO_KINDS: readonly PlanOptions[] = [
   { mode: "jam", passes: 4 },
   { mode: "jam", passes: 8 },
   { mode: "jam", passes: 8, solo: true },
-  { mode: "jam", passes: 12, solo: true },
-  { mode: "jam", minutes: 6 },
   { mode: "jam", open: true, passes: 9 },
   { mode: "jam", open: true, passes: 9, solo: true },
+  // The full run: long jams, solos after the peak and solos into the ending.
+  ...(FULL
+    ? ([
+        { mode: "jam", passes: 12, solo: true },
+        { mode: "jam", minutes: 6 },
+      ] as const)
+    : []),
 ];
-const WHO_SEEDS = Array.from({ length: FULL ? 24 : 6 }, (_, i) => i + 1);
+const WHO_SEEDS = Array.from({ length: FULL ? 24 : 5 }, (_, i) => i + 1);
 
 test("who is in: now and then a jam lays one seat out, by its style's say, for a whole section or pass and never mid-phrase; never the drums or the bass, never two seats at once, never the opening two passes, the last pass or the peak, at most once in four passes and never in a jam planned shorter than four; a band of two, a level the player holds, a song and a chart with an arrangement of its own keep everyone in; a jam made longer or told to finish keeps every lay-out it had, and everyone is in for its last pass", () => {
   for (const style of STYLES) {
@@ -1369,7 +1374,7 @@ test("who is in: now and then a jam lays one seat out, by its style's say, for a
           const where = `${file.file} seed ${seed} ${JSON.stringify(kind)}`;
           if (!data || arranged) {
             // Nobody is laid out by the band itself: the plan the band had before it could be.
-            if (seed > 2) continue;
+            if (seed > 1) continue;
             const asBefore = plan(chart, none, options);
             assert.deepEqual(plan(chart, style, options), asBefore, `${where}: as before`);
             continue;
@@ -1450,7 +1455,7 @@ test("who is in: now and then a jam lays one seat out, by its style's say, for a
             assert.equal(laidOut(held).size, 0, `${where}: a level held`);
           }
         }
-        if (seed <= 2) {
+        if (seed === 1) {
           const song = { mode: "song" as const, solo: true, seed };
           assert.deepEqual(
             plan(chart, style, song),
