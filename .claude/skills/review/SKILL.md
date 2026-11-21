@@ -2,7 +2,7 @@
 name: review
 description: Independently review the current uncommitted ensemble diff (or a named branch/PR) — correctness, plus whether it does what the issue asked — adding `/security-review` when it touches an always-brake surface (a production release, or anything done on the Docker host, anything that would publish a secret, a private address, a network detail or a private email (the repository is public), the release path: the release job in `.github/workflows/ci.yml`, `hosting/`, `scripts/image.sh`, repository secrets and variables, branch protection, a sample pack's source or licence: `scripts/packs/sources.ts`, a pack's `LICENCE` file, the credits, what the app keeps in the browser: the stored lists (`packages/app/src/stored.ts` and the keys and shapes kept through it) and the service worker (`packages/app/service-worker.js`, `offline.ts`), loosening a gate: raising a time budget or a scorecard tolerance, accepting a scorecard drop, deleting or weakening a property). Reports findings with evidence; fixing them is the caller's job. Used by /cycle, or on its own for any diff.
 ---
-<!-- cycle:rendered template=skills/review.md.tmpl hash=141709f7b092 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/review.md.tmpl hash=c9874088f9f7 — managed by the-cycle; edit the template, not this file -->
 
 # /review — fresh eyes on a diff
 
@@ -32,13 +32,14 @@ the issue and the diff from scratch, and say that's what happened.
   The heavyweight `/code-review` is human-triggered — if a diff deserves it, say so and leave the
   call to Brandon.
 
-This repo has **no reviewer agents yet**: every row is reviewed by a fresh-context general reviewer briefed with the "what to hold" column. The rows are the backlog for writing dedicated ones, and `engine` and `styles` are the two that would earn it first.
+This repo has **one reviewer agent**, `ear-reviewer` (`.claude/agents/ear-reviewer.md`): it reads takes as transcriptions (`ensemble read`) against the music notes, and runs beside the general review where a row names it. Every row is also reviewed by a fresh-context general reviewer briefed with the "what to hold" column. The rows without an agent are the backlog for writing dedicated ones.
 
 | Path | Domain | What to hold |
 |---|---|---|
+| `packages/engine/src/players/**` | engine, players | The engine row, and **`ear-reviewer`** beside the general review: the takes the change reaches, read before and after against the music notes for the seat and the style. |
 | `packages/engine/src/**` | engine | Purity: same chart, style, options and seed give identical events; no DOM, audio, I/O, clock or `Math.random`; imports nothing from `app` or `audio`. No style named in engine code (a style is data). Extending an open-ended plan must not change passes already generated. Range, register and resolution rules in `docs/MUSIC_NOTES.md` and `docs/music-notes/`. |
 | `packages/engine/src/critic/**`, `scorecard/**` | critic | A metric measures what its name says, over the seeds it claims. A baseline change is an accepted improvement with a `DECISIONS.md` line, never a quiet drop (§5). |
-| `packages/styles/src/**`, `library/*.chart` | styles | Data only: no engine edit rode along. Other styles' goldens are byte for byte unchanged and `pnpm score` shows no movement for them. A tune's changes are checked against a published source, never recalled. |
+| `packages/styles/src/**`, `library/*.chart` | styles | `packages/styles/src/**` also gets **`ear-reviewer`** beside the general review, on the styles the change touches. Data only: no engine edit rode along. Other styles' goldens are byte for byte unchanged and `pnpm score` shows no movement for them. A tune's changes are checked against a published source, never recalled. |
 | `test/**` | tests | Only the four kinds in `docs/TESTING.md`; public API only; no mocks; each test names its rule in musical or user-facing words. A new property fits the budget as it stands. A changed golden has its `DECISIONS.md` line. |
 | `packages/audio/src/**` | audio | Knows nothing about music theory (no chord, scale or style words). Scheduling against the audio clock, not timers. `docs/AUDIO_NOTES.md` for packs, mixing and phones. |
 | `packages/app/src/**`, `smoke/**` | app | `play/jam.ts` is the only place a take becomes sounds. `stored.ts`, the stored shapes and the service worker are §5 brakes: something kept by an older build must still load. No committed Playwright spec beyond the five journeys. |
