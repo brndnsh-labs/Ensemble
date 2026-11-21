@@ -370,6 +370,16 @@ export const neosoulSolo: SoloStyle = {
   // unrecognised. To move the default, change these two numbers.
   busier: { lift: 0.6, room: 0.2 },
 
+  // None: a lead behind a singer, laid back, pushing on sixteenths (SO-17); doubled it would
+  // be thirty-seconds.
+  doubleTime: {
+    perPulse: 8,
+    chance: 0,
+    bars: { shortest: 0.5, longest: 1 },
+    climbOnly: true,
+    slow: null,
+  },
+
   habits: {
     // A riff repeated 0.15; a chromatic approach 0.30, an enclosure 0.12 (ST-neosoul-33).
     riff: 0.15,

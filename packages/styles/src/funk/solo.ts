@@ -395,6 +395,16 @@ export const funkSolo: SoloStyle = {
   // bars of rest between phrases are. To move the default, change these two numbers.
   busier: { lift: 0.5, room: 0.3 },
 
+  // None: the line already runs in sixteenths (ST-funk-30); doubled it is thirty-seconds,
+  // which is shred, not funk.
+  doubleTime: {
+    perPulse: 8,
+    chance: 0,
+    bars: { shortest: 0.5, longest: 1 },
+    climbOnly: true,
+    slow: null,
+  },
+
   habits: {
     // A riff repeated bar after bar more often than not (ST-funk-32), and said the same:
     // the same notes, moved only where the chord moved.

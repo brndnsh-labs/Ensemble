@@ -506,6 +506,17 @@ export const jazzSolo: SoloStyle = {
   // somewhere to go. To move the default, change these two numbers (DECISIONS.md, a busier soloist).
   busier: { lift: 0.5, room: 0.4 },
 
+  // Double time is the bebop horn's own (sixteenths against the band's swung eighths): it
+  // runs four a beat, even as heard. Most at home here: anywhere in the last chorus once the
+  // line is at its busiest, and on a ballad only toward the top of the setting and short.
+  doubleTime: {
+    perPulse: 4,
+    chance: 0,
+    bars: { shortest: 0.5, longest: 2 },
+    climbOnly: false,
+    slow: { from: 0.75, longest: 0.5 },
+  },
+
   habits: {
     // A bar seldom comes straight back (SO-18); when it does it is a sequence.
     riff: 0.08,

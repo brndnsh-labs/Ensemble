@@ -370,6 +370,38 @@ export interface SoloStyle {
     readonly room: number;
   };
 
+  /**
+   * Double time: late in a solo, for half a bar to two bars, the line runs at twice the
+   * style's running subdivision, a run with a direction (up, or a cascade down) through the
+   * style's notes, a chord tone on every pulse, landing on a chord tone on a pulse, held.
+   * Earned: only in a phrase at the style's busiest level (or the climb to the top note)
+   * straight after a phrase at the busiest level, out of the line's own notes and never out
+   * of a breath; only in a solo's last chorus, never its first phrase; one at most a solo.
+   * Offered beside the phrase it doubles, for the critic to judge. Its notes are even as
+   * heard, whatever the band's swing; at a tempo where they would come faster than the
+   * instrument's `fastest`, it is not offered.
+   */
+  readonly doubleTime: {
+    /**
+     * The notes a pulse in a bar of four, three or six-four: twice what the line runs in. (In
+     * six-eight and twelve-eight it is six, twice a pulse's three eighths, in every style.) A
+     * style that never plays double time still says what it would be, so that a run of it is
+     * heard as one.
+     */
+    readonly perPulse: number;
+    /** The chance a phrase that may take a burst is offered one, at the setting's middle. At none, never. */
+    readonly chance: number;
+    /** Its length in bars, from the pulse it starts on to the pulse it lands on. */
+    readonly bars: { readonly shortest: number; readonly longest: number };
+    /** Only in the climb to the solo's top note: a flurry before the climax. */
+    readonly climbOnly: boolean;
+    /**
+     * At a slow tempo (a bar of four pulses longer than `tempo.slowBar`: a ballad), only from
+     * this setting of `soloDensity` up, and no longer than `longest` bars. Null: as at any tempo.
+     */
+    readonly slow: { readonly from: number; readonly longest: number } | null;
+  };
+
   readonly habits: {
     /** A line bar plays the bar before it again: a riff, a sequence (SO-18). */
     readonly riff: number;
@@ -611,4 +643,9 @@ export interface SoloInstrument {
    * an instrument that does not fall.
    */
   readonly fall: { readonly semitones: number; readonly takes: number } | null;
+  /**
+   * The most notes a second a run in double time asks of the player: where a burst would be
+   * faster, it is not offered. Each instrument says where its number comes from.
+   */
+  readonly fastest: number;
 }

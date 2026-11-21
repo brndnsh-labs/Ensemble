@@ -335,6 +335,16 @@ export const reggaeSolo: SoloStyle = {
   // two numbers.
   busier: { lift: 0.6, room: 0.2 },
 
+  // None: its line holds long notes and rests on the drop (ST-reggae-25). Its eighths doubled
+  // would be sixteenths.
+  doubleTime: {
+    perPulse: 4,
+    chance: 0,
+    bars: { shortest: 0.5, longest: 1 },
+    climbOnly: true,
+    slow: null,
+  },
+
   habits: {
     // A riff repeated 0.45; a chromatic approach 0.10; no enclosures (ST-reggae-27).
     riff: 0.45,
