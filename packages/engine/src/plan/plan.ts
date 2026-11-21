@@ -22,7 +22,7 @@ import type { Key } from "../theory/pitch.ts";
 import { pitchClass } from "../theory/pitch.ts";
 import type { ArcPosition } from "./arc.ts";
 import { arcOffset, defaultClimax } from "./arc.ts";
-import { barQuarters, breatheAmount, breaths } from "./tempo.ts";
+import { arcHighest, barQuarters, breatheAmount, breaths } from "./tempo.ts";
 import type { EndingMark, FillMark, Plan, PlanBar, PlanOptions, SoloMark } from "./types.ts";
 
 /** A timed jam with no stated length. */
@@ -153,11 +153,18 @@ export function planBars(
         options.mode === "jam"
           ? arcOffset(style.arc, told === undefined ? position : { ...position, told })
           : 0;
-      // The tempo follows the arc as the jam set out, before anyone told it to finish: a jam
-      // told to finish keeps the time of what was played, wherever it is told.
+      // The tempo follows the pass's level on the arc as the jam set out, before anyone told it to
+      // finish (a jam told to finish keeps the time of what was played, wherever it is told), read
+      // at the pass's middle so no phrase inside it moves the tempo. A written ending is its last
+      // pass's.
       const arcAsSet =
         breathes && options.energy === undefined
-          ? (told === undefined ? offset : arcOffset(style.arc, position)) * style.arc.depth
+          ? arcOffset(style.arc, {
+              ...position,
+              part: run.part === "ending" ? "body" : run.part,
+              phraseStart: 0.5,
+              phraseEnd: 0.5,
+            }) * style.arc.depth
           : 0;
       // A level the player set is held: the band must not drift away from it (CO-05, CO-06).
       const base =
@@ -220,13 +227,21 @@ export function planBars(
   let tick = countIn ? firstMeterTicks : 0;
   const offsetIndex = countIn ? 1 : 0;
 
-  // One tempo a bar, in the order the bars are played, each from the arc up to it.
-  const shares = breathes
-    ? breaths(
-        drafts.map((draft) => draft.arc),
-        amount,
-      )
-    : [];
+  // One tempo a bar, in the order the bars are played: each its own pass's level against the
+  // opening pass's, scaled so the arc's highest pass asks for the whole amount. The opening pass
+  // (its intro too) is at the tempo as set.
+  const opening = drafts.find((draft) => draft.run.part === "body" && draft.run.pass === 0)?.arc;
+  const span = arcHighest(style.arc, open) - (opening ?? 0);
+  const shares =
+    breathes && opening !== undefined && span > 0
+      ? breaths(
+          drafts.map((draft) =>
+            draft.run.pass === 0
+              ? 0
+              : amount * Math.max(-1, Math.min(1, (draft.arc - opening) / span)),
+          ),
+        )
+      : drafts.map(() => 0);
   const bars: PlanBar[] = [];
   drafts.forEach((draft, i) => {
     const next = drafts[i + 1];
@@ -295,7 +310,7 @@ export function planBars(
       barInSection: draft.barInSection,
       barInPass: draft.barInPass,
       phrase: draft.phrase,
-      quarters: breathes ? barQuarters(quarters, shares[i]!) : quarters,
+      quarters: barQuarters(quarters, shares[i]!),
       energy,
       level: draft.level,
       seats: silent
@@ -355,7 +370,7 @@ interface Draft {
    */
   readonly base: number;
   readonly energy: number;
-  /** The energy the arc adds to this bar as the jam set out, which the tempo breathes with: 0 where it does not. */
+  /** Its pass's level on the arc as the jam set out, read at the pass's middle: what the tempo breathes with, 0 where it does not. */
   readonly arc: number;
   readonly barInSection: number;
   readonly barInPass: number;

@@ -1,29 +1,20 @@
 // The tempo as it breathes: a band asked to (`PlanOptions.breathe`) pushes a
-// little as the jam builds and settles as it comes down. Each bar has one
-// tempo, decided from the arc of the bars up to and including it and nothing
-// after, so an open jam made longer and a jam told to finish keep the time of
-// what was played. Without the option every bar is at the tempo as set.
+// little as the jam builds and eases back as it comes down. Each bar has one
+// tempo, decided from its own pass's level on the arc (read at the pass's middle,
+// so no phrase inside it moves the tempo) against the opening pass's, and the
+// tempo of the bar before. Nothing later is read, so an open jam made longer and
+// a jam told to finish keep the time of what was played. Without the option
+// every bar is at the tempo as set.
 
 import type { Meter } from "../chart/types.ts";
 import { tempoRange } from "../style/meters.ts";
-import type { StylePack } from "../style/types.ts";
+import type { ArcStyle, StylePack } from "../style/types.ts";
 
 /** The most any style breathes, either way, as a share of the tempo as set. */
 export const BREATHE_MOST = 0.02;
 
 /** The most the tempo moves from one bar to the next, as a share of the tempo as set. */
 export const TEMPO_STEP = 0.0025;
-
-/** A rise in the arc this big over where the band has settled asks for the whole of a style's amount. */
-const FULL_RISE = 0.1;
-
-/**
- * How quickly the band gets used to where the arc has taken it: the share of the way it
- * settles each bar. A band pushes while it builds, not for as long as it stays built, so a
- * jam that holds a level comes back to the tempo as set, and over a take the tempo keeps
- * close to it.
- */
-const SETTLE = 1 / 4;
 
 /**
  * How far a style breathes at a tempo, as a share of it: the style's amount, held inside the
@@ -38,21 +29,30 @@ export function breatheAmount(style: StylePack, meter: Meter, tempo: number): nu
 }
 
 /**
- * Each bar's tempo as a share above (or below) the tempo as set, in the order the bars are
- * played, from the arc's offset for each bar (the energy the arc adds, after its depth). A
- * bar's tempo asks for the arc's rise over where the band had settled, scaled to the amount,
- * and the tempo walks toward that at no more than `TEMPO_STEP` a bar. The first bar is the
- * tempo as set, and so is every bar of a flat arc.
+ * The highest a pass of the arc reaches, read at a pass's middle: what asks for the whole of a
+ * style's amount. An open jam's arc is its lift's cap; a timed jam's the highest of its peak,
+ * its settled level, its breath and the middle of its last pass's lift.
  */
-export function breaths(arc: readonly number[], amount: number): number[] {
+export function arcHighest(arc: ArcStyle, open: boolean): number {
+  const shape = arc.timed;
+  const highest = open
+    ? arc.passLift.cap
+    : Math.max(shape.climax, shape.settle, shape.breath, (shape.lastFrom + shape.lastTo) / 2);
+  return highest * arc.depth;
+}
+
+/**
+ * Each bar's tempo as a share above (or below) the tempo as set, in the order the bars are
+ * played. `wanted` is each bar's target, a share: its pass's level on the arc against the
+ * opening pass's, scaled so that the arc's highest pass asks for the whole amount. The tempo
+ * walks toward it by no more than `TEMPO_STEP` a bar, so a change at the top of a pass takes a
+ * few bars. The first bar is the tempo as set.
+ */
+export function breaths(wanted: readonly number[]): number[] {
   const out: number[] = [];
-  let settled = arc[0] ?? 0;
   let now = 0;
-  for (const level of arc) {
-    const rise = level - settled;
-    settled += rise * SETTLE;
-    const wanted = amount * Math.max(-1, Math.min(1, rise / FULL_RISE));
-    now += Math.max(-TEMPO_STEP, Math.min(TEMPO_STEP, wanted - now));
+  for (const target of wanted) {
+    now += Math.max(-TEMPO_STEP, Math.min(TEMPO_STEP, target - now));
     out.push(now);
   }
   return out;

@@ -485,7 +485,7 @@ export function PlayView(props: Props) {
                   <button
                     type="button"
                     className="opt"
-                    aria-pressed={song || !settings.breathe}
+                    aria-pressed={!song && !settings.breathe}
                     onClick={() => change({ ...settings, breathe: false })}
                   >
                     Steady
