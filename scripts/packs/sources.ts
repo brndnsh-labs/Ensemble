@@ -142,7 +142,7 @@ export const SOURCES: readonly Source[] = [
     author: "Jeff Learman",
     repo: "https://github.com/sfzinstruments/jlearman.jRhodes3d",
     commit: "aea5b8d3e11e2f7102593789a4e0a0e41b30271a",
-    // Not a permissive licence: non-commercial. See DECISIONS.md.
+    // Not a permissive licence: non-commercial. See docs/decisions/audio.md, "the electric piano is the Rhodes".
     licence: "CC-BY-NC-4.0",
     licenceFile: "LICENSE",
   },

@@ -436,7 +436,7 @@ export const rockSolo: SoloStyle = {
     // Hammer-ons and pull-offs: the notes give no figure. Clip 13 of the slide study had one of
     // each in eight bars at the working level, and that is the most any style plays: here, a
     // three-chorus solo has one of each in eleven to twenty bars, the busiest chorus the most
-    // (DECISIONS.md, "the guitar's short slide, hammer-on and pull-off").
+    // (docs/decisions/soloist.md, "the guitar's short slide, hammer-on and pull-off").
     hammerOn: 0.4,
     pullOff: 0.4,
     // A note held a dotted quarter is shaken (SO-52).

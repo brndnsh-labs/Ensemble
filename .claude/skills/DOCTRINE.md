@@ -1,4 +1,4 @@
-<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=228d25ba09c6 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=ef164425a068 — managed by the-cycle; edit the template, not this file -->
 # Pipeline doctrine (shared)
 
 The rules every ensemble pipeline skill shares; a skill citing `§N` means this file. **Read it
@@ -14,7 +14,7 @@ Where it's silent, use your judgment.
 - **Feedback from his ear becomes a property or a critic metric first**, then a code change.
 - **Tests are rationed** to the four kinds in `docs/TESTING.md`. An issue whose Acceptance asks for a unit test, a mock or a new Playwright spec is mis-scoped: restate it as a property, a corpus row, a golden or a scorecard metric.
 - **Styles are data.** A style change that needs an engine edit means the engine lacks a concept: add the concept, then express the style as data.
-- **Decide and log.** A call the docs do not settle gets one line of rationale in `DECISIONS.md`; where the work stands is on the issues and pull requests, never in a file. The issue is the unit of work; `PLAN.md` is the map and `DECISIONS.md` the record.
+- **Decide and log.** A call the docs do not settle gets one line of rationale in `docs/decisions/` (its area's file); where the work stands is on the issues and pull requests, never in a file. The issue is the unit of work; `PLAN.md` is the map and `DECISIONS.md` the record.
 
 ---
 
@@ -133,8 +133,8 @@ A spawned agent's "gates green" or "done" is a claim: re-run the gates yourself 
 files actually changed before you rely on it.
 
 - **`pnpm check`** is typecheck, lint and the engine suite (corpus, properties, goldens on two seeds) under a time budget, and an exceeded budget fails it. The answer to that is to consolidate or delete, never to raise the limit: raising it is a §5 brake. Lint also holds the boundaries: no `Math.random`, `Date.now` or `performance.now` in `packages/engine/src` (`tools/no-ambient-inputs.grit`), and the import rules between `engine`, `audio` and `app` (`biome.json`).
-- **`pnpm score`** compares every style's scorecard with its baseline in `scorecard/<style>.json` and fails only on a drop past a metric's tolerance. Movement inside tolerance is reported in the PR, not hidden. `ensemble score --update` accepts a new baseline: an improvement may be accepted with a `DECISIONS.md` line; accepting a drop is a §5 brake.
-- **A golden that moved** (`test/goldens/`) is either the point of the change or a bug. If it is the point, `pnpm goldens` and a `DECISIONS.md` line saying why the output changed; never rewrite goldens to get green without knowing which notes moved.
+- **`pnpm score`** compares every style's scorecard with its baseline in `scorecard/<style>.json` and fails only on a drop past a metric's tolerance. Movement inside tolerance is reported in the PR, not hidden. `ensemble score --update` accepts a new baseline: an improvement may be accepted with a line in `docs/decisions/`; accepting a drop is a §5 brake.
+- **A golden that moved** (`test/goldens/`) is either the point of the change or a bug. If it is the point, `pnpm goldens` and a line in `docs/decisions/` saying why the output changed; never rewrite goldens to get green without knowing which notes moved.
 - **Before a listening gate**, also `pnpm test:full` (six seeds).
 - **CI runs more than the local gates**: `pnpm smoke` (the five browser journeys, needs Google Chrome) and `pnpm image`. Run `pnpm smoke` locally when the diff touches `packages/app`, `packages/audio` or `smoke/`.
 - **A musical change is not done on green.** Green proves the rules held. If the change can be heard, it also needs its page under `out/` with the measurements beside each clip.
@@ -178,7 +178,7 @@ approval of the deploy.
 
 **Decided up front with Brandon (2026-11-20), so these are not stops:**
 
-- **A musical fork never waits on him.** Voicing, rhythm, register, which idiom, how often: pick one from `docs/MUSIC_NOTES.md` and the style's notes, log it in `DECISIONS.md`, and build. He overrules by ear afterwards. Such an issue is `status:ready`, not `status:needs-decision`.
+- **A musical fork never waits on him.** Voicing, rhythm, register, which idiom, how often: pick one from `docs/MUSIC_NOTES.md` and the style's notes, log it in `docs/decisions/` (its area's file), and build. He overrules by ear afterwards. Such an issue is `status:ready`, not `status:needs-decision`.
 - **His ear never blocks the queue.** Work that can be heard or seen merges on green, goes to `status:needs-ear` with its page, and the next issue starts.
 - **No more than two unheard changes on one seat.** Before picking an issue, count the open `status:needs-ear` issues carrying its `area:*` label: at two, skip it (in `/cycle --all`, without stopping) and take the next issue on another seat. A verdict of "not right" must not undo a stack built on top of it.
 - **Silence after production is a pass.** `/deploy-prod`'s preflight names every `status:needs-ear` issue in what is shipping. Once a production release has carried one and he has said nothing against it by the next `/unblock` or `/wrap-up`, close it with the comment "passed by silence: on production since <commit>". He can reopen anything by ear at any time.

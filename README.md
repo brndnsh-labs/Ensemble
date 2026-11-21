@@ -13,7 +13,7 @@ A backing band in a browser. Type or pick a chord chart, press Play, and a gener
 - `library/`: the built-in charts. `docs/CHART_FORMAT.md` is the format.
 - `assets/packs/`: the instruments, each with its own `LICENCE`.
 
-`docs/BRIEF.md` says what it is and why; `CLAUDE.md` has the rules of the repository and every command; `DECISIONS.md` is the record of what was decided and why.
+`docs/BRIEF.md` says what it is and why; `CLAUDE.md` has the rules of the repository and every command; `docs/decisions/` is the record of what was decided and why.
 
 ## Running it
 

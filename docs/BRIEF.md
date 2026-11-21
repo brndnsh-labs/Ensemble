@@ -237,7 +237,7 @@ The CLI is the main feedback loop during the engine stages, and it is a first-cl
 
 - Follow `docs/MILESTONES.md`. Each stage ends with audition files and a short report for a human listening gate.
 - Follow `docs/TESTING.md`. It is binding.
-- Keep `DECISIONS.md` at the repo root: date, decision, one line of why. Include every place you departed from these docs.
+- Keep the decisions in `docs/decisions/`, a file for each area: date, decision, one line of why. Include every place you departed from these docs.
 - Prefer a small, legible codebase over a clever one. Brandon reads the code.
 - When a listening gate produces feedback, restate it as a property or critic metric, confirm the current build fails it, then fix.
 

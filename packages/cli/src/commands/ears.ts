@@ -23,7 +23,7 @@
 // an answer's `section` is a heading in the record; a miss fails the command,
 // naming the case. `--check` does only that and reads no history, for CI.
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import type { Baseline, BaselineLine } from "@ensemble/engine";
 import { styleById, styleIds } from "@ensemble/styles";
@@ -87,8 +87,8 @@ export const earsCommand: Command = {
 
 // ── where his words are written: every source names a heading that is there ──
 
-/** The files whose headings an answer's `section` may name. */
-const RECORD = ["DECISIONS.md"];
+/** The record: its files' headings are what an answer's `section` may name. */
+const DECISIONS = "docs/decisions";
 
 const headings = new Map<string, ReadonlySet<string> | null>();
 
@@ -126,13 +126,18 @@ function unsourced(): string[] {
     if (!there) miss(who, `source "${source}"`, `no file ${path}`);
     else if (!there.has(heading)) miss(who, `source "${source}"`, `no heading in ${path} reads so`);
   }
+  const record = existsSync(DECISIONS)
+    ? readdirSync(DECISIONS)
+        .filter((name) => name.endsWith(".md"))
+        .map((name) => `${DECISIONS}/${name}`)
+    : [];
   for (const c of file.cases) {
     const section = c.answered?.section;
-    if (section !== undefined && !RECORD.some((path) => headingsOf(path)?.has(section))) {
+    if (section !== undefined && !record.some((path) => headingsOf(path)?.has(section))) {
       miss(
         `case "${c.id}"`,
         `answered.section "${section}"`,
-        `no heading in ${RECORD.join(", ")} reads so`,
+        `no heading in ${DECISIONS}/ reads so`,
       );
     }
   }
