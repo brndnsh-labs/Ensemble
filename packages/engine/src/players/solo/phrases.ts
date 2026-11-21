@@ -201,6 +201,8 @@ export function phrasesFor(
    * each phrase made is offered with a run in it too, first, where one will go.
    */
   burst: number | null = null,
+  /** Told each time an idea said again whole is drawn to be said a beat away (for `solo.moved-played`). */
+  drawn?: () => void,
 ): Phrase[] {
   const { instrument } = world;
   // The rhythms are those written for the phrase's meter, where the style has written any.
@@ -553,6 +555,7 @@ export function phrasesFor(
   const remade = (kind: string, plans: readonly BarPlan[], ask: Ask): Phrase => {
     const phrase = compose(kind, plans, ask);
     if (shift === 0) return phrase;
+    drawn?.();
     // The way drawn, else the other where the style goes that way at all.
     const { early } = solo.habits.displace;
     const may = (by: number) => (by < 0 ? early > 0 : lateAllowed && early < 1);

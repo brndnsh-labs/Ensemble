@@ -28,6 +28,7 @@ import {
   rhythmsAgain,
   SOLO_FEATURES,
 } from "../../players/solo/critique.ts";
+import { movedIdeasOf } from "../../players/solo/play.ts";
 import type { World } from "../../players/solo/slots.ts";
 import { worldOf } from "../../players/solo/slots.ts";
 import type { StylePack } from "../../style/types.ts";
@@ -446,6 +447,15 @@ export const soloMeasures: readonly Measure[] = [
     (reading) => {
       const moved = displacements(reading).filter((one) => one.line);
       return share(moved.filter((one) => one.by === -1).length, moved.length);
+    },
+  ),
+  measure(
+    "moved-played",
+    "share",
+    "Of the phrases where the soloist drew an idea said again whole to be said a beat early or late, the share where it was: the rest were not moved because the idea would not fit moved (a note pulled out of the phrase, a note that could not keep its length), or the critic preferred another phrase. Read from what the soloist did when it played the take, not from the notes, which cannot show a phrase not played.",
+    (reading) => {
+      const moved = movedIdeasOf(reading.world.plan);
+      return moved && moved.drawn > 0 ? share(moved.played, moved.drawn) : null;
     },
   ),
   measure(

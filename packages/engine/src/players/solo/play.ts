@@ -34,6 +34,26 @@ import type { Slot, World } from "./slots.ts";
 import { doubleChanceOf, fourPulses, levelIndex, worldOf } from "./slots.ts";
 import type { Form, Role } from "./style.ts";
 
+/** Of a take's phrases drawn to say an idea a beat away, how many were, and how many were offered so. */
+export interface MovedIdeas {
+  /** Phrases where an idea said again whole was drawn to be said a beat early or late. */
+  readonly drawn: number;
+  /** Of those, the phrases where a moved idea was made and offered to the critic. */
+  readonly offered: number;
+  /** Of those, the phrases where the moved idea was played. */
+  readonly played: number;
+}
+const MOVED = new WeakMap<Plan, MovedIdeas>();
+
+/**
+ * What the soloist did with the ideas it drew to say a beat away, the last time it played
+ * this plan: for the scorecard (`solo.moved-played`), which reads a take's notes and
+ * cannot see a phrase that was drawn and not played. Undefined for a plan it has not played.
+ */
+export function movedIdeasOf(plan: Plan): MovedIdeas | undefined {
+  return MOVED.get(plan);
+}
+
 /** The shortest note: half a sixteenth (SO-19). */
 const SHORTEST = STEP / 2;
 
@@ -103,6 +123,7 @@ export function soloPart(
   const accent = style.chords.ending.velocity + style.chords.ending.accent;
 
   const written: WrittenNote[] = [];
+  const moved = { drawn: 0, offered: 0, played: 0 };
   let memory: Memory = NOTHING;
   let earlier: Heard[] = [];
   let form: readonly Role[] = ["s"];
@@ -152,6 +173,7 @@ export function soloPart(
     if (slot.index === 0) form = chorusForm(world, rng, slot, memory.motif !== null);
     const role = form[slot.index % form.length] ?? "s";
 
+    let drawn = false;
     const offered = phrasesFor(
       world,
       slot,
@@ -162,6 +184,9 @@ export function soloPart(
       doubled || !earned(lastPhrase, firstChorus)
         ? null
         : doubleTimeAt(world, s, heldRng(rng, "double time", "phrase", first)),
+      () => {
+        drawn = true;
+      },
     );
     // The pass before's pickup into this phrase is played as it was made, whichever is chosen.
     const leading = lead ? writeLead(lead, first) : [];
@@ -195,6 +220,11 @@ export function soloPart(
     report?.({ slot, role, candidates: score(candidates, SOLO_FEATURES, weights), chosen });
 
     const phrase = phrases[at]!;
+    if (drawn) {
+      moved.drawn++;
+      if (phrases.some((one) => one.inPlace)) moved.offered++;
+      if (phrase.inPlace) moved.played++;
+    }
     // How the horn plays the phrase chosen: what it does with the pitch of the notes it
     // arrives on and of the notes it leaves. Drawn by place, after the choice, so the
     // phrase is the one the critic chose whatever it does.
@@ -244,6 +274,7 @@ export function soloPart(
     const lead = intoPass(next, world.slots.at(-1));
     if (lead) writeLead(lead, next);
   }
+  MOVED.set(plan, moved);
   return written;
 }
 
