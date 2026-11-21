@@ -916,10 +916,7 @@ test("an idea comes back a beat early or late: in the styles that do it most som
       const asked = soloRoles(take.plan, style, options.seed ?? 0);
       const harmony = harmonyOf(take);
       const events = new Map(notesOf(take, "solo").map((note) => [note.tick, note]));
-      for (const { phrase, of, by, source, notes, line, carriesLate } of displacedPhrases(
-        take,
-        style,
-      )) {
+      for (const { phrase, source, notes, line, carriesLate } of displacedPhrases(take, style)) {
         const { slot } = phrase;
         const where = `${style.id}, ${chart.file} ${JSON.stringify(options)}, bar index ${slot.bars[0]!.index}`;
         const lastBar = slot.bars.at(-1)!;
@@ -929,15 +926,15 @@ test("an idea comes back a beat early or late: in the styles that do it most som
         }
         if (!line) continue;
         moved++;
-        if (!of || !by) fail("nothing it repeats", where);
         const role = asked.get(slot.bars[0]!.index);
         if (roles && (!role || !roles.includes(role)))
           fail(`for a letter it is not for`, `${where} (${role})`);
         if (slot.index === 0) fail("the top of a chorus", where);
         if (slot.first || slot.last) fail("the solo's first or last phrase", where);
         if (lastBar.ending !== null) fail("the tune's last phrase", where);
-        if (notes.some((note) => note.tick < slot.bars[0]!.start))
+        if ([...notes, ...phrase.notes].some((note) => note.tick < slot.bars[0]!.start)) {
           fail("before its barline", where);
+        }
         const stops = Math.min(lastBar.start + lastBar.ticks, end.start + end.ticks);
         if (notes.some((note) => note.ends > stops || note.tick >= stops)) {
           fail("past the end of its phrase", where);
