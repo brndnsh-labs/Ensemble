@@ -87,7 +87,31 @@ export function grooveOf(take: Take): string | null {
   return best;
 }
 
+/**
+ * The share of a jam's bars where a seat is laid out while the band plays on (#2240): the
+ * bars of music with any of the band in them, and of those the ones without this seat. A
+ * song is played as arranged and is not measured; a seat that plays in no bar of the take
+ * was left out by the player, not laid out, and is not measured either.
+ */
+const laidOut = (seat: "drums" | "bass" | "chords"): Measure => ({
+  id: `${seat}.laid-out`,
+  seat,
+  says: `How much of a jam ${seat === "chords" ? "the comp sits" : `the ${seat} sit${seat === "bass" ? "s" : ""}`} out while the rest of the band plays: rarely, for a section or a pass at a low point of the arc, and never at all in a style that keeps everyone in.`,
+  unit: "share",
+  of(take) {
+    if (take.plan.mode !== "jam") return null;
+    const band = musicBars(take).filter(
+      (bar) => bar.seats.drums !== null || bar.seats.bass !== null || bar.seats.chords !== null,
+    );
+    if (!band.some((bar) => bar.seats[seat] !== null)) return null;
+    return share(band.filter((bar) => bar.seats[seat] === null).length, band.length);
+  },
+});
+
 export const bandMeasures: readonly Measure[] = [
+  laidOut("drums"),
+  laidOut("bass"),
+  laidOut("chords"),
   {
     id: "band.new-grooves",
     idiom: true,

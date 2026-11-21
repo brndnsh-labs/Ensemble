@@ -569,6 +569,24 @@
     "p90": 3.2193,
     "inTarget": null
   },
+  "drums.laid-out": {
+    "mean": 0,
+    "p10": 0,
+    "p90": 0,
+    "inTarget": null
+  },
+  "bass.laid-out": {
+    "mean": 0,
+    "p10": 0,
+    "p90": 0,
+    "inTarget": null
+  },
+  "chords.laid-out": {
+    "mean": 0,
+    "p10": 0,
+    "p90": 0,
+    "inTarget": null
+  },
   "band.backbeat-swell": {
     "mean": 8.4609,
     "p10": 7.6056,
