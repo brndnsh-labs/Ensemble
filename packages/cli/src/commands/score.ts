@@ -266,7 +266,7 @@ function byEar(sorted: Sorted, lines: readonly ScoreLine[], base: string): strin
   } else {
     out.push("  outside what was passed, for his ear:");
     for (const o of sorted.outside) {
-      const now = f(o.id, o.now);
+      const now = o.now === null ? "" : f(o.id, o.now);
       const passes = o.range ? `${o.range.passes} ${o.range.passes === 1 ? "pass" : "passes"}` : "";
       const range = o.range
         ? `${f(o.id, o.range.low)} to ${f(o.id, o.range.high)} (${passes})`
@@ -280,6 +280,7 @@ function byEar(sorted: Sorted, lines: readonly ScoreLine[], base: string): strin
         further: `${now}, further outside ${range}; was ${was}`,
         unvouched: `${now}, was ${was}; no pass of his covers this measure`,
         new: `${now}, new with this change: no band he has passed had it`,
+        gone: `no longer measured (no take has it to read); was ${was}`,
       }[o.why];
       out.push(`    ${o.id}: ${says}`);
     }

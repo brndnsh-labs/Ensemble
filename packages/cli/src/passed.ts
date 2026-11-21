@@ -275,7 +275,8 @@ export function passedBands(
 
 export interface Outside {
   readonly id: string;
-  readonly now: number;
+  /** The mean with the change; null for a measure the change took away. */
+  readonly now: number | null;
   /** The mean before the change; null for a measure the change brought. */
   readonly was: number | null;
   readonly range: Range | null;
@@ -283,10 +284,13 @@ export interface Outside {
    * toward: past the nearest band he has passed, back toward one he refused.
    * left: inside his range before, outside it now. further: outside before, and
    * further out now. unvouched: no pass of his covers the measure, and it moved
-   * by what tells two bands apart. new: the change brought the measure, so no
-   * band he has passed had it.
+   * at all: with no range to hold it, a measure allowed a little each time would
+   * be allowed anything. new: the change brought the measure, so no band he has
+   * passed had it. gone: the change took the measure away (no take has anything
+   * for it to read: a seat fell silent), which is as far from a passed band as
+   * a band gets.
    */
-  readonly why: "toward" | "left" | "further" | "unvouched" | "new";
+  readonly why: "toward" | "left" | "further" | "unvouched" | "new" | "gone";
   /** For "toward": the band he refused. */
   readonly fence?: Fence;
 }
@@ -319,6 +323,9 @@ export function sortChange(
   const outside: Outside[] = [];
   const already: string[] = [];
   let moved = 0;
+  for (const [id, was] of Object.entries(base)) {
+    if (!now[id]) outside.push({ id, now: null, was: was.mean, range: null, why: "gone" });
+  }
   for (const [id, line] of Object.entries(now)) {
     const was = base[id];
     if (!was) {
@@ -341,7 +348,7 @@ export function sortChange(
       continue;
     }
     if (!range) {
-      if (delta >= TELLS * spread(was)) put("unvouched");
+      if (delta > MOVED) put("unvouched");
       continue;
     }
     const beyond = (mean: number) => Math.max(range.low - mean, mean - range.high, 0);
