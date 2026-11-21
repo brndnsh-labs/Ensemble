@@ -1,0 +1,1055 @@
+{
+  "about": "Brandon's verdicts by ear, as DECISIONS.md and PLAN.md record them. Read by `pnpm ears`. `recorded` is the commit that wrote the verdict down: the band he heard is the one before it. `words` are his own, never reworded; where the record kept only its own sentence, `reported` is true. Add a case when he says something about how the band plays or sounds.",
+  "cases": [
+    {
+      "id": "gate1-a-little-plain",
+      "date": "2026-11-14",
+      "words": "a little plain",
+      "source": "PLAN.md: Resume here",
+      "seat": "band",
+      "styles": ["blues"],
+      "kind": "not-right",
+      "medium": "notes",
+      "heard": "Gate 1's MIDI files in Logic: the blues rhythm section alone (drums and bass).",
+      "recorded": "fb0a2645",
+      "doubt": "No fix is recorded: PLAN says '\"Plain\" was to be judged again with the piano in' and no later text closes it, so answered is null. No date is given beside the words (gate 1 was 2026-11-14 by the DECISIONS heading of its loudness section). The day is the day his words were written down."
+    },
+    {
+      "id": "gate1-velocities-slamming",
+      "date": "2026-11-14",
+      "words": "velocities were slamming",
+      "source": "DECISIONS.md: 2026-11-14: gate 1 feedback, loudness",
+      "seat": "band",
+      "styles": ["blues"],
+      "kind": "not-right",
+      "medium": "notes",
+      "heard": "Gate 1's MIDI files played through Logic's instruments; he then chose the trim by ear from three settings.",
+      "recorded": "fb0a2645",
+      "answered": {
+        "section": "2026-11-14: gate 1 feedback, loudness",
+        "note": "Written levels trimmed 15% (61% to 95% across the energy range), the blues high-tier hat played at its working level, and band.backbeat-level, band.notes-near-the-top and drums.cymbal-under-backbeat added to keep it there.",
+        "commit": "fb0a2645",
+        "logged": [
+          "written levels, bottom of the energy range: 72 -> 61 %",
+          "written levels, top of the energy range: 112 -> 95 %"
+        ]
+      },
+      "doubt": "Not a direct quote: PLAN's feedback line says it unquoted, and DECISIONS paraphrases ('slammed through Logic's instruments'). The rock section quotes 'accented as hard as the backbeat it slammed' as 'the thing heard at gate 1 in the blues', which may be his words about the hat. The trim itself was his choice (no quote).",
+      "reported": true
+    },
+    {
+      "id": "gate2-so-far-so-good",
+      "date": "2026-11-14",
+      "words": "so far so good",
+      "source": "PLAN.md: Resume here",
+      "seat": "band",
+      "styles": ["blues"],
+      "kind": "passed",
+      "medium": "notes",
+      "heard": "Gate 2's audition files (the blues band with the chord seat added).",
+      "recorded": "c1e92864",
+      "doubt": "What gate 2 contained is inferred from the stage order (the chord seat), not stated beside the verdict. No date given. The day is the day his words were written down."
+    },
+    {
+      "id": "gate3-solos-intentional",
+      "date": "2026-11-14",
+      "words": "sounding pretty good, definitely intentional melodies that work well",
+      "source": "DECISIONS.md: 2026-11-14: gate 3 feedback",
+      "seat": "soloist",
+      "styles": ["blues"],
+      "kind": "passed",
+      "medium": "notes",
+      "heard": "Gate 3's MIDI files in Logic, a few seeds: the blues band with a soloist.",
+      "recorded": "fb01ea96"
+    },
+    {
+      "id": "gate3-piano-busy",
+      "date": "2026-11-14",
+      "words": "The piano could leave a bit more room, and gets busy as the intensity ramps up.",
+      "source": "DECISIONS.md: 2026-11-14: gate 3 feedback",
+      "seat": "chords",
+      "styles": ["blues"],
+      "kind": "not-right",
+      "medium": "notes",
+      "heard": "Gate 3's MIDI files in Logic, a few seeds.",
+      "recorded": "fb01ea96",
+      "answered": {
+        "section": "2026-11-14: gate 3 feedback",
+        "note": "Under a soloist the piano stays in its working book however hot the band gets (ChordStyle.listening.busiest 'mid'), and a new measure counts the pump bars the old measures left out.",
+        "commit": "fb01ea96",
+        "measures": ["chords.strikes-per-bar-under-a-hot-solo"],
+        "logged": ["chords.strikes-per-bar-under-a-hot-solo: 5.2 -> 2.0 strikes a bar"]
+      },
+      "doubt": "The words are the record's paraphrase, not a quote (PLAN: 'the piano got busy as the intensity ramped up').",
+      "reported": true
+    },
+    {
+      "id": "gate3-bass-octave-high",
+      "date": "2026-11-14",
+      "words": "The bass could be more creative, its register sometimes gets high, and it reads as an octave up: it should sit in a typical bass guitar register.",
+      "source": "DECISIONS.md: 2026-11-14: gate 3 feedback",
+      "seat": "bass",
+      "styles": ["blues"],
+      "kind": "not-right",
+      "medium": "notes",
+      "heard": "Gate 3's MIDI files in Logic, a few seeds.",
+      "recorded": "fb01ea96",
+      "answered": {
+        "section": "2026-11-14: gate 3 feedback",
+        "note": "Roots go no higher than E2 and home is A1 to D2 (was roots to A2, home C2 to E2), so a box tops out at E3.",
+        "commit": "fb01ea96",
+        "measures": ["bass.register", "bass.high-notes"],
+        "logged": [
+          "bass.register: average note: G2 before (B2 on the 12-bar in A), D2 after",
+          "bass.high-notes: 9 -> 0 % of notes above D3"
+        ]
+      },
+      "doubt": "The words are the record's paraphrase, not a quote (PLAN: 'the bass was an octave high and could be more creative'). The register and the creativity are split into two cases.",
+      "reported": true
+    },
+    {
+      "id": "gate3-bass-more-creative",
+      "date": "2026-11-14",
+      "words": "a bit more creative",
+      "source": "DECISIONS.md: 2026-11-14: a bass that varies its line (gate 3 feedback, \"a bit more creative\")",
+      "seat": "bass",
+      "styles": ["blues"],
+      "kind": "not-right",
+      "medium": "notes",
+      "heard": "Gate 3's MIDI files in Logic, a few seeds.",
+      "recorded": "663ce3a9",
+      "answered": {
+        "section": "2026-11-14: a bass that varies its line (gate 3 feedback, \"a bit more creative\")",
+        "note": "More than one line for a chord, walks into a change, and lines chosen by the phrase through the critic.",
+        "commit": "663ce3a9",
+        "logged": [
+          "bars that are the bar at that place last chorus: 50 -> 42 %",
+          "chorus tops walked into: 0 -> 40 %",
+          "takes with half-step approaches in the 15% to 40% band: 65 -> 90 % of takes"
+        ]
+      }
+    },
+    {
+      "id": "gate3-second-listen",
+      "date": "2026-11-14",
+      "words": "seems pretty good from what i can tell. nice job!",
+      "source": "PLAN.md: Resume here",
+      "seat": "band",
+      "styles": ["blues"],
+      "kind": "passed",
+      "medium": "notes",
+      "heard": "Gate 3's rewritten files and a few more seeds, after the piano and bass fixes.",
+      "recorded": "c05af371",
+      "doubt": "The day is the day his words were written down."
+    },
+    {
+      "id": "piano-under-hot-solo-right",
+      "date": "2026-11-14",
+      "words": "right as it is",
+      "source": "PLAN.md: Resume here",
+      "seat": "chords",
+      "styles": ["blues"],
+      "kind": "passed",
+      "medium": "notes",
+      "heard": "Gate 3's open questions, asked one by one: the piano under a hot solo at 2.0 strikes a bar.",
+      "recorded": "afa5a0dc"
+    },
+    {
+      "id": "bass-depth-fine",
+      "date": "2026-11-14",
+      "words": "fine as it is",
+      "source": "PLAN.md: Resume here",
+      "seat": "bass",
+      "styles": ["blues"],
+      "kind": "passed",
+      "medium": "notes",
+      "heard": "Gate 3's open questions: the bass's depth in C and F (roots stop at E2).",
+      "recorded": "afa5a0dc"
+    },
+    {
+      "id": "bass-variety-right-amount",
+      "date": "2026-11-14",
+      "words": "right amount",
+      "source": "PLAN.md: Resume here",
+      "seat": "bass",
+      "styles": ["blues"],
+      "kind": "passed",
+      "medium": "notes",
+      "heard": "Gate 3's open questions: the amount of bass variety after the varied-line build.",
+      "recorded": "afa5a0dc"
+    },
+    {
+      "id": "worst-solos-acceptable",
+      "date": "2026-11-14",
+      "words": "acceptable",
+      "source": "PLAN.md: Resume here",
+      "seat": "soloist",
+      "styles": ["blues"],
+      "kind": "passed",
+      "medium": "notes",
+      "heard": "Gate 3's open questions: the three worst solos of 200.",
+      "recorded": "afa5a0dc"
+    },
+    {
+      "id": "wide-bass-drops-for-later",
+      "date": "2026-11-14",
+      "words": "okay for now, maybe we can revisit in the future",
+      "source": "PLAN.md: Resume here",
+      "seat": "bass",
+      "styles": ["blues"],
+      "kind": "left",
+      "medium": "notes",
+      "heard": "Gate 3's open questions: the wide bass drops (about 6% of changes reached by a fall of a sixth or more into the lead-in).",
+      "recorded": "afa5a0dc"
+    },
+    {
+      "id": "one-note-drum-fills-for-later",
+      "date": "2026-11-14",
+      "words": "another one for long term improvement",
+      "source": "PLAN.md: Resume here",
+      "seat": "drums",
+      "styles": ["blues"],
+      "kind": "left",
+      "medium": "notes",
+      "heard": "Gate 3's open questions: the two one-note drum fills at bar 8 at the mid level.",
+      "recorded": "afa5a0dc"
+    },
+    {
+      "id": "gate4-incredible",
+      "date": "2026-11-15",
+      "words": "everything is sounding incredible so far, seriously amazing work",
+      "source": "DECISIONS.md: 2026-11-15: gate 4 passed; and the groove does not follow the chart after all",
+      "seat": "band",
+      "styles": ["blues", "funk", "jazz"],
+      "kind": "passed",
+      "medium": "notes",
+      "heard": "Gate 4's downloaded files: 'a handful of seeds across blues/funk/jazz'.",
+      "recorded": "bd7bd4f9",
+      "doubt": "The heading's date is 2026-11-15, but the text gives no date for the words; left null per the rule (section heading dates the decision). The day is the day his words were written down."
+    },
+    {
+      "id": "first-listen-instruments-worked",
+      "date": "2026-11-15",
+      "words": "nice job... the instruments themselves all worked",
+      "source": "DECISIONS.md: first listen: it plays on the laptop and the iPhone; a pop after stop (stage 5)",
+      "seat": "audio",
+      "styles": [],
+      "kind": "passed",
+      "medium": "sound",
+      "heard": "The first five packs through the sampler, on his laptop and his iPhone 17.",
+      "recorded": "9888636f",
+      "doubt": "Which styles were played is not said (the jazz and blues quartet's packs were the only ones cut). No date in the section. The day is the day his words were written down."
+    },
+    {
+      "id": "pop-after-stop",
+      "date": "2026-11-15",
+      "words": "a popping kind of sound that echoes after stopping playback",
+      "source": "DECISIONS.md: first listen: it plays on the laptop and the iPhone; a pop after stop (stage 5)",
+      "seat": "audio",
+      "styles": [],
+      "kind": "not-right",
+      "medium": "sound",
+      "heard": "The first five packs through the sampler, on his laptop and his iPhone 17, pressing stop.",
+      "recorded": "9888636f",
+      "answered": {
+        "section": "first listen: it plays on the laptop and the iPhone; a pop after stop (stage 5)",
+        "note": "A queued recording is stopped at the moment it would begin, so its run-up never sounds; stop fades over 120 ms.",
+        "commit": "9888636f",
+        "logged": [
+          "peak level in the 1.5 s after stop (dry mix): -17 -> -72 dBFS (after: from 0.2 s after the stop; digital silence from 1.7 s)"
+        ]
+      },
+      "doubt": "No date in the section. The day is the day his words were written down."
+    },
+    {
+      "id": "gate5-fantastic",
+      "date": "2026-11-15",
+      "words": "everything is sounding fantastic in my testing so far",
+      "source": "DECISIONS.md: gate 5 passed (stage 5)",
+      "seat": "band",
+      "styles": ["blues", "funk", "jazz"],
+      "kind": "passed",
+      "medium": "sound",
+      "heard": "Gate 5's sixteen audition files (each band on its own tunes, each soloist, every layer and one) on his laptop and iPhone.",
+      "recorded": "8f37ac33"
+    },
+    {
+      "id": "gate5-sax-and-vibes",
+      "date": "2026-11-15",
+      "words": "sax is definitely good enough so far, and the vibes sound wonderful",
+      "source": "DECISIONS.md: gate 5 passed (stage 5)",
+      "seat": "soloist",
+      "styles": ["blues", "funk", "jazz"],
+      "kind": "passed",
+      "medium": "sound",
+      "heard": "Gate 5's files with the same take on each soloist (alto sax and vibraphone packs).",
+      "recorded": "8f37ac33"
+    },
+    {
+      "id": "mix-no-complaints",
+      "date": "2026-11-15",
+      "words": "no complaints about the mix so far. we can always tweak that later",
+      "source": "DECISIONS.md: stage 6 begins: the play view and the library (part 1)",
+      "seat": "band",
+      "styles": ["blues", "funk", "jazz"],
+      "kind": "left",
+      "medium": "sound",
+      "heard": "The mix as measured, after gate 5.",
+      "recorded": "d72d7306",
+      "doubt": "Could also be read as passed; 'we can always tweak that later' makes it fine-for-now. No date in the section. The day is the day his words were written down."
+    },
+    {
+      "id": "lead-guitar-drive-3x",
+      "date": "2026-11-15",
+      "words": "they both sound pretty good, might just depend on the context a little bit. i guess i'd lean toward slightly less, so let's stick with the 3x",
+      "source": "DECISIONS.md: the lead guitar's drive, the soloist's level, and the suite's budget (stage 6, part 5)",
+      "seat": "soloist",
+      "styles": ["rock"],
+      "kind": "chose",
+      "medium": "sound",
+      "heard": "Both overdriven guitar packs (the clean guitar through an amplifier at 3x and at 6x drive); chose 3x, refused 6x.",
+      "recorded": "cca312f5",
+      "doubt": "Which style or clips he heard them in is not said; rock is the style the guitar was cut for. No date in the section. The day is the day his words were written down."
+    },
+    {
+      "id": "soloist-volume-up",
+      "date": "2026-11-15",
+      "words": "soloist volume may need to come up a touch in general, please check levels",
+      "source": "DECISIONS.md: the lead guitar's drive, the soloist's level, and the suite's budget (stage 6, part 5)",
+      "seat": "soloist",
+      "styles": ["blues", "jazz", "rock", "funk"],
+      "kind": "not-right",
+      "medium": "sound",
+      "heard": "The band with its soloists, around the drive comparison (the four styles then built).",
+      "recorded": "cca312f5",
+      "answered": {
+        "section": "the lead guitar's drive, the soloist's level, and the suite's budget (stage 6, part 5)",
+        "note": "pnpm levels was written; the default soloist level went up 1.5 dB, jazz 0.5, rock 3, funk 4.5, and rock's overall level was raised to funk's (-17 LUFS).",
+        "commit": "cca312f5",
+        "logged": [
+          "soloist under the band, blues: 2.5 -> ? dB",
+          "soloist under the band, jazz: 1.5 -> ? dB",
+          "soloist under the band, rock: 4.9 -> ? dB",
+          "soloist under the band, funk: 5.8 -> ? dB",
+          "soloist under the band, all four (range after): dB: 0.5 to 1.8 under in all four"
+        ]
+      },
+      "doubt": "No date in the section; 'in general' read as every style built then. The day is the day his words were written down."
+    },
+    {
+      "id": "pitch-study-bend-and-vibrato",
+      "date": "2026-11-15",
+      "words": "the wide/60 cent vibrato really sounds good and realistic",
+      "source": "DECISIONS.md: the lead guitar bends and shakes (stage 6, part 5)",
+      "seat": "soloist",
+      "styles": ["rock", "blues"],
+      "kind": "chose",
+      "medium": "notes",
+      "heard": "The pitch study's nine ways of moving a note (scripts/pitch-study.ts); chose the quick bend ('quick bends sound great') and the wide 60-cent vibrato, refused the smooth slides ('slides don't sound very good as they are, so we should leave them out. there's still value in them, but we need to snap to pitches/frets to make it sound realistic').",
+      "recorded": "7ac967fd",
+      "doubt": "Medium: bends and vibrato are written by the engine as pitch moves (notes), but the study judged how they sound on the samples (could be sound). Styles of the study clips not stated. No date beside the words. The day is the day his words were written down."
+    },
+    {
+      "id": "lead-guitar-comes-alive",
+      "date": "2026-11-15",
+      "words": "seriously incredible job, it all sounds really tasteful, and the soloist comes alive on guitar now. wow!",
+      "source": "DECISIONS.md: the lead guitar, heard (stage 6, part 5)",
+      "seat": "soloist",
+      "styles": ["rock", "blues"],
+      "kind": "passed",
+      "medium": "notes",
+      "heard": "The lead guitar's bends and shakes on the test site.",
+      "recorded": "2eedc3e3",
+      "doubt": "Styles not named; the guitar bends in blues and rock (jazz and funk only shake)."
+    },
+    {
+      "id": "rock-first-hearing",
+      "date": "2026-11-15",
+      "words": "sounds good so far!",
+      "source": "PLAN.md: Resume here",
+      "seat": "band",
+      "styles": ["rock"],
+      "kind": "passed",
+      "medium": "notes",
+      "heard": "Rock's first hearing, with the alto as soloist.",
+      "recorded": "cc4eafa8",
+      "doubt": "Only in PLAN; no date. The day is the day his words were written down."
+    },
+    {
+      "id": "steel-archtop-chosen",
+      "date": "2026-11-15",
+      "words": "let's go with the archtop, it sounds pretty good and the license is nice",
+      "source": "DECISIONS.md: the acoustic guitar is a steel-string archtop; the nylon stays (stage 6, part 5)",
+      "seat": "chords",
+      "styles": ["acoustic"],
+      "kind": "chose",
+      "medium": "sound",
+      "heard": "The same picked and strummed part on three guitars (out/steel-study/): chose Karoryfer's Shinyguitar archtop; refused FreePats' FSS flat-top and kept the nylon as an option.",
+      "recorded": "2b40b74d",
+      "doubt": "Part of his reason is the licence, not the ear."
+    },
+    {
+      "id": "acoustic-sounds-great",
+      "date": "2026-11-16",
+      "words": "everything i'm listening to sounds great so far! awesome work on the acoustic side of things",
+      "source": "DECISIONS.md: every style heard; the electric bass is harsh (stage 6, part 5)",
+      "seat": "band",
+      "styles": ["acoustic"],
+      "kind": "passed",
+      "medium": "notes",
+      "heard": "Acoustic on the test site (the steel-string by then, per PLAN's 'Heard and passed (2026-11-16)').",
+      "recorded": "764f2801"
+    },
+    {
+      "id": "disco-neosoul-reggae-good",
+      "date": "2026-11-16",
+      "words": "disco, neo-soul, and reggae all seem good as well.",
+      "source": "DECISIONS.md: every style heard; the electric bass is harsh (stage 6, part 5)",
+      "seat": "band",
+      "styles": ["disco", "neosoul", "reggae"],
+      "kind": "passed",
+      "medium": "notes",
+      "heard": "Disco, neo-soul and reggae on the test site.",
+      "recorded": "764f2801"
+    },
+    {
+      "id": "electric-bass-harsh",
+      "date": "2026-11-16",
+      "words": "we might want to look at the bass pack(s) for some of those though - the electric bass sound is a little harsh, and we might need something else for the mellower genres",
+      "source": "DECISIONS.md: every style heard; the electric bass is harsh (stage 6, part 5)",
+      "seat": "bass",
+      "styles": ["disco", "neosoul", "reggae"],
+      "kind": "not-right",
+      "medium": "sound",
+      "heard": "Disco, neo-soul and reggae on the test site (the electric-bass pack).",
+      "recorded": "764f2801",
+      "answered": {
+        "section": "the electric bass, by Brandon's ear (stage 6, part 5)",
+        "note": "A softer touch (sound.touch.bass -12) in neo-soul, funk and disco; reggae -24 with mix.seats.bass.lowpass 400; rock left as it was.",
+        "commit": "082350ef",
+        "logged": [
+          "share of the bass's energy above 800 Hz, softer touch (12 under): dB: 5 to 8 dB off",
+          "share of the bass's energy above 800 Hz, much softer touch (24 under): dB: 11 to 12 dB off"
+        ]
+      },
+      "doubt": "Disco's change was the main thread's inference, not his ear. Funk was fixed from the study though he did not name funk here."
+    },
+    {
+      "id": "bass-study-choice",
+      "date": "2026-11-16",
+      "words": "neo-soul - B / reggae - F / funk - B",
+      "source": "DECISIONS.md: the electric bass, by Brandon's ear (stage 6, part 5)",
+      "seat": "bass",
+      "styles": ["neosoul", "reggae", "funk"],
+      "kind": "chose",
+      "medium": "sound",
+      "heard": "The bass study (out/bass-study/): six ways each of touch and tone; chose B (softer touch) for neo-soul and funk and F (much softer touch, tone down) for reggae over the others.",
+      "recorded": "082350ef",
+      "doubt": "Which letter is which clip is inferred from what was built (B = touch -12; F = touch -24 and lowpass 400)."
+    },
+    {
+      "id": "six-eight-feel-missing",
+      "date": "2026-11-16",
+      "words": "we definitely aren't capturing a 6/8 feel very well",
+      "source": "DECISIONS.md: playing in six and twelve is to be designed (stage 6)",
+      "seat": "band",
+      "styles": ["jazz", "blues", "rock", "acoustic"],
+      "kind": "not-right",
+      "medium": "notes",
+      "heard": "The first meter study (out/meter-study/): a blues in six as jazz in 6/8, 6/4 and 24 bars of 3/4; a slow blues in 12/8 beside 4/4; fifties changes in 12/8; a folk tune in 6/8; all under the fit.",
+      "recorded": "64da440c",
+      "answered": {
+        "section": "the band in six and twelve (stage 6)",
+        "note": "A seat may write its bar again under a meter's name; jazz written for 6/4 and the blues for 12/8, then every style for 6/8 and 12/8; tempo counts the felt pulse.",
+        "commit": "e71ec38e",
+        "measures": ["bass.notes-per-bar-in-six", "chords.strikes-per-bar-in-six"],
+        "logged": [
+          "bass.notes-per-bar-in-six: ? -> 3.52 notes a bar (All Blues and Footprints as jazz; 2 to 5)",
+          "chords.strikes-per-bar-in-six: ? -> 2.47 strikes a bar (1 to 4)"
+        ]
+      },
+      "doubt": "Styles: the study's fifties changes and folk tune were later played as rock and acoustic (meter-study-2); in the first study the styles of those two clips are not stated."
+    },
+    {
+      "id": "meter-study-2-done",
+      "date": "2026-11-16",
+      "words": "done listening - great job so far",
+      "source": "DECISIONS.md: six and twelve heard; a style's tempo range in a meter; the chart's screen says its meter (stage 6)",
+      "seat": "band",
+      "styles": ["jazz", "blues"],
+      "kind": "passed",
+      "medium": "notes",
+      "heard": "out/meter-study-2/: All Blues as jazz in 6/4 and the slow blues in 12/8, each as written and as the fit, with the alto.",
+      "recorded": "3ffc290b"
+    },
+    {
+      "id": "rock-twelve-acoustic-six-heard",
+      "date": "2026-11-16",
+      "words": "great work, you can take those down",
+      "source": "DECISIONS.md: rock in twelve and acoustic in six, heard (stage 6)",
+      "seat": "band",
+      "styles": ["rock", "acoustic"],
+      "kind": "passed",
+      "medium": "notes",
+      "heard": "out/meter-study-3-rock/ (rock in 12/8) and out/meter-study-3-acoustic/ (acoustic in 6/8).",
+      "recorded": "56e35468"
+    },
+    {
+      "id": "gate6-sounds-incredible",
+      "date": "2026-11-16",
+      "words": "i'd say the week has already started - i've been playing along with the app while you've been working, and it seriously sounds incredible",
+      "source": "DECISIONS.md: gate 6 has begun; every style is to be written for compound time; odd meters later (stage 6)",
+      "seat": "band",
+      "styles": [],
+      "kind": "passed",
+      "medium": "notes",
+      "heard": "Playing along with the app on the test site while work went on.",
+      "recorded": "6740f45b",
+      "doubt": "Which styles is not said (not 'every style', so not 'all'). Medium is the whole performance, notes and sound together."
+    },
+    {
+      "id": "neosoul-compound-drags",
+      "date": "2026-11-16",
+      "words": "it might drag a little - i trust your judgment.",
+      "source": "DECISIONS.md: neo-soul in six and twelve, heard; the late four is a sixteenth late there too (stage 6)",
+      "seat": "drums",
+      "styles": ["neosoul"],
+      "kind": "not-right",
+      "medium": "notes",
+      "heard": "out/meter-study-4-neosoul/: neo-soul written for 6/8 and 12/8.",
+      "recorded": "3477a642",
+      "answered": {
+        "section": "neo-soul in six and twelve, heard; the late four is a sixteenth late there too (stage 6)",
+        "note": "The late four in six and twelve is the backbeat a sixteenth after its pulse, not on the triplet's middle eighth; three rules restated, neo-soul's scorecard re-accepted, not heard since.",
+        "commit": "3477a642",
+        "logged": [
+          "the late four's lateness in twelve: 0.34 -> 0.17 s late (at 58; four's is 0.18 s at 85)"
+        ]
+      },
+      "doubt": "He did not name the late four; it was the engineer's likeliest cause of the drag. The seat is drums by that reading."
+    },
+    {
+      "id": "neosoul-compound-grooves",
+      "date": "2026-11-16",
+      "words": "overall it grooves pretty well though, and i really dig what you did",
+      "source": "DECISIONS.md: neo-soul in six and twelve, heard; the late four is a sixteenth late there too (stage 6)",
+      "seat": "band",
+      "styles": ["neosoul"],
+      "kind": "passed",
+      "medium": "notes",
+      "heard": "out/meter-study-4-neosoul/: neo-soul written for 6/8 and 12/8.",
+      "recorded": "3477a642"
+    },
+    {
+      "id": "soloist-a-little-sparse",
+      "date": "2026-11-17",
+      "words": "a little sparse ... makes sense to ramp things up",
+      "source": "PLAN.md: Resume here",
+      "seat": "soloist",
+      "styles": ["all"],
+      "kind": "not-right",
+      "medium": "notes",
+      "heard": "Playing along with the app during gate 6.",
+      "recorded": "56238030",
+      "answered": {
+        "section": "a busier soloist, and a setting for it (stage 6, during gate 6)",
+        "note": "Each style's busier.lift and busier.room, a floor on notes a second by style, the soloDensity setting and soloFromTop, and tempo felt in pulses.",
+        "commit": "ba793d44",
+        "logged": [
+          "notes a second (the property 'the soloist is not sparse'), blues: 1.46 -> ? notes a second (floor 1.65)",
+          "notes a second (the property 'the soloist is not sparse'), reggae: 0.8 -> ? notes a second (floor 0.9)",
+          "the default against what he heard as sparse: 13% to 32% more notes a second"
+        ]
+      },
+      "doubt": "The quote is PLAN's, with an ellipsis in the original; DECISIONS paraphrases it. 'all' because the fix and the property cover every style; the words name none."
+    },
+    {
+      "id": "busier-soloist-defaults-and-range",
+      "date": "2026-11-17",
+      "words": "i agree with your defaults, the range seems really good",
+      "source": "DECISIONS.md: the busier soloist, heard: the defaults and the slider's range stand (stage 6, 2026-11-17)",
+      "seat": "soloist",
+      "styles": ["all"],
+      "kind": "passed",
+      "medium": "notes",
+      "heard": "The page out/solo-density/: the busier soloist's defaults and the slider's travel.",
+      "recorded": "cb79c433",
+      "doubt": "Styles on the page are not listed; every style's defaults stand by it. He also said 'great work' first."
+    },
+    {
+      "id": "horn-study-option-9",
+      "date": "2026-11-18",
+      "words": "i'm leaning toward option 9, the player's choice. sounds most varied and natural of the bunch, in my opinion.",
+      "source": "DECISIONS.md: what the alto does with a note's pitch (stage 6, during gate 6)",
+      "seat": "soloist",
+      "styles": ["jazz"],
+      "kind": "chose",
+      "medium": "notes",
+      "heard": "out/horn-study/: alto clips of shakes, scoops and falls; chose clip 9 (the last note of each phrase shaken 30 cents, one quick scoop, one 6-semitone fall over a beat) over the other eight.",
+      "recorded": "804eba80",
+      "doubt": "Styles of the study's clips are not listed; the text says he 'chose the fall over the jazz band'. Medium: pitch moves are written by the engine, though heard on the alto's samples."
+    },
+    {
+      "id": "soloist-changes-awesome",
+      "date": "2026-11-19",
+      "words": "soloist changes are sounding awesome, great job!",
+      "source": "DECISIONS.md: the account API's data deleted; his ear on the soloist (stage 6, 2026-11-19)",
+      "seat": "soloist",
+      "styles": ["all"],
+      "kind": "passed",
+      "medium": "notes",
+      "heard": "The pages out/horn-moves/ (the alto's shakes, scoops and falls: jazz, funk, disco, reggae, the blues, Body and Soul, funk in six) and out/solo-pickups/.",
+      "recorded": "625d4016",
+      "doubt": "'all' because the pickups page covers every style; the horn page alone covers jazz, funk, disco, reggae and the blues."
+    },
+    {
+      "id": "slide-study-short-and-one-fret",
+      "date": "2026-11-19",
+      "words": "short slide sounds pretty good, and the one fret slide is nice",
+      "source": "DECISIONS.md: slides and grace notes, heard: what is built from the slide study (stage 6, 2026-11-19)",
+      "seat": "soloist",
+      "styles": [],
+      "kind": "chose",
+      "medium": "notes",
+      "heard": "out/slide-study/: twenty clips of slides stepped by frets, hammer-ons, pull-offs and grace notes; chose the short stepped slide (clip 3) and the one-fret slide into a major third (clip 7); the long slide, the slide between two notes and the alto's grace were left out.",
+      "recorded": "74e14d2b",
+      "doubt": "Styles of the clips are not stated except the one-fret slide on the clean guitar over a neo-soul chart. What was left out was the engineer's recommendation, not his refusal."
+    },
+    {
+      "id": "slide-study-players-choice",
+      "date": "2026-11-19",
+      "words": "pretty much as expected, the player's choice sounds the most natural since it mixes things up",
+      "source": "DECISIONS.md: slides and grace notes, heard: what is built from the slide study (stage 6, 2026-11-19)",
+      "seat": "soloist",
+      "styles": [],
+      "kind": "chose",
+      "medium": "notes",
+      "heard": "out/slide-study/, clip 13 (a player's choice with bends, a shake, a slide and hammer-on/pull-off as one struck string); hammer-ons as one string were built from it by inference.",
+      "recorded": "74e14d2b",
+      "doubt": "He asked for recommendations on the rest; building hammer-ons as one string is reasoning from this clip, not his explicit pick."
+    },
+    {
+      "id": "audio-genuinely-impressive",
+      "date": "2026-11-16",
+      "words": "the audio we've cooked up is genuinely impressive",
+      "source": "PLAN.md: Resume here",
+      "seat": "audio",
+      "styles": [],
+      "kind": "passed",
+      "medium": "sound",
+      "heard": "The interface pass tried on his iPhone, the band playing.",
+      "recorded": "f06ef8ca",
+      "doubt": "Only in PLAN; part of a remark mainly about the app's look and navigation."
+    },
+    {
+      "id": "band-livelier-than-before",
+      "date": "2026-11-16",
+      "words": "seriously so much livelier and more musical compared to the previous version",
+      "source": "PLAN.md: Resume here",
+      "seat": "band",
+      "styles": [],
+      "kind": "passed",
+      "medium": "notes",
+      "heard": "The poster wall parts 1 and 2 on his phone, the band playing.",
+      "recorded": "93927f6e",
+      "doubt": "Only in PLAN; styles not said."
+    }
+  ],
+  "leftOut": [
+    {
+      "words": "Not noticed, left as it is: the walk through the fourth",
+      "source": "PLAN.md: Resume here",
+      "why": "not a verdict (no words of his: the record says he did not notice it)"
+    },
+    {
+      "words": "i trust your judgment about when to make changes related to grooves",
+      "source": "DECISIONS.md: 2026-11-15: when the groove starts to follow the chart",
+      "why": "about process"
+    },
+    {
+      "words": "that sounds like it'll pay off",
+      "source": "DECISIONS.md: stage 5: a fresh cut (Brandon's choice), and what a pack is",
+      "why": "about process (choosing to cut packs afresh, not a heard sound)"
+    },
+    {
+      "words": "go ahead and start building",
+      "source": "DECISIONS.md: stage 6 begins: the play view and the library (part 1)",
+      "why": "about process"
+    },
+    {
+      "words": "i'm leaning toward hosting this on docker04 like the current version of ensemble",
+      "source": "DECISIONS.md: hosting: the app as a small image (stage 6)",
+      "why": "about deployment"
+    },
+    {
+      "words": "for now, you can feel free to use ssh to get things working",
+      "source": "DECISIONS.md: the app is on the test site (stage 6)",
+      "why": "about deployment"
+    },
+    {
+      "words": "works great, nice job",
+      "source": "DECISIONS.md: the app is on the test site (stage 6)",
+      "why": "about the app's interface (the app working on his phone)"
+    },
+    {
+      "words": "manipulated the samples ... it worked reasonably well",
+      "source": "DECISIONS.md: a lead guitar's tone: the clean guitar through an amplifier (stage 6, part 5)",
+      "why": "not a verdict (about the previous version)"
+    },
+    {
+      "words": "i'm open to your professional opinion... i don't want to create artifical constraints, but i also don't want to create a monstrous test suite that makes iterating on the project slower",
+      "source": "DECISIONS.md: the lead guitar's drive, the soloist's level, and the suite's budget (stage 6, part 5)",
+      "why": "about process"
+    },
+    {
+      "words": "slides don't sound very good as they are, so we should leave them out. there's still value in them, but we need to snap to pitches/frets to make it sound realistic",
+      "source": "DECISIONS.md: the lead guitar bends and shakes (stage 6, part 5)",
+      "why": "duplicate of pitch-study-bend-and-vibrato (the refused alternative, recorded in its heard field)"
+    },
+    {
+      "words": "quick bends sound great",
+      "source": "DECISIONS.md: the lead guitar bends and shakes (stage 6, part 5)",
+      "why": "duplicate of pitch-study-bend-and-vibrato"
+    },
+    {
+      "words": "it'll stay non-commercial, let's use the rhodes",
+      "source": "DECISIONS.md: the electric piano is the Rhodes (stage 6, part 5)",
+      "why": "not a verdict (a source and licence choice, not by ear)"
+    },
+    {
+      "words": "we should keep nylon as an option as well",
+      "source": "DECISIONS.md: the acoustic guitar is a steel-string archtop; the nylon stays (stage 6, part 5)",
+      "why": "about the app's interface (an instrument picker); the sound choice is steel-archtop-chosen"
+    },
+    {
+      "words": "i just want to make sure initial page load is snappy - don't want people waiting while packs download",
+      "source": "DECISIONS.md: the first visit, timed (stage 6)",
+      "why": "about the app's interface (load time)"
+    },
+    {
+      "words": "i don't think we need to over-engineer it yet. packs can probably download while users are on the main screen in the background, and that should be plenty of time",
+      "source": "DECISIONS.md: the first visit, timed (stage 6)",
+      "why": "about the app's interface (load time)"
+    },
+    {
+      "words": "roboto serif looks good",
+      "source": "DECISIONS.md: the interface pass, first half: checked and merged; the chart in a serif, set larger (stage 6)",
+      "why": "about the app's interface"
+    },
+    {
+      "words": "any thoughts on how we can make the chords larger/more legible ... i'm open to intelligent scrolling if it'll make it easier to look at",
+      "source": "DECISIONS.md: the interface pass, first half: checked and merged; the chart in a serif, set larger (stage 6)",
+      "why": "about the app's interface"
+    },
+    {
+      "words": "larger looks better",
+      "source": "DECISIONS.md: the interface pass, first half: checked and merged; the chart in a serif, set larger (stage 6)",
+      "why": "about the app's interface"
+    },
+    {
+      "words": "any idea why the first chord in a measure looks smaller than the second though?",
+      "source": "DECISIONS.md: the interface pass, first half: checked and merged; the chart in a serif, set larger (stage 6)",
+      "why": "about the app's interface"
+    },
+    {
+      "words": "it takes a pretty long time to pull down all the sound files",
+      "source": "DECISIONS.md: the instruments, fetched faster (stage 6)",
+      "why": "about the app's interface (load time)"
+    },
+    {
+      "words": "i opened a genre, then opened a chart, and when leaving the chart, i couldn't navigate back home",
+      "source": "DECISIONS.md: a style opened on home has a way back (stage 6)",
+      "why": "about the app's interface (navigation)"
+    },
+    {
+      "words": "the poster wall looks really cool, i haven't seen anything like that in a while. reminds me of metro ui in the best way",
+      "source": "DECISIONS.md: the poster wall is chosen; one library, a style is a mark (stage 6)",
+      "why": "about the app's interface (look)"
+    },
+    {
+      "words": "the band is very adaptable and can play any chart in any genre we support. does it make sense to organize things this way? what if we have a unified library and tag things based on their idiomatic genre, with the idea that everything is easily customizable anyway?",
+      "source": "DECISIONS.md: the poster wall is chosen; one library, a style is a mark (stage 6)",
+      "why": "about the app's interface (library organisation)"
+    },
+    {
+      "words": "should we lean more on opus for most of the building?",
+      "source": "DECISIONS.md: the poster wall, part 1: checked and merged (stage 6)",
+      "why": "about process"
+    },
+    {
+      "words": "i think we should have fable design this properly",
+      "source": "DECISIONS.md: playing in six and twelve is to be designed (stage 6)",
+      "why": "about process"
+    },
+    {
+      "words": "i'd also like to add back some common standards that also serve as useful tests for the band",
+      "source": "DECISIONS.md: the library: pruned, renamed, and given standards (stage 6)",
+      "why": "about process (library content)"
+    },
+    {
+      "words": "near duplicate vamps can probably be cleaned up / falling fifths still sounds like a fun exercise; we can keep that",
+      "source": "DECISIONS.md: four vamps cut; a borrowed chart is tested at the borrower's tempo; tempo will count the pulse (stage 6)",
+      "why": "about process (library content, not the band's playing)"
+    },
+    {
+      "words": "what's the 'right' way that pro musicians would think of it? should we aim for the pulse?",
+      "source": "DECISIONS.md: four vamps cut; a borrowed chart is tested at the borrower's tempo; tempo will count the pulse (stage 6)",
+      "why": "not a verdict (a question about how tempo is counted)"
+    },
+    {
+      "words": "i still want to keep the look uniquely ours, for whatever that's worth",
+      "source": "DECISIONS.md: neo-soul in six and twelve: checked and merged; the look stays ours (stage 6)",
+      "why": "about the app's interface (look)"
+    },
+    {
+      "words": "looks great! the live tiles are a bit much, but everything else looks wonderful",
+      "source": "DECISIONS.md: the poster wall in motion (stage 6, during gate 6)",
+      "why": "about the app's interface (motion)"
+    },
+    {
+      "words": "on mobile, the app name is cut off on an iphone 17. we should scale appropriately",
+      "source": "DECISIONS.md: the poster wall in motion (stage 6, during gate 6)",
+      "why": "about the app's interface"
+    },
+    {
+      "words": "i'm on board with your recommendations for the test suite ... we're packing a lot of functionality in here",
+      "source": "DECISIONS.md: the engine's budget counts written meters as it counts styles (stage 6, 2026-11-17)",
+      "why": "about process"
+    },
+    {
+      "words": "a slider to configure soloist density easily up front",
+      "source": "PLAN.md: Resume here",
+      "why": "about the app's interface (a setting); the sound side is soloist-a-little-sparse"
+    },
+    {
+      "words": "an option to let the soloist enter immediately",
+      "source": "PLAN.md: Resume here",
+      "why": "about the app's interface (a setting)"
+    },
+    {
+      "words": "great work",
+      "source": "DECISIONS.md: the busier soloist, heard: the defaults and the slider's range stand (stage 6, 2026-11-17)",
+      "why": "duplicate of busier-soloist-defaults-and-range"
+    },
+    {
+      "words": "i trust your judgment on the fade, especially if you think it'll sound more realistic without being a bunch more work",
+      "source": "DECISIONS.md: what the alto does with a note's pitch (stage 6, during gate 6)",
+      "why": "not a verdict (a call delegated before hearing the fade)"
+    },
+    {
+      "words": "what about an icon?",
+      "source": "DECISIONS.md: the app's icon (stage 6, 2026-11-18)",
+      "why": "about the app's interface (icon)"
+    },
+    {
+      "words": "liked b the best ... but i don't think we're done with it yet. how can we make it look more musical?",
+      "source": "DECISIONS.md: the app's icon (stage 6, 2026-11-18)",
+      "why": "about the app's interface (icon)"
+    },
+    {
+      "words": "b1 is my pick, let's go in that direction. feel free to refine",
+      "source": "DECISIONS.md: the app's icon (stage 6, 2026-11-18)",
+      "why": "about the app's interface (icon)"
+    },
+    {
+      "words": "home screen icon looks good",
+      "source": "DECISIONS.md: the account API's data deleted; his ear on the soloist (stage 6, 2026-11-19)",
+      "why": "about the app's interface (icon)"
+    },
+    {
+      "words": "i'm considering what it's going to take to replace the existing codebase with this rebuilt one ... there's a lot of plumbing in place with ci/cd already",
+      "source": "DECISIONS.md: replacing the old version: the repository and CI (stage 6, 2026-11-18)",
+      "why": "about deployment"
+    },
+    {
+      "words": "let's do prod",
+      "source": "DECISIONS.md: production is the new app (stage 6, 2026-11-18)",
+      "why": "about deployment"
+    },
+    {
+      "words": "Everything looks good, go ahead with the cleanup",
+      "source": "DECISIONS.md: after the swap: the account API retired, the side door closed (stage 6, 2026-11-18)",
+      "why": "about deployment"
+    },
+    {
+      "words": "old account data can be deleted, i was the only user",
+      "source": "DECISIONS.md: the account API's data deleted; his ear on the soloist (stage 6, 2026-11-19)",
+      "why": "about deployment"
+    },
+    {
+      "words": "i'm okay with adding a little budget for tests within reason",
+      "source": "DECISIONS.md: the engine suite's budget, two seconds more (stage 6, 2026-11-19)",
+      "why": "about process"
+    },
+    {
+      "words": "we need to snap to pitches/frets to make it sound realistic",
+      "source": "DECISIONS.md: a study of slides and grace notes: checked and merged (stage 6, 2026-11-19)",
+      "why": "duplicate of pitch-study-bend-and-vibrato"
+    },
+    {
+      "words": "i'm not too sure what to choose on some of this stuff. do you have recommendations?",
+      "source": "DECISIONS.md: slides and grace notes, heard: what is built from the slide study (stage 6, 2026-11-19)",
+      "why": "not a verdict (asks for recommendations)"
+    },
+    {
+      "words": "any issues we need to file, clean up, reconcile? i'm okay with 'starting over' or 'wontfix'ing some issues based on what no longer fits",
+      "source": "DECISIONS.md: the old tracker closed; the folders swapped (2026-11-19)",
+      "why": "about process"
+    },
+    {
+      "words": "i think yesterday's call was a bit unintentional. i wanted to clear out the legacy issues from github, but otherwise it's served us well for keeping things organized and staying on track",
+      "source": "DECISIONS.md: issues are the tracker again; the pipeline installed (2026-11-20)",
+      "why": "about process"
+    },
+    {
+      "words": "i agree with your read, thanks",
+      "source": "DECISIONS.md: what is decided up front, so the pipeline runs without stopping (2026-11-20)",
+      "why": "about process"
+    },
+    {
+      "words": "let's make this look nice! :)",
+      "source": "PLAN.md: Resume here",
+      "why": "about the app's interface"
+    },
+    {
+      "words": "home order sounds good",
+      "source": "PLAN.md: Resume here",
+      "why": "about the app's interface"
+    },
+    {
+      "words": "tapping a bar to edit was really nice, we should implement something like that here",
+      "source": "PLAN.md: Resume here",
+      "why": "about the app's interface"
+    },
+    {
+      "words": "isn't super important right now",
+      "source": "PLAN.md: Resume here",
+      "why": "about the app's interface (iReal Pro import)"
+    },
+    {
+      "words": "works great on iphone, awesome job",
+      "source": "PLAN.md: Resume here",
+      "why": "about the app's interface"
+    },
+    {
+      "words": "seems difficult to navigate though - we should work on that. ... i want the app to look and feel visually impressive as well. welcoming vibes, fun place to practice, but still snappy and responsive",
+      "source": "PLAN.md: Resume here",
+      "why": "about the app's interface (the sound part is audio-genuinely-impressive)"
+    },
+    {
+      "words": "it seems really solid during playback, nice job!",
+      "source": "PLAN.md: Resume here",
+      "why": "about the app's interface (the app's behaviour while playing)"
+    },
+    {
+      "words": "if something really requires fable, i trust your judgment",
+      "source": "PLAN.md: Resume here",
+      "why": "about process"
+    },
+    {
+      "words": "is okay for now",
+      "source": "PLAN.md: Resume here",
+      "why": "about the app's interface (a long line in the editor scrolling sideways)"
+    },
+    {
+      "words": "export works, but the way to get there was pretty confusing. we'll want to make the interface much more intuitive at some point, and that goes for everything",
+      "source": "PLAN.md: Resume here",
+      "why": "about the app's interface (export flow)"
+    },
+    {
+      "words": "there's no rush",
+      "source": "PLAN.md: Resume here",
+      "why": "about process"
+    },
+    {
+      "words": "i'd say the week has already started ... it seriously sounds incredible",
+      "source": "PLAN.md: Resume here",
+      "why": "duplicate of gate6-sounds-incredible"
+    },
+    {
+      "words": "it might drag a little",
+      "source": "PLAN.md: Resume here",
+      "why": "duplicate of neosoul-compound-drags"
+    },
+    {
+      "words": "i agree with your defaults, the range seems really good",
+      "source": "PLAN.md: Resume here",
+      "why": "duplicate of busier-soloist-defaults-and-range"
+    },
+    {
+      "words": "soloist changes are sounding awesome, great job!",
+      "source": "PLAN.md: Resume here",
+      "why": "duplicate of soloist-changes-awesome"
+    },
+    {
+      "words": "most varied and natural of the bunch",
+      "source": "PLAN.md: Resume here",
+      "why": "duplicate of horn-study-option-9"
+    },
+    {
+      "words": "short slide sounds pretty good, and the one fret slide is nice",
+      "source": "PLAN.md: Resume here",
+      "why": "duplicate of slide-study-short-and-one-fret"
+    },
+    {
+      "words": "done listening - great job so far",
+      "source": "PLAN.md: Resume here",
+      "why": "duplicate of meter-study-2-done"
+    },
+    {
+      "words": "great work",
+      "source": "PLAN.md: Resume here",
+      "why": "duplicate of rock-twelve-acoustic-six-heard"
+    },
+    {
+      "words": "a little harsh",
+      "source": "PLAN.md: Resume here",
+      "why": "duplicate of electric-bass-harsh"
+    },
+    {
+      "words": "it all sounds really tasteful, and the soloist comes alive on guitar now",
+      "source": "PLAN.md: Resume here",
+      "why": "duplicate of lead-guitar-comes-alive"
+    },
+    {
+      "words": "sounding pretty good, definitely intentional melodies that work well",
+      "source": "PLAN.md: Resume here",
+      "why": "duplicate of gate3-solos-intentional"
+    },
+    {
+      "words": "we should think about what some of the greats do as they're comping waltzes",
+      "source": "PLAN.md: Resume here",
+      "why": "duplicate of jazz-waltz-comp-for-later"
+    },
+    {
+      "words": "i'm okay with 'starting over' or 'wontfix'ing",
+      "source": "PLAN.md: Resume here",
+      "why": "duplicate (process), see DECISIONS 'the old tracker closed'"
+    },
+    {
+      "words": "i don't think they need to line up *all* the time",
+      "source": "DECISIONS.md: 2026-11-15: Brandon on four of the jazz review's questions (before listening)",
+      "why": "answered before listening, to a written question"
+    },
+    {
+      "words": "an area for improvement. we should think about what some of the greats do as they're comping waltzes",
+      "source": "DECISIONS.md: 2026-11-15: Brandon on four of the jazz review's questions (before listening)",
+      "why": "answered before listening; the wish is issue #2241"
+    },
+    {
+      "words": "this sounds normal, jazz harmony leans a lot on the blues",
+      "source": "DECISIONS.md: 2026-11-15: Brandon on four of the jazz review's questions (before listening)",
+      "why": "answered before listening, to a written finding"
+    },
+    {
+      "words": "we should probably handle the other styles in compound time as well, and in the future, we should support other odd time signatures fully across genres (even if it's not idiomatic). the band should be smart enough to figure it out",
+      "source": "DECISIONS.md: gate 6 has begun; every style is to be written for compound time; odd meters later (stage 6)",
+      "why": "a request for coverage, not a verdict on something heard"
+    },
+    {
+      "words": "are there any obvious musical devices and techniques the soloist is still missing? ... thinking about pick-up notes in particular",
+      "source": "DECISIONS.md: the soloist's pickups (stage 6, during gate 6)",
+      "why": "a question naming a device the soloist lacked, not a verdict on something heard"
+    }
+  ]
+}
