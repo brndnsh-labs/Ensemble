@@ -60,7 +60,7 @@ export const LIBRARY: readonly LibraryChart[] = readdirSync(libraryDir)
   });
 
 /**
- * The meters a style has written a band for besides 4/4 (DECISIONS.md, "the band in six and
+ * The meters a style has written a band for besides 4/4 (docs/decisions/meters.md, "the band in six and
  * twelve"). A style's own rules, and the rules that hold wherever a band plays from its
  * own parts, are held in these as they are in 4/4. In any other meter a style plays a bar it
  * makes up from its 4/4 parts, and only the rules that hold of any bar are asked of it.
@@ -129,7 +129,7 @@ const KINDS: readonly Omit<TakeOptions, "seed">[] = [
 /**
  * How many charts written for other styles each style is handed: twenty on a push, and every
  * one of them on the full run, which held the floors of the blues' properties when the library
- * lost three blues charts that differed only by a setting (DECISIONS.md, the library's standards).
+ * lost three blues charts that differed only by a setting (docs/decisions/engine.md, the library's standards).
  */
 const BORROWED = FULL ? Number.POSITIVE_INFINITY : 20;
 

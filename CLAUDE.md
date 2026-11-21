@@ -8,7 +8,7 @@ A browser-based generative backing band. Read these before doing anything:
 4. `docs/MILESTONES.md` (stages and gates)
 5. `docs/MUSIC_NOTES.md` (musical knowledge carried over from the previous version: an index, plus four parts under `docs/music-notes/` to read when the work touches them)
 6. `docs/AUDIO_NOTES.md` (what the previous version learned about sample packs, mixing them, and phones; read when the work touches audio)
-7. `PLAN.md` (the map) and `DECISIONS.md` (the record). What is in flight and what shipped is in the GitHub issues and pull requests, not in a file
+7. `PLAN.md` (the map) and `docs/decisions/` (the record, a file for each area; its README says which). What is in flight and what shipped is in the GitHub issues and pull requests, not in a file
 
 ## Standing rules
 
@@ -18,14 +18,14 @@ A browser-based generative backing band. Read these before doing anything:
 - **You cannot hear.** Never claim something sounds good. Report what the properties and the critic scorecard say, write audition files, and let Brandon judge.
 - **Tests are rationed.** Only the four kinds in `docs/TESTING.md`. Do not add per-function unit tests, mocks, or Playwright specs outside the named smoke journeys.
 - **Feedback from a listening gate becomes a property or a critic metric first**, then a code change.
-- **Decide and log.** When the docs do not settle something, make the call, record it in `DECISIONS.md` with one line of rationale, and continue. Stop and ask only when a choice would be expensive to reverse and could reasonably go either way.
+- **Decide and log.** When the docs do not settle something, make the call, record it in `docs/decisions/` (its area's file) with one line of rationale, and continue. Stop and ask only when a choice would be expensive to reverse and could reasonably go either way.
 - **Stay in scope.** `docs/BRIEF.md` lists non-goals. Do not build them.
 - **Check current versions.** Do not assume library versions or APIs from memory. Look them up when adding a dependency, and prefer few dependencies.
 
 ## The repository
 
 - **It is public** (github.com/brndnsh-labs/Ensemble, AGPL-3.0). Everything committed is published: no secrets, no private addresses, nothing about the network the sites run on beyond what is already here. Commits carry Brandon's GitHub no-reply address (the repo's own `user.email`); check it before the first commit on a new machine.
-- **Work is tracked in GitHub issues and built through the pipeline** (`.claude/skills/`: `/next`, `/intake`, `/cycle`, `/review`, `/scout`, `/unblock`; its rules are `.claude/skills/DOCTRINE.md`). The skills are rendered from `.cycle/config.jsonc` and `.cycle/overlays/` by `cycle update`: change those, never a rendered skill. `PLAN.md` stays the map and `DECISIONS.md` the record.
+- **Work is tracked in GitHub issues and built through the pipeline** (`.claude/skills/`: `/next`, `/intake`, `/cycle`, `/review`, `/scout`, `/unblock`; its rules are `.claude/skills/DOCTRINE.md`). The skills are rendered from `.cycle/config.jsonc` and `.cycle/overlays/` by `cycle update`: change those, never a rendered skill. `PLAN.md` stays the map and `docs/decisions/` the record.
 - **Issue work lands through a pull request**, on a branch from `origin/main`. `main` requires the `build` check (`pnpm check`, `pnpm score`, the smoke journeys, the image), and a pull request merges itself when that is green (`gh pr merge --auto --squash`). A minor docs or tooling edit may still go straight to `main`.
 - **A merge or push to `main` is a release to the test site.** Production is released by hand and only when Brandon has asked for it.
 - **The old version is the `legacy` branch.** Do not read it, merge it or copy from it: `docs/MUSIC_NOTES.md` and `docs/AUDIO_NOTES.md` are what was carried over.
@@ -43,8 +43,9 @@ pnpm test:full          # the same on six seeds (three times the push budget: 84
 pnpm score              # every style's scorecard against its accepted baseline (2-minute budget)
                         # on a branch it also sorts the change against what Brandon has passed by ear: inside, or the measures outside
 pnpm ears               # Brandon's verdicts by ear (scorecard/ear-cases.json) beside the scorecards as they stood in git: which
-                        # measures told a band he refused from its answer, and where today's sits against what he has passed
-pnpm goldens            # rewrite the golden takes (then say why in DECISIONS.md)
+                        # measures told a band he refused from its answer, and where today's sits against what he has passed;
+                        # it fails first on a case whose source names a file or heading that is not there (`--check`: only that, as CI runs it)
+pnpm goldens            # rewrite the golden takes (then say why in docs/decisions/)
 pnpm gate:1             # write a gate's audition files to out/gate-1/ (also gate:2, gate:3, gate:4)
 pnpm ensemble <command> # the CLI; runs TypeScript directly on Node 26, no build step
 pnpm packs:fetch [id...] # fetch the sample libraries into .sources/ at their pinned versions (needs git and 7z)

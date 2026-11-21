@@ -2,7 +2,7 @@
 name: cycle
 description: Build and ship ensemble work end to end — read the issue, build it, run the gates, review it at the depth its risk deserves, fix what review finds, and open the PR (queuing server-side auto-merge for a safe story). Stops only on a brake or a real judgment call. Usage `/cycle #<n>` · `/cycle next` · `/cycle --all` · `/cycle <plain-English idea>` · add `--deploy`.
 ---
-<!-- cycle:rendered template=skills/cycle.md.tmpl hash=5546e6e159b7 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/cycle.md.tmpl hash=4c40a1ba60a7 — managed by the-cycle; edit the template, not this file -->
 
 # /cycle — build and ship
 
@@ -55,13 +55,13 @@ green gate, or CI transition for about 30 minutes, stop and report what's stuck.
 
 - Read the docs the change touches before building: `docs/CHART_FORMAT.md` for the format, `docs/MUSIC_NOTES.md` and its part under `docs/music-notes/` for a player, `docs/AUDIO_NOTES.md` for audio.
 - A change prompted by Brandon's ear lands as a property or a critic metric first, in its own commit, failing or moving; then the code that satisfies it.
-- If goldens moved on purpose: `pnpm goldens`, and the `DECISIONS.md` line saying why.
+- If goldens moved on purpose: `pnpm goldens`, and the line in `docs/decisions/` saying why.
 - If the change can be heard or seen: write its page under `out/<name>/` (not committed), each clip or picture with what was measured beside it, before and after where that applies. `pnpm levels` before asking an ear about loudness.
 - App work: look at it (`node scripts/look.ts`, light and dark, phone size) before calling it built.
 
 ## Shipping here
 
-- `DECISIONS.md` gets the entry for any call made along the way (in the PR, not after it). The state of the work goes on the issue and the PR, not in `PLAN.md`.
+- `docs/decisions/` (its area's file) gets the entry for any call made along the way (in the PR, not after it). The state of the work goes on the issue and the PR, not in `PLAN.md`.
 - **Whether a change that can be heard waits on his ear is measured, not assumed** (DOCTRINE, "Measured before asked"): paste the last block of each moved style's `pnpm score` report ("against what he has passed by ear") into the PR body. Inside in every style, no new kind of sound, and not the one in five: `Closes #<n>`, and the closing comment says "inside what he has passed".
 - **Work that waits on Brandon's ear or eye does not close on merge.** Write `part of #<n>` in the PR body, not `Closes #<n>`. Once it has merged, set the issue to `status:needs-ear` and comment where the page is (`out/<name>/`) and what was measured. `/unblock` closes it on his verdict.
 - The PR body reports scorecard movement and which goldens changed, in numbers, and makes no claim about how it sounds.

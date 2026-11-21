@@ -41,7 +41,7 @@ A fixed chart, style, and seed that must produce exactly a stored MIDI file.
 
 - One or two per style. Ten to twenty in total.
 - They detect unintended change. They do not prove the music is good.
-- Updating a golden requires a line in `DECISIONS.md` saying why the output changed.
+- Updating a golden requires a line in `docs/decisions/` (its area's file) saying why the output changed.
 
 ### 4. Browser smoke journeys
 
@@ -90,7 +90,7 @@ Musical quality is statistical. "Is the soloist aimless" is a distribution over 
 | Scorecard | 2 minutes | every push, report only except for tolerance failures |
 | Browser smoke | 60 seconds total | merge to main |
 
-CI fails when a budget is exceeded. The response to an exceeded budget is to consolidate or delete, never to raise the limit without a `DECISIONS.md` entry.
+CI fails when a budget is exceeded. The response to an exceeded budget is to consolidate or delete, never to raise the limit without an entry in `docs/decisions/`.
 
 The engine's budget grows with what the band can play and with nothing else. Every style is held to every property, each in a process of its own, so a style added is the same rules checked on one more band, and a meter a style has written its parts for is the same rules checked on one more bar: the cost is real and is not the suite growing. The styles run side by side, so the suite takes as long as its longest style, and the meters are counted on the style that has written the most. What is rationed is the rules. A new property, a new kind of take, or more seeds on a push still has to fit inside the budget as it stands, by consolidating or deleting.
 

@@ -1,6 +1,6 @@
 **Decided up front with Brandon (2026-11-20), so these are not stops:**
 
-- **A musical fork never waits on him.** Voicing, rhythm, register, which idiom, how often: pick one from `docs/MUSIC_NOTES.md` and the style's notes, log it in `DECISIONS.md`, and build. He overrules by ear afterwards. Such an issue is `status:ready`, not `status:needs-decision`.
+- **A musical fork never waits on him.** Voicing, rhythm, register, which idiom, how often: pick one from `docs/MUSIC_NOTES.md` and the style's notes, log it in `docs/decisions/` (its area's file), and build. He overrules by ear afterwards. Such an issue is `status:ready`, not `status:needs-decision`.
 - **His ear never blocks the queue.** Work that can be heard or seen merges on green, goes to `status:needs-ear` with its page, and the next issue starts.
 - **No more than two unheard changes on one seat.** Before picking an issue, count the open `status:needs-ear` issues carrying its `area:*` label: at two, skip it (in `/cycle --all`, without stopping) and take the next issue on another seat. A verdict of "not right" must not undo a stack built on top of it.
 - **Silence after production is a pass.** `/deploy-prod`'s preflight names every `status:needs-ear` issue in what is shipping. Once a production release has carried one and he has said nothing against it by the next `/unblock` or `/wrap-up`, close it with the comment "passed by silence: on production since <commit>". He can reopen anything by ear at any time.

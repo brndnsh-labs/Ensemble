@@ -984,7 +984,7 @@ test("an idea comes back a beat early or late: in the styles that do it most som
  */
 // Rock is written to play it but, held to a fourth into the run and a fifth inside it, its
 // three quarters of a bar of sixteenths through a pentatonic do not fit a phrase's register:
-// on its own charts it plays none (DECISIONS.md, double time).
+// on its own charts it plays none (docs/decisions/soloist.md, double time).
 const DOUBLES = ["jazz", "blues"];
 
 test("double time is earned, late, short, rare and playable, and it lands: a run at twice the style's running subdivision only in a style that plays it (the climb alone where the style says), in a solo's last chorus and never its first phrase, at the busiest level (or the climb) straight after a phrase at the busiest level, out of the line's own notes without a breath (no rest of a pulse in the two before it), after a phrase with no empty bar and at least the first chorus's notes a beat, come to by a fourth at most (a fifth into the climb) and no move inside it wider than a fifth; on the doubled grid as heard from a pulse to a pulse, half a bar to two bars (on a ballad, only toward the top of the setting and no longer than the style says), never faster than the instrument's fastest; one way (straight, or a pulse at a time in sequence), a chord tone on every pulse, landing on a chord tone on a pulse, held a pulse; one at most a solo, none at the bottom of the setting, and some at its top in the styles that play it most", () => {
