@@ -44,6 +44,8 @@ export interface MovedIdea {
   readonly tick: number;
   /** The idea was played a beat away. */
   readonly played: boolean;
+  /** Played by the stricter rules: an idea main's rules refuse (`Phrase.newly`). */
+  readonly newly: boolean;
   /** Its notes held over a barline: where each is struck, and the barline it is held over. */
   readonly held: readonly { readonly tick: number; readonly barline: number }[];
   /**
@@ -207,12 +209,22 @@ export function soloPart(
     // An idea said a beat away keeps every note's length and shake, its last note a pulse
     // shorter at most for its breath; where it cannot, it is not offered (SO-08, SO-17).
     const realised = offered.map((phrase) => realise(world, phrase, accent, from));
-    const keeps = offered.map(
-      (phrase, i) =>
-        (!phrase.inPlace ||
-          keepsLengths(realise(world, phrase.inPlace, accent, from, true), realised[i]!)) &&
-        (!phrase.burst || landsHeld(world, phrase.burst.lands, realised[i]!)),
-    );
+    // An idea moved as main moves it is held to main's check; one moved by the stricter
+    // rules only where main's of the same idea is refused, and then to the stricter check.
+    const mainKept = new Set<Phrase>();
+    const keeps = offered.map((phrase, i) => {
+      const { inPlace } = phrase;
+      if (!inPlace) return !phrase.burst || landsHeld(world, phrase.burst.lands, realised[i]!);
+      if (!phrase.newly) {
+        const kept = asLong(realise(world, inPlace, accent, from), realised[i]!);
+        if (kept) mainKept.add(inPlace);
+        return kept;
+      }
+      return (
+        !mainKept.has(inPlace) &&
+        keepsLengths(realise(world, inPlace, accent, from, true), realised[i]!)
+      );
+    });
     const phrases = offered.filter((_, i) => keeps[i]);
     const notes = realised.filter((_, i) => keeps[i]);
     const candidates = phrases.map((phrase, i): SoloCandidate => {
@@ -251,7 +263,13 @@ export function soloPart(
             was: phrase.idea?.[k] ?? inPlace.line[k]!.pitch,
           }))
         : [];
-      moved?.({ tick: first.start, played: inPlace !== undefined, held, notes: said });
+      moved?.({
+        tick: first.start,
+        played: inPlace !== undefined,
+        newly: phrase.newly === true,
+        held,
+        notes: said,
+      });
     }
     // How the horn plays the phrase chosen: what it does with the pitch of the notes it
     // arrives on and of the notes it leaves. Drawn by place, after the choice, so the
@@ -373,6 +391,22 @@ function landsHeld(world: World, at: number, notes: readonly SoloNote[]): boolea
  * Whether an idea said a beat away is as long as where it was: the same notes, each
  * sounding as long and shaken where it was shaken; the last may give up a pulse for the
  * breath after it, and is still shaken if it was.
+ */
+function asLong(was: readonly SoloNote[], now: readonly SoloNote[]): boolean {
+  const [from, to] = [was.filter((note) => !note.lead), now.filter((note) => !note.lead)];
+  if (from.length !== to.length) return false;
+  return to.every((note, i) => {
+    const before = from[i]!;
+    const last = i === to.length - 1;
+    const give = last ? pulseTicks(note.bar.meter)[0]! : 0;
+    const shaken = before.move?.vibrato === undefined || note.move?.vibrato !== undefined;
+    return note.duration >= before.duration - give && shaken;
+  });
+}
+
+/**
+ * Whether an idea moved by the stricter rules keeps the idea's lengths: each note within a
+ * sixteenth of the idea's, both ways, the last a pulse shorter at most, shaken where it was.
  */
 function keepsLengths(was: readonly SoloNote[], now: readonly SoloNote[]): boolean {
   const [from, to] = [was.filter((note) => !note.lead), now.filter((note) => !note.lead)];

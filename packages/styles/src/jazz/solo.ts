@@ -553,8 +553,8 @@ export const jazzSolo: SoloStyle = {
     // Not the bridge's return (`b`), which is heard where it was. A note that, a beat late,
     // sounds over the barline is held over it (a line that ties, SO-38), into a chord it is a
     // tone of; few are, since a bebop line's notes are short and breathe before the barline.
-    // An idea whose moved notes would leap where it stepped (a chord tone on each beat it is
-    // moved onto) is not moved: more than half of those it would move otherwise.
+    // (Held so only where main's rules would not move the idea: the ideas they move are
+    // played as they were.)
     displace: { chance: 0.6, early: 0.5, roles: ["r", "v"], holds: true },
     // No bends (ST-jazz-37); a guitar shakes a note held a half note or longer (SO-52).
     bend: { third: 0, rootOrFifth: 0, around: 0, elsewhere: 0 },

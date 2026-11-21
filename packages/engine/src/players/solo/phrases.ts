@@ -73,6 +73,13 @@ export interface Phrase {
    */
   readonly displaced?: Phrase;
   /**
+   * The same idea said a beat away by the stricter rules of a style that holds a note over
+   * the barline (`displace.holds`): offered only where `displaced`, main's, is refused.
+   */
+  readonly admitted?: Phrase;
+  /** This is an idea moved that main's rules refuse, admitted by the stricter ones. */
+  readonly newly?: boolean;
+  /**
    * This is an idea said a beat away, and this the idea where it was: what the
    * solo remembers if this one is played, so what follows is made from the idea
    * as it was stated and the shift is not carried on.
@@ -530,6 +537,11 @@ export function phrasesFor(
     ask: Ask,
     by: number,
     inPlace: Phrase,
+    /**
+     * The stricter rules for an idea main's refuse (`displace.holds`): lengths as sounded,
+     * notes held over a barline, the shape kept. Without, the rules main plays by.
+     */
+    newly: boolean,
   ): Phrase | null => {
     const bars = slot.bars.map((_, i) => plans[i] ?? REST);
     const laid = lineBars(world, slot, bars);
@@ -551,12 +563,12 @@ export function phrasesFor(
       return null;
     }
     // How long each note sounded where it was, breath and all: what it is held for moved.
-    const sounded = hooks.sounds?.(inPlace);
+    const sounded = newly ? hooks.sounds?.(inPlace) : undefined;
     if (sounded && sounded.length !== moved.length) return null;
     const lengthOf = (note: { i: number; spot: Spot }) =>
       sounded ? sounded[note.i]!.duration : note.spot.hold;
     type Moved = (typeof moved)[number];
-    const { holds } = solo.habits.displace;
+    const holds = newly && solo.habits.displace.holds;
     const barAt = (tick: number) => slot.bars.findLastIndex((bar) => bar.start <= tick);
     // A note held over into a bar from the bar before, and the sixteenths it sounds there.
     const carried: ({ readonly note: Moved; readonly steps: number } | undefined)[] = [];
@@ -585,11 +597,15 @@ export function phrasesFor(
         // moved, and is not held over a barline it never sounded across.
         const stops = note.tick + lengthOf(note);
         const barline = bar.start + bar.ticks;
-        const held = Math.max(1, Math.ceil((Math.min(stops, barline) - note.tick) / STEP));
+        // By main's rules, a note is as long as its rhythm, and crosses where that does.
+        const held = newly
+          ? Math.max(1, Math.ceil((Math.min(stops, barline) - note.tick) / STEP))
+          : Math.max(1, Math.round(note.spot.hold / STEP));
         const over = Math.ceil((stops - barline) / STEP);
+        const crosses = newly ? stops - barline > STEP / 2 : at + held > length;
         // The idea's last note may stop at the barline: it gives up a pulse at most. Any other
         // is held over into the next bar of the phrase where the style holds it there.
-        if (stops - barline > STEP / 2 && note !== moved.at(-1)) {
+        if (crosses && note !== moved.at(-1)) {
           const following = slot.bars[b + 1];
           if (holds && following && over <= Math.round(following.ticks / STEP)) {
             carried[b + 1] = { note, steps: over };
@@ -644,6 +660,8 @@ export function phrasesFor(
     // it is held into cannot take it: under N.C.), or it is not the idea; and a note held
     // over the barline is a tone of every chord it is held into, or the idea is not moved there.
     if (phrase.line.length !== moved.length) return null;
+    // An idea main's rules admit is played as main plays it.
+    if (!newly) return phrase;
     if (phrase.bars.some((bar) => bar.held && !bar.tied)) return null;
     if (!phrase.line.every((note) => !heldOver(note.spot) || holdsOver(world, note))) return null;
     // Its shape: each move from one note to the next within a whole step of the idea's, as
@@ -657,7 +675,7 @@ export function phrasesFor(
         Math.abs(note.pitch - phrase.line[k - 1]!.pitch - (idea[k]! - idea[k - 1]!)) <= 2,
     );
     if (!keepsShape) return null;
-    return { ...phrase, idea, ...(sounded ? { sounds: sounded } : {}) };
+    return { ...phrase, idea, newly: true, ...(sounded ? { sounds: sounded } : {}) };
   };
 
   /**
@@ -671,10 +689,18 @@ export function phrasesFor(
     // The way drawn, else the other where the style goes that way at all.
     const { early } = solo.habits.displace;
     const may = (by: number) => (by < 0 ? early > 0 : lateAllowed && early < 1);
-    const twin =
-      (may(shift) ? displaced(kind, plans, ask, shift, phrase) : null) ??
-      (may(-shift) ? displaced(kind, plans, ask, -shift, phrase) : null);
-    return twin ? { ...phrase, displaced: { ...twin, inPlace: phrase } } : phrase;
+    const twin = (newly: boolean) =>
+      (may(shift) ? displaced(kind, plans, ask, shift, phrase, newly) : null) ??
+      (may(-shift) ? displaced(kind, plans, ask, -shift, phrase, newly) : null);
+    // The idea moved as main moves it; and where the style holds a note over the barline,
+    // the idea moved by the stricter rules, offered only if main's is refused (`soloPart`).
+    const old = twin(false);
+    const strict = solo.habits.displace.holds ? twin(true) : null;
+    return {
+      ...phrase,
+      ...(old ? { displaced: { ...old, inPlace: phrase } } : {}),
+      ...(strict ? { admitted: { ...strict, inPlace: phrase } } : {}),
+    };
   };
 
   // ── the ways of making a phrase ──────────────────────────────────────────
@@ -855,7 +881,9 @@ export function phrasesFor(
     let fresh = 0;
     return ways.flatMap((way) => {
       const phrase = made(way, way.make === "new" ? fresh++ : 0);
-      return phrase?.displaced ? [phrase.displaced, phrase] : [phrase];
+      return phrase
+        ? [phrase.displaced, phrase.admitted, phrase].filter((one) => one !== undefined)
+        : [phrase];
     });
   };
 
@@ -895,7 +923,8 @@ export function phrasesFor(
     if (!phrase?.bars.some((bar) => bar.pitches.length > 0)) return false;
     const key = phrase.bars
       .map((bar) => `${bar.tied ? "~" : ""}${bar.cell}:${bar.pitches.join(",")}`)
-      .join("|");
+      .join("|")
+      .concat(phrase.newly ? "|new" : "");
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
