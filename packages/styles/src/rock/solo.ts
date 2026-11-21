@@ -425,9 +425,10 @@ export const rockSolo: SoloStyle = {
     },
     // A lick said again a beat late is a rock guitarist's push against the backbeat, now and
     // then; early less often (0.3 where it could go either way). Its held bends reach the
-    // barline, which a beat late would cross, so few are moved. Not the opening idea brought
-    // back (`b`).
-    displace: { chance: 0.35, early: 0.3, roles: ["r", "v"] },
+    // barline, which a beat late would cross, and rock ties nothing over it (ST-rock-24), a
+    // moved lick no more than any other: so few are moved. Not the opening idea brought back
+    // (`b`).
+    displace: { chance: 0.35, early: 0.3, roles: ["r", "v"], holds: false },
     // The blue third pushed up into the third, the flat 7th into the root or the 4th into the
     // 5th (SO-53, ST-rock-24).
     bend: { third: 0.45, rootOrFifth: 0.55, around: 1, elsewhere: 0.5 },

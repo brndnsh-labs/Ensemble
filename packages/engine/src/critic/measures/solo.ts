@@ -784,13 +784,18 @@ export const soloMeasures: readonly Measure[] = [
   idiom(
     "barlines-tied",
     "share",
-    "Of the barlines a run crosses (a note on the last eighth of the bar, running straight on), the share where that note is held over the barline and the downbeat is not struck: a line that does not treat the barline as a wall (SO-38).",
+    "Of the barlines a run crosses (a note on the last eighth of the bar, running straight on), the share where that note is held over the barline and the downbeat is not struck: a line that does not treat the barline as a wall (SO-38). A note of an idea said a beat away is the idea's, held as long as it was where it was stated, and is not counted either way.",
     (reading) => {
+      const moved = new Set(
+        displacements(reading)
+          .filter((one) => one.line)
+          .flatMap((one) => one.notes),
+      );
       let crossed = 0;
       let tied = 0;
       reading.notes.forEach((note, i) => {
         const end = note.bar.start + note.bar.ticks;
-        if (note.tick !== end - PPQ / 2) return;
+        if (note.tick !== end - PPQ / 2 || moved.has(note)) return;
         const next = reading.notes[i + 1];
         const over = note.ends > end + PPQ / 4;
         if (!over && next?.tick !== end) return;

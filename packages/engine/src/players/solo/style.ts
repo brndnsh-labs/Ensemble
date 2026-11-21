@@ -461,7 +461,8 @@ export interface SoloStyle {
      * judges both. Never at a chorus's top, in a solo's first or last phrase,
      * on the way to the top note or where the tune ends; never pulled before
      * the phrase's first bar or pushed past its last, never held across a
-     * barline it was not held across, never late in a section's last bar, and
+     * barline it was not held across unless the style `holds` it there, never
+     * late in a section's last bar, and
      * never with a pickup. Where it fits only the other way it goes that way,
      * if the style goes that way at all (an `early` of 0 or 1 is one way
      * only); where it fits neither it is not offered. What the solo remembers
@@ -479,6 +480,18 @@ export interface SoloStyle {
       readonly early: number;
       /** The letters of a form it is done for. Left out, every one. */
       readonly roles?: readonly Role[];
+      /**
+       * A note of the idea that a pulse late would sound past the barline is held
+       * over it whole, into the next bar of the phrase, and the downbeat it is held
+       * over is not struck: the idea keeps every length it had. It is held only
+       * where it is a tone of every chord that arrives while it sounds over the
+       * barline (moved to the nearest tone it shares with them, within the
+       * landing's reach, where it is not); else the idea is not moved there.
+       * Only a moved idea holds a note so: every other phrase treats a barline
+       * as it did. Left false, a note that would cross a barline keeps the idea
+       * where it was (its last note may still stop at the barline).
+       */
+      readonly holds: boolean;
     };
     /**
      * A string pushed up into a note, on an instrument whose hand can (SO-53).

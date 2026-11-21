@@ -197,7 +197,18 @@ export function soloPart(
     const keeps = offered.map(
       (phrase, i) =>
         (!phrase.inPlace ||
-          keepsLengths(realise(world, phrase.inPlace, accent, from), realised[i]!)) &&
+          keepsLengths(
+            // An idea with a note held over the barline is held to the idea's own lengths:
+            // where it was, a note this slot's chords would stop at a change is not the measure.
+            realise(
+              world,
+              phrase.inPlace,
+              accent,
+              from,
+              phrase.bars.some((bar) => bar.held),
+            ),
+            realised[i]!,
+          )) &&
         (!phrase.burst || landsHeld(world, phrase.burst.lands, realised[i]!)),
     );
     const phrases = offered.filter((_, i) => keeps[i]);
@@ -501,7 +512,14 @@ function moveOf(
  * seconds, before whatever follows (Q-47, SU-B-15); a note stops at a change
  * of chord unless it belongs to the new one (X-B-07).
  */
-function realise(world: World, phrase: Phrase, accent: number, breathedAt?: number): SoloNote[] {
+function realise(
+  world: World,
+  phrase: Phrase,
+  accent: number,
+  breathedAt?: number,
+  /** Not stopped at a change it is not a tone of: the idea's own lengths, as a measure. */
+  uncut = false,
+): SoloNote[] {
   const { solo, instrument, harmony } = world;
   const { slot } = phrase;
   const touch = solo.touch;
@@ -560,12 +578,21 @@ function realise(world: World, phrase: Phrase, accent: number, breathedAt?: numb
     }
 
     const space = next ? next.spot.tick - tick : Number.POSITIVE_INFINITY;
-    const endsLine = !next || next.spot.tick - (tick + spot.hold) >= PPQ || next.spot.bar !== bar;
     // A note tied over the barline ends in the bar it is held into (SO-38).
     const inSlot = slot.bars.indexOf(bar);
     const over = tick + spot.hold > bar.start + bar.ticks ? slot.bars[inSlot + 1] : undefined;
     const endsIn = over ?? bar;
-    const part = phrase.bars[over ? inSlot + 1 : inSlot]?.part;
+    // A moved idea's note held over the barline (`displace.holds`) is the note it was where
+    // the idea was. Struck in a line bar, it ends a line where a rest follows it, not because
+    // the next note is in the bar it is held into; the landing of an end bar ends its line
+    // and takes its breath, as it did where it was.
+    const held = over !== undefined && phrase.bars[inSlot + 1]?.held === true;
+    const lands = held && phrase.bars[inSlot]?.part === "E";
+    const endsLine =
+      !next ||
+      next.spot.tick - (tick + spot.hold) >= PPQ ||
+      (next.spot.bar !== bar && !(held && !lands && next.spot.bar === over));
+    const part = lands ? "E" : phrase.bars[over ? inSlot + 1 : inSlot]?.part;
     let duration = spot.hold;
     if (endsLine && (part === "E" || !next) && !lead) {
       // The breath is taken by shortening the note that sounds into it, never by leaving it
@@ -588,7 +615,7 @@ function realise(world: World, phrase: Phrase, accent: number, breathedAt?: numb
 
     // Held over a change, it must be a tone of the new chord; otherwise it stops there.
     const here = world.arrivalAt(tick);
-    for (let a = (here?.index ?? -1) + 1; a < harmony.length; a++) {
+    for (let a = (here?.index ?? -1) + 1; a < harmony.length && !uncut; a++) {
       const arrival = harmony[a]!;
       if (arrival.tick >= tick + duration) break;
       if (arrival.tick <= tick || (!arrival.changed && arrival.chord !== null)) continue;
