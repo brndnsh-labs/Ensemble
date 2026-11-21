@@ -19,6 +19,7 @@ import {
   bassStruck,
   body,
   closest,
+  displacedFrom,
   likeness,
   lineBars,
   phrasesOf,
@@ -143,6 +144,37 @@ function wholeSolos(reading: Reading): Sounding[][][] {
     if (seen.size === of) result.push(choruses);
   }
   return result;
+}
+
+/** Each phrase of three notes or more after a solo's first, and the earlier one it says again a pulse away, if any. */
+export interface DisplacedPhrase {
+  readonly phrase: Heard;
+  readonly of: Heard | null;
+  readonly by: 1 | -1 | null;
+}
+const displaced = new WeakMap<Reading, DisplacedPhrase[]>();
+function displacements(reading: Reading): DisplacedPhrase[] {
+  const known = displaced.get(reading);
+  if (known) return known;
+  const found = reading.solos.flatMap((solo) =>
+    solo.flatMap((phrase, i): DisplacedPhrase[] => {
+      if (i === 0 || body(phrase).length < 3) return [];
+      const heard = displacedFrom(phrase, solo.slice(0, i));
+      return [{ phrase, of: heard?.of ?? null, by: heard?.by ?? null }];
+    }),
+  );
+  displaced.set(reading, found);
+  return found;
+}
+
+/**
+ * The phrases of a take's solos that say an earlier one again a beat early or
+ * late, read from the notes (`displacedFrom`): what the `solo.displaced`
+ * measure counts, for a property or a page that wants to find them.
+ */
+export function displacedPhrases(take: Take, style: StylePack): DisplacedPhrase[] {
+  const reading = read(take, style);
+  return reading ? displacements(reading).filter((one) => one.by !== null) : [];
 }
 
 const seconds = (reading: Reading, ticks: number) => ticks / reading.world.ticksPerSecond;
@@ -308,6 +340,15 @@ export const soloMeasures: readonly Measure[] = [
       );
       const { same } = reading.world.solo.likeness;
       return share(scores.filter((value) => value >= same).length, scores.length);
+    },
+  ),
+  measure(
+    "displaced",
+    "share",
+    "Sometimes an idea comes back a beat early or a beat late, the same rhythm and contour falling across the bar differently: the share of phrases (of three notes or more, after a solo's first) that say an earlier phrase of the solo again moved by one of the bar's pulses.",
+    (reading) => {
+      const phrases = displacements(reading);
+      return share(phrases.filter((one) => one.by !== null).length, phrases.length);
     },
   ),
   measure(

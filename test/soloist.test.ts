@@ -9,6 +9,7 @@ import {
   chordScale,
   chordTones,
   contextOf,
+  displacedPhrases,
   isCompound,
   MEASURES,
   onPulse,
@@ -881,6 +882,62 @@ test("a pickup spells the chord it is played over: each note of a pickup into a 
   // there is little or nothing on a beat to judge.
   const judging = STYLES.filter((style) => !["neosoul", "reggae"].includes(style.id)).length;
   assert.ok(judged >= enough(5) * judging, `only ${judged} pickup notes on a beat or held`);
+});
+
+// ── an idea said again a beat early or late ─────────────────────────────────
+
+/**
+ * The least share of a style's phrases (of three notes or more, after a solo's first) that
+ * say an earlier idea of the solo again a pulse early or late, over every take with the
+ * soloist: each style does it, the ones whose line is built on a riff or a call seldom.
+ */
+const DISPLACED: Readonly<Record<string, number>> = {
+  jazz: 0.005,
+  blues: 0.005,
+  rock: 0.005,
+  funk: 0.005,
+  disco: 0.005,
+  neosoul: 0.005,
+  reggae: 0.005,
+  acoustic: 0.005,
+};
+
+test("an idea comes back a beat early or late: in every style some phrases say an earlier one of the solo again, the same rhythm and contour moved by one of the bar's pulses; never the top of a chorus, the solo's first or last phrase, nor the tune's last; and the idea so moved stays inside its own phrase's bars and the tune, led in by no pickup", () => {
+  for (const style of STYLES) {
+    const floor = DISPLACED[style.id];
+    if (floor === undefined) continue;
+    let [phrases, moved] = [0, 0];
+    for (const { chart, options, take } of soloTakes().filter((jam) => jam.style === style)) {
+      const counted = MEASURES.find((measure) => measure.id === "solo.displaced")!.of(take, style);
+      if (!counted) continue;
+      phrases += counted.cases;
+      const end = take.plan.bars.findLast((bar) => bar.kind === "music")!;
+      for (const { phrase, of, by } of displacedPhrases(take, style)) {
+        moved++;
+        const { slot, notes } = phrase;
+        const where = `${style.id}, ${chart.file} ${JSON.stringify(options)}, bar ${slot.bars[0]!.index}`;
+        assert.ok(of && by, `${where}: a displaced phrase with nothing it repeats`);
+        assert.notEqual(slot.index, 0, `${where}: the top of a chorus moved`);
+        assert.ok(!slot.first && !slot.last, `${where}: the solo's first or last phrase moved`);
+        const lastBar = slot.bars.at(-1)!;
+        assert.equal(lastBar.ending, null, `${where}: the tune's last phrase moved`);
+        assert.ok(
+          notes.every((note) => note.tick >= slot.bars[0]!.start),
+          `${where}: led into before its barline`,
+        );
+        const stops = Math.min(lastBar.start + lastBar.ticks, end.start + end.ticks);
+        assert.ok(
+          notes.every((note) => note.ends <= stops),
+          `${where}: a note past the end of its phrase`,
+        );
+      }
+    }
+    assert.ok(phrases > enough(300), `${style.id}: only ${phrases} phrases`);
+    assert.ok(
+      moved >= Math.max(1, phrases * floor),
+      `${style.id}: ${moved} of ${phrases} phrases an idea displaced (${((100 * moved) / phrases).toFixed(1)}%), under ${100 * floor}%`,
+    );
+  }
 });
 
 test("a horn breathes: the alto never plays eight seconds without half a second of air, as heard", () => {

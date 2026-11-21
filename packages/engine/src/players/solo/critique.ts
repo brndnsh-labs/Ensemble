@@ -7,7 +7,7 @@
 import { PPQ } from "../../chart/types.ts";
 import { choose } from "../../critic/choose.ts";
 import type { Feature } from "../../critic/types.ts";
-import { onPulse } from "../../perform/meter.ts";
+import { onPulse, pulseTicks } from "../../perform/meter.ts";
 import type { PlanBar } from "../../plan/types.ts";
 import { mod12 } from "../../theory/pitch.ts";
 import { isChordTone, ranked } from "./harmony.ts";
@@ -142,6 +142,48 @@ export function likeness(a: Heard, b: Heard): number {
 /** The likeness of a phrase to the earlier phrase of its solo most like it. Null for the first. */
 export function closest(heard: Heard, earlier: readonly Heard[]): number | null {
   return earlier.length === 0 ? null : Math.max(...earlier.map((other) => likeness(heard, other)));
+}
+
+/** An earlier phrase of the solo, and which way a phrase says it again a pulse away from where it was. */
+export interface Displacement {
+  readonly of: Heard;
+  /** A pulse late (1) or early (-1). */
+  readonly by: 1 | -1;
+}
+
+/**
+ * Whether a phrase is an earlier one of its solo said again a pulse early or
+ * late, as a listener would match them: the same rhythm (every note struck the
+ * same distance from the one before), the same contour (each move the same way,
+ * up, down or the same note), and the whole of it moved by one of the bar's
+ * pulses (the quarter in 4/4, the dotted quarter in 6/8 and 12/8) from where it
+ * fell in its bar, so that it falls across the bar differently. Three notes at
+ * least: fewer are not an idea. The phrase's own notes, without a pickup into
+ * it; the earlier one's with or without the pickups inside it.
+ */
+export function displacedFrom(heard: Heard, earlier: readonly Heard[]): Displacement | null {
+  const said = body(heard);
+  if (said.length < 3) return null;
+  const { meter, ticks } = said[0]!.bar;
+  if (said.some((note) => note.bar.ticks !== ticks)) return null;
+  const pulse = pulseTicks(meter)[0]!;
+  const contour = (notes: readonly Sounding[]) =>
+    notes.slice(1).map((note, i) => Math.sign(note.pitch - notes[i]!.pitch));
+  const shape = contour(said);
+  for (const other of [...earlier].reverse()) {
+    for (const notes of [idea(other), body(other)]) {
+      if (notes.length !== said.length) continue;
+      const moved = said[0]!.tick - notes[0]!.tick;
+      if (!notes.every((note, i) => said[i]!.tick - note.tick === moved)) continue;
+      if (notes.some((note) => note.bar.ticks !== ticks)) continue;
+      const inBar = ((moved % ticks) + ticks) % ticks;
+      const by = inBar === pulse ? 1 : inBar === ticks - pulse ? -1 : 0;
+      if (by === 0) continue;
+      const was = contour(notes);
+      if (shape.every((move, i) => move === was[i])) return { of: other, by };
+    }
+  }
+  return null;
 }
 
 const beat = (note: Sounding) => onPulse(note.bar.meter, note.tick - note.bar.start);
