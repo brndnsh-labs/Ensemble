@@ -14,6 +14,7 @@ import type {
 } from "../chart/types.ts";
 import { PPQ } from "../chart/types.ts";
 import { tempoPulse } from "../perform/meter.ts";
+import { createRng } from "../rng.ts";
 import { tempoRange } from "../style/meters.ts";
 import type { Seat, StylePack } from "../style/types.ts";
 import { LEVEL_ENERGY, SEATS, TIER_HIGH, TIER_MID, tierOf } from "../style/types.ts";
@@ -48,6 +49,8 @@ export function planBars(
   meter: Meter,
   style: StylePack,
   options: PlanOptions,
+  /** The chart has an arrangement block of its own: nobody is laid out but as it says. */
+  ownArrangement = false,
 ): Plan {
   const tempo = clampTempo(options.tempo ?? chartTempo ?? tempoRange(style, meter).default);
   // How busy the soloist is goes on the plan only where the player set it.
@@ -201,6 +204,21 @@ export function planBars(
       : mark,
   );
 
+  // Who is in: now and then a seat sits out a section or a pass at a low point of the arc.
+  const outs =
+    options.mode === "jam" && !ownArrangement
+      ? layOuts(drafts, solos, style, options, {
+          planned,
+          passes,
+          open,
+          ends,
+          without,
+          ...(climax === undefined ? {} : { climax }),
+          ...(breath === undefined ? {} : { breath }),
+          rise,
+        })
+      : drafts.map(() => null);
+
   // The one-bar build into a bigger section, then the rule about the high-tier line.
   const energies = drafts.map((draft, i) => {
     const next = drafts[i + 1];
@@ -317,7 +335,11 @@ export function planBars(
         ? seatEnergies(energy, new Set(SEATS))
         : seatEnergies(
             energy,
-            solos[i] ? without : new Set([...without, "solo" as const]),
+            new Set([
+              ...without,
+              ...(solos[i] ? [] : ["solo" as const]),
+              ...(outs[i] ? [outs[i]] : []),
+            ]),
             draft.line,
           ),
       solo: silent || without.has("solo") ? null : solos[i]!,
@@ -713,6 +735,95 @@ function soloRise(
   if (!turn || turn.of < 2 || pass <= climax) return undefined;
   if (pass - turn.chorus + turn.of - 1 >= passes - 1) return undefined;
   return turn.chorus / (turn.of - 1);
+}
+
+// ── who is in ───────────────────────────────────────────────────────────────
+
+/** The fewest band seats a jam may lay one out of: a band of two keeps both. */
+const LAY_OUT_BAND = 3;
+/** The first pass a seat may sit out: the band states the tune, then gets going, before it thins. */
+const LAY_OUT_FROM = 2;
+/** At most one lay-out in any run of this many passes. */
+const LAY_OUT_EVERY = 4;
+
+interface Shape {
+  readonly planned: number;
+  readonly passes: number;
+  readonly open: boolean;
+  readonly ends: boolean;
+  readonly without: ReadonlySet<Seat>;
+  readonly climax?: number;
+  readonly breath?: number;
+  readonly rise: (pass: number) => number | undefined;
+}
+
+/**
+ * The seat each bar of a jam lays out by the style's own say (`ArcStyle.layOut`), or null. A
+ * seat goes out at the top of a section or a pass and is back at the top of the next, in a
+ * pass low on the arc as the jam set out: never the first two passes, the last, or the peak,
+ * and never a level the player holds. A jam planned shorter than four passes, a band of two
+ * seats, and the soloist are left alone, and at most one pass in four thins. Each pass draws
+ * from the seed by its own number, and only what the passes before it drew can stop it, so a
+ * jam made longer, or told to finish, keeps every lay-out it had played. The pass it is told
+ * to finish on is its last, and everyone is in for it.
+ */
+function layOuts(
+  drafts: readonly Draft[],
+  solos: readonly (SoloMark | null)[],
+  style: StylePack,
+  options: PlanOptions,
+  shape: Shape,
+): (Seat | null)[] {
+  const outs: (Seat | null)[] = drafts.map(() => null);
+  const data = style.arc.layOut;
+  if (!data || options.seed === undefined || options.energy !== undefined) return outs;
+  const band = (["drums", "bass", "chords"] as const).filter((seat) => !shape.without.has(seat));
+  const seats = data.seats.filter((seat) => !shape.without.has(seat));
+  if (band.length < LAY_OUT_BAND || seats.length === 0) return outs;
+
+  const byPass = Map.groupBy(
+    drafts.flatMap((draft, i) => (draft.run.part === "body" ? [i] : [])),
+    (i) => drafts[i]!.run.pass,
+  );
+  const timed = style.arc.timed;
+  const ceiling = timed.first + data.below * (timed.climax - timed.first);
+  const peak = shape.open ? undefined : (shape.climax ?? defaultClimax(shape.planned));
+  const rng = createRng(options.seed);
+  let last = Number.NEGATIVE_INFINITY;
+  for (const [pass, bars] of byPass) {
+    if (pass < LAY_OUT_FROM || pass === peak || pass - last < LAY_OUT_EVERY) continue;
+    if (shape.ends && pass === shape.passes - 1) continue;
+    const soloing = (i: number) => solos[i] !== null && !shape.without.has("solo");
+    if (data.under === "solo" ? !bars.every(soloing) : bars.some(soloing)) continue;
+    const rise = shape.rise(pass);
+    const height = arcOffset(style.arc, {
+      pass,
+      passes: shape.planned,
+      open: shape.open,
+      part: "body",
+      phraseStart: 0.5,
+      phraseEnd: 0.5,
+      ...(shape.climax === undefined ? {} : { climax: shape.climax }),
+      ...(shape.breath === undefined ? {} : { breath: shape.breath }),
+      ...(rise === undefined ? {} : { rise }),
+    });
+    if (height > ceiling) continue;
+    const draw = rng.fork("lay-out", style.id, pass);
+    if (!draw.chance(data.chance)) continue;
+    const seat = draw.pick(seats);
+    // A section: the pass's lowest, by its own level; of several as low, one drawn.
+    const levels = new Map(bars.map((i) => [drafts[i]!.run, drafts[i]!.level]));
+    const lowest = Math.min(...levels.values());
+    const chosen =
+      data.span === "pass"
+        ? new Set(levels.keys())
+        : new Set([
+            draw.pick([...levels].filter(([, level]) => level === lowest).map(([run]) => run)),
+          ]);
+    for (const i of bars) if (chosen.has(drafts[i]!.run)) outs[i] = seat;
+    last = pass;
+  }
+  return outs;
 }
 
 /** Add a lift without leaving the tier the bar is in. */

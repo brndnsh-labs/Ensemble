@@ -83,7 +83,10 @@ export interface Take {
 
 /** The roadmap of a performance, without playing it. */
 export function plan(chart: Chart, style: StylePack, options: PlanOptions): Plan {
-  return planBars(expand(chart), chart.tempo, chart.meter, style, options);
+  // A chart with an arrangement of its own is played as its writer arranged it: the band lays
+  // nobody out of a jam on it by itself either.
+  const arranged = chart.arrangement?.lines != null;
+  return planBars(expand(chart), chart.tempo, chart.meter, style, options, arranged);
 }
 
 /**
