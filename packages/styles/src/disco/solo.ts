@@ -418,9 +418,10 @@ export const discoSolo: SoloStyle = {
     },
     // Seldom: a disco line rides the four on the floor and its riffs sit where they were
     // stated. Drawn early as often as late where it could go either way; in the takes the
-    // suite makes none is moved: its figures run to the barline. Not the opening idea
-    // brought back (`b`).
-    displace: { chance: 0.15, early: 0.5, roles: ["r", "v"] },
+    // suite makes none is moved: its figures run to the barline, and a riff over the four on
+    // the floor ties nothing over it (`solo.barlines-tied` none, by intent), a moved riff no
+    // more than any other. Not the opening idea brought back (`b`).
+    displace: { chance: 0.15, early: 0.5, roles: ["r", "v"], holds: false },
     // On a guitar, a bend into the 3rd 0.30 and into the root 0.20 (ST-disco-25), in phrases
     // the hand gets lyrical in, as the blues and rock have it.
     bend: { third: 0.3, rootOrFifth: 0.2, around: 1, elsewhere: 0.5 },

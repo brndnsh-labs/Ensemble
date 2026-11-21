@@ -6,7 +6,8 @@ import { planBar } from "../plan/types.ts";
 import { playBass } from "../players/bass/play.ts";
 import { playChords } from "../players/chords/play.ts";
 import { playDrums } from "../players/drums/play.ts";
-import { playSolo } from "../players/solo/play.ts";
+import type { MovedIdea } from "../players/solo/play.ts";
+import { playSolo, soloPart } from "../players/solo/play.ts";
 import { createRng } from "../rng.ts";
 import type { Seat, StylePack } from "../style/types.ts";
 import { SEATS } from "../style/types.ts";
@@ -24,7 +25,18 @@ const PLAYERS: Readonly<Partial<Record<Seat, Player>>> = {
 };
 
 export function perform(plan: Plan, style: StylePack, seed: number | string): PerformanceEvent[] {
+  return performed(plan, style, seed).events;
+}
+
+/** A performance, and what the soloist did with the ideas it drew to say a beat away. */
+export interface Performed {
+  readonly events: PerformanceEvent[];
+  readonly moved: readonly MovedIdea[];
+}
+
+export function performed(plan: Plan, style: StylePack, seed: number | string): Performed {
   const rng = createRng(seed);
+  const moved: MovedIdea[] = [];
   const heard: Partial<Record<Seat, WrittenNote[][]>> = {};
   const written: WrittenNote[] = [];
   const barCount = plan.bars.length + plan.lookahead.length;
@@ -32,7 +44,11 @@ export function perform(plan: Plan, style: StylePack, seed: number | string): Pe
   for (const seat of SEATS) {
     const player = PLAYERS[seat];
     if (!player) continue;
-    const part = player({ plan, style, rng: rng.fork("seat", seat), heard: heard as Heard });
+    const context = { plan, style, rng: rng.fork("seat", seat), heard: heard as Heard };
+    const part =
+      seat === "solo"
+        ? soloPart(context, undefined, undefined, (idea) => moved.push(idea))
+        : player(context);
     // A seat that is out for a bar plays nothing in it, whatever its player wrote, but a
     // note leading into a bar it plays; and the look-ahead pass is read but never played.
     // (The bar a note leads into may be the look-ahead's.)
@@ -57,7 +73,7 @@ export function perform(plan: Plan, style: StylePack, seed: number | string): Pe
   const pitch = (e: PerformanceEvent) => (e.kind === "note" ? e.pitch : 0);
   // Each event's keys are read once: events of many shapes (notes with and without a move, a
   // fade, a voice, and markers) make reading them in the comparison slow.
-  return events
+  const sorted = events
     .map((event, index) => ({
       event,
       index,
@@ -67,6 +83,7 @@ export function perform(plan: Plan, style: StylePack, seed: number | string): Pe
     }))
     .sort((a, b) => a.at - b.at || a.rank - b.rank || a.pitch - b.pitch || a.index - b.index)
     .map(({ event }) => event);
+  return { events: sorted, moved };
 }
 
 function markers(plan: Plan): MarkerEvent[] {

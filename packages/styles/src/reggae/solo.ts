@@ -371,9 +371,10 @@ export const reggaeSolo: SoloStyle = {
     },
     // A reggae line starts after the One and rests on the drop (ST-reggae-25): an idea moved
     // is moved later, never a beat earlier, where it would land on the One. Its held notes
-    // reach the barline, which a beat late would cross, so it is all but never moved. Not the
-    // opening idea brought back (`b`).
-    displace: { chance: 0.2, early: 0, roles: ["r", "v"] },
+    // reach the barline (SO-17), but most breathe before it: a beat late, one that sounds past
+    // the barline is held over it, into a chord it is a tone of; still few are moved (one
+    // phrase in two hundred and fifty). Not the opening idea brought back (`b`).
+    displace: { chance: 0.2, early: 0, roles: ["r", "v"], holds: true },
     // No bends (ST-reggae-27): on a guitar too, the line is sung, not bent.
     bend: { third: 0, rootOrFifth: 0, around: 0, elsewhere: 0 },
     // No slide: the notes give reggae none, and the line is sung (ST-reggae-27).
