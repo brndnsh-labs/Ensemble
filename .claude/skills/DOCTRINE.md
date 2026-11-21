@@ -1,4 +1,4 @@
-<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=ac130f04daa8 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=92f18a39965f — managed by the-cycle; edit the template, not this file -->
 # Pipeline doctrine (shared)
 
 The rules every ensemble pipeline skill shares; a skill citing `§N` means this file. **Read it
@@ -58,6 +58,20 @@ cached data.
 **Labels.** `finding` = review debt that a cycle could not fix in-diff; it should trend to empty,
 and a cycle must not grow it without Brandon's nod. `scout` = provenance stamp on issues
 `/scout` filed; it doesn't change routing.
+
+Every issue carries one `area:*` label: it routes review and it is what the two-unheard cap (§5) counts.
+
+| Label | What it covers |
+|---|---|
+| `area:soloist` | the soloist and its instruments' moves |
+| `area:bass` · `area:chords` · `area:drums` | that seat, in the engine or in a style's data |
+| `area:groove` | the band together: a style as a whole, meters, feel, tempo, the arc, who plays |
+| `area:harmony` | the chart format, theory, the library's charts |
+| `area:audio` | packs, the sampler, the mix, phones |
+| `area:ui` | the app |
+| `area:infra` | the critic and scorecard, tests, the CLI, CI, this pipeline |
+
+`bug` for a fault in something built. The old code's other labels (`track:*`, `lens:*`, `model/*`, `size/*`, `needs-ear`, `needs-decision` without `status:`) are not used.
 
 ## §2 Filing
 
@@ -161,6 +175,17 @@ costs trust; an extra look only costs a little time.
 **Production is never unattended.** Deploying to production, or any action a brake calls
 irreversible, needs Brandon's explicit go in the current turn — approval of the code is not
 approval of the deploy.
+
+**Decided up front with Brandon (2026-11-20), so these are not stops:**
+
+- **A musical fork never waits on him.** Voicing, rhythm, register, which idiom, how often: pick one from `docs/MUSIC_NOTES.md` and the style's notes, log it in `DECISIONS.md`, and build. He overrules by ear afterwards. Such an issue is `status:ready`, not `status:needs-decision`.
+- **His ear never blocks the queue.** Work that can be heard or seen merges on green, goes to `status:needs-ear` with its page, and the next issue starts.
+- **No more than two unheard changes on one seat.** Before picking an issue, count the open `status:needs-ear` issues carrying its `area:*` label: at two, skip it (in `/cycle --all`, without stopping) and take the next issue on another seat. A verdict of "not right" must not undo a stack built on top of it.
+- **Silence after production is a pass.** `/deploy-prod`'s preflight names every `status:needs-ear` issue in what is shipping. Once a production release has carried one and he has said nothing against it by the next `/unblock` or `/wrap-up`, close it with the comment "passed by silence: on production since <commit>". He can reopen anything by ear at any time.
+- **Big work on an established pattern is pickable.** A new style, a style in a new meter, a new pack for an existing seat: each has been built several times from a brief (`prompts/style-*.md`, `prompts/meter-*.md`). Write the brief, build it, review it in its own clone.
+- **Still his, every time:** a production release, the §5 brakes, and anything that makes a new kind of sound (a new instrument, a new articulation, a change to the mix): build a study page of alternatives first and let him choose, as with the slides and the horn's moves.
+
+**Measured before asked.** Before an ear is asked, say whether the change stays inside what he has already passed: the scorecard's movement, and the ear cases once they exist. A change that moves nothing he could hear (goldens and scorecard unmoved) needs no page and no `status:needs-ear`.
 
 ## §6 Delivery
 
