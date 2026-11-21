@@ -25,6 +25,8 @@ export const funk: StylePack = {
   },
   arc: {
     ...DEFAULT_ARC,
+    // Now and then a breakdown to drums and bass: the guitar out of a section where the band plays
+    // alone (docs/decisions/styles.md, who is in).
     layOut: { seats: ["chords"], under: "band", span: "section", below: 0.75, chance: 0.25 },
   },
   ending: {
