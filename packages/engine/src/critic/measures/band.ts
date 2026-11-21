@@ -105,7 +105,8 @@ export const bandMeasures: readonly Measure[] = [
         read++;
         heard.add(groove);
       }
-      return share(heard.size, read);
+      // Fewer takes read fewer repeats: the share is only comparable over the full hundred.
+      return read < GROOVE_SEEDS ? null : share(heard.size, read);
     },
   },
   {

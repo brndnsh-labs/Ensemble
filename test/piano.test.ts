@@ -1405,3 +1405,28 @@ test(
       );
   },
 );
+
+test(
+  'funk: in four the guitar\'s line has a stab in the bar\'s last eighth from the working level up, on the "and" of 4 or its "a", so that it can lean into the chord coming (ST-funk-38)',
+  only("funk"),
+  () => {
+    let bars = 0;
+    for (const { chart, options, take } of takes(
+      (jam) => jam.style.id === "funk" && written(jam),
+    )) {
+      const stabs = new Set(strikesOf(take).map((strike) => strike.tick));
+      for (const bar of take.plan.bars) {
+        if (bar.kind !== "music" || bar.ending || bar.seats.chords === null) continue;
+        if (bar.meter.beats !== 4 || bar.meter.unit !== 4) continue;
+        if (tierOf(bar.seats.chords) === "low" || bar.spans.some((span) => span.chord === null))
+          continue;
+        bars++;
+        assert.ok(
+          stabs.has(bar.start + 14 * STEP) || stabs.has(bar.start + 15 * STEP),
+          `${chart.file} ${JSON.stringify(options)} bar ${bar.index}: no stab in the last eighth`,
+        );
+      }
+    }
+    assert.ok(bars > enough(2000), `only ${bars} bars`);
+  },
+);

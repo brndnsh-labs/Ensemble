@@ -20,9 +20,8 @@ import type { DrumStyle, DrumTime, FillShape, GrooveOption } from "@ensemble/eng
  * The first five are the notes' own (ST-funk-06, DR-47). Each is a front half
  * (beats 1 and 2: the statement an answer bar keeps, DR-05) and a back half
  * (beats 3 and 4: what it turns); the next three are the notes' front halves
- * on another of the notes' back halves, which keeps the rule. The last is
- * ST-funk-05's cells said in four by DR-10's pulse roles: the downbeat pulse's
- * kick on 1, the strong pulse's on 3. Four only: six and twelve have their own.
+ * on another of the notes' back halves, which keeps the rule. Four only: six
+ * and twelve have their own.
  */
 const KICKS = [
   { lines: { kick: "x... ...x ..x. ...." }, weights: [3, 3, 2] },
@@ -36,8 +35,6 @@ const KICKS = [
   { lines: { kick: "x... ...x ..x. .x.." }, weights: [1, 2, 2] },
   // The third's front half, the fifth's back half: five, the busiest, held for the louder band.
   { lines: { kick: "x... ..x. xx.. .x.." }, weights: [0, 1, 2] },
-  // ST-funk-05: the downbeat pulse `x..x` on 1, the strong pulse `.x.x` on 3.
-  { lines: { kick: "x..x .... .x.x ...." }, weights: [1, 2, 2] },
 ] as const;
 
 function kicks(tier: 0 | 1 | 2): GrooveOption[] {
