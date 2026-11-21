@@ -51,6 +51,8 @@ export const reggae: StylePack = {
     // No build, arc or lift carries a section from the one drop into steppers or rockers, or
     // back (ST-reggae-33).
     liftsCrossHigh: false,
+    // Now and then the dub's drop to the riddim: the skank out of a section where the band plays
+    // alone (docs/decisions/styles.md, who is in).
     layOut: { seats: ["chords"], under: "band", span: "section", below: 0.75, chance: 0.25 },
   },
   ending: {
