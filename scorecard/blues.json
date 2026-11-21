@@ -378,13 +378,13 @@
     "inTarget": 1
   },
   "solo.thirds-and-sevenths-on-changes": {
-    "mean": 0.7422,
+    "mean": 0.7418,
     "p10": 0.5926,
     "p90": 0.8611,
     "inTarget": 0.9828
   },
   "solo.beats-on-chord-tones": {
-    "mean": 0.883,
+    "mean": 0.8833,
     "p10": 0.8125,
     "p90": 0.9451,
     "inTarget": 1
@@ -396,25 +396,25 @@
     "inTarget": 1
   },
   "solo.phrases-related": {
-    "mean": 0.6924,
+    "mean": 0.6947,
     "p10": 0.5,
     "p90": 0.875,
     "inTarget": 1
   },
   "solo.phrase-likeness": {
-    "mean": 0.6158,
+    "mean": 0.6174,
     "p10": 0.538,
     "p90": 0.7316,
     "inTarget": null
   },
   "solo.phrase-same-as-last": {
-    "mean": 0.129,
+    "mean": 0.1313,
     "p10": 0,
     "p90": 0.25,
     "inTarget": 0.9821
   },
   "solo.displaced": {
-    "mean": 0.0079,
+    "mean": 0.0058,
     "p10": 0,
     "p90": 0,
     "inTarget": null
@@ -432,9 +432,9 @@
     "inTarget": null
   },
   "solo.moved-played": {
-    "mean": 0.0676,
+    "mean": 0.0541,
     "p10": 0,
-    "p90": 0.5,
+    "p90": 0,
     "inTarget": null
   },
   "solo.bars-that-rhyme": {
@@ -480,19 +480,19 @@
     "inTarget": null
   },
   "solo.notes-per-second-last": {
-    "mean": 2.4165,
+    "mean": 2.4175,
     "p10": 1.7083,
     "p90": 3.0813,
     "inTarget": null
   },
   "solo.builds": {
-    "mean": 2.0855,
+    "mean": 2.0863,
     "p10": 1.4259,
     "p90": 3.0717,
     "inTarget": 0.8
   },
   "solo.rises": {
-    "mean": 4.5106,
+    "mean": 4.5101,
     "p10": 3.4589,
     "p90": 5.6762,
     "inTarget": 1
@@ -522,25 +522,25 @@
     "inTarget": 1
   },
   "solo.steps": {
-    "mean": 0.8333,
+    "mean": 0.8334,
     "p10": 0.7762,
     "p90": 0.8864,
     "inTarget": null
   },
   "solo.wide-leaps": {
-    "mean": 0.0054,
+    "mean": 0.0055,
     "p10": 0,
     "p90": 0.0146,
     "inTarget": 1
   },
   "solo.leaps-resolved": {
-    "mean": 0.7177,
+    "mean": 0.6953,
     "p10": 0,
     "p90": 1,
     "inTarget": null
   },
   "solo.trills": {
-    "mean": 0.0092,
+    "mean": 0.0094,
     "p10": 0,
     "p90": 0.0192,
     "inTarget": 1
@@ -552,13 +552,13 @@
     "inTarget": 1
   },
   "solo.entered-early": {
-    "mean": 0.1911,
+    "mean": 0.1929,
     "p10": 0,
     "p90": 0.3889,
     "inTarget": null
   },
   "solo.cost": {
-    "mean": 1.5399,
+    "mean": 1.5378,
     "p10": 1.2855,
     "p90": 1.77,
     "inTarget": 0.9167
