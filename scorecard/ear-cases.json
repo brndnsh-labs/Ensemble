@@ -670,7 +670,7 @@
       "seat": "soloist",
       "styles": ["jazz", "funk", "blues"],
       "kind": "passed",
-      "medium": "sound",
+      "medium": "notes",
       "heard": "out/solo-displaced/: alto on So What and All the Things You Are (jazz), funk in D minor and the vamp in A, vibraphone on the minor blues; nine moved ideas, main before against now, same seeds, served over the LAN.",
       "recorded": "e1988803",
       "doubt": "He did not say whether he wants moved ideas more often."
@@ -681,7 +681,7 @@
       "words": "everything i'm listening to sounds like a net improvement",
       "source": "DECISIONS.md: his ear on the meters and the guitar's slides (2026-11-21, #2233, #2234, #2235)",
       "kind": "passed",
-      "medium": "sound",
+      "medium": "notes",
       "recorded": "b32f23bd",
       "doubt": "One remark for every page on the front page; he did not answer the questions put per page (the neo-soul slide or bend, more or fewer, rock's tempo in twelve) one by one, and did not say which pages he played.",
       "seat": "band",
@@ -694,12 +694,38 @@
       "words": "everything i'm listening to sounds like a net improvement",
       "source": "DECISIONS.md: his ear on the meters and the guitar's slides (2026-11-21, #2233, #2234, #2235)",
       "kind": "passed",
-      "medium": "sound",
+      "medium": "notes",
       "recorded": "b32f23bd",
       "doubt": "One remark for every page on the front page; he did not answer the questions put per page (the neo-soul slide or bend, more or fewer, rock's tempo in twelve) one by one, and did not say which pages he played.",
       "seat": "soloist",
       "styles": ["rock", "neosoul", "acoustic", "blues"],
       "heard": "out/guitar-slides/: the guitar soloist's slides, hammer-ons and pull-offs, before (74e14d2) and after, and rock and the blues at half and at double the chances."
+    },
+    {
+      "id": "solo-double-time-well-executed",
+      "date": "2026-11-21",
+      "words": "double time in a solo sounds really good, nice job - well executed",
+      "source": "DECISIONS.md: his ear on double time and funk's wider pool (2026-11-21, #2238, #2242)",
+      "kind": "passed",
+      "medium": "notes",
+      "recorded": "e27da3fe",
+      "doubt": "One remark for the page; he did not answer the questions put (whether the top of the setting is too much, whether the ballad's run belongs) one by one, and did not say which clips he played. Rock and disco were on the page and play no run.",
+      "seat": "soloist",
+      "styles": ["jazz", "blues"],
+      "heard": "out/solo-double-time/: jazz on Autumn Leaves and Body and Soul and the gospel blues in six, each at soloDensity 0, the default and 1, main beside the default, one seed each; rock in A minor and disco in C beside them, with no run."
+    },
+    {
+      "id": "funk-wider-pool-all-good",
+      "date": "2026-11-21",
+      "words": "funk all sounds good",
+      "source": "DECISIONS.md: his ear on double time and funk's wider pool (2026-11-21, #2238, #2242)",
+      "kind": "passed",
+      "medium": "notes",
+      "recorded": "e27da3fe",
+      "doubt": "One remark for the page; he did not answer the questions put (the guitar more off the beat, fewer strokes at the quiet level) one by one, and did not say which clips he played. Four charts at one seed each, of a pool of 8 kicks, 9 riffs and 7 guitar lines.",
+      "seat": "band",
+      "styles": ["funk"],
+      "heard": "out/funk-grooves/: four funk charts in 4/4 at one seed each, the rhythm section alone and with the alto at the working level, and quiet, main's take of the same seed (before the wider pool) beside each."
     }
   ],
   "leftOut": [
