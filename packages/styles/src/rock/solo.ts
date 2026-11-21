@@ -379,15 +379,16 @@ export const rockSolo: SoloStyle = {
   // up (rock's space is jazz's, 0.25, SO-11). To move the default, change these two numbers.
   busier: { lift: 0.5, room: 0.4 },
 
-  // Straight eighths, doubled: sixteenths, half a bar and more where the busy level's bursts
-  // are a beat (ST-rock-22). A flurry before the climax: only in the climb to the top note;
-  // on a rock ballad, only toward the top of the setting and short.
+  // Straight eighths, doubled: sixteenths. The busy level already has bursts of sixteenths
+  // (ST-rock-22), and a pickup of them into a busy bar runs two beats, so double time is
+  // longer than that: three quarters of a bar to a bar. A flurry before the climax: only in
+  // the climb to the top note; on a rock ballad, only toward the top of the setting.
   doubleTime: {
     perPulse: 4,
     chance: 0.7,
-    bars: { shortest: 0.5, longest: 1 },
+    bars: { shortest: 0.75, longest: 1 },
     climbOnly: true,
-    slow: { from: 0.75, longest: 0.5 },
+    slow: { from: 0.75, longest: 1 },
   },
 
   habits: {

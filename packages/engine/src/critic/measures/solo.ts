@@ -85,10 +85,21 @@ function read(take: Take, style: StylePack): Reading | null {
       const before = solos[phrase.slot.solo]!;
       return { ...phrase, kind: "", earlier: before.slice(0, before.indexOf(phrase)), world };
     });
-    const costs = score(candidates, SOLO_FEATURES, style.critic.weights.solo ?? {}).map(
-      (scored) => scored.cost,
-    );
-    reading = { world, events, notes, phrases, solos: solos.filter(Boolean), costs };
+    // Costed when a measure asks: most readers of a take want its notes, not its costs.
+    let costs: number[] | undefined;
+    reading = {
+      world,
+      events,
+      notes,
+      phrases,
+      solos: solos.filter(Boolean),
+      get costs() {
+        costs ??= score(candidates, SOLO_FEATURES, style.critic.weights.solo ?? {}).map(
+          (scored) => scored.cost,
+        );
+        return costs;
+      },
+    };
   }
   readings.set(take, reading);
   return reading;

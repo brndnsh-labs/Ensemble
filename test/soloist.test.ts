@@ -985,7 +985,7 @@ test("an idea comes back a beat early or late: in the styles that do it most som
  */
 const DOUBLES = ["jazz", "blues", "rock"];
 
-test("double time is earned, late, short, rare and playable, and it lands: a run at twice the style's running subdivision only in a style that plays it (the climb alone where the style says), in a solo's last chorus and never its first phrase, at the busiest level (or the climb) straight after a phrase at the busiest level, out of the line's own notes without a breath; on the doubled grid as heard from a pulse to a pulse, half a bar to two bars (on a ballad, only toward the top of the setting and no longer than the style says), never faster than the instrument's fastest; one way all along, a chord tone on every pulse, landing on a chord tone on a pulse, held a pulse; one at most a solo, none at the bottom of the setting, and some at its top in the styles that play it most", () => {
+test("double time is earned, late, short, rare and playable, and it lands: a run at twice the style's running subdivision only in a style that plays it (the climb alone where the style says), in a solo's last chorus and never its first phrase, at the busiest level (or the climb) straight after a phrase at the busiest level, out of the line's own notes without a breath; on the doubled grid as heard from a pulse to a pulse, half a bar to two bars (on a ballad, only toward the top of the setting and no longer than the style says), never faster than the instrument's fastest; one way (straight, or a pulse at a time in sequence), a chord tone on every pulse, landing on a chord tone on a pulse, held a pulse; one at most a solo, none at the bottom of the setting, and some at its top in the styles that play it most", () => {
   const failures = new Map<string, string[]>();
   const fail = (clause: string, where: string) =>
     failures.set(clause, [...(failures.get(clause) ?? []), where]);
@@ -1074,14 +1074,23 @@ test("double time is earned, late, short, rare and playable, and it lands: a run
           );
         }
         // It goes somewhere, a chord tone on every pulse, and lands.
+        // One way: straight, or as a sequence of pulses, each pulse's notes going one way (all
+        // of them the same way), each pulse starting further on than the one before, and the
+        // landing further on than every note of the run.
         const line = [...notes, landing];
         const way = Math.sign(landing.pitch - first.pitch);
-        if (
-          way === 0 ||
-          line.slice(1).some((note, j) => Math.sign(note.pitch - line[j]!.pitch) !== way)
-        ) {
-          fail("not one way all along", where);
-        }
+        const onBeat = (note: (typeof line)[number]) =>
+          onPulse(note.bar.meter, note.tick - note.bar.start);
+        const opens = line.filter(onBeat);
+        const inside = notes
+          .slice(1)
+          .flatMap((note, j) => (onBeat(note) ? [] : [Math.sign(note.pitch - notes[j]!.pitch)]));
+        const turns = inside.some((move) => move === 0 || move !== inside[0]);
+        const backs = opens
+          .slice(1)
+          .some((note, j) => Math.sign(note.pitch - opens[j]!.pitch) !== way);
+        const short = notes.some((note) => Math.sign(landing.pitch - note.pitch) !== way);
+        if (way === 0 || turns || backs || short) fail("not one way", where);
         for (const note of line) {
           if (!onPulse(note.bar.meter, note.tick - note.bar.start)) continue;
           const chord = harmony.findLast((arrival) => arrival.tick <= note.tick)?.chord;

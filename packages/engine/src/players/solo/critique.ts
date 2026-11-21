@@ -94,9 +94,10 @@ export interface Burst {
 
 /**
  * The runs of a solo's notes in double time, as heard: notes come one after another no more
- * than half as far apart again as double time's step (`doubledIn`), for three quarters of
- * half a bar or more. Nothing a style writes as a line comes so close for so long: the
- * quickest line of any style is half as quick. The run's last note is the one it lands on.
+ * than half as far apart again as double time's step (`doubledIn`), for three quarters of the
+ * style's shortest run or more. Nothing a style writes as a line comes so close for so long
+ * (rock's sixteenths into a busy bar from a pickup are two beats, under its shortest run of
+ * three quarters of a bar). The run's last note is the one it lands on.
  */
 export function burstsIn(world: World, notes: readonly Sounding[]): Burst[] {
   const bursts: Burst[] = [];
@@ -108,7 +109,8 @@ export function burstsIn(world: World, notes: readonly Sounding[]): Burst[] {
       const perPulse = doubledIn(world.solo, first.bar.meter)!;
       const pulse = pulseTicks(first.bar.meter)[0]!;
       const pulses = first.bar.ticks / pulse;
-      if (chain.length - 1 >= Math.ceil(0.75 * (pulses / 2) * perPulse)) {
+      const shortest = world.solo.doubleTime.bars.shortest * pulses * perPulse;
+      if (chain.length - 1 >= Math.ceil(0.75 * shortest)) {
         const at = notes.indexOf(first);
         bursts.push({
           notes: chain.slice(0, -1),

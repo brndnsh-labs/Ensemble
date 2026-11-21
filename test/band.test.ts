@@ -7,6 +7,7 @@ import { test } from "node:test";
 import type { Plan, PlanBar, PlanOptions, Take } from "@ensemble/engine";
 import {
   arrangedLines,
+  burstPhrases,
   isCompound,
   PPQ,
   parse,
@@ -600,11 +601,18 @@ test(
 );
 
 test(
-  "blues: nothing is ever played between the notes of the triplet, where it would flam: in four nothing on the last sixteenth of a beat, and in six and twelve nothing off the eighths",
+  "blues: nothing is ever played between the notes of the triplet, where it would flam: in four nothing on the last sixteenth of a beat, and in six and twelve nothing off the eighths (but for a run in double time in a solo, six to the beat and so twice the triplet, which has a property of its own)",
   only("blues"),
   () => {
+    const blues = STYLES.find((style) => style.id === "blues");
     for (const { chart, take } of takes(bluesWritten)) {
+      const doubled = new Set(
+        (blues ? burstPhrases(take, blues) : []).flatMap(({ burst }) =>
+          burst.notes.map((note) => note.tick),
+        ),
+      );
       for (const note of notesOf(take)) {
+        if (note.seat === "solo" && doubled.has(note.tick)) continue;
         if (chart.meter === "4/4")
           assert.notEqual(note.tick % PPQ, (PPQ * 3) / 4, `${chart.file}: ${note.seat} on an "a"`);
         else
