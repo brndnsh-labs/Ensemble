@@ -37,7 +37,14 @@ export const jazz: StylePack = {
   // the head (a bridge) reaches the working level and walks, as it should.
   // The bridge sits a little higher than the default arc's, so that under the head it is
   // clear of the line between the tiers however the jam is shaped (0.45 to 0.48, not 0.42).
-  arc: { ...DEFAULT_ARC, levels: [["bridge", 0.63], ...DEFAULT_ARC.levels], head: -0.15 },
+  arc: {
+    ...DEFAULT_ARC,
+    levels: [["bridge", 0.63], ...DEFAULT_ARC.levels],
+    head: -0.15,
+    // The piano strolls a chorus under the soloist now and then: bass and drums alone under the
+    // horn (docs/decisions/styles.md, who is in). Rare: he heard it thin when it laid out too readily (EAR-26).
+    layOut: { seats: ["chords"], under: "solo", span: "pass", below: 0.75, chance: 0.2 },
+  },
   ending: {
     // The tonic 6th: no major-seventh rub under a melody resting on the root (ST-jazz-47).
     finalChord: { major: "6", minor: "m6", dominant: "6" },

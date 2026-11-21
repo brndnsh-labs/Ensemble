@@ -120,19 +120,19 @@
     "inTarget": 1
   },
   "chords.top-holds": {
-    "mean": 0.2805,
+    "mean": 0.2803,
     "p10": 0,
     "p90": 0.4921,
     "inTarget": null
   },
   "chords.top-steps": {
-    "mean": 0.4858,
+    "mean": 0.4861,
     "p10": 0.0159,
     "p90": 1,
     "inTarget": null
   },
   "chords.top-small-leaps": {
-    "mean": 0.2337,
+    "mean": 0.2336,
     "p10": 0,
     "p90": 0.5571,
     "inTarget": null
@@ -144,7 +144,7 @@
     "inTarget": 1
   },
   "chords.top-movement": {
-    "mean": 1.6727,
+    "mean": 1.6725,
     "p10": 1,
     "p90": 2.6714,
     "inTarget": 1
@@ -168,14 +168,14 @@
     "inTarget": 1
   },
   "chords.lowest-note": {
-    "mean": 62.9196,
-    "p10": 62.0237,
+    "mean": 62.9202,
+    "p10": 62.0286,
     "p90": 63.8188,
     "inTarget": 1
   },
   "chords.colour": {
-    "mean": 0.8009,
-    "p10": 0.6059,
+    "mean": 0.8007,
+    "p10": 0.6043,
     "p90": 1,
     "inTarget": null
   },
@@ -198,7 +198,7 @@
     "inTarget": 1
   },
   "chords.neck-movement": {
-    "mean": 1.0612,
+    "mean": 1.0615,
     "p10": 0.729,
     "p90": 1.4603,
     "inTarget": 1
@@ -210,7 +210,7 @@
     "inTarget": 1
   },
   "chords.with-the-drums": {
-    "mean": 0.078,
+    "mean": 0.0774,
     "p10": 0.0184,
     "p90": 0.1853,
     "inTarget": null
@@ -222,25 +222,25 @@
     "inTarget": null
   },
   "chords.with-the-drums-over-chance": {
-    "mean": -0.2012,
+    "mean": -0.2019,
     "p10": -0.2685,
-    "p90": -0.0897,
+    "p90": -0.0905,
     "inTarget": null
   },
   "chords.off-the-beat": {
-    "mean": 0.9537,
-    "p10": 0.8487,
+    "mean": 0.9541,
+    "p10": 0.8501,
     "p90": 1,
     "inTarget": 1
   },
   "chords.changes-anticipated": {
-    "mean": 0.0568,
+    "mean": 0.0578,
     "p10": 0,
     "p90": 0.15,
     "inTarget": 1
   },
   "chords.strokes-per-bar": {
-    "mean": 15.8249,
+    "mean": 15.8226,
     "p10": 15.617,
     "p90": 16,
     "inTarget": 1
@@ -252,14 +252,14 @@
     "inTarget": 1
   },
   "chords.strokes-per-bar-hot": {
-    "mean": 15.6402,
+    "mean": 15.6417,
     "p10": 15.3478,
     "p90": 15.8889,
     "inTarget": 1
   },
   "chords.short-stabs": {
-    "mean": 0.9909,
-    "p10": 0.9815,
+    "mean": 0.9908,
+    "p10": 0.9808,
     "p90": 1,
     "inTarget": 1
   },
@@ -534,9 +534,9 @@
     "inTarget": null
   },
   "chords.laid-out": {
-    "mean": 0,
+    "mean": 0.015,
     "p10": 0,
-    "p90": 0,
+    "p90": 0.05,
     "inTarget": null
   },
   "band.backbeat-swell": {

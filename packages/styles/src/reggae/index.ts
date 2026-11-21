@@ -51,6 +51,7 @@ export const reggae: StylePack = {
     // No build, arc or lift carries a section from the one drop into steppers or rockers, or
     // back (ST-reggae-33).
     liftsCrossHigh: false,
+    layOut: { seats: ["chords"], under: "band", span: "section", below: 0.75, chance: 0.25 },
   },
   ending: {
     // The plain triad, I or i (ST-reggae-31).
