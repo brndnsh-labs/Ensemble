@@ -258,6 +258,21 @@ SO-10. Limits on silence, set after the owner heard the first audition's rests a
 
 SO-11. A style's "space" value (metal 0.12, ska-punk 0.15, disco 0.2, jazz, rock and country 0.25, funk, blues, hip hop and acoustic 0.3, bossa 0.35, neo-soul and reggae 0.45) acts twice: it is the chance that a medium or busy phrase takes a shape from the next sparser list (keeping its busier rhythm cells), and each rest bar in a shape multiplies that shape's weight by (space / 0.25). Resulting share of empty bars in a solo: metal 0.10 to 0.20, ska-punk and disco 0.10 to 0.35, jazz, rock and blues 0.20 to 0.50, neo-soul and reggae 0.22 to 0.50. [style-data] (solid)
 
+This band, since 2026-11-17: the shares of empty bars above are the last band's and are not what this band plays, at its default or at any setting. Brandon heard the soloist as "a little sparse ... makes sense to ramp things up" and then passed the busier one and the range of its setting ("i agree with your defaults, the range seems really good"; ear cases `soloist-a-little-sparse` and `busier-soloist-defaults-and-range` in `scorecard/ear-cases.json`, and `soloist-changes-awesome` on 2026-11-19). The space values are still the ones above, and they act in full only at the bottom of the player's setting (`soloDensity` 0). At the default (0.5) each style gives up a share of that room (blues, funk and acoustic 0.3; jazz, rock and disco 0.4; neo-soul and reggae 0.2) and lifts every other phrase or so a level. The measure is `solo.empty-bars`: of the bars of the solo's phrases, the share with no note struck in them, where a pickup and a note in a bar's last beat belong to the next bar and a note tied over the barline plays in the bar it is held into. Per style, the mean over the scorecard's takes with a soloist (one take in ten below, one in ten above), then the mean at `soloDensity` 0 and at 1 (48 takes each, counted 2026-11-20):
+
+| Style | SO-11 (last band) | Default: mean (p10 to p90) | At 0 | At 1 |
+| --- | --- | --- | --- | --- |
+| Blues | 0.20 to 0.50 | 0.09 (0 to 0.17) | 0.13 | 0.04 |
+| Jazz | 0.20 to 0.50 | 0.09 (0.03 to 0.15) | 0.14 | 0.03 |
+| Rock | 0.20 to 0.50 | 0.12 (0.03 to 0.20) | 0.18 | 0.06 |
+| Funk | not given | 0.14 (0.04 to 0.23) | 0.17 | 0.07 |
+| Disco | 0.10 to 0.35 | 0.14 (0.06 to 0.21) | 0.20 | 0.08 |
+| Neo-soul | 0.22 to 0.50 | 0.15 (0.02 to 0.23) | 0.20 | 0.10 |
+| Reggae | 0.22 to 0.50 | 0.11 (0.06 to 0.20) | 0.15 | 0.07 |
+| Acoustic | not given | 0.16 (0.06 to 0.23) | 0.19 | 0.10 |
+
+Even the sparse end of the setting leaves fewer empty bars than the last band did (only disco's sits inside its old range), so the old figures are not "this band turned down": read them as history. The blues' target for `solo.empty-bars` (0.05 to 0.30) is the band's; a solo with 0.09 of its bars empty is the default he chose, not a fault.
+
 SO-12. Phrase register: a sparse phrase's contour travels 6 semitones, a medium phrase's 9, a busy phrase's 12; all of a phrase's notes stay within that span plus 3 semitones either side of the phrase's centre, inside the instrument. A line that reaches the edge of its register turns round; it does not pin against the edge. [property] (solid)
 
 SO-13. Contours and their weights: arch 4, fall 3, climb 2, wave 2. An arch starts a third of its span below centre, peaks two thirds of its span above centre in the middle and returns; a fall runs from half a span above centre to half a span below; a climb is the reverse; a wave is one full up-and-down cycle of half a span either side. The wind-down phrase always falls and the peak phrase always climbs. The contour is measured by note count, not by time. [style-data] (solid)
@@ -557,6 +572,8 @@ Q-30. Share of breaths (silences of a beat or more) that last two bars or more: 
 Q-31. Longest stretch without a beat of silence: 6 bars or less for a song-form head, 8 or less for call-style heads. This separates a sung tune from a stream. [metric] (solid)
 
 Q-32. Share of bars the soloist leaves empty, by role and style: heads 0 to 0.15 (call-style heads 0.15 to 0.4); solos from 0.10 to 0.20 (metal) to 0.22 to 0.50 (neo-soul) (SO-11). [metric] (solid)
+
+This band, since 2026-11-17, by Brandon's ear (`soloist-a-little-sparse`, `busier-soloist-defaults-and-range`): the solo figures above are the last band's. `solo.empty-bars` reads a mean of 0.09 (jazz, blues) to 0.16 (acoustic) at the default setting, and one take in ten at 0 (blues) to 0.06 (disco, reggae, acoustic) or below; the table under SO-11 has every style, and the setting's two ends.
 
 Q-33. Share of sixteenths left silent inside the bars the soloist plays in: funk 0.4 to 0.85, hip hop 0.28 to 0.6, ska-punk 0.2 to 0.45, country 0.15 to 0.4, neo-soul 0.08 to 0.4, metal 0.15 or less. [metric] (solid)
 
