@@ -214,8 +214,9 @@ export const bluesCritic: CriticStyle = {
     "solo.wide-leaps": { max: 0.05, kind: "intent", minCases: 20 },
     "solo.trills": { max: 0.05, kind: "intent", minCases: 20 },
     "solo.repeated-notes": { max: 0.07, kind: "intent", minCases: 20 },
-    // Not a target for the music: a ceiling one take in ten sits above today, so that the
-    // scorecard names the worst solos, which are the ones to go and listen to.
+    // Not a target for the music: a ceiling one take in ten sat above when it was set, so that
+    // the scorecard would name the worst solos. The measure names them by itself now (#2247);
+    // the ceiling stays because `score --check` has held the share under it since.
     "solo.cost": { max: 1.8, kind: "measured" },
   },
   weights: {

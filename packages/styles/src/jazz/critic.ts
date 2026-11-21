@@ -210,8 +210,9 @@ export const jazzCritic: CriticStyle = {
     // 20% to 30% of phrases are led in from the beat before (SO-39): 19% over everything.
     // The ceiling is the point: leading into every phrase is a mannerism.
     "solo.entered-early": { max: 0.5, kind: "intent", minCases: 6 },
-    // Not a target for the music: a ceiling one take in ten sits above today, so that the
-    // scorecard names the worst solos, which are the ones to go and listen to.
+    // Not a target for the music: a ceiling one take in ten sat above when it was set, so that
+    // the scorecard would name the worst solos. The measure names them by itself now (#2247);
+    // the ceiling stays because `score --check` has held the share under it since.
     "solo.cost": { max: 2.32, kind: "measured" },
     // ── band ──
   },

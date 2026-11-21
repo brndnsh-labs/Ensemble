@@ -196,6 +196,12 @@ const idiom = (...args: Parameters<typeof measure>): Measure => ({
   idiom: true,
 });
 
+/** A cost: less is better, and the scorecard names the takes with the most of it. */
+const cost = (...args: Parameters<typeof measure>): Measure => ({
+  ...measure(...args),
+  lowerIsBetter: true,
+});
+
 export const soloMeasures: readonly Measure[] = [
   measure(
     "changes-on-chord-tones",
@@ -670,13 +676,13 @@ export const soloMeasures: readonly Measure[] = [
       return share(early.length, phrases.length);
     },
   ),
-  measure(
+  cost(
     "cost",
     "cost",
     "How the solo went by the critic's own lights: the mean cost of its phrases under the style's weights. Lower is better; it is for finding the worst takes, not a target.",
     (reading) => mean(reading.costs.filter((_, i) => reading.phrases[i]!.notes.length > 0)),
   ),
-  measure("worst-phrase", "cost", "The cost of the solo's worst phrase.", (reading) => {
+  cost("worst-phrase", "cost", "The cost of the solo's worst phrase.", (reading) => {
     const costs = reading.costs.filter((_, i) => reading.phrases[i]!.notes.length > 0);
     return costs.length === 0 ? null : { value: Math.max(...costs), cases: costs.length };
   }),
