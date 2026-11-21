@@ -661,6 +661,19 @@
       "heard": "The poster wall parts 1 and 2 on his phone, the band playing.",
       "recorded": "93927f6e",
       "doubt": "Only in PLAN; styles not said."
+    },
+    {
+      "id": "soloist-displaced-natural",
+      "date": "2026-11-21",
+      "words": "seems like this is all sounding good, i'm not hearing anything that seems off in the new clips. great job, everything sounds pretty natural and melodic",
+      "source": "DECISIONS.md: an idea said again a beat early or late (2026-11-20, #2237)",
+      "seat": "soloist",
+      "styles": ["jazz", "funk", "blues"],
+      "kind": "passed",
+      "medium": "sound",
+      "heard": "out/solo-displaced/: alto on So What and All the Things You Are (jazz), funk in D minor and the vamp in A, vibraphone on the minor blues; nine moved ideas, main before against now, same seeds, served over the LAN.",
+      "recorded": "e1988803",
+      "doubt": "He did not say whether he wants moved ideas more often."
     }
   ],
   "leftOut": [
