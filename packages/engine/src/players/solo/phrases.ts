@@ -436,6 +436,7 @@ export function phrasesFor(
     return draw.fork("early").chance(early) ? -pulse : pulse;
   })();
   // A section's last bar keeps its landing where the band turns: not pushed late there.
+  // (The first draw is drawn by the style's share; the other way is tried where it fails.)
   const closing = slot.bars.at(-1)!;
   const lateAllowed = closing.barInSection < closing.section.bars - 1;
 
@@ -517,9 +518,12 @@ export function phrasesFor(
   const remade = (kind: string, plans: readonly BarPlan[], ask: Ask): Phrase => {
     const phrase = compose(kind, plans, ask);
     if (shift === 0) return phrase;
+    // The way drawn, else the other where the style goes that way at all.
+    const { early } = solo.habits.displace;
+    const may = (by: number) => (by < 0 ? early > 0 : lateAllowed && early < 1);
     const twin =
-      (shift > 0 && !lateAllowed ? null : displaced(kind, plans, ask, shift)) ??
-      (shift < 0 && !lateAllowed ? null : displaced(kind, plans, ask, -shift));
+      (may(shift) ? displaced(kind, plans, ask, shift) : null) ??
+      (may(-shift) ? displaced(kind, plans, ask, -shift) : null);
     return twin ? { ...phrase, displaced: twin } : phrase;
   };
 

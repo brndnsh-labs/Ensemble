@@ -429,7 +429,8 @@ export interface SoloStyle {
      * the way to the top note or where the tune ends; never pulled before the
      * phrase's first bar or pushed past its last, and never late in a
      * section's last bar; a displaced idea takes no pickup. Where it fits only
-     * the other way it goes that way, and where it fits neither it stays put.
+     * the other way it goes that way, if the style goes that way at all (an
+     * `early` of 0 or 1 is one way only); where it fits neither it stays put.
      */
     readonly displace: {
       /** The chance a phrase said again bar for bar is said a beat away. At none, never. */

@@ -536,7 +536,8 @@ export const jazzSolo: SoloStyle = {
       approach: true,
     },
     // An idea said again a beat early or late is how a bebop player develops a motif: the
-    // style that does it most, anticipated as often as delayed. Not the bridge's return (`b`),
+    // style that does it most, drawn early as often as late (early fits only an idea that
+    // leaves its first beat free). Not the bridge's return (`b`),
     // which is heard where it was.
     displace: { chance: 0.4, early: 0.5, roles: ["r", "v"] },
     // No bends (ST-jazz-37); a guitar shakes a note held a half note or longer (SO-52).
