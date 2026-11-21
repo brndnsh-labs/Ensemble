@@ -4,9 +4,11 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { Plan, PlanBar, PlanOptions, Take } from "@ensemble/engine";
+import type { Plan, PlanBar, PlanOptions, StylePack, Take } from "@ensemble/engine";
 import {
   arrangedLines,
+  BREATHE_MOST,
+  breatheAmount,
   burstPhrases,
   isCompound,
   PPQ,
@@ -16,8 +18,13 @@ import {
   pulseStarts,
   render,
   seconds,
+  secondsAt,
   strongPulses,
+  TEMPO_STEP,
+  tempoRange,
+  tickAt,
   tierOf,
+  timedNotes,
   toMidi,
   validateStyle,
   withArrangement,
@@ -158,6 +165,8 @@ test("making an open jam one pass longer changes nothing that was already played
       for (const seed of SEEDS.slice(0, 4).filter((s) => FULL || (s + c) % 2 === 0)) {
         // Each chart at each length, on two seeds or one by turns.
         for (const passes of [1, 2, 4].filter((_, i) => (i + seed + (c >> 1)) % 2 === 0)) {
+          // Half the charts with the tempo breathing: a bar's tempo may not depend on the jam's length either.
+          const breathe = c % 2 === 0;
           const jam = (n: number) =>
             // Half with the soloist asked for: its solo may not depend on the jam's length.
             render(chart.text, style, {
@@ -166,16 +175,25 @@ test("making an open jam one pass longer changes nothing that was already played
               passes: n,
               seed,
               solo: seed % 2 === 0,
+              breathe,
             });
           const shorter = jam(passes);
           const longer = jam(passes + 1);
+          const where = `${chart.file} seed ${seed} at ${passes}`;
           const before = (take: Take) =>
             take.events.filter((event) => event.tick < shorter.plan.ticks);
+          assert.deepEqual(before(longer), shorter.events, where);
+          // The pass it was only looking ahead to is timed as it is then played.
+          const known = [...shorter.plan.bars, ...shorter.plan.lookahead];
+          const played = [...longer.plan.bars, ...longer.plan.lookahead];
           assert.deepEqual(
-            before(longer),
-            shorter.events,
-            `${chart.file} seed ${seed} at ${passes}`,
+            played.slice(0, known.length).map((bar) => bar.quarters),
+            known.map((bar) => bar.quarters),
+            `${where}: the tempo of a bar already planned`,
           );
+          const heard = (take: Take) =>
+            timedNotes(take.plan, before(take)).map((note) => [note.at, note.length]);
+          assert.deepEqual(heard(longer), heard(shorter), `${where}: the seconds`);
         }
       }
     }
@@ -199,8 +217,10 @@ test("a jam told to finish plays everything before its last pass as it would hav
         )) {
           // Half with the soloist: its solo is cut short, and the band's peak is placed by it.
           const solo = (seed + c) % 4 < 2;
-          const asPlanned = render(chart.text, style, { ...options, seed, solo });
-          const told = render(chart.text, style, { ...options, seed, solo, endAfter });
+          // Half the charts with the tempo breathing: the band keeps the time of what was played.
+          const breathe = c % 2 === 0;
+          const asPlanned = render(chart.text, style, { ...options, seed, solo, breathe });
+          const told = render(chart.text, style, { ...options, seed, solo, breathe, endAfter });
           const where = `${chart.file} seed ${seed}, told on pass ${endAfter}`;
 
           const top = told.plan.bars.find((bar) => bar.kind === "music" && bar.pass === endAfter)!;
@@ -211,6 +231,16 @@ test("a jam told to finish plays everything before its last pass as it would hav
                 event.tick < top.start && !(event.kind === "marker" && event.marker === "pass"),
             );
           assert.deepEqual(before(told), before(asPlanned), where);
+          // The band may be told at any phrase top of the pass it turns on (the app tells it where
+          // it can), so the whole of that pass keeps the time it was going to be played in.
+          const turned = told.plan.bars.filter(
+            (bar) => bar.kind === "music" && bar.pass <= endAfter && bar.section.role === "body",
+          );
+          assert.deepEqual(
+            turned.map((bar) => bar.quarters),
+            turned.map((bar) => asPlanned.plan.bars[bar.index]!.quarters),
+            `${where}: the time of the pass it turns on`,
+          );
 
           assert.equal(told.plan.open, false, where);
           assert.equal(told.plan.passes, endAfter + 1, where);
@@ -1107,3 +1137,139 @@ function musicSeconds(roadmap: Plan): number {
     .reduce((sum, bar) => sum + bar.ticks, 0);
   return (ticks / PPQ) * (60 / roadmap.quarters);
 }
+
+// ── the tempo, breathing ────────────────────────────────────────────────────
+
+/** The kinds of plan the breathing tempo is held to: every way a jam is shaped, and the two that keep no arc. */
+const BREATHING_KINDS: readonly PlanOptions[] = [
+  { mode: "jam", passes: 2 },
+  { mode: "jam", minutes: 2.5 },
+  { mode: "jam", minutes: 6, solo: true },
+  { mode: "jam", passes: 4, solo: true },
+  { mode: "jam", passes: 4, solo: true, soloFromTop: true },
+  { mode: "jam", open: true, passes: 5 },
+  { mode: "jam", passes: 6, endAfter: 3 },
+  { mode: "jam", passes: 3, energy: 0.6 },
+  { mode: "song" },
+];
+
+/** A take lasts within this share of the same take at the tempo as set: at 120, a mean between 119.3 and 120.7. */
+const MEAN_WITHIN = 0.006;
+
+/** A style as it ships, and as it would be if it breathed the most any style may: the rules hold at any amount. */
+const breathingAs = (style: StylePack): StylePack[] => [
+  style,
+  { ...style, feel: { ...style.feel, breathe: BREATHE_MOST } },
+];
+
+test("a take that does not ask to breathe keeps the tempo as set in every bar", () => {
+  for (const { chart, take } of takes()) {
+    for (const bar of [...take.plan.bars, ...take.plan.lookahead]) {
+      assert.equal(bar.quarters, take.plan.quarters, `${chart.file} bar ${bar.index}`);
+    }
+  }
+});
+
+test("a breathing tempo is small and slow: within the style's amount of the tempo as set (never more than 2%), one tempo a bar, never moving more than a quarter of a percent from one bar to the next; the first bar is the tempo as set, so is every bar of a song or of a level the player holds, and a take lasts within 0.6% of the steady take", () => {
+  for (const shipped of STYLES) {
+    for (const style of breathingAs(shipped)) {
+      let moved = 0;
+      for (const chart of ownCharts(style)) {
+        const written = parse(chart.text).chart;
+        for (const kind of BREATHING_KINDS) {
+          const steady = plan(written, style, kind);
+          const breathing = plan(written, style, { ...kind, breathe: true });
+          const where = `${style.id} at ${style.feel.breathe}, ${chart.file} ${JSON.stringify(kind)}`;
+          const set = breathing.quarters;
+          assert.equal(set, steady.quarters, `${where}: the tempo as set`);
+          const amount = breatheAmount(style, written.meter, breathing.tempo);
+          assert.ok(amount <= style.feel.breathe && amount <= BREATHE_MOST, where);
+          const bars = [...breathing.bars, ...breathing.lookahead];
+          // A whole microsecond a quarter note is as near as a bar's tempo is said.
+          const hair = 1e-5;
+          bars.forEach((bar, i) => {
+            const share = bar.quarters / set - 1;
+            assert.ok(Math.abs(share) <= amount + hair, `${where} bar ${bar.index}: ${share}`);
+            const step = i === 0 ? 0 : Math.abs(bar.quarters - bars[i - 1]!.quarters) / set;
+            assert.ok(step <= TEMPO_STEP + hair, `${where} bar ${bar.index}: a step of ${step}`);
+            // One tempo for the whole bar: its seconds are its ticks at its own tempo.
+            const lasts =
+              secondsAt(breathing, bar.start + bar.ticks) - secondsAt(breathing, bar.start);
+            const own = (bar.ticks / PPQ) * (60 / bar.quarters);
+            assert.ok(
+              Math.abs(lasts - own) < 1e-9,
+              `${where} bar ${bar.index}: ${lasts} s, not ${own}`,
+            );
+            const middle = bar.start + bar.ticks / 2;
+            assert.ok(
+              Math.abs(tickAt(breathing, secondsAt(breathing, middle)) - middle) < 1e-6,
+              where,
+            );
+            if (share !== 0) moved++;
+          });
+          assert.equal(breathing.bars[0]!.quarters, set, `${where}: the count-in`);
+          const first = breathing.bars.find((bar) => bar.kind === "music");
+          if (first)
+            assert.equal(first.quarters, set, `${where}: the band comes in at the tempo set`);
+          if (kind.mode === "song" || kind.energy !== undefined || amount === 0) {
+            for (const bar of bars) assert.equal(bar.quarters, set, `${where}: a flat arc`);
+          }
+          const longer = seconds(breathing) / seconds(steady) - 1;
+          assert.ok(
+            Math.abs(longer) <= MEAN_WITHIN,
+            `${where}: ${(longer * 100).toFixed(2)}% longer`,
+          );
+        }
+        // At the top of the style's range there is no push left: the band keeps the tempo set.
+        const top = tempoRange(style, written.meter).max;
+        const atTop = plan(written, style, { mode: "jam", passes: 4, tempo: top, breathe: true });
+        for (const bar of atTop.bars)
+          assert.equal(bar.quarters, atTop.quarters, `${chart.file} at ${top}`);
+      }
+      // A style that breathes does breathe somewhere in its own charts.
+      if (style.feel.breathe > 0) assert.ok(moved > 0, `${style.id}: the tempo never moved`);
+    }
+  }
+});
+
+test("asked to breathe, the band plays the same notes; a style that does not breathe is the steady take to the byte, and one that does is the same take again, to the second, and its MIDI file's tempo map is the plan's: each bar's tempo where it changes, to a whole microsecond a quarter note", () => {
+  for (const style of STYLES) {
+    const chart = ownCharts(style)[0]!;
+    const options = { mode: "jam", minutes: 3, solo: true, seed: 1 } as const;
+    const steady = render(chart.text, style, options);
+    const breathing = render(chart.text, style, { ...options, breathe: true });
+    const again = render(chart.text, style, { ...options, breathe: true });
+    const where = `${style.id}, ${chart.file}`;
+    assert.deepEqual(breathing.events, steady.events, `${where}: the notes`);
+    assert.deepEqual(
+      timedNotes(again.plan, again.events),
+      timedNotes(breathing.plan, breathing.events),
+      `${where}: the same take, the same seconds`,
+    );
+    const file = toMidi(breathing.plan, breathing.events, style);
+    assert.deepEqual(toMidi(again.plan, again.events, style), file, `${where}: the same bytes`);
+    if (style.feel.breathe === 0) {
+      assert.deepEqual(file, toMidi(steady.plan, steady.events, style), `${where}: the bytes`);
+      assert.deepEqual(
+        timedNotes(breathing.plan, breathing.events),
+        timedNotes(steady.plan, steady.events),
+        `${where}: the seconds`,
+      );
+    }
+    const said = readSmf(file).tracks[0]!.tempoMap;
+    const played = breathing.plan.bars
+      .filter((bar, i, bars) => i === 0 || bar.quarters !== bars[i - 1]!.quarters)
+      .map((bar) => ({ tick: bar.start, micros: Math.round(60_000_000 / bar.quarters) }));
+    assert.deepEqual(said, played, `${where}: the tempo map`);
+    for (const bar of breathing.plan.bars) {
+      // Held to a whole microsecond, a bar off the tempo set is exactly what the file says.
+      if (bar.quarters === breathing.plan.quarters) continue;
+      const micros = 60_000_000 / bar.quarters;
+      assert.ok(
+        Math.abs(micros - Math.round(micros)) < 1e-6,
+        `${where} bar ${bar.index}: ${micros}`,
+      );
+    }
+    if (style.feel.breathe > 0) assert.ok(said.length > 1, `${where}: one tempo only`);
+  }
+});
