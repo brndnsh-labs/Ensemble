@@ -18,7 +18,7 @@
   --line: #8887a6;
   --marker: #ffe53b;
   --on-marker: #1e1a4f;
-  --pencil: #cf3d35;
+  --pencil: #c5352d;
   /* The ink as it prints on a spot colour: the same in either theme, since the colour
      under it is. A spot colour is always a field with this printed on it, never the
      colour of type on paper. */
