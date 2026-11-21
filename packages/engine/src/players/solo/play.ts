@@ -645,7 +645,10 @@ function realise(
     // always has one before whatever follows.
     let ends = !next;
     if (next) {
-      const gap = heard(next.spot.tick, next.spot.bar) - heard(tick + duration, bar);
+      // A moved idea's note held over the barline ends in the bar it is held into, and is
+      // heard there as the band swings that bar.
+      const stops = held && tick + duration >= endsIn.start ? endsIn : bar;
+      const gap = heard(next.spot.tick, next.spot.bar) - heard(tick + duration, stops);
       if (gap >= breath) breathed = next.spot.tick;
       ends = gap >= breath && !lead;
     }
