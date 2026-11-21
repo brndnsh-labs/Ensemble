@@ -980,8 +980,7 @@ test("an idea comes back a beat early or late: in the styles that do it most som
 
 /**
  * The styles whose soloist plays double time on some of its own charts at the top of the
- * setting: at least one burst over them. Disco writes it and never plays it (its double is the
- * thirty-second, past every instrument's `fastest` at disco's tempos).
+ * setting: at least one burst over them.
  */
 const DOUBLES = ["jazz", "blues", "rock"];
 
