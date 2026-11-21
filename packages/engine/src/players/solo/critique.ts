@@ -159,15 +159,18 @@ export interface Displacement {
  * may turn), and the whole of it moved by one of the bar's
  * pulses (the quarter in 4/4, the dotted quarter in 6/8 and 12/8) from where it
  * fell in its bar, so that it falls across the bar differently; and no earlier
- * phrase it says again where that one fell. Three notes at
+ * phrase whose rhythm it plays where that one fell. Three notes at
  * least: fewer are not an idea. The phrase's own notes, without a pickup into
  * it; the earlier one's with or without the pickups inside it.
  */
 export function displacedFrom(heard: Heard, earlier: readonly Heard[]): Displacement | null {
   const contour = (notes: readonly Sounding[]) =>
     notes.slice(1).map((note, i) => Math.sign(note.pitch - notes[i]!.pitch));
-  /** Where one set of notes falls against another it says again, in ticks into the bar; null if it does not. */
-  const against = (said: readonly Sounding[], notes: readonly Sounding[]): number | null => {
+  /**
+   * Where one set of notes falls against another in the same rhythm, in ticks into the
+   * bar, and whether its line goes the same way; null if the rhythm is not the same.
+   */
+  const against = (said: readonly Sounding[], notes: readonly Sounding[]) => {
     const ticks = said[0]!.bar.ticks;
     if (notes.length !== said.length || notes.some((note) => note.bar.ticks !== ticks)) return null;
     const moved = said[0]!.tick - notes[0]!.tick;
@@ -176,7 +179,7 @@ export function displacedFrom(heard: Heard, earlier: readonly Heard[]): Displace
     // the same way is the same line.
     const [shape, was] = [contour(said), contour(notes)];
     const same = shape.filter((move, i) => move === was[i]).length;
-    return same * 5 >= shape.length * 4 ? ((moved % ticks) + ticks) % ticks : null;
+    return { at: ((moved % ticks) + ticks) % ticks, line: same * 5 >= shape.length * 4 };
   };
   // The phrase, and the earlier ones, with and without the pickups inside them.
   const versions = (one: Heard) => [body(one), idea(one)];
@@ -188,13 +191,14 @@ export function displacedFrom(heard: Heard, earlier: readonly Heard[]): Displace
         versions(other).map((notes) => ({ said, other, at: against(said, notes) })),
       );
   });
-  // An idea said again where it fell before is not moved, whatever else it is like.
-  if (falls.some(({ at }) => at === 0)) return null;
+  // A rhythm played again where it fell before is not moved, whatever its line does.
+  if (falls.some(({ at }) => at?.at === 0)) return null;
   for (const { said, other, at } of falls) {
+    if (!at?.line) continue;
     const { meter, ticks } = said[0]!.bar;
     const pulse = pulseTicks(meter)[0]!;
-    if (at === pulse) return { of: other, by: 1 };
-    if (at === ticks - pulse) return { of: other, by: -1 };
+    if (at.at === pulse) return { of: other, by: 1 };
+    if (at.at === ticks - pulse) return { of: other, by: -1 };
   }
   return null;
 }
