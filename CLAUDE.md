@@ -41,6 +41,7 @@ pnpm lint               # biome check; `pnpm format` to fix
 pnpm test               # engine suite under the budget: every property, two seeds
 pnpm test:full          # the same on six seeds (three times the push budget: 84 seconds); run before a gate
 pnpm score              # every style's scorecard against its accepted baseline (2-minute budget)
+                        # on a branch it also sorts the change against what Brandon has passed by ear: inside, or the measures outside
 pnpm ears               # Brandon's verdicts by ear (scorecard/ear-cases.json) beside the scorecards as they stood in git: which
                         # measures told a band he refused from its answer, and where today's sits against what he has passed
 pnpm goldens            # rewrite the golden takes (then say why in DECISIONS.md)

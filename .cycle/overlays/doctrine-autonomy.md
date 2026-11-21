@@ -7,4 +7,11 @@
 - **Big work on an established pattern is pickable.** A new style, a style in a new meter, a new pack for an existing seat: each has been built several times from a brief (`prompts/style-*.md`, `prompts/meter-*.md`). Write the brief, build it, review it in its own clone.
 - **Still his, every time:** a production release, the §5 brakes, and anything that makes a new kind of sound (a new instrument, a new articulation, a change to the mix): build a study page of alternatives first and let him choose, as with the slides and the horn's moves.
 
-**Measured before asked.** Before an ear is asked, say whether the change stays inside what he has already passed: the scorecard's movement, and the ear cases once they exist. A change that moves nothing he could hear (goldens and scorecard unmoved) needs no page and no `status:needs-ear`.
+**Measured before asked.** A change to what the band plays is sorted by measurement, in this order, before his ear is asked:
+
+1. **Nothing he could hear moved** (the goldens did not move): no page, no `status:needs-ear`, whatever else the report says.
+2. **A new kind of sound** (a new instrument, a new articulation, a change to the mix) is his every time, as above. The scorecard does not read these: the horn's moves and the guitar's slides moved no measure.
+3. **Otherwise `pnpm score` sorts it.** Run on the branch, each style's report ends with the change set against what he has passed by ear (`scorecard/ear-cases.json`; the change is what moved since the branch left `main`). "Inside what was passed" in every style: it merges and closes with no page and no `status:needs-ear`, and the PR body and the closing comment say "inside what he has passed" with how many measures moved. "Outside what was passed" in any style: the page and `status:needs-ear`, with the measures that left their range named first, on the page and on the `/unblock` card. A measure the change brought is outside by definition: no band he has passed had it. So is a measure that moved back toward a band he refused, past the nearest he has passed.
+4. **One inside change in five goes to his ear anyway**, so the ranges are checked and not only trusted: an inside change whose issue number divides by five gets its page and `status:needs-ear` like an outside one, and says it is the sample.
+
+An inside change carries no `status:needs-ear`, so it does not count toward a seat's two unheard changes.
