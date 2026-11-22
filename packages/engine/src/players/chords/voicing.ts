@@ -299,19 +299,21 @@ export function voiceStrikes(
 ): VoicedStrike[] {
   const ways = new Map<string, Way>();
   const wayAt = new Map<string, Way>();
-  // The strikes voiced whole: an ending's final chord, and every strike of it the hand holds
-  // into the ending from where the chord was struck before it (CH-31).
+  // The strikes voiced whole (`Strike.whole`: the final chord of an ending, a bar with no
+  // bassist). A guitarist holds a grip while the chord stays (CH-31), so a run of strikes on one
+  // chord is voiced whole where any of it is: the hand takes the grip it will need there, the
+  // whole chord, as the pick takes its alternate bass from the fifth.
   const wholeAt = new Set<Strike>();
   const chordOf = (s: Strike) => {
     const chord = s.arrival.chord;
     return chord ? `${s.kind} ${JSON.stringify([chord.root, chord.quality, chord.bass])}` : null;
   };
-  for (let i = strikes.length - 1; i >= 0; i--) {
-    if (!strikes[i]!.whole) continue;
-    const held = chordOf(strikes[i]!);
-    for (let j = i; j >= 0 && chordOf(strikes[j]!) === held && !wholeAt.has(strikes[j]!); j--) {
-      wholeAt.add(strikes[j]!);
-    }
+  for (let i = 0; i < strikes.length; ) {
+    let j = i;
+    while (j + 1 < strikes.length && chordOf(strikes[j + 1]!) === chordOf(strikes[i]!)) j++;
+    const run = strikes.slice(i, j + 1);
+    if (run.some((s) => s.whole)) for (const s of run) wholeAt.add(s);
+    i = j + 1;
   }
   const voiced: VoicedStrike[] = [];
   let previous: Voicing | null = null;
@@ -325,9 +327,7 @@ export function voiceStrikes(
     const chord = strike.arrival.chord;
     const kind = chords.kinds[strike.kind];
     if (!chord || !kind) return null;
-    // The final chord of an ending is voiced whole: its free tones are voices. A guitarist holds
-    // a grip while the chord stays (CH-31), so where the final chord was struck before the
-    // ending bar, every strike of it takes the grip the hand will end on.
+    // Voiced whole, a recipe's free tones are voices.
     const isWhole = wholeAt.has(strike);
     const whole = isWhole ? " whole" : "";
     const at = `${strike.kind} ${strike.arrival.index}${whole}`;

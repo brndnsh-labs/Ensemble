@@ -2121,7 +2121,7 @@ test(
         for (const bar of take.plan.bars) {
           if (bar.kind !== "music" || bar.ending) continue;
           const chord = harmonyOf(take).findLast((arrival) => arrival.tick <= bar.start)?.chord;
-          if (!chord || chord.quality.base !== "" || chord.quality.alterations.length > 0) continue;
+          if (chord?.quality.base !== "" || chord.quality.alterations.length > 0) continue;
           const degree = (pitchClass(chord.root) - tonic + 12) % 12;
           if (degree !== 0 && degree !== 5) continue;
           const boom = pluckedOf(take).find((strike) => strike.tick === bar.start);

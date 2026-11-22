@@ -57,9 +57,11 @@ export interface Strike {
    */
   readonly pullOff?: number;
   /**
-   * The final chord of an ending: voiced whole, a recipe's free tones voices
-   * like the rest (`Recipe.free`). A chord that rings as the end leaves
-   * nothing out; the freedom is a short stroke's, with the bass under it.
+   * Voiced whole, a recipe's free tones voices like the rest (`Recipe.free`):
+   * the final chord of an ending, which rings and leaves nothing out, and a
+   * strike in a bar with no bassist, where the pick's boom carries the root and
+   * takes its alternate bass from the fifth. The freedom is a short stroke's,
+   * with the bass under it (CH-24: "over a bassist").
    */
   readonly whole?: true;
 }
