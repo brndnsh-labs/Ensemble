@@ -414,7 +414,7 @@
     "inTarget": 0.9
   },
   "chords.overlap-over-chance": {
-    "mean": 0.0233,
+    "mean": 0.0234,
     "p10": -0.0164,
     "p90": 0.0833,
     "inTarget": 0.8667
@@ -434,7 +434,7 @@
   "chords.strikes-in-breaths": {
     "mean": 0.1287,
     "p10": 0.1114,
-    "p90": 0.1521,
+    "p90": 0.1529,
     "inTarget": 0.9
   },
   "chords.breaths-over-the-line": {
@@ -450,7 +450,7 @@
     "inTarget": 0.9667
   },
   "chords.answers-louder": {
-    "mean": 4.7317,
+    "mean": 4.7238,
     "p10": 2.8665,
     "p90": 6.725,
     "inTarget": 1

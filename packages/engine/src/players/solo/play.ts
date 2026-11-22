@@ -24,7 +24,7 @@ import { TIER_MID } from "../../style/types.ts";
 import type { ToneRole } from "../../theory/chord.ts";
 import { mod12, pitchClass } from "../../theory/pitch.ts";
 import type { Heard, SoloCandidate, SoloPick, Sounding } from "./critique.ts";
-import { bassStruck, bySoloCritic, runOf, SOLO_FEATURES } from "./critique.ts";
+import { bassStruck, bySoloCritic, rhythmsAgain, runOf, SOLO_FEATURES } from "./critique.ts";
 import { EIGHTH, isChordTone, onlyPasses } from "./harmony.ts";
 import { soloVoice } from "./instruments.ts";
 import { placeOf, spotsOf } from "./line.ts";
@@ -139,8 +139,8 @@ export function soloPart(
   /** What the solo played: its first chorus's notes and beats, and the phrase before's. */
   let firstChorus = { notes: 0, beats: 0 };
   let lastPhrase: PlayedPhrase | null = null;
-  /** Each idea remembered, its notes as they were played: a horn's air and the chords cut them. */
-  const heardAs = new WeakMap<Phrase, readonly SoloNote[]>();
+  /** Every note this solo has played, by where it is struck: as long as it was heard. */
+  let playedAt = new Map<number, SoloNote>();
   /** A pickup into the top of a pass, made from the pass before (`passPickup`). */
   const intoPass = (bar: PlanBar, previous: Slot | undefined): PassPickup | null => {
     if (!opensPass(plan, bar)) return null;
@@ -159,7 +159,10 @@ export function soloPart(
   };
   const writeLead = (lead: PassPickup, bar: PlanBar): SoloNote[] => {
     const notes = realiseLead(world, lead, bar);
-    for (const note of notes) written.push(writtenOf(note, voice, true));
+    for (const note of notes) {
+      written.push(writtenOf(note, voice, true));
+      playedAt.set(note.tick, note);
+    }
     return notes;
   };
   world.slots.forEach((slot, s) => {
@@ -170,6 +173,7 @@ export function soloPart(
       // into it leaves that note its breath.
       memory = { ...NOTHING, restEnds: memory.restEnds };
       earlier = [];
+      playedAt = new Map();
       fell = false;
       doubled = false;
       firstChorus = { notes: 0, beats: 0 };
@@ -183,21 +187,22 @@ export function soloPart(
     // Where the pass before's pickup into this phrase starts, if it leads in: a phrase's
     // first breath is taken from there.
     const from = lead ? realiseLead(world, lead, first)[0]?.tick : undefined;
-    // An idea said again, where it was, as it sounded: the notes it was heard at, where they
-    // are the same notes the same distances apart (SO-33). Otherwise as it sounds laid in this
-    // slot, with its own lengths, not stopped at a change of this slot's it is not a tone of (a
-    // moved note is checked against the chords it is moved onto).
-    const asHeard = (inPlace: Phrase, idea: Phrase | undefined): SoloNote[] => {
-      const heard = idea && heardAs.get(idea);
-      const [now, was] = [inPlace.line, idea?.line ?? []];
-      const by = (now[0]?.spot.tick ?? 0) - (was[0]?.spot.tick ?? 0);
-      const notes = was.map((note) => heard?.find((one) => one.tick === note.spot.tick));
-      const same =
-        now.length === was.length &&
-        now.every((note, k) => note.spot.tick - was[k]!.spot.tick === by);
-      return same && notes.every((note) => note !== undefined)
-        ? (notes as SoloNote[])
-        : realise(world, inPlace, accent, from, true).filter((note) => !note.lead);
+    // An idea said again, where it was, as it sounded: the notes of the latest phrase of the
+    // solo heard with the idea's notes where they fall here, the same distances apart and the
+    // same line (`rhythmsAgain`, unmoved), each as long as it was played. That phrase is what
+    // the idea moved a pulse is heard against (`displacedFrom`). Where none is, as the idea
+    // sounds laid in this slot, with its own lengths, not stopped at a change of this slot's it
+    // is not a tone of (a moved note is checked against the chords it is moved onto).
+    const asHeard = (inPlace: Phrase): SoloNote[] => {
+      const laid = realise(world, inPlace, accent, from, true).filter((note) => !note.lead);
+      const here: Heard = { slot, notes: laid.map((note) => sounding(world, note)) };
+      const all = [...earlier.flatMap((one) => one.notes), ...here.notes];
+      const found = rhythmsAgain(here, earlier, all).find((one) => one.inBar === 0 && one.line);
+      const heard = laid.map((note) => {
+        const j = found?.notes.findIndex((one) => one.tick === note.tick) ?? -1;
+        return j < 0 ? undefined : playedAt.get(found!.source[j]!.tick);
+      });
+      return heard.every((note) => note !== undefined) ? (heard as SoloNote[]) : laid;
     };
     const offered = phrasesFor(
       world,
@@ -213,8 +218,8 @@ export function soloPart(
         drawn: () => {
           drawn = true;
         },
-        sounds: (phrase, idea) =>
-          asHeard(phrase, idea).map((note) => ({
+        sounds: (phrase) =>
+          asHeard(phrase).map((note) => ({
             duration: note.duration,
             value: note.lasts ?? note.value,
           })),
@@ -236,9 +241,7 @@ export function soloPart(
         if (kept) mainKept.add(inPlace);
         return kept;
       }
-      return (
-        !mainKept.has(inPlace) && keepsLengths(asHeard(inPlace, phrase.remembered), realised[i]!)
-      );
+      return !mainKept.has(inPlace) && keepsLengths(asHeard(inPlace), realised[i]!);
     });
     const phrases = offered.filter((_, i) => keeps[i]);
     const notes = realised.filter((_, i) => keeps[i]);
@@ -306,6 +309,7 @@ export function soloPart(
     for (const note of played) {
       // A pickup struck before the phrase's first bar leads into it, from wherever it is played.
       written.push(writtenOf(note, voice, note.tick < opens));
+      playedAt.set(note.tick, note);
     }
     const last = played.at(-1);
     // A new idea is the idea from now on, wherever in the form it turned up; and so is
@@ -314,10 +318,6 @@ export function soloPart(
     const stated = memory.motif === null || phrase.fresh || "svcb".includes(role);
     // A phrase with a run in double time is remembered as the line it doubles.
     const kept = phrase.plain ?? phrase;
-    // How it was heard, what an idea said again a beat away is held to: not a run in double
-    // time, which is remembered as the line it doubles.
-    const heard = played.filter((note) => !note.lead);
-    if (!phrase.burst) heardAs.set(kept, heard);
     earlier = [...earlier, candidates[at]!];
     memory = {
       // The climb to the top note is a use of the idea, not a new one. An idea said a beat

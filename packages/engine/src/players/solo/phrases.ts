@@ -98,11 +98,6 @@ export interface Phrase {
    * one for each note of `line`, in order.
    */
   readonly sounds?: readonly Sounded[];
-  /**
-   * An idea said a beat away by the stricter rules: the idea remembered that it says again,
-   * whose notes it is held to as they were heard.
-   */
-  readonly remembered?: Phrase;
   /** An idea said a beat away: the pitch each note of `line` has in the idea it says again. */
   readonly idea?: readonly number[];
 }
@@ -117,11 +112,8 @@ export interface Sounded {
 export interface Hooks {
   /** Told each time an idea said again whole is drawn to be said a beat away. */
   readonly drawn?: () => void;
-  /**
-   * How the notes of an idea said again sound where it was (`phrase`, the idea remembered
-   * laid in this slot): as they were heard, breath and all. What a moved idea keeps.
-   */
-  readonly sounds?: (phrase: Phrase, idea: Phrase) => readonly Sounded[];
+  /** How the notes of a phrase sound as it is played: what a moved idea keeps. */
+  readonly sounds?: (phrase: Phrase) => readonly Sounded[];
 }
 
 export interface Placed {
@@ -545,8 +537,6 @@ export function phrasesFor(
     ask: Ask,
     by: number,
     inPlace: Phrase,
-    /** The idea remembered that `inPlace` says again. */
-    remembered: Phrase,
     /**
      * The stricter rules for an idea main's refuse (`displace.holds`): lengths as sounded,
      * notes held over a barline, the shape kept. Without, the rules main plays by.
@@ -573,7 +563,7 @@ export function phrasesFor(
       return null;
     }
     // How long each note sounded where it was, breath and all: what it is held for moved.
-    const sounded = newly ? hooks.sounds?.(inPlace, remembered) : undefined;
+    const sounded = newly ? hooks.sounds?.(inPlace) : undefined;
     if (sounded && sounded.length !== moved.length) return null;
     const lengthOf = (note: { i: number; spot: Spot }) =>
       sounded ? sounded[note.i]!.duration : note.spot.hold;
@@ -685,14 +675,14 @@ export function phrasesFor(
         Math.abs(note.pitch - phrase.line[k - 1]!.pitch - (idea[k]! - idea[k - 1]!)) <= 2,
     );
     if (!keepsShape) return null;
-    return { ...phrase, idea, newly: true, remembered, ...(sounded ? { sounds: sounded } : {}) };
+    return { ...phrase, idea, newly: true, ...(sounded ? { sounds: sounded } : {}) };
   };
 
   /**
    * The idea said again bar for bar, with the same said a beat away where the slot draws
    * it. Only the idea whole: one with a new ending, grown, or turned is something else.
    */
-  const remade = (kind: string, idea: Phrase, plans: readonly BarPlan[], ask: Ask): Phrase => {
+  const remade = (kind: string, plans: readonly BarPlan[], ask: Ask): Phrase => {
     const phrase = compose(kind, plans, ask);
     if (shift === 0) return phrase;
     hooks.drawn?.();
@@ -700,8 +690,8 @@ export function phrasesFor(
     const { early } = solo.habits.displace;
     const may = (by: number) => (by < 0 ? early > 0 : lateAllowed && early < 1);
     const twin = (newly: boolean) =>
-      (may(shift) ? displaced(kind, plans, ask, shift, phrase, idea, newly) : null) ??
-      (may(-shift) ? displaced(kind, plans, ask, -shift, phrase, idea, newly) : null);
+      (may(shift) ? displaced(kind, plans, ask, shift, phrase, newly) : null) ??
+      (may(-shift) ? displaced(kind, plans, ask, -shift, phrase, newly) : null);
     // The idea moved as main moves it; and where the style holds a note over the barline,
     // the idea moved by the stricter rules, offered only if main's is refused (`soloPart`).
     const old = twin(false);
@@ -771,7 +761,7 @@ export function phrasesFor(
     move: (pitch: number, spot: Spot) => number,
   ): Phrase => {
     const from = layout(idea);
-    return remade(kind, idea, barsOf(idea, from), {
+    return remade(kind, barsOf(idea, from), {
       contour: shaped("arch"),
       ending,
       given: remembered(idea, from, move),
