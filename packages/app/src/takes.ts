@@ -50,9 +50,27 @@ const isKept = (item: unknown): item is KeptTake => {
   );
 };
 
+/**
+ * A kept take as it is played: one whose `options.meter` is not a meter (`{ beats, unit }`, a
+ * whole number of beats over 2, 4 or 8) is played in its chart's own, as a take kept before a
+ * meter could be chosen is. What is stored is left as it is.
+ */
+function readable(take: KeptTake): KeptTake {
+  const meter: unknown = take.recipe.options.meter;
+  if (meter === undefined) return take;
+  const sound =
+    isObject(meter) &&
+    Number.isInteger(meter.beats) &&
+    (meter.beats as number) >= 1 &&
+    (meter.unit === 2 || meter.unit === 4 || meter.unit === 8);
+  if (sound) return take;
+  const { meter: _, ...options } = take.recipe.options;
+  return { ...take, recipe: { ...take.recipe, options } };
+}
+
 let shelf: readonly KeptTake[] = [];
 const takes = storedList(KEY, isKept, (items) => {
-  shelf = [...items].sort((a, b) => b.kept - a.kept);
+  shelf = items.map(readable).sort((a, b) => b.kept - a.kept);
 });
 
 export const subscribeTakes = takes.subscribe;

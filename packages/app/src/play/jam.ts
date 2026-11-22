@@ -202,8 +202,9 @@ export const meterWords = (meter: Meter): string =>
   meter.beats === 4 && meter.unit === 4 ? "" : `, ${meterName(meter)}`;
 
 /** The meter a chart is played in: the one chosen for it, where the chart still fits that, else its own. */
-export function meterOf(chart: Chart, chosen: string | undefined): Meter {
-  const meter = chosen === undefined ? null : parseMeter(chosen);
+export function meterOf(chart: Chart, chosen: unknown): Meter {
+  // Read defensively: settings are the browser's to lose or mangle, and anything else is no choice.
+  const meter = typeof chosen === "string" ? parseMeter(chosen) : null;
   return meter && fits(chart, meter).ok ? meter : chart.meter;
 }
 
