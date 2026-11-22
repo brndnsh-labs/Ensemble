@@ -34,9 +34,10 @@ export function CreditsView({ packsUrl }: { packsUrl: string }) {
         have shared freely. Each instrument's licence is kept beside its recordings.
       </p>
       <p>
-        Ensemble counts how it is used, anonymously: which built-in charts are opened and played, in
-        which styles, and for how long. Nothing that identifies you is sent, nothing of your own
-        charts but that one was used, and nothing at all with Do Not Track on.
+        Ensemble counts how it is used, anonymously: which screens are visited, which built-in
+        charts are opened and played, in which styles, and for how long. Nothing that identifies you
+        is sent, nothing of your own charts but that one was used, and nothing at all with Do Not
+        Track on.
       </p>
       {failed && <p role="alert">The credits could not be read. Check the connection.</p>}
       {packs?.map((pack) => (
