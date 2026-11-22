@@ -108,10 +108,10 @@
     "inTarget": null
   },
   "bass.boom-chick": {
-    "mean": 0.9032,
-    "p10": 0.8312,
+    "mean": 1,
+    "p10": 1,
     "p90": 1,
-    "inTarget": 0.445
+    "inTarget": 1
   },
   "bass.notes-per-beat": {
     "mean": 0.5268,
