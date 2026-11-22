@@ -12,6 +12,7 @@ import {
   recipeText,
   render,
   SOLO_INSTRUMENTS,
+  sameMeter,
   seconds,
   toMidi,
 } from "@ensemble/engine";
@@ -96,10 +97,14 @@ export function takeOf(
     throw new UsageError(`--key: "${values.key}" is not a key (try Bb or F#m)`);
 
   // Another of the band's meters, which the chart must fit: refused with the reason it does not.
-  const meter = values.meter === undefined ? undefined : parseMeter(values.meter);
-  if (values.meter !== undefined) {
-    if (!meter) throw new UsageError(`--meter: "${values.meter}" is not a meter (try 12/8 or 3/4)`);
-    const fit = fits(parse(text).chart, meter);
+  // The chart's own meter is no option at all: the take is the one it always was, and says so.
+  const asked = values.meter === undefined ? undefined : parseMeter(values.meter);
+  if (values.meter !== undefined && !asked)
+    throw new UsageError(`--meter: "${values.meter}" is not a meter (try 12/8 or 3/4)`);
+  const chart = parse(text).chart;
+  const meter = asked && !sameMeter(asked, chart.meter) ? asked : undefined;
+  if (meter) {
+    const fit = fits(chart, meter);
     if (!fit.ok) throw new UsageError(`--meter ${values.meter}: ${fit.reason}`);
   }
 
