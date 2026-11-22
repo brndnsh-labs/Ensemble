@@ -1,0 +1,14 @@
+title: Country Ballad
+key: G
+tempo: 72
+style: country
+
+// A slow one in G: the I falling to the vi, the IV and the V; then the ii
+// before the V, and home.
+[A]
+| G | Em | C  | D |
+| G | Em | Am | D |
+
+[B]
+| C  | D | G | Em |
+| Am | D | G | G  |

@@ -1,0 +1,44 @@
+title: Country Song
+key: G
+tempo: 108
+style: country
+
+// An intro on the turn and a first verse for the guitar alone, verses on the I
+// and the IV, a chorus that opens on the IV and comes back by the V and the II7,
+// the lead over the third verse, and the chorus and the turn out.
+[Intro]
+| C | D | G | G |
+
+[Verse]
+| G | G | C | G |
+| G | G | D | D |
+| G | G | C | G |
+| D | D | G | G |
+
+[Chorus]
+| C  | C | G | G  |
+| C  | C | D | D  |
+| C  | C | G | Em |
+| A7 | D | G | G  |
+
+[Verse]
+
+[Chorus]
+
+[Verse]
+
+[Chorus]
+
+[Outro]
+| C | D | G | G |
+
+--- arrangement
+//      energy  drums  bass  chords  solo
+Intro   1       .      .     -       .
+Verse   1       .      .     -       .
+Chorus  3       -      -     -       .
+Verse   2       -      -     -       .
+Chorus  3       -      -     -       .
+Verse   3       -      -     -       -
+Chorus  4       -      -     -       .
+Outro   2       -      -     -       .
