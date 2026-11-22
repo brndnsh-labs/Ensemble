@@ -52,6 +52,7 @@ Playwright specs for things only a real browser can prove. The list is fixed:
 3. A chart typed in the editor renders, and an error shows a diagnostic in place.
 4. Pressing play starts audio and advances the playhead.
 5. Export downloads a MIDI file that matches the CLI's output for the same take.
+6. The app counts its use only where it is told it is production, and only what it says: off production a chart opened, played and given another style sends nothing to another origin; taken for production the same sends exactly its events, each with only its allowed fields, to a stub of the endpoint; with do-not-track set, nothing.
 
 - No spec waits for music to play in real time. Timing logic is checked in the engine with an injected clock.
 - No sleeps, no retries. A flaky spec is fixed or deleted the same day.
@@ -79,7 +80,7 @@ Musical quality is statistical. "Is the soloist aimless" is a distribution over 
 3. **Every test names its rule** in plain musical or user-facing language. If the rule cannot be named, the test does not exist.
 4. **A bug found by ear becomes a stronger property or a new critic metric.** A one-off example test is the last resort and needs a comment saying why no property could express it.
 5. **Deleting a test that no longer earns its place is normal maintenance.**
-6. **Playwright is for looking, not for accumulating.** Drive the app freely to verify your own work in a headless session. Do not commit a spec unless it is one of the five journeys.
+6. **Playwright is for looking, not for accumulating.** Drive the app freely to verify your own work in a headless session. Do not commit a spec unless it is one of the six journeys.
 
 ## Budgets
 

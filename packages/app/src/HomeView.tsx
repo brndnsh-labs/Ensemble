@@ -6,6 +6,7 @@
 import { STYLES } from "@ensemble/styles";
 import { go, LIBRARY, showing } from "./address.ts";
 import { addChart, findChart, readChartFile, STARTER } from "./charts.ts";
+import { count as countUse } from "./counts.ts";
 import type { LibraryChart } from "./library.ts";
 import { LIBRARY as BUILT_IN } from "./library.ts";
 import type { Saving } from "./offline.ts";
@@ -24,6 +25,32 @@ const FIRST = ["blues-12-bar-a", "rock-four-chord-g", "funk-vamp-a"];
 /** The last thing played is a poster; this many before it are smaller bills under it. */
 const LATELY = 2;
 
+type Shown = { readonly played: Played } & (
+  | { readonly take: KeptTake }
+  | { readonly entry: LibraryChart }
+);
+
+/**
+ * What home shows as played lately: what is still here (a chart or a take since deleted is
+ * left out), the latest first, the poster's and the bills'. Its addresses are what was played.
+ */
+export function shownLately(
+  recent: readonly Played[],
+  takes: readonly KeptTake[],
+): readonly Shown[] {
+  return recent
+    .flatMap((played): Shown[] => {
+      const [, kind, id] = /^#\/(chart|take)\/(.+)$/.exec(played.id) ?? [];
+      if (kind === "take") {
+        const take = takes.find((kept) => kept.id === id);
+        return take ? [{ played, take }] : [];
+      }
+      const entry = id === undefined ? undefined : findChart(id);
+      return entry ? [{ played, entry }] : [];
+    })
+    .slice(0, 1 + LATELY);
+}
+
 /** Open a chart of the player's on its screen, with the pencil down. */
 const edit = (id: string) => go(`#/edit/${id}`);
 
@@ -31,7 +58,14 @@ const edit = (id: string) => go(`#/edit/${id}`);
 export function NewCharts() {
   return (
     <div className="actions">
-      <button type="button" className="act first" onClick={() => edit(addChart(STARTER))}>
+      <button
+        type="button"
+        className="act first"
+        onClick={() => {
+          countUse("chart_created");
+          edit(addChart(STARTER));
+        }}
+      >
         New chart
       </button>
       <label className="act">
@@ -45,7 +79,10 @@ export function NewCharts() {
             if (!file) return;
             const text = await readChartFile(file);
             if (text === undefined) alert(`${file.name} is too big to be a chart.`);
-            else edit(addChart(text));
+            else {
+              countUse("chart_imported");
+              edit(addChart(text));
+            }
           }}
         />
       </label>
@@ -102,23 +139,18 @@ export function HomeCharts({ play, own, takes, recent, choices, saving }: Props)
   const width = usePosterWidths();
 
   // What was played lately and is still here, as it was played.
-  const played = recent
-    .flatMap((item): (Row & { readonly at: number })[] => {
-      const [, kind, id] = /^#\/(chart|take)\/(.+)$/.exec(item.id) ?? [];
-      if (kind === "take") {
-        const take = takes.find((kept) => kept.id === id);
-        if (!take) return [];
-        const row = takeRow(take);
-        // On a poster a take says that it is one, and how long it runs.
-        const facts = row.short
-          ? `A take kept ${dayOf(take.kept)}: ${row.short}, ${row.length}`
-          : row.facts;
-        return [{ ...row, facts, at: item.played }];
-      }
-      const entry = id === undefined ? undefined : findChart(id);
-      return entry ? [{ ...playedRow(entry, choices[entry.id]), at: item.played }] : [];
-    })
-    .slice(0, 1 + LATELY);
+  const played = shownLately(recent, takes).map((shown): Row & { readonly at: number } => {
+    const at = shown.played.played;
+    if ("take" in shown) {
+      const row = takeRow(shown.take);
+      // On a poster a take says that it is one, and how long it runs.
+      const facts = row.short
+        ? `A take kept ${dayOf(shown.take.kept)}: ${row.short}, ${row.length}`
+        : row.facts;
+      return { ...row, facts, at };
+    }
+    return { ...playedRow(shown.entry, choices[shown.entry.id]), at };
+  });
   const [last, ...lately] = played;
   const first = FIRST.flatMap((id) => BUILT_IN.filter((entry) => entry.id === id));
   const [start, ...next] = first;

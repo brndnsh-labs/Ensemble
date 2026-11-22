@@ -170,3 +170,10 @@ Asked whether "everything sounds (and looks) good on the test server" had taken 
 
 - **The band building by who plays is passed by ear.** #2240 is closed. What he heard is what merged (`060a260f`): the comp out of a chorus under the soloist in jazz and the blues, out of a section where the band plays alone in funk, disco and reggae, at the chances and spacing recorded in `docs/decisions/styles.md` and `engine.md`. It stays on, with no switch.
 - The questions put on the page (does the drop read as the band's choice, does the comp come back in the right place, is a chorus without the piano too bare under the soloist, could he play along through it) were not answered one by one: they keep what is built. How often it happens was told to him in numbers and not asked.
+
+## his ear on the jazz waltz (2026-11-22, #2241)
+
+"just listened, that sounds great!". The page was `out/jazz-waltz/`, the only one on the front page over the LAN: Jazz Waltz in F as jazz on seed 1, `main` (where the piano in three fell to the pad, one held chord a bar) beside the build, quiet and working, the band alone and under the alto; and seed 3, chosen because it has the hemiola in both phases (bars 1 to 4 and 17 to 24). Under each clip the piano bar by bar, its strikes a bar, the share of bars with one strike or none, and where in the bar the strikes fall.
+
+- **The jazz piano's waltz comp is passed by ear.** #2241 is closed. What he heard is what merged (`0417d849`): the book in three written from the study, the two-bar figures, and the hemiola at a chance of 0.22 with the band alone (392 of 1,780 working phrases over 320 takes, never longer than 8 bars, never over a section's top, never under the soloist).
+- The questions put on the page (does the piano read as comping a waltz, does it leave the alto room, does the hemiola sit right with the bass and drums, could he play along without the piano stating the 1) were not answered one by one: they keep what is built. How often the hemiola comes was told to him in numbers and not asked.
