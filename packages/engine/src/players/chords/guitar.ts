@@ -550,7 +550,7 @@ export function guitar(style: Guitar): InstrumentIdiom {
                 strings.findIndex((s) => s >= OPEN_STRINGS.length - strike.top!),
               );
         let from = Math.max(floor, upstroke ? Math.max(0, voicing.pitches.length - up) : 0);
-        if (upstroke && from > floor) {
+        if (from > 0) {
           const needed = heardBy(voicing, strike.arrival.chord);
           const family = strike.arrival.chord ? chordFamily(strike.arrival.chord.quality) : null;
           const caught = (pitch: number) =>
@@ -559,7 +559,10 @@ export function guitar(style: Guitar): InstrumentIdiom {
             family !== null &&
             !growls(voicing, family) &&
             growls({ pitches: voicing.pitches.slice(from) }, family);
+          // An upstroke reaches down to the top strings' floor for a growl-free sound, and any
+          // stroke below it only for a tone the chord is heard by that the top strings lack.
           while (from > floor && (needed.some((pitch) => !caught(pitch)) || growl())) from--;
+          while (from > 0 && needed.some((pitch) => !caught(pitch))) from--;
         }
         const [lowest, highest] = [strings[from]!, strings.at(-1)!];
         const across = (highest - lowest) * roll;
