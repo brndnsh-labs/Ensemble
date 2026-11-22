@@ -167,7 +167,7 @@ test("the app counts its use on production only, and only what it says it counts
   const own = new URL(base).origin;
 
   /** A fresh visit, told before it loads what it is to take itself for. Nothing it asks of another origin leaves the machine. */
-  const visit = async (as: { production?: boolean; doNotTrack?: boolean }) => {
+  const visit = async (as: { production?: boolean; doNotTrack?: boolean; play?: boolean }) => {
     // No service worker: the instruments it would save are not wanted here, nor the count of their saving.
     const context = await browser.newContext({ baseURL: base, serviceWorkers: "block" });
     const sent: unknown[] = [];
@@ -186,10 +186,10 @@ test("the app counts its use on production only, and only what it says it counts
           "access-control-allow-headers": "content-type",
         };
         if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
+        sent.push(request.postDataJSON());
         // Nothing beside the payload says who or where from: no cookie, no referrer.
         const headers = await request.allHeaders();
         if (headers.cookie !== undefined || headers.referer !== undefined) wrong.push(UMAMI);
-        sent.push(request.postDataJSON());
         return route.fulfill({ status: 200, headers: cors, json: {} });
       },
     );
@@ -200,29 +200,37 @@ test("the app counts its use on production only, and only what it says it counts
           true;
       if (as.doNotTrack)
         Object.defineProperty(Navigator.prototype, "doNotTrack", { get: () => "1" });
-      // Every request for another origin, as the page makes it: there is no waiting to see that none was.
-      const asked: string[] = [];
-      (window as unknown as { asked: string[] }).asked = asked;
+      // Every request for another origin and what it carries, in the order the page makes them:
+      // there is no waiting to see that none was, and two sent together cannot pass each other.
+      const asked: { url: string; body: unknown }[] = [];
+      (window as unknown as { asked: typeof asked }).asked = asked;
       const fetched = window.fetch;
       window.fetch = (input, init) => {
         const url = new URL(input instanceof Request ? input.url : String(input), location.href);
-        if (url.origin !== location.origin) asked.push(url.href);
+        if (url.origin !== location.origin)
+          asked.push({
+            url: url.href,
+            body: typeof init?.body === "string" ? JSON.parse(init.body) : undefined,
+          });
         return fetched(input, init);
       };
     }, as);
     const page = await context.newPage();
 
-    // A chart opened, played, stopped and played in another style.
+    // A chart opened, played, stopped and given another style.
     await page.goto("./");
     await page.getByRole("link", { name: "12-Bar Blues" }).click();
-    await page.getByRole("button", { name: "Play", exact: true }).click();
-    await expect(page.locator(".bar").nth(0)).toHaveAttribute("aria-current", "true");
-    await page.getByRole("button", { name: "Stop", exact: true }).click();
+    if (as.play !== false) {
+      await page.getByRole("button", { name: "Play", exact: true }).click();
+      await expect(page.locator(".bar").nth(0)).toHaveAttribute("aria-current", "true");
+      await page.getByRole("button", { name: "Stop", exact: true }).click();
+    }
     await page.getByRole("button", { name: /^Style:/ }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Rock", exact: true }).click();
     await expect(page.getByRole("button", { name: /^Style:/ })).toHaveText(/Rock/);
 
-    const asked = () => page.evaluate(() => (window as unknown as { asked: string[] }).asked);
+    const asked = () =>
+      page.evaluate(() => (window as unknown as { asked: { url: string; body: unknown }[] }).asked);
     return { context, sent, wrong, asked };
   };
 
@@ -245,29 +253,30 @@ test("the app counts its use on production only, and only what it says it counts
     { name: "play_ended", data: { how: "stopped", length: "0-1" } },
     { name: "style_changed", data: { style: "rock" } },
   ];
-  await expect.poll(() => production.sent.length).toBe(events.length);
-  expect(await production.asked()).toEqual(events.map(() => UMAMI));
-  expect(production.wrong).toEqual([]);
   const paths = ["/", "/chart", "/chart", "/chart", "/chart"];
-  expect(production.sent).toEqual(
-    events.map((event, i) => ({
-      type: "event",
-      payload: {
-        website: "3b7ffbc5-a7bd-4dcd-9587-8eef4053c0ad",
-        hostname: new URL(own).hostname,
-        url: paths[i],
-        title: "Ensemble",
-        referrer: "",
-        language: expect.any(String),
-        screen: expect.stringMatching(/^\d+x\d+$/),
-        ...event,
-      },
-    })),
-  );
+  const payloads = events.map((event, i) => ({
+    type: "event",
+    payload: {
+      website: "3b7ffbc5-a7bd-4dcd-9587-8eef4053c0ad",
+      hostname: new URL(own).hostname,
+      url: paths[i],
+      title: "Ensemble",
+      referrer: "",
+      language: expect.any(String),
+      screen: expect.stringMatching(/^\d+x\d+$/),
+      ...event,
+    },
+  }));
+  // In the order the page sent them, each to the endpoint and nowhere else; and each caught there.
+  expect(await production.asked()).toEqual(payloads.map((body) => ({ url: UMAMI, body })));
+  await expect.poll(() => production.sent.length).toBe(events.length);
+  expect(production.sent).toEqual(expect.arrayContaining(payloads));
+  expect(production.wrong).toEqual([]);
   await production.context.close();
 
-  // Taken for production, with do-not-track set: nothing at all.
-  const declined = await visit({ production: true, doNotTrack: true });
+  // Taken for production, with do-not-track set: nothing at all. No play, to keep it short: the
+  // visit, the chart opened and the style changed would each have been counted.
+  const declined = await visit({ production: true, doNotTrack: true, play: false });
   expect(await declined.asked()).toEqual([]);
   expect(declined.sent).toEqual([]);
   expect(declined.wrong).toEqual([]);
