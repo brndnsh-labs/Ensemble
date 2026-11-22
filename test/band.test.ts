@@ -1358,7 +1358,7 @@ const WHO_KINDS: readonly PlanOptions[] = [
       ] as const)
     : []),
 ];
-const WHO_SEEDS = Array.from({ length: FULL ? 24 : 3 }, (_, i) => i + 1);
+const WHO_SEEDS = Array.from({ length: FULL ? 24 : 2 }, (_, i) => i + 1);
 
 /**
  * The kinds a push plans for a style: a jam too short to thin, one of eight passes and an open
@@ -1421,7 +1421,7 @@ test("who is in: now and then a jam lays one seat out, by its style's say, for a
           const where = `${file.file} seed ${seed} ${JSON.stringify(kind)}`;
           if (!data) {
             // A style with no say lays nobody out of any jam.
-            if (seed <= 2) assert.equal(laidOut(plan(chart, style, options)).size, 0, where);
+            if (seed === 1) assert.equal(laidOut(plan(chart, style, options)).size, 0, where);
             continue;
           }
           if (arranged) {
@@ -1484,7 +1484,7 @@ test("who is in: now and then a jam lays one seat out, by its style's say, for a
           }
           if (!roadmap.open && roadmap.passes < 4)
             assert.equal(outs.size, 0, `${where}: too short`);
-          if (kind.open) {
+          if (kind.open && (FULL || seed === 1)) {
             // One pass more changes nobody's place in what was planned.
             const longer = plan(chart, style, { ...options, passes: kind.passes! + 1 });
             const known = [...roadmap.bars, ...roadmap.lookahead].map((bar) => bar.seats);
@@ -1567,17 +1567,60 @@ test("who is in: now and then a jam lays one seat out, by its style's say, for a
       }
     }
     if (data) {
+      // The quickest open jam, over more seeds, planned only, to tell to finish and play.
+      const opens = WHO_KINDS.filter(
+        (kind) => kind.open === true && (kind.solo === true) === (data.under === "solo"),
+      );
+      for (const file of ownCharts(style)) {
+        const chart = parse(file.text).chart;
+        if (chart.arrangement?.lines != null) continue;
+        for (let seed = 1; seed <= (FULL ? 12 : 6); seed++) {
+          for (const kind of opens) {
+            const roadmap = plan(chart, style, { ...kind, seed });
+            const first = stretchesOf(roadmap)[0];
+            if (!first) continue;
+            const at = [...roadmap.bars, ...roadmap.lookahead].find(
+              (bar) =>
+                bar.kind === "music" &&
+                bar.index > first.from.index &&
+                bar.index <= first.to.index &&
+                bar.phrase.bar === 0,
+            );
+            if (!at) continue;
+            const seconds = secondsAt(roadmap, at.start);
+            if (shortest?.open && shortest.seconds <= seconds) continue;
+            shortest = {
+              text: file.text,
+              where: `${file.file} seed ${seed} ${JSON.stringify(kind)}`,
+              at,
+              open: true,
+              seconds,
+              options: {
+                ...kind,
+                seed,
+                passes: first.from.pass + 1,
+                endAfter: first.from.pass,
+                toldAt: at.start,
+              },
+            };
+          }
+        }
+      }
       assert.ok(seen > 0, `${style.id}: nobody ever sat out`);
       assert.ok(shortest, `${style.id}: no take that thins was played`);
       // Told to finish as the app tells it, at a phrase top inside the lay-out: up to there the
       // seat is out, from there everyone is in, and the plan says so of each bar as the notes
-      // do: a seat it marks out is silent, and one it marks in for a whole phrase plays in it
-      // wherever the band with nobody laid out does.
+      // do: up to the word its seats are the jam's as it was going to be, a seat it marks out is
+      // silent, and one it marks in for a whole phrase plays in it.
       const { text, where, at, options } = shortest!;
       const take = render(text, style, options);
-      // The band with nobody laid out, which up to the word plays as when it was never told.
-      const { toldAt: _word, ...knew } = options;
-      const base = render(text, none, knew);
+      // Up to the word, who is in is the jam's as it was going to be.
+      const { toldAt: _word, endAfter: _last, ...going } = options;
+      const was = plan(parse(text).chart, style, going);
+      for (const bar of take.plan.bars) {
+        if (bar.start >= at.start) break;
+        assert.deepEqual(bar.seats, was.bars[bar.index]!.seats, `${where}, told: bar ${bar.index}`);
+      }
       const toldOuts = laidOut(take.plan);
       assert.ok(toldOuts.size > 0, `${where}: told, the lay-out before it is gone`);
       const inBar = (t: Take, seat: string, bar: PlanBar) =>
@@ -1605,7 +1648,7 @@ test("who is in: now and then a jam lays one seat out, by its style's say, for a
           }
           const marked = bars.every((bar) => bar.seats[seat] !== null);
           const played = (t: Take) => bars.reduce((n, bar) => n + inBar(t, seat, bar), 0);
-          if (marked && played(base) > 0) {
+          if (marked) {
             assert.ok(
               played(take) > 0,
               `${where}, told: ${seat} marked in and silent from bar ${bars[0]!.index}`,
