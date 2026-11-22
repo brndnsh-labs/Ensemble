@@ -85,13 +85,15 @@ Musical quality is statistical. "Is the soloist aimless" is a distribution over 
 
 | Suite | Limit | When it runs |
 |---|---|---|
-| Engine (corpus, properties, goldens) | 12 seconds with three styles, 2 more for each style after the third, and 2 more for each meter beyond 4/4 that the style with the most of them has written (28 at eight styles and three meters) | every push |
-| Engine, six seeds | three times the push budget (72) | before a gate |
-| Scorecard | 2 minutes | every push, report only except for tolerance failures |
-| Browser smoke | 60 seconds total | merge to main |
+| Engine (corpus, properties, goldens) | 4 CPU seconds, and 24 more for each style (196 at eight styles) | every push |
+| Engine, six seeds | three times the push budget (588) | before a gate |
+| Scorecard | 150 CPU seconds | every push, report only except for tolerance failures |
+| Browser smoke | 60 seconds on the clock | merge to main |
 
-CI fails when a budget is exceeded. The response to an exceeded budget is to consolidate or delete, never to raise the limit without an entry in `docs/decisions/`.
+A budget for work the machine does is counted in **CPU seconds**: the processor time the command and everything it started used. That is the work done, and it hardly moves with what else the machine is doing; the time on the clock does (the engine suite measured alone, back to back, beside a scorecard run and two at once: the clock ranged from 26.0 to 39.7 seconds, the CPU time from 182.5 to 190.3). The browser journeys wait on a browser, so theirs is time on the clock. `scripts/budget.ts` measures both and prints the clock beside the CPU time.
 
-The engine's budget grows with what the band can play and with nothing else. Every style is held to every property, each in a process of its own, so a style added is the same rules checked on one more band, and a meter a style has written its parts for is the same rules checked on one more bar: the cost is real and is not the suite growing. The styles run side by side, so the suite takes as long as its longest style, and the meters are counted on the style that has written the most. What is rationed is the rules. A new property, a new kind of take, or more seeds on a push still has to fit inside the budget as it stands, by consolidating or deleting.
+A budget is kept on the machine the work is done on; CI says the figure and does not judge it. The response to an exceeded budget is to consolidate or delete, never to raise the limit without an entry in `docs/decisions/`.
+
+The engine's budget grows with what the band can play and with nothing else. Every style is held to every property, in a process of its own, so a style added is the same rules checked on one more band: the cost is real (about 22.6 CPU seconds a style, beside the others) and is not the suite growing, and `budget.ts` works the limit out from the styles that ship. A meter a style writes its parts for, and a chart added to the library, cost almost nothing here (a style's tests cost the same with a written meter taken away, and jazz's twenty charts cost little more than another style's seven), so neither earns anything. What is rationed is the rules. A new property, a new kind of take, or more seeds on a push still has to fit inside the budget as it stands, by consolidating or deleting.
 
 Property tests can use a small seed count on every push and a larger one nightly, so long as the push run stays inside the budget.
