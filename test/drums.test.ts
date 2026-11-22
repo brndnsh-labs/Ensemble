@@ -378,7 +378,7 @@ test(
 );
 
 test(
-  "jazz: once the band has opened up the ride is on every pulse, through the fills too, unless a crash takes the One or the stick goes round the toms; the hat foot closes on the pulse after each strong one (2 and 4 in four and in twelve; in 6/4, 2 and 5; in six-eight the second pulse) and on no other; the snare stays off the One and off the foot's pulses",
+  "jazz: once the band has opened up the ride is on every pulse, through the fills too, unless a crash takes the One or the stick goes round the toms; the hat foot closes on the pulse after each strong one (2 and 4 in four and in twelve; in 6/4, 2 and 5; in six-eight the second pulse; in a waltz, 3/4, on 2 and 3, the variant a source names, since the drums in three are the fit and not written) and on no other; the snare stays off the One and off the foot's pulses",
   only("jazz"),
   () => {
     let bars = 0;
@@ -391,10 +391,12 @@ test(
         meters.set(chart.meter, (meters.get(chart.meter) ?? 0) + 1);
         const pulses = pulseStarts(bar.meter);
         const beats = pulses.map((tick) => tick / STEP);
-        // The second pulse of each half: the pulse after each strong one.
-        const foot = strongPulses(bar.meter).map(
-          (tick) => pulses[pulses.indexOf(tick) + 1]! / STEP,
-        );
+        // The second pulse of each half: the pulse after each strong one. In a waltz, every
+        // pulse after the One (the study's D3: "the hi-hat on 'two' and 'three'", S6).
+        const waltz = bar.meter.beats === 3 && bar.meter.unit === 4;
+        const foot = waltz
+          ? beats.slice(1)
+          : strongPulses(bar.meter).map((tick) => pulses[pulses.indexOf(tick) + 1]! / STEP);
         const toms = TOMS.some((voice) => kit.has(voice));
         for (const beat of beats) {
           if (toms && beat >= beats.at(-2)!) continue;

@@ -262,7 +262,169 @@ function strikesInSix(take: Take): number[][] {
     .map((bar) => [...(struck.get(bar.index) ?? [])]);
 }
 
+/**
+ * The chords struck in each bar of three (3/4) the seat plays, short of the ending bar, as
+ * ticks from the barline: with the band to itself, at every level; or under a soloist, from
+ * the working level up (where a style holds its hand to the working book under a soloist, that
+ * is the book read; a quiet bar is the quiet book's held chord, soloist or not). The 4/4
+ * reading above does not read these bars.
+ */
+function strikesInThree(take: Take, soloing: boolean): number[][] {
+  const struck = new Map<number, Set<number>>();
+  for (const note of notesOf(take, "chords")) {
+    if (note.voice === MUTED || note.voice === PICKED) continue;
+    const bar = take.plan.bars.findLast((candidate) => candidate.start <= note.tick);
+    if (!bar) continue;
+    let ticks = struck.get(bar.index);
+    if (!ticks) {
+      ticks = new Set();
+      struck.set(bar.index, ticks);
+    }
+    ticks.add(note.tick - bar.start);
+  }
+  return take.plan.bars
+    .filter(
+      (bar) =>
+        bar.kind === "music" &&
+        !bar.ending &&
+        bar.meter.beats === 3 &&
+        bar.meter.unit === 4 &&
+        bar.seats.chords !== null &&
+        (bar.solo !== null) === soloing &&
+        (!soloing || tierOf(bar.seats.chords) !== "low"),
+    )
+    .map((bar) => [...(struck.get(bar.index) ?? [])]);
+}
+
+/**
+ * Under a soloist in three, the share of bars struck on one of the bar's six eighths, pooled
+ * over every bar of the run's takes. A proportion of a population and not of a take: on a tune
+ * of one section a take's whole solo is one section's figure and its answers, so one take's
+ * share says which figure was drawn, not where the hand's strikes fall.
+ */
+const eighthUnderTheSolo = (eighth: number, name: string, label: string): Measure => ({
+  id: `chords.under-the-solo-in-three-on-${name}`,
+  seat: "chords",
+  idiom: true,
+  says: `In three, under a solo, from the working level up, the share of bars the piano strikes on ${label}, over every take of the run together: the strikes spread over the bar, none of its eighths always or never struck.`,
+  unit: "share",
+  of: () => null,
+  across(takes) {
+    const bars = takes.flatMap((take) => strikesInThree(take, true));
+    return share(bars.filter((ticks) => ticks.includes((eighth * PPQ) / 2)).length, bars.length);
+  },
+});
+
+/** In three: how many chords a bar, the share of bars of one or none, and of bars struck on 1. */
+const inThree = {
+  perBar: (take: Take, soloing: boolean) =>
+    mean(strikesInThree(take, soloing).map((ticks) => ticks.length)),
+  thin(takes: readonly Take[], soloing: boolean) {
+    const bars = takes.flatMap((take) => strikesInThree(take, soloing));
+    return share(bars.filter((ticks) => ticks.length <= 1).length, bars.length);
+  },
+  onOne(take: Take, soloing: boolean) {
+    const bars = strikesInThree(take, soloing);
+    return share(bars.filter((ticks) => ticks.includes(0)).length, bars.length);
+  },
+};
+
+/**
+ * In three, with the band to itself at the working level: the share of whole phrases played
+ * as the hemiola, three short chords over two bars (1 and 3, then 2). Its second bar is the
+ * one no other figure plays: a lone stab on 2, with nothing before 3 but it.
+ */
+function hemiolaInThree(take: Take): Measurement | null {
+  const struck = new Map<number, { tick: number; length: number }[]>();
+  for (const note of notesOf(take, "chords")) {
+    if (note.voice === MUTED || note.voice === PICKED) continue;
+    const bar = take.plan.bars.findLast((candidate) => candidate.start <= note.tick);
+    if (!bar) continue;
+    const list = struck.get(bar.index) ?? [];
+    const tick = note.tick - bar.start;
+    if (!list.some((hit) => hit.tick === tick)) list.push({ tick, length: note.duration });
+    struck.set(bar.index, list);
+  }
+  const phrases = new Map<string, PlanBar[]>();
+  for (const bar of take.plan.bars) {
+    if (bar.kind !== "music" || bar.ending || bar.seats.chords === null || bar.solo !== null)
+      continue;
+    if (bar.meter.beats !== 3 || bar.meter.unit !== 4) continue;
+    const place = `${bar.section.occurrence}/${bar.phrase.index}`;
+    phrases.set(place, [...(phrases.get(place) ?? []), bar]);
+  }
+  const whole = [...phrases.values()].filter(
+    (bars) => bars.length === bars[0]!.phrase.length && tierAt(bars[0]!) === "mid",
+  );
+  const second = (bar: PlanBar) => {
+    const hits = struck.get(bar.index) ?? [];
+    const before = hits.filter((hit) => hit.tick < 2 * PPQ);
+    return before.length === 1 && before[0]!.tick === PPQ && before[0]!.length <= EIGHTH;
+  };
+  const runs = whole.filter((bars) => bars.some(second));
+  return share(runs.length, whole.length);
+}
+
 export const compingMeasures: readonly Measure[] = [
+  {
+    id: "chords.hemiola-in-three",
+    seat: "chords",
+    idiom: true,
+    says: "In three, with the band to itself at the working level, now and then a whole phrase is played as the hemiola, three short chords over two bars (the study's F1): the share of those phrases.",
+    unit: "share",
+    of: (take) => hemiolaInThree(take),
+  },
+  // A waltz (3/4), with a soloist and without: what a pianist comping one does (the study in
+  // `prompts/jazz-waltz-study.md`, 1.1 and 4.4: behind a soloist about two chords a bar, one
+  // to four, and beat 1 left to the bass more often than not).
+  {
+    id: "chords.thin-bars-under-the-solo-in-three",
+    seat: "chords",
+    idiom: true,
+    says: "In three, under a solo, from the working level up, few bars have one strike or none, over every take of the run together: the hand is sparse under the line and still keeps the time (in three, Kelly's 4 bars of 16).",
+    unit: "share",
+    // Pooled, as the eighths are: one take's share is one section's figure on a tune of one.
+    of: () => null,
+    across: (takes) => inThree.thin(takes, true),
+  },
+  {
+    id: "chords.strikes-per-bar-in-three-under-the-solo",
+    seat: "chords",
+    idiom: true,
+    says: "In three, under a solo, from the working level up, the piano strikes about two chords a bar, one to four.",
+    unit: "per bar",
+    of: (take) => inThree.perBar(take, true),
+  },
+  {
+    id: "chords.on-one-in-three-under-the-solo",
+    seat: "chords",
+    idiom: true,
+    says: "In three, under a solo, from the working level up, the piano leaves beat 1 to the bass more often than it plays it: the share of bars it strikes on 1.",
+    unit: "share",
+    of: (take) => inThree.onOne(take, true),
+  },
+  eighthUnderTheSolo(0, "1", "beat 1"),
+  eighthUnderTheSolo(1, "and-of-1", 'the "and" of 1'),
+  eighthUnderTheSolo(2, "2", "beat 2"),
+  eighthUnderTheSolo(3, "and-of-2", 'the "and" of 2'),
+  eighthUnderTheSolo(4, "3", "beat 3"),
+  eighthUnderTheSolo(5, "and-of-3", 'the "and" of 3'),
+  {
+    id: "chords.strikes-per-bar-in-three",
+    seat: "chords",
+    idiom: true,
+    says: "In three, with the band to itself, the piano strikes one to four chords a bar at every level: not one chord a bar held, the pad.",
+    unit: "per bar",
+    of: (take) => inThree.perBar(take, false),
+  },
+  {
+    id: "chords.on-one-in-three",
+    seat: "chords",
+    idiom: true,
+    says: "In three, with the band to itself, the share of bars the piano strikes on 1: some bars leave the One to the bass, a pad never does.",
+    unit: "share",
+    of: (take) => inThree.onOne(take, false),
+  },
   {
     id: "chords.strikes-per-bar-in-six",
     seat: "chords",

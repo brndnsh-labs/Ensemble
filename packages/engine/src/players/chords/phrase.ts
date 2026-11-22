@@ -17,7 +17,7 @@
 import { cells } from "../../perform/grid.ts";
 import type { Arrival } from "../../perform/harmony.ts";
 import { sameChord } from "../../perform/harmony.ts";
-import { writtenFor } from "../../perform/meter.ts";
+import { barSteps, writtenFor } from "../../perform/meter.ts";
 import type { PlayerContext } from "../../perform/notes.ts";
 import { heldRng } from "../../perform/notes.ts";
 import type { PlanBar } from "../../plan/types.ts";
@@ -110,6 +110,39 @@ export function compStrikes(
   const tierAt = (bar: PlanBar) => tierOf(levelAt(bar));
   const own = once((bar) => stretches(bar, harmony, 0));
 
+  // A figure of two bars a whole phrase may be played on (`RhythmTier.twoBars`): drawn for the
+  // phrase each time through, from its first bar, and never where a soloist has the lead in it.
+  // A phrase drawn straight after one played on it goes on with the same figure, as one run,
+  // as long as the run stays inside its length and, unless the tier lets it, inside its section;
+  // where it cannot, the phrase is played from its plan. Asked of the bars an open jam is only
+  // looking ahead to as well, as they will be played.
+  const soloed = new Set(
+    [...plan.bars, ...plan.lookahead]
+      .filter((bar) => bar.kind === "music" && bar.solo !== null)
+      .map((bar) => `${bar.section.occurrence}/${bar.phrase.index}`),
+  );
+  const runOf = once((bar): { figure: CompFigure; bars: number } | null => {
+    const first = planBar(plan, bar.index - bar.phrase.bar);
+    if (!first || !comps(first, chords)) return null;
+    const across = bookOf(first).tiers[tierAt(first)].twoBars;
+    if (!across || soloed.has(`${first.section.occurrence}/${first.phrase.index}`)) return null;
+    const held = heldRng(rng, `two bars:${tierAt(first)}`, "phrase", first);
+    if (!held.chance(across.chance)) return null;
+    const length = first.phrase.length;
+    const before = planBar(plan, first.index - 1);
+    const going = before?.kind === "music" ? runOf(before) : null;
+    if (going) {
+      const goesOn =
+        going.bars + length <= across.longest &&
+        (across.crossesSections || first.barInSection !== 0);
+      return goesOn ? { figure: going.figure, bars: going.bars + length } : null;
+    }
+    if (length > across.longest) return null;
+    const figure = held.fork("figure").weighted(across.figures, (one) => one.weight);
+    return { figure, bars: length };
+  });
+  const runsOn = (bar: PlanBar): CompFigure | null => runOf(bar)?.figure ?? null;
+
   // The book is read once: each figure's strokes, each form's letters.
   const reads = new Map<RhythmBook, Map<string, FigureStroke[]>>();
   const strokes = (figure: CompFigure, tier: Tier, book: RhythmBook) => {
@@ -163,7 +196,23 @@ export function compStrikes(
   // played that way there: the plan says who is playing (CH-26).
   const unaccompanied = new Map<CompFigure, CompFigure>();
   const underTheLine = new Map<CompFigure, CompFigure>();
+  // A figure of two bars is played a bar at a time: its first bar in the phrase's first bar and
+  // every other bar after. Asked once of each figure, which is read for one meter's bar.
+  const halves = new Map<CompFigure, readonly [CompFigure, CompFigure] | null>();
   const asPlayed = (bar: PlanBar, figure: CompFigure): CompFigure => {
+    let split = halves.get(figure);
+    if (split === undefined) {
+      const symbols = cells(figure.grid);
+      const steps = barSteps(bar.meter);
+      const half = (n: number): CompFigure => ({
+        ...figure,
+        name: `${figure.name}, bar ${n + 1}`,
+        grid: symbols.slice(n * steps, (n + 1) * steps).join(""),
+      });
+      split = symbols.length > steps ? [half(0), half(1)] : null;
+      halves.set(figure, split);
+    }
+    if (split) return split[bar.phrase.bar % 2]!;
     if (figure.alone !== undefined && bar.seats.bass === null) {
       let known = unaccompanied.get(figure);
       if (!known) {
@@ -194,12 +243,14 @@ export function compStrikes(
   });
 
   // Whether the hand leans into the next bar: one decision per barline, each time through
-  // (CH-36). Never into the ending bar, a bar the seat sits out or comes in on, or a rest.
+  // (CH-36). Never into the ending bar, a bar the seat sits out or comes in on, or a rest; nor
+  // into a phrase played on a figure of two bars, which opens on its own first stroke.
   const pushAfter = once((bar): boolean => {
     const next = planBar(plan, bar.index + 1);
     if (!changeAfter(bar) || !comps(next, chords) || next.enters?.includes("chords")) return false;
+    if (runsOn(next) !== null) return false;
     const last = own(bar).at(-1)!;
-    const figure = asPlayed(bar, home(bar));
+    const figure = asPlayed(bar, runsOn(bar) ?? home(bar));
     const tier = tierAt(bar);
     const reach = bar.ticks - EIGHTH;
     // A chord written for an eighth or less is played where it is written, never leaned past.
@@ -293,9 +344,11 @@ export function compStrikes(
 
   /** The plans the comper weighs for a phrase: a figure for each of its bars. */
   const plans = (first: PlanBar): CompFigure[][] => {
+    const length = first.phrase.length;
+    const across = runsOn(first);
+    if (across) return [new Array<CompFigure>(length).fill(across)];
     const a = home(first);
     const [b, c] = answers(first);
-    const length = first.phrase.length;
     if (!b || !c) return [ended(new Array<CompFigure>(length).fill(a))];
     // Every form, with either answer in the first answer's seat.
     const written = new Map<string, { weight: number; figures: CompFigure[] }>();

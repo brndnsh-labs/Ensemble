@@ -157,6 +157,55 @@ export const jazzCritic: CriticStyle = {
     "chords.top-leaps-under-the-solo": { max: 0.01, kind: "intent", minCases: 20 },
     // Louder is harder, not busier: 1.9 strikes a bar under a hot solo (deaf 2.2).
     "chords.strikes-per-bar-under-a-hot-solo": { max: 3, kind: "intent", minCases: 8 },
+    // ── the piano in a waltz (3/4) ── (the study, `prompts/jazz-waltz-study.md`: Kelly behind
+    // Davis, 16 bars counted, 31 strikes, 1 to 4 a bar, 6 of the 16 struck on 1, 4 of one strike:
+    // bars 70, 73, 76, 78). Under a solo these read the bars from the working level up.
+    // One strike or none: Kelly's 4 of 16 is a quarter, so at most 30%. ST-jazz-30's 21% is four's.
+    "chords.thin-bars-under-the-solo-in-three": { max: 0.3, kind: "intent", minCases: 12 },
+    // About two a bar (1.9 counted), one to four.
+    "chords.strikes-per-bar-in-three-under-the-solo": {
+      min: 1.5,
+      max: 2.6,
+      kind: "intent",
+      minCases: 12,
+    },
+    // Beat 1 left to the bass more often than it is played (1.1, 4.4).
+    "chords.on-one-in-three-under-the-solo": { max: 0.5, kind: "intent", minCases: 12 },
+    // Every eighth struck in some bars and none in most: Kelly's 16 bars under Davis strike 1 in
+    // 38%, the "and" of 1 in 38%, 2 in 31%, the "and" of 2 in 38%, 3 in 31%, the "and" of 3 in
+    // 44% (study 1.1: proportions, not rates), so each is held between 15% and 55%. A section
+    // keeps its figure, so a take of a one-section tune is one figure's eighths: the spread is
+    // read over many takes or not at all (400 bars; this card's two waltz takes with the alto are
+    // 143, and the full run's property pools 906).
+    "chords.under-the-solo-in-three-on-1": { min: 0.15, max: 0.55, kind: "intent", minCases: 400 },
+    "chords.under-the-solo-in-three-on-and-of-1": {
+      min: 0.15,
+      max: 0.55,
+      kind: "intent",
+      minCases: 400,
+    },
+    "chords.under-the-solo-in-three-on-2": { min: 0.15, max: 0.55, kind: "intent", minCases: 400 },
+    "chords.under-the-solo-in-three-on-and-of-2": {
+      min: 0.15,
+      max: 0.55,
+      kind: "intent",
+      minCases: 400,
+    },
+    "chords.under-the-solo-in-three-on-3": { min: 0.15, max: 0.55, kind: "intent", minCases: 400 },
+    "chords.under-the-solo-in-three-on-and-of-3": {
+      min: 0.15,
+      max: 0.55,
+      kind: "intent",
+      minCases: 400,
+    },
+    // With the band to itself, at every level: one to four a bar (AU-94), and not every bar
+    // on 1, which is the pad (the quiet level's "and" of 1 and beat 2 held, F5 and F7). The
+    // floor of one does not tell the pad (1.06) from the book; the share on 1 is what does.
+    "chords.strikes-per-bar-in-three": { min: 1, max: 4, kind: "intent", minCases: 12 },
+    "chords.on-one-in-three": { max: 0.9, kind: "intent", minCases: 12 },
+    // The hemiola, a phrase at a time and a minority of them (the engineer's call: about one
+    // phrase in five with no soloist).
+    "chords.hemiola-in-three": { max: 0.5, kind: "intent", minCases: 4 },
     // ── solo ──
     // Measured over 200 takes of the seven jazz charts, each also played taking the first
     // candidate every time and a candidate at random (ME-10).

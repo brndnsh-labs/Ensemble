@@ -215,11 +215,13 @@ export function validateChordStyle(chords: ChordStyle): string[] {
   let figureSteps = FIGURE_STEPS;
   let label = "rhythm";
   /** A grid read as a bar of comping: its length, its symbols, and what it holds. */
-  const readGrid = (grid: string, articulation: Articulation, at: string) => {
+  const readGrid = (grid: string, articulation: Articulation, at: string, bars = 1) => {
     const symbols = cells(grid);
     say(
-      symbols.length === figureSteps,
-      `${at}: ${symbols.length} steps; a figure is one bar of ${figureSteps} sixteenths.`,
+      symbols.length === figureSteps * bars,
+      bars === 1
+        ? `${at}: ${symbols.length} steps; a figure is one bar of ${figureSteps} sixteenths.`
+        : `${at}: ${symbols.length} steps; a figure of two bars is ${figureSteps * bars} sixteenths.`,
     );
     // A bar of rest is written all silence; anything else that never comes down is a mistake.
     say(
@@ -338,6 +340,45 @@ export function validateChordStyle(chords: ChordStyle): string[] {
       }
       for (const figure of vocabulary.answers) {
         say(!figure.groove, `${where}, "${figure.name}": a groove is never an answer.`);
+      }
+      const across = vocabulary.twoBars;
+      if (across) {
+        const what = `${where}, the figures of two bars`;
+        say(across.figures.length > 0, `${what}: there are none.`);
+        say(
+          across.figures.some((figure) => figure.weight > 0),
+          `${what}: none has a weight above zero.`,
+        );
+        const own = across.figures.map((figure) => figure.name);
+        say(new Set(own).size === own.length, `${what}: two share a name.`);
+        for (const figure of across.figures) {
+          const at = `${where}, the figure of two bars "${figure.name}"`;
+          const articulation = figure.articulation ?? vocabulary.articulation;
+          readGrid(figure.grid, articulation, at, 2);
+          say(!names.includes(figure.name), `${at}: another figure has its name.`);
+          say(figure.groove === true, `${at}: a figure of two bars is a groove; say so.`);
+          say(
+            figure.turn === undefined && figure.alone === undefined && figure.soloing === undefined,
+            `${at}: a figure of two bars has no turn, no bar alone and none under the soloist.`,
+          );
+          for (const [symbol, attack] of Object.entries(figure.articulation ?? {})) {
+            level(attack.level, `${at}, "${symbol}"`);
+            plucks(attack, `${at}, "${symbol}"`);
+          }
+          say(figure.weight >= 0, `${at}: a weight cannot be negative.`);
+          say(
+            figure.voicing === undefined || figure.voicing in chords.kinds,
+            `${at}: there is no voicing kind "${figure.voicing}".`,
+          );
+        }
+        say(
+          across.chance > 0 && across.chance <= 1,
+          `${what}: a chance of ${across.chance} is not one a phrase could be drawn with; write more than 0, up to 1.`,
+        );
+        say(
+          Number.isInteger(across.longest) && across.longest >= 2,
+          `${what}: a run of ${across.longest} bars is not a whole number of bars from 2.`,
+        );
       }
       say(
         vocabulary.figures.some(

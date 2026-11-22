@@ -363,6 +363,32 @@ export interface RhythmTier {
    * it (CH-48: 64 against 80). Left out, that strike is played as written.
    */
   readonly restrike?: number;
+  /**
+   * Figures of two bars that a whole phrase may be played on instead of its
+   * plan: one thought across the barline, each written as one grid twice a bar
+   * long (the waltz's hemiola, three chords over two bars, in either phase). The
+   * phrase plays a figure's first bar in the phrase's first bar and every other
+   * bar after, and its second bar between, so it starts where the phrase does
+   * and stops where the phrase does. It is a groove: played as written in every
+   * bar of the phrase, it answers nothing and leans into a change only on a
+   * stroke it has, and the hand does not lean into a phrase played on it. Drawn
+   * phrase by phrase, each time through the section, with this chance, and
+   * never in a phrase where a soloist has the lead. A phrase drawn straight
+   * after one played on it goes on with the same figure as one run, while the
+   * run is no longer than `longest` bars and, unless `crossesSections`, does
+   * not go on over the first bar of a section (a chorus's top is one); where it
+   * cannot go on, that phrase is played from its plan. Which figure a run takes
+   * is drawn by the figures' weights. Left out, every phrase is played from its
+   * plan.
+   */
+  readonly twoBars?: {
+    readonly figures: readonly CompFigure[];
+    readonly chance: number;
+    /** The most bars a run of phrases on these figures may take. */
+    readonly longest: number;
+    /** Whether a run may go on over the first bar of a section. */
+    readonly crossesSections: boolean;
+  };
 }
 
 /**
