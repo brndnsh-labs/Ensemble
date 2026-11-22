@@ -24,7 +24,7 @@
      colour of type on paper. */
   --press: #1e1a4f;
 
-  /* The eight inks, one for each style, and one for a style the app has not been given a
+  /* The nine inks, one for each style, and one for a style the app has not been given a
      colour for (and for a chart that names no style). A new style is given its colour
      here and in the list under these tokens. */
   --ink-blues: #5aa9ff;
@@ -35,6 +35,7 @@
   --ink-neosoul: #a99bff;
   --ink-reggae: #45c95f;
   --ink-acoustic: #d9a968;
+  --ink-country: #b8c454;
   --ink-other: #b7bcd3;
   /* The spot colour in force: whatever carries `data-style` sets it for everything inside. */
   --spot: var(--ink-other);
@@ -125,6 +126,9 @@
 }
 [data-style="acoustic"] {
   --spot: var(--ink-acoustic);
+}
+[data-style="country"] {
+  --spot: var(--ink-country);
 }
 
 *,
@@ -222,7 +226,7 @@ fieldset {
   color: var(--on-marker);
 }
 
-/* On a spot colour the ring is the press ink, which shows on all eight. */
+/* On a spot colour the ring is the press ink, which shows on all nine. */
 :focus-visible {
   outline: 2.5px solid var(--focus, var(--ink));
   outline-offset: 2px;
