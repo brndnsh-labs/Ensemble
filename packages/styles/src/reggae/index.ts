@@ -53,7 +53,7 @@ export const reggae: StylePack = {
     liftsCrossHigh: false,
     // Now and then the dub's drop to the riddim: the skank out of a section where the band plays
     // alone (docs/decisions/styles.md, who is in).
-    layOut: { seats: ["chords"], under: "band", span: "section", below: 0.75, chance: 0.25 },
+    layOut: { seats: ["chords"], under: "band", span: "section", below: 0.75, chance: 0.45 },
   },
   ending: {
     // The plain triad, I or i (ST-reggae-31).

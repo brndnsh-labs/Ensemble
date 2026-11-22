@@ -30,7 +30,7 @@ export const blues: StylePack = {
   arc: {
     ...DEFAULT_ARC,
     // Now and then the comp sits out a chorus under the soloist (docs/decisions/styles.md, who is in).
-    layOut: { seats: ["chords"], under: "solo", span: "pass", below: 0.75, chance: 0.2 },
+    layOut: { seats: ["chords"], under: "solo", span: "pass", below: 0.75, chance: 0.1 },
   },
   ending: {
     // A blues band ends even a major tune on its I9.
