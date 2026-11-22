@@ -6,6 +6,8 @@ import type { CriticStyle } from "@ensemble/engine";
 
 export const bluesCritic: CriticStyle = {
   targets: {
+    // How many jams thin at all, of those that could (docs/decisions/styles.md, who is in).
+    "band.takes-thinned": { min: 0.1, max: 0.3, kind: "intent" },
     // The kick is on 1 and the backbeat on 2 and 4 in every bar of time (ST-blues-08).
     "drums.kick-on-one": { min: 0.95, kind: "intent" },
     "drums.backbeat": { min: 0.95, kind: "intent" },

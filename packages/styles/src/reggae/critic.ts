@@ -6,6 +6,8 @@ import type { CriticStyle } from "@ensemble/engine";
 
 export const reggaeCritic: CriticStyle = {
   targets: {
+    // How many jams thin at all, of those that could (docs/decisions/styles.md, who is in).
+    "band.takes-thinned": { min: 0.2, max: 0.4, kind: "intent" },
     // ── drums ──
     // The drop on 3 in every bar at every level (ST-reggae-05: floor 90%).
     "drums.drop-on-three": { min: 0.9, kind: "intent" },

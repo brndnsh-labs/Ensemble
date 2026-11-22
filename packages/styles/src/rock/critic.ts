@@ -6,6 +6,11 @@ import type { CriticStyle } from "@ensemble/engine";
 
 export const rockCritic: CriticStyle = {
   targets: {
+    // Everyone stays in (docs/decisions/styles.md, who is in).
+    "band.takes-thinned": { max: 0, kind: "intent" },
+    "drums.laid-out": { max: 0, kind: "intent" },
+    "bass.laid-out": { max: 0, kind: "intent" },
+    "chords.laid-out": { max: 0, kind: "intent" },
     // ── drums ──
     // Kick on 1 in 95% of bars, the backbeat in 90% (ST-rock-11).
     "drums.kick-on-one": { min: 0.95, kind: "intent" },

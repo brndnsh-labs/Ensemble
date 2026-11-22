@@ -6,6 +6,8 @@ import type { CriticStyle } from "@ensemble/engine";
 
 export const jazzCritic: CriticStyle = {
   targets: {
+    // How many jams thin at all, of those that could (docs/decisions/styles.md, who is in).
+    "band.takes-thinned": { min: 0.05, max: 0.25, kind: "intent" },
     // ── drums ──
     // The ride on every beat once the band has opened up (ST-jazz-17, DR-39: 90%).
     "drums.ride-every-beat": { min: 0.9, kind: "intent", minCases: 8 },

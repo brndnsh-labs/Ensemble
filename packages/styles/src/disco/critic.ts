@@ -6,6 +6,8 @@ import type { CriticStyle } from "@ensemble/engine";
 
 export const discoCritic: CriticStyle = {
   targets: {
+    // How many jams thin at all, of those that could (docs/decisions/styles.md, who is in).
+    "band.takes-thinned": { min: 0.2, max: 0.4, kind: "intent" },
     // ── drums ──
     // The kick on every beat is the property (ST-disco-04); the One and the backbeat in every
     // bar of time follow from it.
