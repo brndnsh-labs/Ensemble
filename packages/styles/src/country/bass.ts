@@ -61,6 +61,9 @@ const leadIn: LeadInPolicy = {
   hold: "pass",
   // Root and fifth only: a fifth that is the next chord's root (D, then A) is played as it is.
   playsNextRoot: true,
+  // The boom keeps its shape: its fifth stays under the root and a quiet bar keeps its two
+  // notes, whatever the next root is (BA-51, BA-52).
+  keepsShape: true,
   kinds: {
     fallFifth: NONE,
     riseFifth: NONE,
@@ -74,8 +77,11 @@ const leadIn: LeadInPolicy = {
 
 /** The root held from 1, two stepping notes on 3 and 4 (BA-53). */
 const TWO_STEPS = "x------- x--- x---";
-/** Across a third there is one note between: the root held, and a step on 4. */
-const ONE_STEP = "x------- ---- x---";
+/**
+ * Across a third there is one note between: the bar keeps its boom-chick, the root on 1 and
+ * the fifth on 3, and walks in on beat 4 alone (EN-47).
+ */
+const ONE_STEP = "x------- 5--- x---";
 
 const walk = (
   name: string,
@@ -88,7 +94,10 @@ const walk = (
 
 /**
  * Into a change a third to a tritone away (BA-53). Each note fits the chord it
- * is played over, the one on 4 most of all: a tone of the chord or of its scale.
+ * is played over, and the one on 4 is never a half step above a tone of it
+ * (ST-country-05): a chord tone, the sixth, the ninth or the major seventh. So
+ * up a fifth the line comes down instead (C, B, A into G), as EN-47 walks down
+ * from the IV; where no walk fits, the bar stays boom-chick.
  */
 const walks: BassStyle["walks"] = {
   // Never quiet (BA-52); into a new section 90%, otherwise 65% hot and 45% at the working
@@ -106,13 +115,10 @@ const walks: BassStyle["walks"] = {
       }),
       walk("down the scale", "down", ["R", "6"], "whole", TWO_STEPS),
     ],
-    // Up a fifth: C, E-F, G. Down a fourth over a dominant: C, Bb-A, G.
-    riseFifth: [
-      walk("up through the third", "up", ["R", "3"], "whole", TWO_STEPS),
-      walk("down from the seventh", "down", ["R", "7"], "whole", TWO_STEPS, {
-        family: ["dominant"],
-      }),
-    ],
+    // Into the root a fifth over (a fourth under): down the scale's seventh and the sixth,
+    // C, B-A, G; over a dominant C, Bb-A, G. Up through the third would put the fourth on 4,
+    // a half step over the chord's third.
+    riseFifth: [walk("down from the seventh", "down", ["R", "M7"], "whole", TWO_STEPS)],
     // A tritone up: C, D-E, F#.
     tritone: [walk("up by whole steps", "up", ["R", "2"], "whole", TWO_STEPS)],
     // A third: the scale step between, on 4.

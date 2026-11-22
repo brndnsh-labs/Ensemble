@@ -22,6 +22,10 @@ export const countryCritic: CriticStyle = {
     // BA-51: root on 1 and fifth on 3 in at least 90% of bars, 0.5 to 0.75 notes a beat.
     "bass.boom-chick": { min: 0.9, kind: "intent", minCases: 8 },
     "bass.notes-per-beat": { min: 0.5, max: 0.75, kind: "intent", minCases: 32 },
+    // BA-51: the fifth under the root wherever it fits; ST-country-05: a walk's note on 4 never
+    // a half step over a tone of its chord.
+    "bass.fifth-under": { min: 0.98, kind: "intent", minCases: 8 },
+    "bass.walks-that-rub": { max: 0, kind: "intent", minCases: 4 },
     // BA-53: 20% to 60% of changes walked.
     "bass.changes-walked": { min: 0.2, max: 0.6, kind: "intent", minCases: 8 },
     "bass.lead-ins-that-leap": { max: 0.03, kind: "intent", minCases: 5 },

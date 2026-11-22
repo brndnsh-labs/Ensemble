@@ -54,7 +54,7 @@ const HAND: Articulation = {
   // With no bassist the pick takes the boom on the low strings (ST-country-07), as the
   // upright would: 100 then 92 (BA-51).
   B: { level: 92, steps: 4, pluck: ["bass"] },
-  v: { level: 86, steps: 4, pluck: ["alternate"] },
+  v: { level: 86, steps: 4, pluck: ["fifth"] },
 };
 
 /** A groove: one figure for the section, the same in every bar, and the same with no bassist but for the boom. */
