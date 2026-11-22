@@ -56,13 +56,17 @@ export function App() {
 
   // Once the app is open, bring the instruments onto the device for next time.
   useEffect(() => {
-    // The first report is what was already on the device: only a visit that brought the rest in
-    // has saved the instruments, and it says so once, at its end.
-    let first = true;
+    // Counted when this visit brought the last of them in: a report said some were still to
+    // fetch, and the last says every one is here. A visit that finds them all here (it reports
+    // so twice) counts nothing.
+    let wanting = false;
     const report = (now: Saving) => {
       setSaving(now);
-      if (!first && now.finished && now.done === now.total) count("instruments_saved_offline");
-      first = false;
+      if (now.done < now.total) wanting = true;
+      else if (now.finished && wanting) {
+        wanting = false;
+        count("instruments_saved_offline");
+      }
     };
     saveInstruments(PACKS_URL, report, () => rig.idle()).catch(() => {
       // No connection, or no room: whatever was saved stays, and the next visit tries again.

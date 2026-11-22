@@ -21,14 +21,15 @@ import { copyOf, deleteChart, duplicateChart, renameChart } from "../charts.ts";
 import { chartCalled, count } from "../counts.ts";
 import { download, fileName } from "../download.ts";
 import { useEditor } from "../edit/useEditor.tsx";
+import { shownLately } from "../HomeView.tsx";
 import type { LibraryChart } from "../library.ts";
 import { instrument } from "../posters.ts";
-import { notePlayed, ON_HOME, recentlyPlayed } from "../recent.ts";
+import { notePlayed, recentlyPlayed } from "../recent.ts";
 import { takeRow } from "../rows.tsx";
 import type { ChartChoices, Settings } from "../settings.ts";
 import { placeOf } from "../Trail.tsx";
 import type { KeptTake } from "../takes.ts";
-import { followTake, keepTake, takeName } from "../takes.ts";
+import { followTake, keepTake, keptTakes, takeName } from "../takes.ts";
 import { midiOf } from "./band.ts";
 import type { Call, JamSetup } from "./jam.ts";
 import { chartOf, SEAT_ORDER, takeOptions, tempoFor } from "./jam.ts";
@@ -193,16 +194,19 @@ export function PlayView(props: Props) {
   };
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, as the screen opens
   useEffect(() => {
-    // Opened: from what home shows as played lately, or else as what it is. Counted before an
-    // autoplay below puts it at the top of what was played.
-    const fromHome = !openedHere() && routeOf(cameFrom()).screen === "home";
-    const lately = recentlyPlayed()
-      .slice(0, ON_HOME)
-      .some((played) => played.id === `#/chart/${entry.id}`);
-    count("chart_opened", {
-      from: fromHome && lately ? "recent" : entry.own ? "own" : "library",
-      chart: chartCalled(entry),
-    });
+    // Opened on the chart's screen (the screen opening as the editor is not a chart opened, nor is
+    // going to the editor and back): from what home shows as played lately, or else as what it
+    // is. Counted before an autoplay below puts it at the top of what was played.
+    if (!(props.mode === "edit" && entry.own)) {
+      const fromHome = !openedHere() && routeOf(cameFrom()).screen === "home";
+      const lately = shownLately(recentlyPlayed(), keptTakes()).some(
+        (shown) => shown.played.id === `#/chart/${entry.id}`,
+      );
+      count("chart_opened", {
+        from: fromHome && lately ? "recent" : entry.own ? "own" : "library",
+        chart: chartCalled(entry),
+      });
+    }
     if (copied) madeCopy(undefined);
     if (!autoplay) return;
     jam.play();

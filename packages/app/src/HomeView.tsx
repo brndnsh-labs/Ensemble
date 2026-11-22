@@ -13,7 +13,6 @@ import type { Saving } from "./offline.ts";
 import { PosterName, usePosterWidths } from "./PosterName.tsx";
 import { count, lineUp, spelled, writtenFor } from "./posters.ts";
 import type { Played } from "./recent.ts";
-import { ON_HOME } from "./recent.ts";
 import type { Row } from "./rows.tsx";
 import { Charts, chartRow, inkOf, Lines, PLAY, playedRow, takeRow } from "./rows.tsx";
 import type { ChartChoices } from "./settings.ts";
@@ -22,6 +21,35 @@ import { dayOf } from "./takes.ts";
 
 /** Where someone starts who has played nothing yet: a blues, a rock song and a funk vamp, all easy keys on a guitar or a bass. */
 const FIRST = ["blues-12-bar-a", "rock-four-chord-g", "funk-vamp-a"];
+
+/** The last thing played is a poster; this many before it are smaller bills under it. */
+const LATELY = 2;
+
+type Shown = { readonly played: Played } & (
+  | { readonly take: KeptTake }
+  | { readonly entry: LibraryChart }
+);
+
+/**
+ * What home shows as played lately: what is still here (a chart or a take since deleted is
+ * left out), the latest first, the poster's and the bills'. Its addresses are what was played.
+ */
+export function shownLately(
+  recent: readonly Played[],
+  takes: readonly KeptTake[],
+): readonly Shown[] {
+  return recent
+    .flatMap((played): Shown[] => {
+      const [, kind, id] = /^#\/(chart|take)\/(.+)$/.exec(played.id) ?? [];
+      if (kind === "take") {
+        const take = takes.find((kept) => kept.id === id);
+        return take ? [{ played, take }] : [];
+      }
+      const entry = id === undefined ? undefined : findChart(id);
+      return entry ? [{ played, entry }] : [];
+    })
+    .slice(0, 1 + LATELY);
+}
 
 /** Open a chart of the player's on its screen, with the pencil down. */
 const edit = (id: string) => go(`#/edit/${id}`);
@@ -111,23 +139,18 @@ export function HomeCharts({ play, own, takes, recent, choices, saving }: Props)
   const width = usePosterWidths();
 
   // What was played lately and is still here, as it was played.
-  const played = recent
-    .flatMap((item): (Row & { readonly at: number })[] => {
-      const [, kind, id] = /^#\/(chart|take)\/(.+)$/.exec(item.id) ?? [];
-      if (kind === "take") {
-        const take = takes.find((kept) => kept.id === id);
-        if (!take) return [];
-        const row = takeRow(take);
-        // On a poster a take says that it is one, and how long it runs.
-        const facts = row.short
-          ? `A take kept ${dayOf(take.kept)}: ${row.short}, ${row.length}`
-          : row.facts;
-        return [{ ...row, facts, at: item.played }];
-      }
-      const entry = id === undefined ? undefined : findChart(id);
-      return entry ? [{ ...playedRow(entry, choices[entry.id]), at: item.played }] : [];
-    })
-    .slice(0, ON_HOME);
+  const played = shownLately(recent, takes).map((shown): Row & { readonly at: number } => {
+    const at = shown.played.played;
+    if ("take" in shown) {
+      const row = takeRow(shown.take);
+      // On a poster a take says that it is one, and how long it runs.
+      const facts = row.short
+        ? `A take kept ${dayOf(shown.take.kept)}: ${row.short}, ${row.length}`
+        : row.facts;
+      return { ...row, facts, at };
+    }
+    return { ...playedRow(shown.entry, choices[shown.entry.id]), at };
+  });
   const [last, ...lately] = played;
   const first = FIRST.flatMap((id) => BUILT_IN.filter((entry) => entry.id === id));
   const [start, ...next] = first;

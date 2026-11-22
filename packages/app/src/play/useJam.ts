@@ -80,6 +80,15 @@ interface Running {
   toldAt: number | undefined;
   /** When the band started, on the page's clock. */
   readonly startedAt: number;
+  /** Its end has been counted: once for each start, however it ended. */
+  ended: boolean;
+}
+
+/** Count a run's end, unless it has been counted already. */
+function countEnd(run: Running, how: "finished" | "ran-out" | "stopped" | "closed"): void {
+  if (run.ended) return;
+  run.ended = true;
+  count("play_ended", { how, length: lengthOf((performance.now() - run.startedAt) / 1000) });
 }
 
 const newSeed = (): number => Math.floor(Math.random() * 2 ** 31);
@@ -143,10 +152,7 @@ export function useJam(
     (ended: "ran-out" | "stopped" = "stopped") => {
       presses.current++;
       const run = running.current;
-      if (run) {
-        const how = ended === "ran-out" && run.toldAt !== undefined ? "finished" : ended;
-        count("play_ended", { how, length: lengthOf((performance.now() - run.startedAt) / 1000) });
-      }
+      if (run) countEnd(run, ended === "ran-out" && run.toldAt !== undefined ? "finished" : ended);
       const position = run?.player.position;
       if (run && position !== undefined && run.made.plan.open) {
         // An open jam that was not told to finish is, as a take, the passes it got to.
@@ -191,6 +197,7 @@ export function useJam(
           extending: false,
           toldAt: undefined,
           startedAt: performance.now(),
+          ended: false,
         };
         const { beats, unit } = made.chart.meter;
         const options = recipe.options;
@@ -333,6 +340,18 @@ export function useJam(
 
   // Leaving the screen stops the band.
   useEffect(() => () => stop(), [stop]);
+
+  // The page closed while the band plays: that is its end. A page kept by the browser and come
+  // back to plays on, and its end has been counted. Hidden is not closed: a phone puts a page
+  // away while it plays.
+  useEffect(() => {
+    const closed = () => {
+      const run = running.current;
+      if (run) countEnd(run, "closed");
+    };
+    addEventListener("pagehide", closed);
+    return () => removeEventListener("pagehide", closed);
+  }, []);
 
   const bar = now.place?.bar;
   const canFinish =
