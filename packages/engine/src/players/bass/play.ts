@@ -242,6 +242,7 @@ export function performer(
             piece,
             landing,
             walked.length === 2,
+            before,
           );
           if (notes) {
             parts[i - 1] = notes;

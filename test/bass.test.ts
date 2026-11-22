@@ -21,7 +21,7 @@ import {
   strongPulses,
   tierOf,
 } from "@ensemble/engine";
-import { bluesWritten } from "./reading.ts";
+import { bluesWritten, harmonyOf } from "./reading.ts";
 import type { LibraryChart } from "./takes.ts";
 import {
   enough,
@@ -244,18 +244,35 @@ test("in a style whose bass walks home, every ending that is one chord struck on
     const gain = (b: PlanBar) => energyGain(b.seats.bass ?? b.energy);
     const touch = (2 * 10 * style.feel.humanize) / 100 + 1;
     assert.ok(
-      home.velocity / gain(end) >= four.velocity / gain(before) - touch,
+      (home.velocity + touch) / gain(end) >= four.velocity / gain(before),
       `${where}: the final root (${home.velocity}) is softer than the walk's last note (${four.velocity})`,
     );
     if (split || motion > 7) continue;
-    // The run itself: from the fourth over the root down, or from the fifth under it up.
-    const down = motion === 5;
-    const held = motion === 5 || motion === 7;
-    const run = held ? [...at(0), ...at(2), four] : [...at(1), ...at(2), four];
-    if (held)
-      assert.equal(at(1).length, 0, `${where}: the walk's first note is held through beat 2`);
+    // The run itself: from the fourth over the root down (from the IV, its root held), from
+    // the fifth under it up (over the V, that fifth held), or the bar's root and the run on 2.
+    const [first] = at(0);
+    const down = motion === 5 && first?.pitch === home.pitch + 5 && at(1).length === 0;
+    const held = down || (motion === 7 && first?.pitch === home.pitch - 5 && at(1).length === 0);
+    const climbs = at(1).length === 1 && at(1)[0]!.pitch === home.pitch - 5;
+    if (!held && !climbs) {
+      // In on beat 4 alone: only where the run would leave the chord's scale or leap.
+      const harmony = harmonyOf(take);
+      const over = harmony.findLast((arrival) => arrival.tick <= before.start)!;
+      const scale = chordScale(over.chord!, contextOf(harmony, over));
+      const inScale = (pitch: number) =>
+        scaleHas(scale, pitch - pitchClass(last.root)) ||
+        chordTones(last.quality).some(
+          (tone) => (((pitch - pitchClass(last.root) - tone.interval) % 12) + 12) % 12 === 0,
+        );
+      const leaps = first !== undefined && Math.abs(first.pitch - (home.pitch - 5)) > 12;
+      assert.ok(
+        leaps || !inScale(home.pitch - 5) || (!inScale(home.pitch - 3) && !inScale(home.pitch - 4)),
+        `${where}: the bar goes in on beat 4 alone where its run would fit`,
+      );
+      continue;
+    }
+    const run = held ? [first!, ...at(2), four] : [...at(1), ...at(2), four];
     assert.equal(run.length, 3, `${where}: the run is not three notes`);
-    assert.equal(run[0]!.pitch, home.pitch + (down ? 5 : -5), `${where}: the run starts elsewhere`);
     const path = [...run.map((note) => note.pitch), home.pitch];
     const moves = path.slice(1).map((pitch, i) => pitch - path[i]!);
     assert.ok(
