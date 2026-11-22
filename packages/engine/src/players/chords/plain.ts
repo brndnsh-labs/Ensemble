@@ -61,7 +61,7 @@ export function plainStrikes(
   comped: (bar: PlanBar) => boolean,
 ): Strike[] {
   const strikes: Strike[] = [];
-  const { length, velocity } = chords.plain;
+  const { length, velocity, top } = chords.plain;
   // The chord the pad was still holding at the last barline, if it was playing.
   let holding: ChartChord | null = null;
   let at = -1;
@@ -101,6 +101,7 @@ export function plainStrikes(
           arrival: stretch.arrival,
           kind,
           down: true,
+          ...(top !== undefined && bar.seats.bass !== null ? { top } : {}),
         });
       });
     }

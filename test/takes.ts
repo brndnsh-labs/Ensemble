@@ -294,6 +294,13 @@ const STRESS_KINDS: readonly Omit<TakeOptions, "seed">[] = [
 export const SOLO_SECTION: LibraryChart = testChart("solo-section.chart");
 
 /**
+ * A plain country waltz in G (3/4): most chords held two bars, in by the V7 at the end. Not in
+ * the library, so no style's scorecard or borrowed charts move with it; the properties of the
+ * waltz play it as they choose (`takeOf`).
+ */
+export const COUNTRY_WALTZ: LibraryChart = { ...testChart("country-waltz.chart"), meter: "3/4" };
+
+/**
  * A chart with two Solo sections in one time through the form, each the next chorus of the
  * soloist's solo. Written here, not in the stress charts: only plan-only properties read it.
  */

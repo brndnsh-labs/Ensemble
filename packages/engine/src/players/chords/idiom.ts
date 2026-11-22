@@ -8,7 +8,7 @@ import type { WrittenNote } from "../../perform/notes.ts";
 import type { Plan } from "../../plan/types.ts";
 import { guitar } from "./guitar.ts";
 import { keys } from "./keys.ts";
-import type { VoicedStrike, Voicing } from "./strike.ts";
+import type { Strike, VoicedStrike, Voicing } from "./strike.ts";
 import type { ChordRegister, Idiom, VoicingKind } from "./style.ts";
 import type { FittedTone } from "./tones.ts";
 
@@ -37,6 +37,11 @@ export interface InstrumentIdiom {
    * pianist re-voices every strike, each led from the one before (CH-31).
    */
   readonly holds: boolean;
+  /**
+   * What a downstroke of this strike sounds of the voicing, low to high: on a guitar, a
+   * stroke written across only its top strings sounds what is on them. Left out, every note.
+   */
+  sounds?(voicing: Voicing, strike: Strike): readonly number[];
   /**
    * The notes of a whole part, its strikes in order. The plan says where the
    * barlines are and how long a millisecond is, for an instrument whose

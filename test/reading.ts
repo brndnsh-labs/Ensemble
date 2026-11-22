@@ -2,7 +2,15 @@
 // band.test.ts, soloist.test.ts, and piano.test.ts needs. Not a test file.
 
 import type { Take } from "@ensemble/engine";
-import { arrivals, chordScale, contextOf, MUTED, PICKED, PPQ } from "@ensemble/engine";
+import {
+  arrivals,
+  chordScale,
+  chordToString,
+  contextOf,
+  MUTED,
+  PICKED,
+  PPQ,
+} from "@ensemble/engine";
 import { type Jam, notesOf, written } from "./takes.ts";
 
 /** Ticks of slack for where a note sounds: the largest lean plus human placement. */
@@ -93,4 +101,32 @@ export function chordsUnder(take: Take, strike: Strike) {
       ? [{ chord: arrival.chord, scale: chordScale(arrival.chord, contextOf(harmony, arrival)) }]
       : [],
   );
+}
+
+/**
+ * For each bar a seat plays whose first chord is at the barline, the whole bars that chord has
+ * held before it, counted from where it was struck (BA-97): 0 in the bar of a new chord, at the
+ * top of a section, after the seat's rest, in the ending bar, and in the first bar after a
+ * chord arrives inside the bar the count goes on from there.
+ */
+export function barsOnChord(take: Take, seat: "bass" | "chords"): Map<number, number> {
+  const result = new Map<number, number>();
+  let previous: { name: string | null; bar: number } | null = null;
+  let held = 0;
+  for (const bar of take.plan.bars) {
+    if (bar.kind !== "music") continue;
+    for (const span of bar.spans) {
+      const name = bar.seats[seat] === null || !span.chord ? null : chordToString(span.chord);
+      const carried = previous !== null && previous.name === name;
+      if (carried && previous!.bar === bar.index && !bar.ending) continue;
+      const atBarline = span.start === 0;
+      const struck =
+        name !== null && (!carried || (atBarline && bar.barInSection === 0) || Boolean(bar.ending));
+      if (struck) held = 0;
+      if (atBarline && name !== null) result.set(bar.index, held);
+      if (atBarline && name !== null) held++;
+      previous = { name, bar: bar.index };
+    }
+  }
+  return result;
 }

@@ -2,7 +2,7 @@
 // bar under one chord, with what he needs to know to play it.
 
 import type { ChartChord } from "../../chart/types.ts";
-import { arrivals, contextOf, sameChord } from "../../perform/harmony.ts";
+import { arrivals, contextOf, heldCount } from "../../perform/harmony.ts";
 import { pulseTicks, writtenFor } from "../../perform/meter.ts";
 import type { Plan, PlanBar } from "../../plan/types.ts";
 import { planBar } from "../../plan/types.ts";
@@ -61,7 +61,7 @@ function ownTier(bar: PlanBar): Tier {
 export function pieces(plan: Plan, early = false): Piece[] {
   const harmony = arrivals(plan);
   let sounding = -1;
-  let barsOnChord = 0;
+  const held = heldCount();
   const result: Piece[] = [];
 
   const read = (bar: PlanBar, lookahead: boolean): void => {
@@ -76,18 +76,12 @@ export function pieces(plan: Plan, early = false): Piece[] {
       const start = bar.start + span.start;
       while ((harmony[sounding + 1]?.tick ?? Infinity) <= start) sounding++;
       const chord = bar.seats.bass === null ? null : span.chord;
-      const previous = result[result.length - 1];
-      const carried = previous !== undefined && sameChord(previous.chord, chord);
+      const { merged, struck, cycle } = held(bar, span, chord);
       // One chord written twice in a bar is one piece: the line continues through it.
-      // The ending bar is kept as written, because the band strikes each of its chords.
-      if (carried && previous.bar === bar && !bar.ending) {
-        result[result.length - 1] = { ...previous, end: start + span.duration };
+      if (merged) {
+        result[result.length - 1] = { ...result[result.length - 1]!, end: start + span.duration };
         continue;
       }
-      const atBarline = span.start === 0;
-      const top = atBarline && bar.barInSection === 0;
-      const struck = chord !== null && (!carried || top || bar.ending !== null);
-      if (struck) barsOnChord = 0;
       const arrival = harmony[Math.max(0, sounding)];
       result.push({
         bar,
@@ -96,12 +90,11 @@ export function pieces(plan: Plan, early = false): Piece[] {
         chord,
         scale: chord && arrival ? chordScale(chord, contextOf(harmony, arrival)) : null,
         struck,
-        cycle: atBarline ? barsOnChord : 0,
+        cycle,
         ending: null,
         lookahead,
         tier,
       });
-      if (atBarline && chord !== null) barsOnChord++;
     }
     if (bar.ending) markEnding(result, first);
   };

@@ -24,6 +24,7 @@ import {
   tierOf,
 } from "@ensemble/engine";
 import {
+  barsOnChord,
   bluesWritten,
   chordsUnder,
   harmonyOf,
@@ -32,7 +33,9 @@ import {
   type Strike,
   strikesOf,
 } from "./reading.ts";
+import type { LibraryChart } from "./takes.ts";
 import {
+  COUNTRY_WALTZ,
   enough,
   FULL,
   heldTakes,
@@ -44,6 +47,7 @@ import {
   STYLES,
   soloistTakes,
   stressTakes,
+  takeOf,
   takes,
   WRITTEN,
   written,
@@ -154,7 +158,47 @@ test("the hand does not growl: a chord's two lowest notes are a half step apart 
   // is a cluster where the 7th on the bottom (C E F A) is the chord. Hard under a soloist,
   // where the hand is pressed down; and no voicing on the way into or out of a solo needs it.
   let judged = 0;
-  for (const { chart, options, take } of [...takes(), ...stressTakes(), ...soloistTakes()]) {
+  // Thirteenths in every style, in four and in three, with the bass in and without: a grip that is clean
+  // struck whole can growl across only its top strings (A13's F#3 G3 C#4); and the take where
+  // country's chick in six first did, which the full run alone reaches.
+  const thirteenths = ["4/4", "3/4"].map(
+    (meter): LibraryChart => ({
+      file: `thirteenths-in-${meter.replace("/", "-")}`,
+      // And two chords whose top strings sound two notes at most, which keep the grips they
+      // had: with no grip that sounds three notes there, the hand chooses as for any strike.
+      text: `title: Thirteenths\nkey: D\nmeter: ${meter}\n\n[A]\n| A13 | E13 | D13 | G13 |\n| B13 | C13 | F#13 | Bb13 |\n| E5 | A5 | A13 | E13 |\n`,
+      meter,
+    }),
+  );
+  const country = STYLES.find((style) => style.id === "country");
+  const sixEight = LIBRARY.find((chart) => chart.file === "disco-floor-six-d.chart");
+  const extra = [
+    ...STYLES.flatMap((style) =>
+      thirteenths.flatMap((chart) =>
+        [0.3, 0.6, 0.85].flatMap((energy) =>
+          // With the bass in, and with none: then a picked boom takes the grip the chick holds.
+          [[], ["bass" as const]].map((without) =>
+            takeOf({ style, chart, options: { mode: "jam", passes: 1, energy, seed: 1, without } }),
+          ),
+        ),
+      ),
+    ),
+    ...(country && sixEight
+      ? [
+          takeOf({
+            style: country,
+            chart: sixEight,
+            options: { mode: "jam", open: true, passes: 3, seed: 6, tempo: 73 },
+          }),
+        ]
+      : []),
+  ];
+  for (const { chart, options, take } of [
+    ...takes(),
+    ...stressTakes(),
+    ...soloistTakes(),
+    ...extra,
+  ]) {
     for (const strike of strikesOf(take)) {
       judged++;
       const [low, next] = strike.pitches;
@@ -1899,3 +1943,102 @@ test("in a style whose guitar pulls off its final chord, the stinger is played o
   }
   assert.ok(stung > enough(90), `only ${stung} stingers`);
 });
+
+test(
+  "country: while a bassist plays, the guitar strums only its top four strings (ST-country-07): no stroke before the final chord sounds under the D string's open D3, in any meter",
+  only("country"),
+  () => {
+    const country = STYLES.find((style) => style.id === "country")!;
+    const lowest = OPEN[2]!;
+    const others = [
+      COUNTRY_WALTZ,
+      ...["3/4", "6/8", "12/8", "6/4"].map(
+        (meter) => LIBRARY.find((chart) => chart.meter === meter)!,
+      ),
+    ];
+    let outside = 0;
+    for (const { chart, options, take } of [
+      ...takes((jam) => jam.style === country),
+      ...others.flatMap((chart) =>
+        [0.3, 0.85].map((energy) =>
+          takeOf({
+            style: country,
+            chart,
+            options: { mode: "jam", passes: 1, energy, seed: SEEDS.length },
+          }),
+        ),
+      ),
+    ]) {
+      for (const strike of strikesOf(take)) {
+        const bar = take.plan.bars.findLast((candidate) => candidate.start <= strike.tick)!;
+        if (bar.kind !== "music" || bar.ending || bar.seats.bass === null) continue;
+        if (bar.meter.beats !== 4 || bar.meter.unit !== 4) outside++;
+        assert.ok(
+          strike.pitches[0]! >= lowest,
+          `${chart.file} seed ${options.seed} ${JSON.stringify(options)} bar ${bar.index}: ${strike.pitches} under the top four strings`,
+        );
+      }
+    }
+    assert.ok(outside > enough(600), `only ${outside} strokes outside 4/4`);
+  },
+);
+
+test(
+  "country: in three with no bassist the guitar's pick takes the boom on 1 of every bar it plays that is not a rest or the final chord: one plucked note, the lowest the guitar sounds in the bar, the grip's bass in the bar its chord is struck in and every second bar it holds after, the grip's alternate bass (its fifth) in the bars between, counted as the waltz bass counts (ST-country-07, CH-26, BA-56). The grip stands on the chord's own root: over a slash chord the boom is that root and its fifth, the slash note left to a bassist, as in four",
+  only("country"),
+  () => {
+    const country = STYLES.find((style) => style.id === "country")!;
+    let booms = 0;
+    // Slash chords held and changed: the boom is the grip's (C3, G2, C3 over C/G), not the slash.
+    const slashes: LibraryChart = {
+      file: "slash-waltz",
+      text: "title: Slash waltz\nkey: C\nmeter: 3/4\n\n[A]\n| C/G | C/G | C/G | F |\n| G/B | G/B | D/F# | D/F# |\n",
+      meter: "3/4",
+    };
+    for (const chart of [
+      COUNTRY_WALTZ,
+      slashes,
+      ...LIBRARY.filter((candidate) => candidate.meter === "3/4"),
+    ]) {
+      for (const energy of [0.3, 0.6, 0.85]) {
+        for (const seed of SEEDS) {
+          const options: TakeOptions = { mode: "jam", passes: 2, energy, seed, without: ["bass"] };
+          const { take } = takeOf({ style: country, chart, options });
+          const plucked = pluckedOf(take);
+          const strikes = strikesOf(take);
+          const counts = barsOnChord(take, "chords");
+          for (const bar of take.plan.bars) {
+            const first = bar.spans[0]?.chord ?? null;
+            const cycle = counts.get(bar.index);
+            if (bar.kind !== "music" || bar.ending || cycle === undefined || !first) continue;
+            const where = `${chart.file} seed ${seed} at ${energy} bar ${bar.index}`;
+            const inBar = (tick: number) => tick >= bar.start && tick < bar.start + bar.ticks;
+            const boom = plucked.filter((note) => note.tick === bar.start);
+            assert.equal(boom.length, 1, `${where}: ${boom.length} plucked notes on 1`);
+            const pitch = boom[0]!.pitches[0]!;
+            const standsOn = pitchClass(first.root);
+            const other =
+              (standsOn +
+                (chordTones(first.quality).find((tone) => tone.role === "fifth")?.interval ?? 7)) %
+              12;
+            const odd = cycle % 2 === 1;
+            assert.equal(
+              pitch % 12,
+              odd ? other : standsOn,
+              `${where}: ${cycle} bars into the chord, the boom ${pitch} where the ${odd ? "alternate bass" : "bass"} belongs`,
+            );
+            const chick = strikes
+              .filter((strike) => inBar(strike.tick))
+              .flatMap((strike) => strike.pitches);
+            assert.ok(
+              chick.every((note) => note >= pitch),
+              `${where}: the boom ${pitch} is over the chick (${Math.min(...chick)})`,
+            );
+            booms++;
+          }
+        }
+      }
+    }
+    assert.ok(booms > enough(600), `only ${booms} bars with no bassist`);
+  },
+);
