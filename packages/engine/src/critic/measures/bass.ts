@@ -925,7 +925,7 @@ export const bassMeasures: readonly Measure[] = [
     id: "bass.boom-chick",
     seat: "bass",
     idiom: true,
-    says: "The two-beat bass: in a bar of four on one chord, its root on 1 and its fifth on 3 (over a chord standing on its fifth, the chord's own root), 2 and 4 left to the chick.",
+    says: "The two-beat bass: in a bar of four on one chord, its root on 1 and on 3 its fifth (over a chord standing on its fifth, the chord's own root), or the first note of a walk into the next chord: the root held and a step on 4, a step on 3 before it or not. 2 and 4 are left to the chick.",
     unit: "share",
     of(take) {
       const bass = notesOf(take, "bass");
@@ -935,14 +935,29 @@ export const bassMeasures: readonly Measure[] = [
         const chord = bar.spans[0]!.chord!;
         const notes = notesIn(bass, bar);
         const on = (beat: number) => notes.find((note) => note.tick === bar.start + beat * PPQ);
-        const [one, three] = [on(0), on(2)];
+        const [one, three, four] = [on(0), on(2), on(3)];
         bars++;
         const root = pitchClass(chord.root);
         const standsOn = pitchClass(chord.bass ?? chord.root);
         const fifth =
           chordTones(chord.quality).find((tone) => tone.role === "fifth")?.interval ?? 7;
         const other = standsOn !== root ? root : mod12(root + fifth);
-        if (one && mod12(one.pitch) === standsOn && three && mod12(three.pitch) === other) boom++;
+        if (!one || mod12(one.pitch) !== standsOn) continue;
+        if (three && mod12(three.pitch) === other) {
+          boom++;
+          continue;
+        }
+        // A walk (BA-53): the note on 4 a step from the next bar's first, the one on 3 (if any)
+        // a step from it, and nothing else in the bar but the root.
+        const landing = bass.find((note) => note.tick === bar.start + bar.ticks);
+        const step = (a: number, b: number) => a !== b && Math.abs(a - b) <= 2;
+        const walks =
+          four !== undefined &&
+          landing !== undefined &&
+          step(four.pitch, landing.pitch) &&
+          (three === undefined || step(three.pitch, four.pitch)) &&
+          notes.length === (three ? 3 : 2);
+        if (walks) boom++;
       }
       return share(boom, bars);
     },
