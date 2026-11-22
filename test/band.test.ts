@@ -430,8 +430,9 @@ test("where a chord is written the bass plays a tone of that chord, and at a cha
 test("a timed jam has a shape: it does not start at its peak, and it ends above where it started", () => {
   for (const style of STYLES) {
     for (const passes of [3, 4, 6, 9, 14]) {
-      const take = render(LIBRARY[0]!.text, style, { mode: "jam", passes, seed: 1 });
-      const body = take.plan.bars.filter(
+      // The roadmap alone answers this: nobody needs to play it.
+      const roadmap = plan(parse(LIBRARY[0]!.text).chart, style, { mode: "jam", passes, seed: 1 });
+      const body = roadmap.bars.filter(
         (bar) => bar.kind === "music" && bar.section.role === "body",
       );
       const mean = (bars: readonly PlanBar[]) =>
@@ -460,8 +461,14 @@ test("a timed jam has a shape: it does not start at its peak, and it ends above 
 test("a level the player sets is held: every pass plays at that level, with no arc and no lift", () => {
   for (const style of STYLES) {
     for (const energy of [0.2, 0.5, 0.9]) {
-      const take = render(LIBRARY[0]!.text, style, { mode: "jam", passes: 5, seed: 1, energy });
-      const body = take.plan.bars.filter(
+      // The roadmap alone answers this too.
+      const roadmap = plan(parse(LIBRARY[0]!.text).chart, style, {
+        mode: "jam",
+        passes: 5,
+        seed: 1,
+        energy,
+      });
+      const body = roadmap.bars.filter(
         (bar) => bar.kind === "music" && bar.section.role === "body",
       );
       const firstPass = body.filter((bar) => bar.pass === 0).map((bar) => bar.energy);
