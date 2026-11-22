@@ -27,7 +27,14 @@ export const funk: StylePack = {
     ...DEFAULT_ARC,
     // Now and then a breakdown to drums and bass: the guitar out of a section where the band plays
     // alone (docs/decisions/styles.md, who is in).
-    layOut: { seats: ["chords"], under: "band", span: "section", below: 0.75, chance: 0.5 },
+    layOut: {
+      seats: ["chords"],
+      under: "band",
+      span: "section",
+      below: 0.75,
+      chance: 0.5,
+      openChance: 0.075,
+    },
   },
   ending: {
     // The I9 on a dominant tonic; the 6/9 where a flat seventh would turn the last chord

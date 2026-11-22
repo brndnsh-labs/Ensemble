@@ -146,8 +146,15 @@ export interface LayOutStyle {
    * 1 as high as the peak (which is never chosen).
    */
   readonly below: number;
-  /** The chance a pass that may lay a seat out does, where none has in the three before it. */
+  /** In a jam of a set length, the chance a pass that may lay a seat out does. */
   readonly chance: number;
+  /**
+   * In an open jam, the chance a pass from the third on lays a seat out. An open jam has no arc
+   * to be low on and no peak (its lift only climbs to a cap), so there it is this chance and the
+   * spacing alone: set lower than `chance`, since every pass may where a jam of a set length
+   * offers a low pass or two.
+   */
+  readonly openChance: number;
 }
 
 export type EndingGesture =

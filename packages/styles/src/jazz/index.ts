@@ -43,7 +43,14 @@ export const jazz: StylePack = {
     head: -0.15,
     // The piano strolls a chorus under the soloist now and then: bass and drums alone under the
     // horn (docs/decisions/styles.md, who is in). Rare: he heard it thin when it laid out too readily (EAR-26).
-    layOut: { seats: ["chords"], under: "solo", span: "pass", below: 0.75, chance: 0.16 },
+    layOut: {
+      seats: ["chords"],
+      under: "solo",
+      span: "pass",
+      below: 0.75,
+      chance: 0.16,
+      openChance: 0.06,
+    },
   },
   ending: {
     // The tonic 6th: no major-seventh rub under a melody resting on the root (ST-jazz-47).

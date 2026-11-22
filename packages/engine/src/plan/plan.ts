@@ -753,12 +753,6 @@ const LAY_OUT_FIRST_BAR = 16;
 const LAY_OUT_PASSES_BETWEEN = 3;
 /** ...and at least this many bars, however short the form, before another starts. */
 const LAY_OUT_BARS_BETWEEN = 64;
-/**
- * In an open jam every pass from the third may thin, where a jam of a set length offers a low
- * pass or two in its few minutes: there a pass draws this share of the style's chance, so that
- * a long open jam thins now and then and not every few minutes.
- */
-const LAY_OUT_OPEN = 0.25;
 
 interface Shape {
   readonly planned: number;
@@ -783,7 +777,8 @@ interface Shape {
  * among them: a drop before everyone comes in for the top). Never the peak, the last pass, the
  * first two passes or the first 16 bars. Under the soloist, never the last chorus of a solo
  * (its peak, SO-05), so never a solo of one chorus. An open jam has no arc to be low on (its
- * lift only climbs to a cap) and no peak: there it is the spacing and the chance alone.
+ * lift only climbs to a cap) and no peak: there it is the spacing and the style's open-jam
+ * chance alone (`LayOutStyle.openChance`).
  *
  * How often: after a lay-out, everyone is in for three whole passes and 64 bars at least, and
  * each pass draws its chance. Never a level the player holds, a band of two seats, or the
@@ -847,7 +842,7 @@ function layOuts(
       if (height > ceiling) continue;
     }
     const draw = rng.fork("lay-out", style.id, pass);
-    if (!draw.chance(shape.open ? data.chance * LAY_OUT_OPEN : data.chance)) continue;
+    if (!draw.chance(shape.open ? data.openChance : data.chance)) continue;
     const seat = draw.pick(seats);
     // A section: the pass's lowest, by its own level; of several as low, one drawn.
     const levels = new Map(bars.map((i) => [drafts[i]!.run, drafts[i]!.level]));
