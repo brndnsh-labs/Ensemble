@@ -49,7 +49,10 @@ interface Events {
     chart: CountedChart;
   };
   /** Told to finish and ended, came to its end by itself, was stopped (Stop, Play again, the screen left), or the page was closed. */
-  play_ended: { how: "finished" | "ran-out" | "stopped" | "closed"; length: Length };
+  play_ended: {
+    how: "finished" | "ran-out" | "stopped" | "interrupted" | "closed";
+    length: Length;
+  };
   style_changed: { style: string };
   seat_toggled: { seat: Seat; on: boolean };
   soloist_changed: { instrument: string };
