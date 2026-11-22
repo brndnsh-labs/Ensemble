@@ -34,6 +34,7 @@ import {
   strikesOf,
 } from "./reading.ts";
 import {
+  COUNTRY_WALTZ,
   enough,
   FULL,
   heldTakes,
@@ -1908,9 +1909,12 @@ test(
   () => {
     const country = STYLES.find((style) => style.id === "country")!;
     const lowest = OPEN[2]!;
-    const others = ["3/4", "6/8", "12/8", "6/4"].map(
-      (meter) => LIBRARY.find((chart) => chart.meter === meter)!,
-    );
+    const others = [
+      COUNTRY_WALTZ,
+      ...["3/4", "6/8", "12/8", "6/4"].map(
+        (meter) => LIBRARY.find((chart) => chart.meter === meter)!,
+      ),
+    ];
     let outside = 0;
     for (const { chart, options, take } of [
       ...takes((jam) => jam.style === country),
@@ -1944,7 +1948,10 @@ test(
   () => {
     const country = STYLES.find((style) => style.id === "country")!;
     let booms = 0;
-    for (const chart of LIBRARY.filter((candidate) => candidate.meter === "3/4")) {
+    for (const chart of [
+      COUNTRY_WALTZ,
+      ...LIBRARY.filter((candidate) => candidate.meter === "3/4"),
+    ]) {
       for (const energy of [0.3, 0.6, 0.85]) {
         for (const seed of SEEDS) {
           const options: TakeOptions = { mode: "jam", passes: 2, energy, seed, without: ["bass"] };

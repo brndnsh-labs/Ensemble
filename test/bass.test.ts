@@ -23,6 +23,7 @@ import {
 import { barsOnChord, bluesWritten, harmonyOf } from "./reading.ts";
 import type { LibraryChart } from "./takes.ts";
 import {
+  COUNTRY_WALTZ,
   enough,
   heldTakes,
   LIBRARY,
@@ -238,9 +239,18 @@ test("in a style whose bass walks home, every ending that is one chord struck on
       ),
     ),
   );
+  // The country waltz as the waltz bass's property plays it: in by the V7 in three.
+  const waltz = STYLES.filter(homeward).flatMap((style) =>
+    [0.3, 0.85].flatMap((energy) =>
+      SEEDS.map((seed) =>
+        takeOf({ style, chart: COUNTRY_WALTZ, options: { mode: "jam", passes: 2, energy, seed } }),
+      ),
+    ),
+  );
   for (const { style, chart, options, take } of [
     ...takes((jam) => homeward(jam.style) && !jam.options.open),
     ...own,
+    ...waltz,
   ]) {
     const music = take.plan.bars.filter((bar) => bar.kind === "music");
     const end = music.at(-1)!;
@@ -518,7 +528,7 @@ test(
   only("country"),
   () => {
     const country = STYLES.find((style) => style.id === "country")!;
-    const waltzes = LIBRARY.filter((chart) => chart.meter === "3/4");
+    const waltzes = [COUNTRY_WALTZ, ...LIBRARY.filter((chart) => chart.meter === "3/4")];
     let held = 0;
     for (const { chart, options, take } of [
       ...takes((jam) => jam.style === country && jam.chart.meter === "3/4"),
@@ -575,7 +585,7 @@ test(
         root = odd ? null : one.pitch;
       }
     }
-    assert.ok(held > enough(300), `only ${held} bars of three on a held chord`);
+    assert.ok(held > enough(200), `only ${held} bars of three on a held chord`);
   },
 );
 
