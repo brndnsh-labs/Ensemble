@@ -180,14 +180,14 @@
     "inTarget": null
   },
   "chords.closest-to-bass": {
-    "mean": 11.285,
+    "mean": 11.485,
     "p10": 8,
     "p90": 12,
     "inTarget": null
   },
   "chords.lowest-note": {
-    "mean": 52.267,
-    "p10": 50.3053,
+    "mean": 52.6551,
+    "p10": 51.0737,
     "p90": 54.1461,
     "inTarget": 1
   },
@@ -210,9 +210,9 @@
     "inTarget": null
   },
   "chords.neck-movement": {
-    "mean": 0.9259,
+    "mean": 0.9135,
     "p10": 0,
-    "p90": 1.5389,
+    "p90": 1.4887,
     "inTarget": 1
   },
   "chords.neck-jumps": {
@@ -264,9 +264,9 @@
     "inTarget": null
   },
   "chords.in-the-soloists-register": {
-    "mean": 0.0738,
+    "mean": 0.0763,
     "p10": 0.0536,
-    "p90": 0.0975,
+    "p90": 0.0977,
     "inTarget": null
   },
   "chords.overlap": {
