@@ -54,15 +54,15 @@
     "inTarget": 1
   },
   "bass.semitones-per-move": {
-    "mean": 4.7317,
-    "p10": 4.3193,
-    "p90": 5.2045,
+    "mean": 4.9015,
+    "p10": 4.3729,
+    "p90": 5.6122,
     "inTarget": null
   },
   "bass.register": {
-    "mean": 34.662,
-    "p10": 33.3137,
-    "p90": 36.8405,
+    "mean": 34.3253,
+    "p10": 32.7368,
+    "p90": 36.5532,
     "inTarget": 1
   },
   "bass.high-notes": {
@@ -72,15 +72,15 @@
     "inTarget": null
   },
   "bass.chorus-same-as-last": {
-    "mean": 0.1453,
+    "mean": 0.0936,
     "p10": 0,
-    "p90": 0.5,
+    "p90": 0.3333,
     "inTarget": null
   },
   "bass.bars-same-as-last-chorus": {
-    "mean": 0.8811,
-    "p10": 0.8085,
-    "p90": 0.9417,
+    "mean": 0.8404,
+    "p10": 0.766,
+    "p90": 0.9149,
     "inTarget": null
   },
   "bass.walks-into-the-top": {
@@ -96,15 +96,15 @@
     "inTarget": null
   },
   "bass.steps-into-a-line": {
-    "mean": 0.2668,
-    "p10": 0,
-    "p90": 0.5,
+    "mean": 0.3191,
+    "p10": 0.0667,
+    "p90": 0.625,
     "inTarget": null
   },
   "bass.changes-by-step": {
-    "mean": 0.2154,
+    "mean": 0.2511,
     "p10": 0,
-    "p90": 0.3571,
+    "p90": 0.5,
     "inTarget": null
   },
   "bass.boom-chick": {
@@ -113,17 +113,29 @@
     "p90": 1,
     "inTarget": 1
   },
+  "bass.fifth-under": {
+    "mean": 1,
+    "p10": 1,
+    "p90": 1,
+    "inTarget": 1
+  },
+  "bass.walks-that-rub": {
+    "mean": 0,
+    "p10": 0,
+    "p90": 0,
+    "inTarget": 1
+  },
   "bass.notes-per-beat": {
-    "mean": 0.5268,
+    "mean": 0.5298,
     "p10": 0.5,
-    "p90": 0.5437,
+    "p90": 0.5516,
     "inTarget": 1
   },
   "bass.changes-walked": {
-    "mean": 0.243,
-    "p10": 0.0893,
-    "p90": 0.3714,
-    "inTarget": 0.7107
+    "mean": 0.2969,
+    "p10": 0.0714,
+    "p90": 0.5,
+    "inTarget": 0.7736
   },
   "chords.top-holds": {
     "mean": 0.3024,
@@ -168,7 +180,7 @@
     "inTarget": null
   },
   "chords.closest-to-bass": {
-    "mean": 10.72,
+    "mean": 11.285,
     "p10": 8,
     "p90": 12,
     "inTarget": null
