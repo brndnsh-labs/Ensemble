@@ -158,7 +158,42 @@ test("the hand does not growl: a chord's two lowest notes are a half step apart 
   // is a cluster where the 7th on the bottom (C E F A) is the chord. Hard under a soloist,
   // where the hand is pressed down; and no voicing on the way into or out of a solo needs it.
   let judged = 0;
-  for (const { chart, options, take } of [...takes(), ...stressTakes(), ...soloistTakes()]) {
+  // Thirteenths in every style, in four and in three, with the bass in: a grip that is clean
+  // struck whole can growl across only its top strings (A13's F#3 G3 C#4); and the take where
+  // country's chick in six first did, which the full run alone reaches.
+  const thirteenths = ["4/4", "3/4"].map(
+    (meter): LibraryChart => ({
+      file: `thirteenths-in-${meter.replace("/", "-")}`,
+      text: `title: Thirteenths\nkey: D\nmeter: ${meter}\n\n[A]\n| A13 | E13 | D13 | G13 |\n| B13 | C13 | F#13 | Bb13 |\n`,
+      meter,
+    }),
+  );
+  const country = STYLES.find((style) => style.id === "country");
+  const sixEight = LIBRARY.find((chart) => chart.file === "disco-floor-six-d.chart");
+  const extra = [
+    ...STYLES.flatMap((style) =>
+      thirteenths.flatMap((chart) =>
+        [0.3, 0.6, 0.85].map((energy) =>
+          takeOf({ style, chart, options: { mode: "jam", passes: 1, energy, seed: 1 } }),
+        ),
+      ),
+    ),
+    ...(country && sixEight
+      ? [
+          takeOf({
+            style: country,
+            chart: sixEight,
+            options: { mode: "jam", open: true, passes: 3, seed: 6, tempo: 73 },
+          }),
+        ]
+      : []),
+  ];
+  for (const { chart, options, take } of [
+    ...takes(),
+    ...stressTakes(),
+    ...soloistTakes(),
+    ...extra,
+  ]) {
     for (const strike of strikesOf(take)) {
       judged++;
       const [low, next] = strike.pitches;
