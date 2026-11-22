@@ -162,3 +162,11 @@ Asked whether "everything sounds (and looks) good on the test server" had taken 
 - **The tempo that breathes is passed by ear**, and that was his go for the stored setting, so #2268 merged (`e7091a41`) and #2239 is closed. The amounts stay as built (jazz and the blues 1%, rock and acoustic 0.75%, the rest nought), and so does the average sitting above the tempo as set (jazz at 132 about 132.9), which the page told him of and he did not object to. The app's default stays Steady. Not yet tried on his phone: added to #2236.
 - **The dark pass's pictures are passed by eye** (the stronger bar lines in light and dark, the selection, the pencil). #2265 stays open for the one thing no picture shows: his own browser, the extension on, the test site left alone.
 - The questions put on the pages and not answered one by one keep what is built.
+
+
+## his ear on who plays (2026-11-21, #2240)
+
+"listening page sounds good, thanks for posting that". The page was `out/who-plays/`, the only one on the front page over the LAN: jazz, the blues, funk, disco and reggae, each a jam of eight passes and an open jam told to finish as the app tells it, `main` beside the build on the same seed, with the bars the comp is out of under each clip; rock, where nobody sits out, for comparison.
+
+- **The band building by who plays is passed by ear.** #2240 is closed. What he heard is what merged (`060a260f`): the comp out of a chorus under the soloist in jazz and the blues, out of a section where the band plays alone in funk, disco and reggae, at the chances and spacing recorded in `docs/decisions/styles.md` and `engine.md`. It stays on, with no switch.
+- The questions put on the page (does the drop read as the band's choice, does the comp come back in the right place, is a chorus without the piano too bare under the soloist, could he play along through it) were not answered one by one: they keep what is built. How often it happens was told to him in numbers and not asked.
