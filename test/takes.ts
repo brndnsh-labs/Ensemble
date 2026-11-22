@@ -109,6 +109,12 @@ function render1(spec: JamSpec): Jam {
   return jam;
 }
 
+/**
+ * A take a property makes for itself, kept with the library's takes: one asked for twice, or one
+ * the library's takes already hold, is rendered once.
+ */
+export const takeOf = (spec: JamSpec): Jam => render1(spec);
+
 function renderOnly(specs: readonly JamSpec[], only: (spec: JamSpec) => boolean): Jam[] {
   return specs.filter(only).map(render1);
 }
