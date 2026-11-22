@@ -1983,6 +1983,116 @@ test(
   },
 );
 
+/**
+ * The open shapes country's guitar holds, as a player writes them (CH-24, the style's own
+ * notes), by key: a plain major on the I or the IV with its 6th, on the V a triad. A6 is left
+ * out: the hand takes x04220, a four-note shape with the root, where x02222 would do as well.
+ */
+const COUNTRY_SHAPES: readonly (readonly [
+  key: string,
+  shapes: Readonly<Record<string, string>>,
+])[] = [
+  [
+    "C",
+    {
+      C: "x32210",
+      F: "1x0211",
+      G: "3x0003",
+      C7: "x32310",
+      Csus4: "x33011",
+      Am: "x02210",
+      Dm: "xx0231",
+      Em: "022000",
+      F13: "131231",
+    },
+  ],
+  [
+    "G",
+    {
+      G: "3x0000",
+      C: "x32210",
+      D: "xx0232",
+      G7: "3x0001",
+      D7: "xx0212",
+      Gsus4: "3x0013",
+      G13: "3x3000",
+    },
+  ],
+  [
+    "D",
+    {
+      D: "xx0202",
+      A: "x02220",
+      D7: "xx0212",
+      Bm: "x24432",
+      Dsus4: "xx0233",
+      A7: "x02020",
+      Dm7: "xx0211",
+    },
+  ],
+  [
+    "A",
+    {
+      D: "xx0202",
+      E: "022100",
+      E7: "022130",
+      B7: "x21202",
+      A13: "x02022",
+      Asus4: "x02230",
+      Am7: "x02010",
+    },
+  ],
+  [
+    "E",
+    { E: "022120", B7: "x21202", E13: "020120", Esus4: "022200", Em7: "022030", B13: "x21204" },
+  ],
+];
+
+test(
+  "country: with a bassist the chick sounds the top four strings of the open shape a player holds (CH-24, ST-country-07): C6 is x32210, E3 A3 C4 E4, and C7 x32310, four notes with the root among them, not three with the B string silent; the thirteenths in their open shapes too (A13 x02022, E13 020120, F13 131231)",
+  only("country"),
+  () => {
+    const country = STYLES.find((style) => style.id === "country")!;
+    const wrong: string[] = [];
+    let checked = 0;
+    for (const [key, shapes] of COUNTRY_SHAPES) {
+      const symbols = Object.keys(shapes);
+      // Each chord for a bar, then home: the last bar is the ending, which is not a chick.
+      const text = `title: Open shapes in ${key}\nkey: ${key}\nstyle: country\n\n[A]\n${symbols.map((symbol) => `| ${symbol} `).join("")}| ${key} | ${key} |\n`;
+      const chart: LibraryChart = { file: `open-shapes-${key}`, text, meter: "4/4" };
+      const { take } = takeOf({
+        style: country,
+        chart,
+        options: { mode: "jam", passes: 1, energy: 0.5, seed: 1 },
+      });
+      for (const [i, symbol] of symbols.entries()) {
+        const shape = shapes[symbol]!;
+        // The shape's top four strings, the D string up, as a player frets them.
+        const expected = [...shape]
+          .map((fret, string) => (fret === "x" ? null : OPEN[string]! + Number(fret)))
+          .slice(2)
+          .filter((pitch): pitch is number => pitch !== null);
+        const bar = take.plan.bars.filter((candidate) => candidate.kind === "music")[i];
+        if (!bar || bar.seats.bass === null) continue;
+        const struck = strikesOf(take).filter(
+          (strike) =>
+            strike.tick >= bar.start &&
+            strike.tick < bar.start + bar.ticks &&
+            (strike.tick - bar.start) % PPQ === 0,
+        );
+        for (const strike of struck) {
+          checked++;
+          if (strike.pitches.join(" ") !== expected.join(" ")) {
+            wrong.push(`${symbol} in ${key} (${shape}): ${strike.pitches} where ${expected}`);
+          }
+        }
+      }
+    }
+    assert.deepEqual([...new Set(wrong)], []);
+    assert.ok(checked > 60, `only ${checked} chicks`);
+  },
+);
+
 test(
   "country: in three with no bassist the guitar's pick takes the boom on 1 of every bar it plays that is not a rest or the final chord: one plucked note, the lowest the guitar sounds in the bar, the grip's bass in the bar its chord is struck in and every second bar it holds after, the grip's alternate bass (its fifth) in the bars between, counted as the waltz bass counts (ST-country-07, CH-26, BA-56). The grip stands on the chord's own root: over a slash chord the boom is that root and its fifth, the slash note left to a bassist, as in four",
   only("country"),
