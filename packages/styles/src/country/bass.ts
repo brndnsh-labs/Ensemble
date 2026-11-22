@@ -78,10 +78,10 @@ const leadIn: LeadInPolicy = {
 /** The root held from 1, two stepping notes on 3 and 4 (BA-53). */
 const TWO_STEPS = "x------- x--- x---";
 /**
- * Across a third there is one note between: the bar keeps its boom-chick, the root on 1 and
- * the fifth on 3, and walks in on beat 4 alone (EN-47).
+ * Across a third there is one note between: the root is held from 1, ringing through beat 3,
+ * and the one stepping note is on 4 (BA-53).
  */
-const ONE_STEP = "x------- 5--- x---";
+const ONE_STEP = "x------- ---- x---";
 
 const walk = (
   name: string,
@@ -90,7 +90,17 @@ const walk = (
   last: Walk["last"],
   grid: string,
   when?: Walk["when"],
-): Walk => ({ name, weight: 1, toward, tones: walkTones, last, grid, ...(when ? { when } : {}) });
+): Walk => ({
+  name,
+  weight: 1,
+  toward,
+  tones: walkTones,
+  last,
+  grid,
+  // Walking notes connect: 92% of their space, however short the boom is (BA-52).
+  length: 0.92,
+  ...(when ? { when } : {}),
+});
 
 /**
  * Into a change a third to a tritone away (BA-53). Each note fits the chord it
