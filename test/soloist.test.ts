@@ -16,6 +16,7 @@ import {
   onPulse,
   PPQ,
   parse,
+  parseMeter,
   pitchClass,
   plan,
   pulseTicks,
@@ -2172,9 +2173,9 @@ test(
   () => {
     let chromatic = 0;
     // Where jazz has written its soloist (4/4, 6/4, 6/8, 12/8) and in three, where its line is
-    // a 4/4 rhythm cut to the bar.
+    // a 4/4 rhythm cut to the bar. The meter the take is played in, the chart's own or another.
     const own = (jam: Parameters<typeof written>[0]) =>
-      written(jam) || !isCompound(parse(jam.chart.text).chart.meter);
+      written(jam) || !isCompound(parseMeter(jam.chart.meter)!);
     for (const { chart, options, take } of soloTakes().filter(own)) {
       const harmony = harmonyOf(take);
       const solo = notesOf(take, "solo");
