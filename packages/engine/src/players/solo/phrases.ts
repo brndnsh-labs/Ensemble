@@ -17,6 +17,7 @@ import type { Rng } from "../../rng.ts";
 import type { ToneRole } from "../../theory/chord.ts";
 import { pitchClass } from "../../theory/pitch.ts";
 import { burstOf } from "./burst.ts";
+import { owedBreath } from "./critique.ts";
 import type { Pool } from "./harmony.ts";
 import { climb, EIGHTH, isChordTone, landing, onlyPasses } from "./harmony.ts";
 import type { LineBar, Spot } from "./line.ts";
@@ -1062,6 +1063,7 @@ function leadIn(world: World, into: Into, draw: Rng): Placed[] | null {
   // short and off the beat (SO-36).
   const leans = habit.approach && draw.fork("approach").chance(solo.habits.chromatic);
   const breath = breathOf(world);
+  const owed = owedBreath(world);
   const within = (pitch: number) => pitch >= into.low && pitch <= into.high;
 
   for (const figure of tries) {
@@ -1073,7 +1075,10 @@ function leadIn(world: World, into: Into, draw: Rng): Placed[] | null {
     }
     // It lives in the air the phrase before left, and leaves that air its breath, as heard:
     // swing carries a note's end on an "and" later, and a breath on paper may not be one.
+    // And on paper too, the breath a listener is owed (`owedBreath`): a pickup that is a
+    // breath only once swung is heard as the phrase before running on, not as a pickup.
     if (heardAt(world, spots[0]!.tick) - heardAt(world, into.air) < breath) continue;
+    if (spots[0]!.tick - into.air < owed) continue;
     // A tone from outside the chord's scale leads to the note a half step on, here as in
     // the line: the phrase's first note, for the last of the pickup.
     const leadingOn = (notes: readonly Placed[]): Placed[] =>

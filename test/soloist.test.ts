@@ -33,6 +33,7 @@ import {
   FULL,
   type Jam,
   type JamSpec,
+  LIBRARY,
   notesOf,
   only,
   ownCharts,
@@ -41,6 +42,7 @@ import {
   STYLES,
   soloistTakes,
   stressTakes,
+  takeOf,
   takes,
   written,
 } from "./takes.ts";
@@ -923,6 +925,23 @@ const HELD: Readonly<Record<string, number>> = {
   neosoul: 4,
 };
 
+/**
+ * A take of this property's own, that the library's takes do not reach: jazz on
+ * `reggae-one-four-g`, a jam of four passes, seed 1. The pickup into a phrase there was laid a
+ * breath after the phrase before only once swung, and read from the notes it ran on from that
+ * phrase; an idea moved a beat later was measured against it with that note (#2287).
+ */
+const DISPLACED_OWN = (): Jam[] =>
+  STYLES.some((style) => style.id === "jazz")
+    ? [
+        takeOf({
+          style: STYLES.find((style) => style.id === "jazz")!,
+          chart: LIBRARY.find((chart) => chart.file === "reggae-one-four-g.chart")!,
+          options: { mode: "jam", passes: 4, solo: true, seed: 1 },
+        }),
+      ]
+    : [];
+
 test("an idea comes back a beat early or late: in the styles that do it most some phrases say an earlier one of the solo again, the same rhythm and contour moved by one of the bar's pulses, only where the form asks what the style says; never the top of a chorus, the solo's first or last phrase, nor the tune's last, and never late in a section's last bar (nor an answer that carries a moved rhythm there); every note of the idea so moved inside its own phrase's bars and the tune, led in by no pickup, a chord tone where it falls on a beat (SO-33), and as long as it was, shaken where it was shaken, its last note a pulse shorter at most and an idea main's rules refuse, moved by the stricter ones, no note longer by more than a sixteenth and each move within a whole step of the idea's; a note held over a barline only in a style that holds one there (never in funk, rock or disco), only where it sounds across it, and then a tone of every chord it is held into (SO-02, SO-33), and some held so in the styles that hold; and every idea so moved heard as one", () => {
   const failures = new Map<string, string[]>();
   const fail = (clause: string, where: string) =>
@@ -932,7 +951,9 @@ test("an idea comes back a beat early or late: in the styles that do it most som
     const floor = DISPLACED[style.id];
     const { roles, holds } = style.solo.habits.displace;
     let [phrases, moved] = [0, 0];
-    for (const { chart, options, take } of soloTakes().filter((jam) => jam.style === style)) {
+    for (const { chart, options, take } of [...soloTakes(), ...DISPLACED_OWN()].filter(
+      (jam) => jam.style === style,
+    )) {
       const counted = MEASURES.find((measure) => measure.id === "solo.displaced")!.of(take, style);
       if (!counted) continue;
       phrases += counted.cases;
