@@ -47,6 +47,18 @@ export interface VoicingCondition {
   readonly has?: readonly VoiceTone[];
   /** Tones the chord must be unable to give. */
   readonly lacks?: readonly VoiceTone[];
+  /**
+   * What the chord's root is in the key: a numeral of the major scale counted
+   * from the tonic, in major and minor keys alike, with a flat or sharp where it
+   * is off that scale (`I`, `IV`, `bVII`). Read by pitch, so A# and Bb in C are
+   * both `bVII`. Every chord is measured against the key its bar is in; a
+   * secondary dominant's root is where it sounds (V7/ii in C is `VI`). The
+   * pedal steel's 6th on a plain I or IV, never on V (ST-country-06), and the
+   * add9 by the chord's job in the key (ST-acoustic-21) are conditions on this.
+   */
+  readonly degrees?: readonly string[];
+  /** Only in a key of this mode. */
+  readonly mode?: "major" | "minor";
 }
 
 export interface Recipe {

@@ -4,7 +4,8 @@
 
 import type { Alteration, Chord } from "../../theory/chord.ts";
 import { chordFamily, chordTones, toneInterval } from "../../theory/chord.ts";
-import { mod12 } from "../../theory/pitch.ts";
+import type { Key } from "../../theory/pitch.ts";
+import { mod12, pitchClass } from "../../theory/pitch.ts";
 import type { ChordScale } from "../../theory/scale.ts";
 import { scaleHas } from "../../theory/scale.ts";
 import type { Recipe, VoiceTone, VoicingCondition, VoicingKind } from "./style.ts";
@@ -93,18 +94,63 @@ export function toneOf(
   }
 }
 
-function meets(when: VoicingCondition | undefined, chord: Chord, scale: ChordScale): boolean {
+/** The numerals a degree may be written in, by the semitones of the major scale's steps. */
+const NUMERALS: Readonly<Record<string, number>> = {
+  I: 0,
+  II: 2,
+  III: 4,
+  IV: 5,
+  V: 7,
+  VI: 9,
+  VII: 11,
+};
+
+/** Semitones above the tonic of a degree as a condition writes it (`bVII` is 10), or null where it is no numeral. */
+export function degreeSemitonesOf(written: string): number | null {
+  const match = /^([b#]?)(I|II|III|IV|V|VI|VII)$/.exec(written);
+  if (!match) return null;
+  const shift = match[1] === "b" ? -1 : match[1] === "#" ? 1 : 0;
+  return mod12(NUMERALS[match[2]!]! + shift);
+}
+
+function meets(
+  when: VoicingCondition | undefined,
+  chord: Chord,
+  scale: ChordScale,
+  key: Key | null,
+): boolean {
   if (!when) return true;
   const can = (tone: VoiceTone) => tone === "T" || toneOf(tone, chord, scale) !== null;
   if (when.family && !when.family.includes(chordFamily(chord.quality))) return false;
   if (when.has?.some((tone) => !can(tone))) return false;
   if (when.lacks?.some((tone) => tone !== "T" && can(tone))) return false;
+  // With no key to read it from, a chord has no degree, and meets no condition on one.
+  if (when.mode !== undefined && key?.mode !== when.mode) return false;
+  if (when.degrees !== undefined) {
+    if (!key) return false;
+    const above = mod12(pitchClass(chord.root) - pitchClass(key.tonic));
+    if (!when.degrees.some((degree) => degreeSemitonesOf(degree) === above)) return false;
+  }
   return true;
 }
 
-/** The first recipe whose condition the chord meets. */
-export function recipeFor(kind: VoicingKind, chord: Chord, scale: ChordScale): Recipe {
-  return kind.recipes.find((recipe) => meets(recipe.when, chord, scale)) ?? { voices: ["3", "7"] };
+/** Whether a voicing kind's recipes ask what the chord is in the key. */
+export function readsTheKey(kind: VoicingKind): boolean {
+  return kind.recipes.some(
+    (recipe) => recipe.when?.degrees !== undefined || recipe.when?.mode !== undefined,
+  );
+}
+
+/** The first recipe whose condition the chord meets, in the key its bar is in. */
+export function recipeFor(
+  kind: VoicingKind,
+  chord: Chord,
+  scale: ChordScale,
+  key: Key | null = null,
+): Recipe {
+  return (
+    kind.recipes.find((recipe) => meets(recipe.when, chord, scale, key)) ?? { voices: ["3", "7"] }
+  );
 }
 
 /**

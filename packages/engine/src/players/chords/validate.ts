@@ -10,6 +10,7 @@ import { FIGURE_STEPS, HELD } from "./figure.ts";
 import { OPEN_STRINGS, TOP_FRET } from "./guitar.ts";
 import type { Articulation, Attack, ChordStyle, RhythmBook, Voice } from "./style.ts";
 import { INSTRUMENTS, PICK_PLACES, VOICE_TONES } from "./style.ts";
+import { degreeSemitonesOf } from "./tones.ts";
 
 const TIERS: readonly Tier[] = ["low", "mid", "high"];
 const FAMILIES: readonly ChordFamily[] = [
@@ -160,6 +161,21 @@ export function validateChordStyle(chords: ChordStyle): string[] {
       for (const family of recipe.when?.family ?? []) {
         say(FAMILIES.includes(family), `${at}: "${family}" is not a chord family.`);
       }
+      const degrees = recipe.when?.degrees;
+      if (degrees !== undefined) {
+        say(degrees.length > 0, `${at}: lists no degrees, so no chord can meet it.`);
+        for (const degree of degrees) {
+          say(
+            degreeSemitonesOf(degree) !== null,
+            `${at}: "${degree}" is not a degree; write a numeral, I to VII, with b or # where it is off the major scale.`,
+          );
+        }
+      }
+      const mode = recipe.when?.mode;
+      say(
+        mode === undefined || mode === "major" || mode === "minor",
+        `${at}: "${mode}" is not a key's mode; write major or minor.`,
+      );
     });
   }
   for (const tier of TIERS) {
