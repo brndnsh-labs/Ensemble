@@ -97,7 +97,9 @@ function validateTime(drums: DrumTime, meter: { beats: number; unit: 2 | 4 | 8 }
       if (when?.phraseBars?.some((bar) => !Number.isInteger(bar) || bar < 1))
         problems.push(`${where}: phrase bars are counted from 1.`);
       for (const name of when?.meters ?? []) {
-        if (readMeter(name) === null) problems.push(`${where}: "${name}" is not a meter.`);
+        // 4/4 is the style itself, and a meter like any other here.
+        if (name !== "4/4" && readMeter(name) === null)
+          problems.push(`${where}: "${name}" is not a meter.`);
       }
       if (when?.meters?.length === 0)
         problems.push(`${where}: names no meter, so it is never played.`);
