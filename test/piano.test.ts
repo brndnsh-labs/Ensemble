@@ -1055,13 +1055,33 @@ function holdable(
   return place(0, 0, Infinity, -Infinity, false);
 }
 
-test("a guitar's chords can be held: every stroke is three notes or more and no more than the guitar has strings (four, where it grips three), one to a string, inside a four-fret hand, none over the 15th fret; on neighbouring strings and none open, unless the style's guitar may mute a string inside its grip or plays open strings", {
+/**
+ * The top strings a style's every strum crosses in a bar of four, where its book writes them
+ * all across the top N strings (`Attack.top`); otherwise none.
+ */
+const topStrings = (style: (typeof STYLES)[number]): number | null => {
+  const book = style.chords.rhythm;
+  if (!book) return null;
+  const tops = [book.tiers.low, book.tiers.mid, book.tiers.high].flatMap((tier) => [
+    tier.arrival,
+    ...[tier.articulation, ...tier.figures.map((figure) => figure.articulation ?? {})].flatMap(
+      (articulation) => Object.values(articulation),
+    ),
+  ]);
+  const strums = tops.filter((attack) => attack.pluck === undefined && !attack.muted);
+  const top = strums[0]?.top;
+  return top !== undefined && strums.every((attack) => attack.top === top) ? top : null;
+};
+
+test("a guitar's chords can be held: every stroke is three notes or more and no more than the guitar has strings (four, where it grips three), one to a string, inside a four-fret hand, none over the 15th fret; on neighbouring strings and none open, unless the style's guitar may mute a string inside its grip or plays open strings; and a strum across the top N strings sounds nothing under the N-th string's open pitch", {
   skip: guitars.length === 0,
 }, () => {
   let strokes = 0;
+  let topped = 0;
   for (const { style, chart, options, take } of [...takes(strummed), ...stressTakes(strummed)]) {
     const idiom = style.chords.idiom;
     if (idiom === "keys") continue;
+    const top = topStrings(style);
     for (const stroke of [...strikesOf(take), ...strikesOf(take, true)]) {
       strokes++;
       const where = `${chart.file} seed ${options.seed} at tick ${stroke.tick}: ${stroke.pitches}`;
@@ -1070,9 +1090,21 @@ test("a guitar's chords can be held: every stroke is three notes or more and no 
         `${where}: the strings`,
       );
       assert.ok(holdable(stroke.pitches, idiom), `${where}: no hand holds this`);
+      // In a bar of four the book plays, short of the ending, every strum crosses the top strings.
+      if (top === null) continue;
+      const bar = take.plan.bars.findLast((candidate) => candidate.start <= stroke.tick);
+      if (!bar || bar.ending || bar.meter.beats !== 4 || bar.meter.unit !== 4) continue;
+      topped++;
+      const lowest = OPEN[OPEN.length - top]!;
+      assert.ok(
+        Math.min(...stroke.pitches) >= lowest,
+        `${where}: a strum across the top ${top} strings sounds under ${lowest}`,
+      );
     }
   }
   assert.ok(strokes > enough(20000), `only ${strokes} strokes`);
+  if (STYLES.some((style) => topStrings(style) !== null))
+    assert.ok(topped > enough(30000), `only ${topped} strums across the top strings`);
 });
 
 test("a guitarist holds a grip: the notes under the hand change only where the chord does (or leaning into it), a scratch deadens the grip being held and never goes back to the last one, and after a chord leant into nothing is stroked until it has rung an eighth", {
