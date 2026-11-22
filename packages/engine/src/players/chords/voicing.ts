@@ -305,10 +305,12 @@ export function voiceStrikes(
   let held: Way | null = null;
   // Whether the hand is still out of its place after a line it heard.
   let away = false;
-  for (const [i, strike] of strikes.entries()) {
+  // The ways to play a strike's chord, worked out once for each chord in each kind; null for a
+  // strike with nothing to voice.
+  const wayFor = (strike: Strike): Way | null => {
     const chord = strike.arrival.chord;
     const kind = chords.kinds[strike.kind];
-    if (!chord || !kind) continue;
+    if (!chord || !kind) return null;
     const at = `${strike.kind} ${strike.arrival.index}`;
     let way = wayAt.get(at);
     if (!way) {
@@ -352,6 +354,24 @@ export function voiceStrikes(
       }
       wayAt.set(at, way);
     }
+    return way;
+  };
+  // The strings a hand holding one grip strums across, at most, from this strike while it keeps
+  // the grip: the strikes after it on the same chord, as the hand will play them. A grip is
+  // chosen for all of them: the boom picked alone chooses the shape the chick strums on top.
+  const heldTop = (i: number, way: Way): number | undefined => {
+    let top: number | undefined;
+    for (let j = i; j < strikes.length; j++) {
+      const strike = strikes[j]!;
+      if (j > i && (!idiom.holds || wayFor(strike) !== way)) break;
+      if (strike.top !== undefined)
+        top = top === undefined ? strike.top : Math.min(top, strike.top);
+    }
+    return top;
+  };
+  for (const [i, strike] of strikes.entries()) {
+    const way = wayFor(strike);
+    if (!way) continue;
     // The chord just struck, struck again (the button): the hand is where it was, and a
     // soloist still sounding over it does not make it choose again.
     const before = voiced.at(-1);
@@ -365,12 +385,20 @@ export function voiceStrikes(
     // strike with the hand in its own place is remembered.
     // A strum across only the top strings is judged by what it sounds: where one of the
     // chord's grips sounds three notes or more there with no growl, the hand takes one of
-    // those (A13 as x02022 strummed on its top four: E3 G3 C#4 F#4, not F#3 G3 C#4). Where
-    // none does, the grips as for any strike.
-    const across = strike.top !== undefined && idiom.sounds ? topped(way, strike, idiom) : null;
-    const led = across ? across.led : way.led;
-    let next: Voicing | null | undefined =
-      idiom.holds && way === held && previous ? previous : away ? undefined : led.get(previous);
+    // those (A13 strummed on its top four: F#3 A3 C#4 G4, not F#3 G3 C#4). Where none does,
+    // the grips as for any strike. A guitarist holds the grip while the chord stays, so it is
+    // chosen for every strike that will be played on it: a boom picked alone chooses the
+    // shape the chick then strums across its top strings.
+    const holding: boolean = idiom.holds && way === held && previous !== null;
+    const strums: number | undefined = holding || !idiom.sounds ? undefined : heldTop(i, way);
+    const across: Topped | null =
+      strums !== undefined ? topped(way, { ...strike, top: strums }, idiom) : null;
+    const led: Map<Voicing | null, Voicing | null> = across ? across.led : way.led;
+    let next: Voicing | null | undefined = holding
+      ? previous
+      : away
+        ? undefined
+        : led.get(previous);
     held = way;
     if (next === undefined) {
       const { family } = way;

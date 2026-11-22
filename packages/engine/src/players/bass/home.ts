@@ -314,6 +314,18 @@ export function walkHome(
           placed: at !== holds[0],
           widest: FOURTH,
         });
+    // From the bVII in three, where the step down from above has no room, the bar goes in on
+    // 3 by the leading tone from under the root, b7, 7, 1 (F2, F#2, G2 into G), in the octave
+    // whose 5th is on the instrument: the half step over the chord's root is taken here, as
+    // the way in where there is no other (a judgement; never the drop of a seventh).
+    if (waltz && motion === 10 && inside(fifth))
+      for (const at of holds)
+        found.push({
+          notes: [note(0, lastBeat, at, one), note(lastBeat, 1, landing - 1, four, true)],
+          path: [at, landing - 1, landing],
+          placed: at !== holds[0],
+          widest: FOURTH,
+        });
     return found;
   };
 
