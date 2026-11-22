@@ -440,27 +440,37 @@ const rhythmInThree: RhythmBook = {
     },
 
     // The working level: the two off-beats and their mixes, 1 and 3, the dotted-quarter cell,
-    // beat 2 held. A section's own figure is a two-strike cell (the off-beats and the
-    // dotted-quarter cell lead, study 1.1, 1.2); the one-strike cells are answers.
+    // beat 2 held, and Kelly's bars that land on 2 and on 3 (80, 81, 83). A section's own figure
+    // is a two-strike cell; the one-strike cells are answers. The weights spread the strikes
+    // over the bar as Kelly's 16 bars under Davis do (study 1.1: each eighth struck in 31% to
+    // 44% of them), measured under a soloist over 320 takes: each eighth in 24% to 46% of the
+    // working bars, a bar of one strike or none 22% (Kelly's 4 of 16). The off-beats and the
+    // dotted-quarter cell had led, and left beat 2 in 6% of the bars and the "and" of 2 in 68%.
     mid: {
       draw: "working",
       articulation: STAB,
       figures: [
         // F6: the "and" of 1 and the "and" of 2, short (Kelly bar 79; Walsh's two up-beats).
-        { name: "the ands of one and two", weight: 4, grid: "..X. ..X. ...." },
+        { name: "the ands of one and two", weight: 3, grid: "..X. ..X. ...." },
         // F2: 1 held a dotted quarter, then the "and" of 2 short (Kelly bars 37, 77, 93-99).
-        { name: "the dotted quarter", weight: 3, grid: "x--- --X. ...." },
+        { name: "the dotted quarter", weight: 2, grid: "x--- --X. ...." },
         // F8: 1 and 3, short (Kelly bars 74, 82).
-        { name: "one and three", weight: 2, grid: "x... .... x..." },
+        { name: "one and three", weight: 4, grid: "x... .... x..." },
+        // Kelly bar 81: 2 (accented in the source) and its "and", short.
+        { name: "two and its and", weight: 3, grid: ".... x.X. ...." },
       ],
       answers: [
         // F9: the "and" of 2 alone, short (Kelly bar 73; Walsh's second rhythm).
-        { name: "and of two", weight: 3, grid: ".... ..X. ...." },
+        { name: "and of two", weight: 2, grid: ".... ..X. ...." },
         // F6's mix: the "and" of 1 alone (Walsh: "sometimes hitting the and-of-one, sometimes
         // the and-of-two").
         { name: "and of one", weight: 2, grid: "..X. .... ...." },
         // F7: beat 2, held (Kelly bars 76, 78).
-        { name: "two, held", weight: 2, grid: ".... x--- ----" },
+        { name: "two, held", weight: 3, grid: ".... x--- ----" },
+        // Kelly bar 80: 1 held a half note, then 3 short.
+        { name: "one held, and three", weight: 3, grid: "x--- ---- x..." },
+        // Kelly bar 83: the "and" of 1 held to 3, and 3 held.
+        { name: "and of one held, and three held", weight: 2, grid: "..X- ---- x---" },
       ],
       // F1, the hemiola: three short chords over two bars, a chord every two beats (Kelly
       // behind the melody of the head's A sections, bars 38-43 and 53-60, 6 to 8 bars at a time,
@@ -468,13 +478,21 @@ const rhythmInThree: RhythmBook = {
       // now and then: about one in five with the band to itself, the engineer's call (no
       // source gives a rate). Each chord the style's stab.
       twoBars: {
-        figure: {
-          name: "the hemiola",
-          weight: 1,
-          groove: true,
-          grid: "x... .... x... .... x... ....",
-        },
-        chance: 0.2,
+        figures: [
+          { name: "the hemiola", weight: 2, groove: true, grid: "x... .... x... .... x... ...." },
+          // The other phase (Kelly bars 53-60, starting `. . x . . . | x . . . x .`): the
+          // chord on 1 left to the bass in the run's first bar.
+          {
+            name: "the hemiola, from two",
+            weight: 1,
+            groove: true,
+            grid: ".... x... .... x... .... x...",
+          },
+        ],
+        chance: 0.28,
+        // Six to eight bars at a time, released at the section's end (study 2.1).
+        longest: 8,
+        crossesSections: false,
       },
       // Two a bar through the level (Kelly behind Davis: 1.9 a bar, study 1.1), so that a bar
       // laid out under the line to one strike counts as thinned (the critic's floor is the aim
@@ -483,12 +501,13 @@ const rhythmInThree: RhythmBook = {
       arrival: { level: 78, steps: 4 },
     },
 
-    // Hot, with the band to itself: the working cells (the tiers share the draw, so a
-    // section's figure is the same cell grown), the dotted-quarter cell and its variants, and
+    // Hot, with the band to itself: the working cells grown, the dotted-quarter cell and its
+    // variants leading (a draw of its own: the working level's figures are weighted for the
+    // bar under a soloist, which hot never reads), and
     // where a phrase ends on the dotted-quarter cell, the denser bar Kelly plays at the end of
     // a phrase (F12, study 4.2: "dense voicings to emphasize the end of the 8 bar phrase").
     high: {
-      draw: "working",
+      draw: "hot",
       articulation: STAB,
       figures: [
         // F6 with the "and" of 3 (Kelly bar 72: all three "ands", short).

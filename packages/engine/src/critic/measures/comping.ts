@@ -296,15 +296,21 @@ function strikesInThree(take: Take, soloing: boolean): number[][] {
     .map((bar) => [...(struck.get(bar.index) ?? [])]);
 }
 
-/** Under a soloist in three, the share of bars struck on one of the bar's six eighths. */
+/**
+ * Under a soloist in three, the share of bars struck on one of the bar's six eighths, pooled
+ * over every bar of the run's takes. A proportion of a population and not of a take: on a tune
+ * of one section a take's whole solo is one section's figure and its answers, so one take's
+ * share says which figure was drawn, not where the hand's strikes fall.
+ */
 const eighthUnderTheSolo = (eighth: number, name: string, label: string): Measure => ({
   id: `chords.under-the-solo-in-three-on-${name}`,
   seat: "chords",
   idiom: true,
-  says: `In three, under a solo, from the working level up, the share of bars the piano strikes on ${label}: the strikes spread over the bar, none of its eighths always or never struck.`,
+  says: `In three, under a solo, from the working level up, the share of bars the piano strikes on ${label}, over every take of the run together: the strikes spread over the bar, none of its eighths always or never struck.`,
   unit: "share",
-  of(take) {
-    const bars = strikesInThree(take, true);
+  of: () => null,
+  across(takes) {
+    const bars = takes.flatMap((take) => strikesInThree(take, true));
     return share(bars.filter((ticks) => ticks.includes((eighth * PPQ) / 2)).length, bars.length);
   },
 });
@@ -313,8 +319,8 @@ const eighthUnderTheSolo = (eighth: number, name: string, label: string): Measur
 const inThree = {
   perBar: (take: Take, soloing: boolean) =>
     mean(strikesInThree(take, soloing).map((ticks) => ticks.length)),
-  thin(take: Take, soloing: boolean) {
-    const bars = strikesInThree(take, soloing);
+  thin(takes: readonly Take[], soloing: boolean) {
+    const bars = takes.flatMap((take) => strikesInThree(take, soloing));
     return share(bars.filter((ticks) => ticks.length <= 1).length, bars.length);
   },
   onOne(take: Take, soloing: boolean) {
@@ -375,9 +381,11 @@ export const compingMeasures: readonly Measure[] = [
     id: "chords.thin-bars-under-the-solo-in-three",
     seat: "chords",
     idiom: true,
-    says: "In three, under a solo, from the working level up, few bars have one strike or none: the hand is sparse under the line and still keeps the time (in three, Kelly's 4 bars of 16).",
+    says: "In three, under a solo, from the working level up, few bars have one strike or none, over every take of the run together: the hand is sparse under the line and still keeps the time (in three, Kelly's 4 bars of 16).",
     unit: "share",
-    of: (take) => inThree.thin(take, true),
+    // Pooled, as the eighths are: one take's share is one section's figure on a tune of one.
+    of: () => null,
+    across: (takes) => inThree.thin(takes, true),
   },
   {
     id: "chords.strikes-per-bar-in-three-under-the-solo",

@@ -603,14 +603,17 @@ test('jazz: in a waltz the piano comps, not a pad (prompts/jazz-waltz-study.md):
 
 /**
  * A bar of the waltz's hemiola (three short chords over two bars, F1 of the study), as it is
- * played: its first bar 1 and 3, its second bar 2, each a stab. The second bar is the one no
- * other figure plays; a chord arriving on 3 may be struck in it.
+ * played: its first bar 1 and 3, its second bar 2, each a stab (in the other phase the same
+ * two bars the other way round). The bar of 2 is the one no other figure plays; a chord
+ * arriving on 3 may be struck in it.
  */
 function hemiolaBar(bar: PlanBar, strikes: readonly Strike[], half: 0 | 1): boolean {
-  const short = strikes.every((strike) => strike.ends - strike.sounds <= PPQ / 2 + POCKET);
+  const stab = (strike: Strike | undefined) =>
+    strike !== undefined && strike.ends - strike.sounds <= PPQ / 2 + POCKET;
   const at = strikes.map((strike) => strike.tick - bar.start);
-  if (half === 0) return short && at.length === 2 && at[0] === 0 && at[1] === 2 * PPQ;
-  return short && at[0] === PPQ && at.every((tick) => tick === PPQ || tick >= 2 * PPQ);
+  if (half === 0) return strikes.every(stab) && at.length === 2 && at[0] === 0 && at[1] === 2 * PPQ;
+  // The stab on 2; a chord arriving on 3 is laid in there as any chord is.
+  return stab(strikes[0]) && at[0] === PPQ && at.every((tick) => tick === PPQ || tick >= 2 * PPQ);
 }
 
 /** Whether a style's book for a bar's meter, at the bar's level, has a figure of two bars. */
@@ -692,7 +695,7 @@ test("jazz: in a waltz, with the band to itself at the working level, the piano 
           .map((strike) => (strike.tick - bar.start) / STEP)
           .join(" "),
       );
-      assert.ok(whole, `${where}: the hemiola, not from the phrase's top`);
+      assert.equal(first.phrase.bar, 0, `${where}: the hemiola, not from the phrase's top`);
       assert.notEqual(
         hemiolaPhase(bars, strikes),
         null,
