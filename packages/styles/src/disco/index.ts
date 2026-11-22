@@ -18,6 +18,8 @@ export const disco: StylePack = {
   // the kick on every pulse at the dancer's speed, as in four, not two thirds of it. Its eighths
   // are then a triplet at half as fast again as four's (six a second at 120 against four's
   // sixteenths at eight), and the pump, the bark and the chop come as often as they do in four.
+  // The meters a player of disco would call its own: listed first. Four on the floor (docs/decisions/styles.md, #2298).
+  ownMeters: ["4/4"],
   tempo: {
     default: 120,
     min: 100,

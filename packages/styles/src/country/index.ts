@@ -18,6 +18,8 @@ export const country: StylePack = {
   name: "Country",
   // ST-country-01: 110 imported, 100 the stock groove, 110 the loudness reference. The range
   // is what the three feels carry: a ballad down to 66, a train up to 160.
+  // The meters a player of country would call its own: listed first. Four, and the country waltz, though no part is written for it: it plays the fit (docs/decisions/styles.md, #2298).
+  ownMeters: ["4/4", "3/4"],
   tempo: { default: 110, min: 66, max: 160 },
   feel: {
     // Dead straight eighths: any lilt read as a shuffle that is not one. Nobody leans (the

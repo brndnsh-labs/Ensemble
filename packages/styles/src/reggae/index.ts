@@ -24,6 +24,8 @@ export const reggae: StylePack = {
   // drop with its beat a triplet, and six is a bar of two of the same pulse, the drop on the
   // second. So the range is four's in both, as the blues' is for its shuffle in twelve, and
   // not the two thirds of it that keeps a style's eighths at four's speed.
+  // The meters a player of reggae would call its own: listed first. The one drop is in four (docs/decisions/styles.md, #2298).
+  ownMeters: ["4/4"],
   tempo: {
     default: 76,
     min: 60,

@@ -1,6 +1,8 @@
 // Checks a style pack for mistakes the type system cannot see. The compiler
 // guarantees the shape; this guarantees the data means something.
 
+import { BAND_METERS } from "../chart/remeter.ts";
+import { meterName } from "../perform/meter.ts";
 import { BREATHE_MOST } from "../plan/tempo.ts";
 import { validateBassStyle } from "../players/bass/validate.ts";
 import { validateChordStyle } from "../players/chords/validate.ts";
@@ -34,6 +36,14 @@ export function validateStyle(style: StylePack): string[] {
       `tempo in ${name}: the default must lie between a positive min and the max`,
     );
   }
+  const own = style.ownMeters;
+  check(own.length > 0, "ownMeters: a style has at least one meter of its own");
+  check(new Set(own).size === own.length, "ownMeters: a meter is named once");
+  for (const name of own)
+    check(
+      BAND_METERS.some((meter) => meterName(meter) === name),
+      `ownMeters: "${name}" is not one of the band's meters (${BAND_METERS.map(meterName).join(", ")})`,
+    );
   check(feel.swing.amount >= 0 && feel.swing.amount <= 100, "feel: swing amount is 0 to 100");
   check(feel.humanize >= 0 && feel.humanize <= 100, "feel: humanize is 0 to 100");
   check(

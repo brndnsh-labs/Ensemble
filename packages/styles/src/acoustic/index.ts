@@ -16,6 +16,8 @@ export const acoustic: StylePack = {
   name: "Acoustic",
   // ST-acoustic-01: the one stock groove is 90 and the loudness reference 100; about 95.
   // Widened each side, as the other styles' are: a ballad and a brisk strum are both this band.
+  // The meters a player of acoustic would call its own: listed first. Four, the folk waltz (ST-acoustic-04) and six-eight (docs/decisions/styles.md, #2298).
+  ownMeters: ["4/4", "3/4", "6/8"],
   tempo: { default: 95, min: 72, max: 120 },
   feel: {
     // Straight eighths with a lilt: swing 15, the off-beat eighth at 52.5% of the beat

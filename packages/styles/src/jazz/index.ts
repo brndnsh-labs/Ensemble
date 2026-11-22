@@ -17,6 +17,8 @@ export const jazz: StylePack = {
   // 92 and as quick as 160, a medium six and not a ballad, so the usual is 66 (four's ballad
   // speed, a pulse a beat), the floor 40 (a bar of six seconds) and the ceiling 96. Six-eight
   // keeps two thirds of four's: 40 to 160, usually 92, its eighths as quick as four's at most.
+  // The meters a player of jazz would call its own: listed first. Four, the waltz (ST-jazz-56 to 68), six-eight (EAR-19, AU-92) and 6/4 (All Blues, Footprints) (docs/decisions/styles.md, #2298).
+  ownMeters: ["4/4", "3/4", "6/8", "6/4"],
   tempo: {
     default: 138,
     min: 60,

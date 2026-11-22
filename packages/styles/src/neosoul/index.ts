@@ -16,6 +16,8 @@ export const neosoul: StylePack = {
   name: "Neo-soul",
   // ST-neosoul-01: a sixteenth of 165 to 195 ms, 77 to 91; the stock groove at 85. Widened a
   // little each side, as the other styles' are.
+  // The meters a player of neo-soul would call its own: listed first. Four, and the soul ballad in six and twelve (docs/decisions/styles.md, #2298).
+  ownMeters: ["4/4", "6/8", "12/8"],
   tempo: { default: 85, min: 70, max: 100 },
   feel: {
     // Swing 45 on the sixteenths: the off-sixteenth at 57.5% of its pair (ST-neosoul-02). The

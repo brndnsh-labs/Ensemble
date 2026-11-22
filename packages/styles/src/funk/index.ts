@@ -13,6 +13,8 @@ export const funk: StylePack = {
   id: "funk",
   name: "Funk",
   // ST-funk-01: the old band's funk scenes ran 100 to 115.
+  // The meters a player of funk would call its own: listed first. A pocket in four (docs/decisions/styles.md, #2298).
+  ownMeters: ["4/4"],
   tempo: { default: 105, min: 80, max: 126 },
   feel: {
     // A trace on the sixteenths, not a shuffle (ST-funk-02).
