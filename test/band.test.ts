@@ -79,10 +79,14 @@ test("a different seed is a different take", () => {
           jam.options.passes === 2 &&
           !jam.options.open &&
           !jam.options.solo,
-      ).map((jam) => jam.take);
+      );
+      // One of them for each seed, or they are not what this compares.
+      const eachSeed =
+        played.length === SEEDS.length &&
+        new Set(played.map((jam) => jam.options.seed)).size === SEEDS.length;
       const performances = (
-        played.length === SEEDS.length
-          ? played
+        eachSeed
+          ? played.map((jam) => jam.take)
           : SEEDS.map((seed) => render(chart.text, style, { mode: "jam", passes: 3, seed }))
       ).map((take) => JSON.stringify(take.events));
       assert.equal(new Set(performances).size, SEEDS.length, chart.file);
