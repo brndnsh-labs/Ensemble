@@ -127,8 +127,8 @@ test("a bass note held for a half note or more is a tone of its chord", () => {
   }
 });
 
-test("the last bass note of a jam that ends is the lowest root on the instrument, or the root an octave over it where the fall from the note before would be more than an octave", () => {
-  for (const { chart, options, take } of takes((jam) => !jam.options.open && written(jam))) {
+test("the last bass note of a jam that ends is the lowest root on the instrument, or the root an octave over it where the fall from the note before would be more than an octave, or where the bar before walked up into it from the fifth under it and the low root has no fifth under it", () => {
+  for (const { style, chart, options, take } of takes((jam) => !jam.options.open && written(jam))) {
     const bass = notesOf(take, "bass");
     const last = bass.at(-1)!;
     const ending = take.plan.bars.findLast((bar) => bar.kind === "music")!;
@@ -137,8 +137,19 @@ test("the last bass note of a jam that ends is the lowest root on the instrument
     // A line on a low tonic lives an octave over the open string, and its last note can be
     // a seventh over that: it comes home there, not two octaves down by a leap (EN-28).
     const leap = before !== undefined && before.pitch - lowest > 12;
+    // A walk home up the run from the fifth under the root is played in the lowest octave whose
+    // fifth is on the instrument, and lands there: on E to Ab, the octave over the open
+    // string's (EN-48). Only where the run is there: its 5th on beat 2 (over the V, held from
+    // 1), a step under the root on 4.
+    const struck = (beat: number) =>
+      bass.find((note) => note.tick === ending.start - (5 - beat) * PPQ)?.pitch;
+    const walkedUp =
+      style.bass.walks?.ending !== undefined &&
+      lowest - 5 < LOW_E &&
+      (struck(2) ?? struck(1)) === last.pitch - 5 &&
+      [1, 2].includes(last.pitch - (struck(4) ?? last.pitch));
     assert.ok(
-      last.pitch === lowest || (leap && last.pitch === lowest + 12),
+      last.pitch === lowest || ((leap || walkedUp) && last.pitch === lowest + 12),
       `${chart.file} seed ${options.seed}: ends on ${last.pitch} from ${before?.pitch}`,
     );
   }
