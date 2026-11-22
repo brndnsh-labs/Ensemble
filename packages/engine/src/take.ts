@@ -116,9 +116,13 @@ export function render(text: string, style: StylePack, options: TakeOptions): Ta
     ...told,
     plan: {
       ...told.plan,
-      bars: told.plan.bars.map((bar) =>
-        bar.start < toldAt ? { ...bar, seats: asWas(bar).seats } : bar,
-      ),
+      bars: told.plan.bars.map((bar) => {
+        if (bar.start >= toldAt) return bar;
+        // Nor does a seat come in on a bar from before the word (`PlanBar.enters`): told later
+        // in the pass, the seat was still out there.
+        const { enters: _told, ...rest } = bar;
+        return { ...rest, seats: asWas(bar).seats };
+      }),
     },
     events: [
       ...untold.events.filter((event) => time(event) < join),

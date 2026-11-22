@@ -47,7 +47,7 @@ export const disco: StylePack = {
       under: "band",
       span: "section",
       below: 0.75,
-      chance: 0.32,
+      chance: 0.12,
       openChance: 0.1,
     },
   },

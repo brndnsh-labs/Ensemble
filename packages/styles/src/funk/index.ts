@@ -32,7 +32,7 @@ export const funk: StylePack = {
       under: "band",
       span: "section",
       below: 0.75,
-      chance: 0.5,
+      chance: 0.18,
       openChance: 0.075,
     },
   },

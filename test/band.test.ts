@@ -1358,7 +1358,7 @@ const WHO_KINDS: readonly PlanOptions[] = [
       ] as const)
     : []),
 ];
-const WHO_SEEDS = Array.from({ length: FULL ? 24 : 2 }, (_, i) => i + 1);
+const WHO_SEEDS = Array.from({ length: FULL ? 24 : 4 }, (_, i) => i + 1);
 
 /**
  * The kinds a push plans for a style: a jam too short to thin, one of eight passes and an open

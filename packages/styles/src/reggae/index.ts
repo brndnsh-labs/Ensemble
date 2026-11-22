@@ -58,7 +58,7 @@ export const reggae: StylePack = {
       under: "band",
       span: "section",
       below: 0.75,
-      chance: 0.45,
+      chance: 0.18,
       openChance: 0.12,
     },
   },
