@@ -2100,6 +2100,37 @@ test(
 );
 
 test(
+  "country: the final tonic chord of an ending leaves nothing out: it sounds the chord's fifth, struck with it or as the stinger's landing, in every key (EN-49; a chick may leave the open shape's fifth to the bass, a chord that rings as the end may not)",
+  only("country"),
+  () => {
+    const country = STYLES.find((style) => style.id === "country")!;
+    let finals = 0;
+    for (const { chart, options, take } of [
+      ...takes((jam) => jam.style === country),
+      ...homeTakes(country),
+    ]) {
+      const last = take.plan.bars.findLast((bar) => bar.kind === "music");
+      if (!last?.ending || last.seats.chords === null) continue;
+      const landing = last.start + last.ending.at;
+      const final = harmonyOf(take).findLast((arrival) => arrival.tick <= landing)?.chord;
+      if (!final || pitchClass(final.root) !== pitchClass(last.key.tonic)) continue;
+      const fifth = chordTones(final.quality).find((tone) => tone.role === "fifth");
+      if (fifth?.interval !== 7) continue;
+      const sounded = notesOf(take, "chords").filter(
+        (note) => note.tick === landing || (note.slur && note.tick === landing + PPQ / 2),
+      );
+      if (sounded.length === 0) continue;
+      finals++;
+      assert.ok(
+        sounded.some((note) => (note.pitch - pitchClass(final.root) + 120) % 12 === 7),
+        `${chart.file} seed ${options.seed} ${JSON.stringify(options)}: the final ${sounded.map((note) => note.pitch)} has no fifth`,
+      );
+    }
+    assert.ok(finals > enough(300), `only ${finals} final chords`);
+  },
+);
+
+test(
   "country: in three with no bassist the guitar's pick takes the boom on 1 of every bar it plays that is not a rest or the final chord: one plucked note, the lowest the guitar sounds in the bar, the grip's bass in the bar its chord is struck in and every second bar it holds after, the grip's alternate bass (its fifth) in the bars between, counted as the waltz bass counts (ST-country-07, CH-26, BA-56). The grip stands on the chord's own root: over a slash chord the boom is that root and its fifth, the slash note left to a bassist, as in four",
   only("country"),
   () => {
