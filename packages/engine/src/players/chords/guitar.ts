@@ -540,10 +540,17 @@ export function guitar(style: Guitar): InstrumentIdiom {
         // as it takes to sound every tone the chord is heard by (X-B-13), and to leave no
         // growl on the bottom of what it sounds: a grip with the 13th under the 7th is clean
         // from its root, and its top three strings are not (Q-03).
-        // A stroke written across only the top strings catches no more of them, either way.
-        const reach = Math.min(upstroke ? up : Infinity, strike.top ?? Infinity);
-        let from = Number.isFinite(reach) ? Math.max(0, voicing.pitches.length - reach) : 0;
-        if (from > 0) {
+        // A stroke written across only the top N strings sounds the grip's notes on those
+        // strings and nothing under them: a string the grip leaves silent is one of the N.
+        const floor =
+          strike.top === undefined
+            ? 0
+            : Math.max(
+                0,
+                strings.findIndex((s) => s >= OPEN_STRINGS.length - strike.top!),
+              );
+        let from = Math.max(floor, upstroke ? Math.max(0, voicing.pitches.length - up) : 0);
+        if (upstroke && from > floor) {
           const needed = heardBy(voicing, strike.arrival.chord);
           const family = strike.arrival.chord ? chordFamily(strike.arrival.chord.quality) : null;
           const caught = (pitch: number) =>
@@ -552,7 +559,7 @@ export function guitar(style: Guitar): InstrumentIdiom {
             family !== null &&
             !growls(voicing, family) &&
             growls({ pitches: voicing.pitches.slice(from) }, family);
-          while (from > 0 && (needed.some((pitch) => !caught(pitch)) || growl())) from--;
+          while (from > floor && (needed.some((pitch) => !caught(pitch)) || growl())) from--;
         }
         const [lowest, highest] = [strings[from]!, strings.at(-1)!];
         const across = (highest - lowest) * roll;

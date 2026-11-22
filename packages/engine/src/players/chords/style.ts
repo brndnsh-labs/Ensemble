@@ -280,13 +280,13 @@ export interface Attack {
    */
   readonly pluck?: readonly PickPlace[];
   /**
-   * The stroke crosses only the grip's top this many strings, as an upstroke
-   * already catches only its top few (CH-27), and as many more under them as it
-   * takes to sound every tone the chord is heard by (X-B-13). On a guitar only.
-   * A boom-chick guitar's chick on the top four strings of the grip whose low
-   * strings the thumb plays as the boom (ST-country-07). An upstroke catches the
-   * fewer of this and the style's `strum.up`. Left out, a downstroke crosses the
-   * whole grip.
+   * The stroke crosses only the guitar's top this many strings: it sounds the
+   * grip's notes on those strings and nothing under them, a string the grip
+   * leaves silent counting as one of them. On a guitar only. A boom-chick
+   * guitar's chick on the top four strings, over the low strings the thumb
+   * plays as the boom (ST-country-07). An upstroke among them catches the
+   * style's `strum.up` of their top notes, as any upstroke does. Left out, a
+   * downstroke crosses the whole grip.
    */
   readonly top?: number;
 }
