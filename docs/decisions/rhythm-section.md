@@ -133,3 +133,13 @@ Brandon: "i trust your judgment about when to make changes related to grooves". 
 
 What stays true from the review: **the funk pool is small** (three kicks, about six riffs and four strums at the working level; seeds 1 and 4 are one groove). That is style data, to be widened when funk next gets attention, with a measure first (distinct grooves in 100 seeds: 57 today). For stage 6: the app picks a fresh seed for each jam.
 
+
+## "the bass keeps its line" compares a chord with its like in the key (2026-11-22, #2284)
+
+Found on the six-seed run while country was built (#2243): the blues, handed a chart of plain triads in G, opened a phrase on the I with root, third, fifth, sixth and a phrase on the V with root, fifth, sixth, fifth, and the property called that a line not kept. The bass was doing what BA-30 asks: it takes its box from the chord's scale, and a plain V has the flat seventh in its scale where a plain I has not. The property's key was the section, the level and the chord as written, so two triads were one kind of chord whatever their place in the key. The blues' own charts never showed it: every chord in them is a dominant seventh.
+
+Brandon, shown the two bars and the two ways out (the test compares only chords with the same scale; or the blues bass plays a plain V as it plays the I, against BA-30): "Let's go with your recommendation", which was the first.
+
+- **The key now has the chord's scale in it.** A phrase opens on the same shape each time its section comes round at that level on the same kind of chord in the same place in the key. The bass is unchanged everywhere.
+- **What it compares**: on the library as it stands, 96 openings on two seeds and 374 on six, where it compared 96 and 377; the floors (83 and 250) are as they were.
+- **It still bites**: with the section's home shape drawn again on every pass (a scratch change in `players/bass/phrase.ts`, reverted), it fails on `blues-12-bar-a` seed 1 bar 13.
