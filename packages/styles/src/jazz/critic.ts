@@ -174,6 +174,9 @@ export const jazzCritic: CriticStyle = {
     // on 1, which is the pad (the quiet level's "and" of 1 and beat 2 held, F5 and F7).
     "chords.strikes-per-bar-in-three": { min: 1, max: 4, kind: "intent", minCases: 12 },
     "chords.on-one-in-three": { max: 0.9, kind: "intent", minCases: 12 },
+    // The hemiola, a phrase at a time and a minority of them (the engineer's call: about one
+    // phrase in five with no soloist).
+    "chords.hemiola-in-three": { max: 0.5, kind: "intent", minCases: 4 },
     // ── solo ──
     // Measured over 200 takes of the seven jazz charts, each also played taking the first
     // candidate every time and a candidate at random (ME-10).

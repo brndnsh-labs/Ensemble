@@ -307,7 +307,51 @@ const inThree = {
   },
 };
 
+/**
+ * In three, with the band to itself at the working level: the share of whole phrases played
+ * as the hemiola, three short chords over two bars (1 and 3, then 2). Its second bar is the
+ * one no other figure plays: a lone stab on 2, with nothing before 3 but it.
+ */
+function hemiolaInThree(take: Take): Measurement | null {
+  const struck = new Map<number, { tick: number; length: number }[]>();
+  for (const note of notesOf(take, "chords")) {
+    if (note.voice === MUTED || note.voice === PICKED) continue;
+    const bar = take.plan.bars.findLast((candidate) => candidate.start <= note.tick);
+    if (!bar) continue;
+    const list = struck.get(bar.index) ?? [];
+    if (!list.some((hit) => hit.tick === note.tick))
+      list.push({ tick: note.tick - bar.start, length: note.duration });
+    struck.set(bar.index, list);
+  }
+  const phrases = new Map<string, PlanBar[]>();
+  for (const bar of take.plan.bars) {
+    if (bar.kind !== "music" || bar.ending || bar.seats.chords === null || bar.solo !== null)
+      continue;
+    if (bar.meter.beats !== 3 || bar.meter.unit !== 4) continue;
+    const place = `${bar.section.occurrence}/${bar.phrase.index}`;
+    phrases.set(place, [...(phrases.get(place) ?? []), bar]);
+  }
+  const whole = [...phrases.values()].filter(
+    (bars) => bars.length === bars[0]!.phrase.length && tierAt(bars[0]!) === "mid",
+  );
+  const second = (bar: PlanBar) => {
+    const hits = struck.get(bar.index) ?? [];
+    const before = hits.filter((hit) => hit.tick < 2 * PPQ);
+    return before.length === 1 && before[0]!.tick === PPQ && before[0]!.length <= EIGHTH;
+  };
+  const runs = whole.filter((bars) => bars.some((bar) => bar.phrase.bar % 2 === 1 && second(bar)));
+  return share(runs.length, whole.length);
+}
+
 export const compingMeasures: readonly Measure[] = [
+  {
+    id: "chords.hemiola-in-three",
+    seat: "chords",
+    idiom: true,
+    says: "In three, with the band to itself at the working level, now and then a whole phrase is played as the hemiola, three short chords over two bars (the study's F1): the share of those phrases.",
+    unit: "share",
+    of: (take) => hemiolaInThree(take),
+  },
   // A waltz (3/4), with a soloist and without: what a pianist comping one does (the study in
   // `prompts/jazz-waltz-study.md`, 1.1 and 4.4: behind a soloist about two chords a bar, one
   // to four, and beat 1 left to the bass more often than not).

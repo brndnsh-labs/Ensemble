@@ -251,6 +251,12 @@
     "p90": 0,
     "inTarget": 1
   },
+  "chords.hemiola-in-three": {
+    "mean": 0,
+    "p10": 0,
+    "p90": 0,
+    "inTarget": 1
+  },
   "chords.thin-bars-under-the-solo-in-three": {
     "mean": 0.1847,
     "p10": 0.1354,
