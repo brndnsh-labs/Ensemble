@@ -1240,9 +1240,15 @@ const attacksOf = (style: (typeof STYLES)[number]) => {
 const picksWithTheBand = (style: (typeof STYLES)[number]): boolean =>
   attacksOf(style).some(({ grid }) => grid.some((attack) => attack.pluck !== undefined));
 /**
+ * A guitar that plucks with no bassist: a figure's second grid has plucked strings in it, the
+ * Travis hand's or a boom-chick's boom. Every bar it plucks with the bass out is read below.
+ */
+const plucksAlone = (style: (typeof STYLES)[number]): boolean =>
+  attacksOf(style).some(({ alone }) => alone?.some((attack) => attack.pluck !== undefined));
+/**
  * A guitar that picks a whole bar with no bassist: a figure's second grid that is all plucked
- * strings, the Travis hand. Only such a bar is read by the rule below; a boom-chick's bar with no
- * bassist strums its chick, and is not one.
+ * strings, the Travis hand. Such a bar is asked a string on every pulse besides; a boom-chick's
+ * bar with no bassist strums its chick between.
  */
 const picksAlone = (style: (typeof STYLES)[number]): boolean =>
   attacksOf(style).some(
@@ -1344,11 +1350,13 @@ test("a picked note is a string of the shape the hand is holding: everything the
     assert.ok(twelve > PICKED_IN_TWELVE, `only ${twelve} chords picked in twelve`);
 });
 
-test("with no bassist the picking thumb is the bass: in a bar of four, or of six or twelve where the style has written it, the guitar picks while the bass is out, a string is plucked on every pulse a chord sounds on, and the first one plucked on a pulse under a chord is that chord's root, with nothing in the bar under it but the fifth below", {
+test("with no bassist the picking thumb is the bass: in a bar of four, or of six or twelve where the style has written it, wherever the guitar plucks while the bass is out (strumming between or not), the first string plucked on a pulse under a chord is that chord's root, with nothing plucked in the bar under it but the fifth below; and a guitar that picks the whole bar plucks a string on every pulse a chord sounds on", {
   skip: pickers.length === 0,
 }, () => {
   let bars = 0;
   let stated = 0;
+  let plucking = 0;
+  let booms = 0;
   let six = 0;
   let twelve = 0;
   const played = [
@@ -1370,10 +1378,15 @@ test("with no bassist the picking thumb is the bass: in a bar of four, or of six
       if (bar.seats.bass !== null || !(four || inSix || inTwelve)) continue;
       const end = bar.start + bar.ticks;
       const own = plucked.filter((note) => note.tick >= bar.start && note.tick < end);
-      if (own.length === 0 || strums.some((s) => s.tick >= bar.start && s.tick < end)) continue;
-      bars++;
-      if (inSix) six++;
-      if (inTwelve) twelve++;
+      if (own.length === 0) continue;
+      // A bar picked whole, the Travis hand; or one where the pick plays the boom between strums.
+      const whole = !strums.some((s) => s.tick >= bar.start && s.tick < end);
+      plucking++;
+      if (whole) {
+        bars++;
+        if (inSix) six++;
+        if (inTwelve) twelve++;
+      }
       const where = `${of} bar ${bar.index}`;
       // The chords of the bar, each from where it arrives (or the barline) to the next.
       const at = harmony.findLastIndex((arrival) => arrival.tick <= bar.start);
@@ -1390,10 +1403,12 @@ test("with no bassist the picking thumb is the bass: in a bar of four, or of six
           const beat = bar.start + pulse;
           if (beat < starts || beat >= stops) continue;
           const thumb = own.filter((note) => note.tick === beat).map((note) => note.pitches[0]!);
-          assert.ok(thumb.length > 0, `${where}: no string plucked on the pulse at ${beat}`);
-          if (!first) continue;
+          if (whole)
+            assert.ok(thumb.length > 0, `${where}: no string plucked on the pulse at ${beat}`);
+          if (thumb.length === 0 || !first) continue;
           first = false;
-          stated++;
+          if (whole) stated++;
+          else booms++;
           const bass = Math.min(...thumb);
           assert.equal(bass % 12, root, `${where}: ${chord.text} is first given ${bass}`);
           // Nothing under the bass but the alternate bass, a fourth below it.
@@ -1412,6 +1427,11 @@ test("with no bassist the picking thumb is the bass: in a bar of four, or of six
     assert.ok(
       bars > enough(60) && stated > enough(60),
       `only ${bars} bars picked with no bassist, ${stated} chords stated`,
+    );
+  if (STYLES.some(plucksAlone))
+    assert.ok(
+      plucking > enough(60) && stated + booms > enough(60),
+      `only ${plucking} bars plucked with no bassist, ${stated + booms} chords stated`,
     );
   if (guitarsInSix.length > 0)
     assert.ok(six > ALONE_IN_SIX, `only ${six} bars of six picked alone`);
