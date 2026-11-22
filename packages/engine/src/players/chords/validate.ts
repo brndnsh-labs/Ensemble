@@ -470,5 +470,12 @@ export function validateChordStyle(chords: ChordStyle): string[] {
   level(ending.velocity, "ending", LOUDEST - ending.accent);
   level(ending.soft, "soft ending");
   say(ending.accent >= 0, "ending: the button's accent cannot be negative.");
+  if (ending.pullOff) {
+    say(guitar !== null, "ending: a pull-off is a guitar's; a keyboard has no string to pull off.");
+    say(
+      ending.pullOff.level > 0 && ending.pullOff.level <= 1,
+      "ending: the pulled-off note's level is a share of the strike's, more than 0 and at most 1.",
+    );
+  }
   return problems;
 }

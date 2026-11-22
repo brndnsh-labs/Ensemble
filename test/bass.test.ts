@@ -3,13 +3,15 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { PlanBar, Take } from "@ensemble/engine";
+import type { PlanBar, StylePack, Take } from "@ensemble/engine";
 import {
   arrivals,
   chordScale,
   chordTones,
+  chordToString,
   contextOf,
   DEAD_VOICE,
+  energyGain,
   isCompound,
   PPQ,
   pitchClass,
@@ -20,6 +22,7 @@ import {
   tierOf,
 } from "@ensemble/engine";
 import { bluesWritten } from "./reading.ts";
+import type { LibraryChart } from "./takes.ts";
 import {
   enough,
   heldTakes,
@@ -27,7 +30,9 @@ import {
   notesOf,
   only,
   ownCharts,
+  SEEDS,
   STYLES,
+  takeOf,
   takes,
   written,
 } from "./takes.ts";
@@ -138,6 +143,127 @@ test("the last bass note of a jam that ends is the lowest root on the instrument
       `${chart.file} seed ${options.seed}: ends on ${last.pitch} from ${before?.pitch}`,
     );
   }
+});
+
+/** A bar of four quarters. */
+const inFour = (bar: PlanBar) => bar.meter.beats === 4 && bar.meter.unit === 4;
+
+/**
+ * Charts the library does not have, written to end every way a walk home can meet: from each
+ * degree of a major and a minor key, from a chord struck on beat 3, and into a landing whose
+ * low root has no fifth under it (E) and one whose does (C).
+ */
+const HOME_CHARTS: readonly LibraryChart[] = (
+  [
+    [
+      "C",
+      [
+        "C",
+        "F",
+        "G",
+        "G7",
+        "Am",
+        "Bb",
+        "Ab",
+        "Dm",
+        "Em",
+        "D7",
+        "C7",
+        "F G",
+        "Dm G",
+        "Am Bb",
+        "G F",
+      ],
+    ],
+    ["Am", ["Am", "Dm", "E7", "F", "G", "F E7", "Dm G"]],
+    ["E", ["E", "A", "B7", "C#m", "D", "A B7"]],
+    ["G", ["G", "C", "D7", "Em", "F"]],
+  ] as const
+).flatMap(([key, befores]) =>
+  befores.map((before) => ({
+    file: `home-${key}-${before.replace(" ", "-")}`,
+    text: `title: Home\nkey: ${key}\ntempo: 100\n\n[A]\n| ${key} | ${key} | ${before} | ${key} |\n`,
+    meter: "4/4",
+  })),
+);
+
+test("in a style whose bass walks home, every ending that is one chord struck on its downbeat, in four after a bar of four of one chord (or two, the second on beat 3), is walked into: the final root in the lowest octave whose fifth is on the instrument, and a note on beat 4 a step from it; a bar of one chord whose root is outside the run climbs on 2, 3 and 4 from the fifth under the root by steps (over the V the fifth is held from 1; from the IV the line comes down from the fourth over it); a V on beat 3 holds; and the final root is struck at least as hard as the note before it", {
+  skip: !STYLES.some((style) => style.bass.walks?.ending !== undefined),
+}, () => {
+  let walked = 0;
+  const homeward = (style: StylePack) => style.bass.walks?.ending !== undefined;
+  const own = STYLES.filter(homeward).flatMap((style) =>
+    HOME_CHARTS.flatMap((chart) =>
+      [0.3, 0.85].flatMap((energy) =>
+        SEEDS.map((seed) =>
+          takeOf({ style, chart, options: { mode: "jam", passes: 1, energy, seed } }),
+        ),
+      ),
+    ),
+  );
+  for (const { style, chart, options, take } of [
+    ...takes((jam) => homeward(jam.style) && !jam.options.open),
+    ...own,
+  ]) {
+    const music = take.plan.bars.filter((bar) => bar.kind === "music");
+    const end = music.at(-1)!;
+    const before = music.at(-2);
+    if (end.ending?.at !== 0 || !before || before.index !== end.index - 1) continue;
+    if (!inFour(end) || !inFour(before) || end.seats.bass === null || before.seats.bass === null)
+      continue;
+    const chorded = end.spans.filter((span) => span.chord !== null);
+    const final = chorded[0]!.chord!;
+    if (chorded.some((span) => chordToString(span.chord!) !== chordToString(final))) continue;
+    const spans = before.spans.filter((span) => !span.tied);
+    if (before.spans.some((span) => span.chord === null)) continue;
+    const split = spans.length === 2 && spans[1]!.start === 2 * PPQ;
+    if (spans.length !== 1 && !split) continue;
+    const where = `${chart.file} seed ${options.seed} ${JSON.stringify(options)}`;
+    const bass = notesOf(take, "bass");
+    const home = bass.find((note) => note.tick === end.start);
+    assert.ok(home, `${where}: no final root`);
+    const pc = pitchClass(final.bass ?? final.root);
+    const low = 28 + ((pc - 28 + 120) % 12);
+    assert.equal(home.pitch, low - 5 >= 28 ? low : low + 12, `${where}: the final root's octave`);
+    const bar = bass.filter((note) => note.tick >= before.start && note.tick < end.start);
+    const at = (beat: number) => bar.filter((note) => note.tick === before.start + beat * PPQ);
+    const last = spans.at(-1)!.chord!;
+    const motion = (pitchClass(last.bass ?? last.root) - pc + 12) % 12;
+    walked++;
+    if (split && motion === 7) {
+      assert.equal(at(3).length, 0, `${where}: a V on beat 3 plays on into the final root`);
+      continue;
+    }
+    const [four] = at(3);
+    assert.ok(four && at(3).length === 1, `${where}: no note on beat 4 of the walk home`);
+    assert.ok(
+      Math.abs(four.pitch - home.pitch) <= 2 && four.pitch !== home.pitch,
+      `${where}: beat 4 (${four.pitch}) is not a step from the final root (${home.pitch})`,
+    );
+    // Struck at least as hard: the levels as written, the two bars' energy and the hand's touch aside.
+    const gain = (b: PlanBar) => energyGain(b.seats.bass ?? b.energy);
+    const touch = (2 * 10 * style.feel.humanize) / 100 + 1;
+    assert.ok(
+      home.velocity / gain(end) >= four.velocity / gain(before) - touch,
+      `${where}: the final root (${home.velocity}) is softer than the walk's last note (${four.velocity})`,
+    );
+    if (split || motion > 7) continue;
+    // The run itself: from the fourth over the root down, or from the fifth under it up.
+    const down = motion === 5;
+    const held = motion === 5 || motion === 7;
+    const run = held ? [...at(0), ...at(2), four] : [...at(1), ...at(2), four];
+    if (held)
+      assert.equal(at(1).length, 0, `${where}: the walk's first note is held through beat 2`);
+    assert.equal(run.length, 3, `${where}: the run is not three notes`);
+    assert.equal(run[0]!.pitch, home.pitch + (down ? 5 : -5), `${where}: the run starts elsewhere`);
+    const path = [...run.map((note) => note.pitch), home.pitch];
+    const moves = path.slice(1).map((pitch, i) => pitch - path[i]!);
+    assert.ok(
+      moves.every((move) => (down ? move < 0 && move >= -2 : move > 0 && move <= 2)),
+      `${where}: the run ${path} does not walk by steps`,
+    );
+  }
+  assert.ok(walked > enough(400), `only ${walked} endings walked home`);
 });
 
 /**

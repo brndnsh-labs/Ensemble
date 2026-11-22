@@ -8,6 +8,8 @@ import {
   chordAt,
   chordFamily,
   chordTones,
+  fingering,
+  fretsOf,
   isCompound,
   lastPulse,
   onAnd,
@@ -1808,3 +1810,85 @@ test(
     assert.ok(bars > enough(2000), `only ${bars} bars`);
   },
 );
+
+test("in a style whose guitar pulls off its final chord, the stinger is played on the final tonic of an ending that rings, and nowhere else: the 6th (the b6 over a minor chord) struck on one of the grip's top two strings and pulled off to the 5th under it on that string an eighth later, softer by the style's share; where the strike has a 6th there that its string can pull off from within the hand, without a half step over it, it always is; and no other chord note is pulled off or hammered on", {
+  skip: !STYLES.some((style) => style.chords.ending.pullOff),
+}, () => {
+  let stung = 0;
+  for (const { style, chart, options, take } of [...takes(), ...stressTakes()]) {
+    const slurs = notesOf(take, "chords").filter((note) => note.slur);
+    const where = `${chart.file} seed ${options.seed} ${JSON.stringify(options)}`;
+    const pullOff = style.chords.ending.pullOff;
+    const idiom = style.chords.idiom;
+    if (!pullOff || idiom === "keys") {
+      assert.equal(slurs.length, 0, `${where}: a chord note pulled off in a style that does not`);
+      continue;
+    }
+    const last = take.plan.bars.findLast((bar) => bar.kind === "music");
+    const ending = last?.ending;
+    const landing = last && ending ? last.start + ending.at : -1;
+    const final = harmonyOf(take).findLast((arrival) => arrival.tick <= landing)?.chord ?? null;
+    const rings =
+      last !== undefined &&
+      ending !== undefined &&
+      ending !== null &&
+      (ending.gesture.kind === "hold" || ending.gesture.kind === "soft") &&
+      ending.ring > PPQ &&
+      final !== null &&
+      pitchClass(final.root) === pitchClass(last.key.tonic);
+    if (!rings || !final) {
+      assert.equal(slurs.length, 0, `${where}: a pull-off where no final tonic rings`);
+      continue;
+    }
+    const root = pitchClass(final.root);
+    const minor = chordTones(final.quality).some(
+      (tone) => tone.role === "third" && tone.interval === 3,
+    );
+    const step = minor ? 1 : 2;
+    const sixth = minor ? 8 : 9;
+    const strike = strikesOf(take).find((one) => one.tick === landing);
+    if (!strike) continue;
+    const top = strike.pitches.slice(-2);
+    // Where the strike's 6th on one of its two top strings can pull off to the 5th: within the
+    // hand, and nothing a half step over it.
+    const strings = fingering(idiom, strike.pitches);
+    const frets = strings ? fretsOf(strings, strike.pitches) : [];
+    const fretted = frets.filter((fret) => fret > 0);
+    const can = top.some((pitch) => {
+      const k = strike.pitches.indexOf(pitch);
+      const to = frets[k]! - step;
+      const reach = to === 0 || Math.max(...fretted) - Math.min(to, ...fretted) <= 3;
+      return (
+        (pitch - root + 120) % 12 === sixth &&
+        to >= 0 &&
+        reach &&
+        !strike.pitches.some((other) => (((other - pitch) % 12) + 12) % 12 === 1)
+      );
+    });
+    if (can)
+      assert.equal(slurs.length, 1, `${where}: the final tonic ${strike.pitches} has no stinger`);
+    assert.ok(slurs.length <= 1, `${where}: ${slurs.length} pull-offs`);
+    const [pulled] = slurs;
+    if (!pulled) continue;
+    stung++;
+    assert.equal(
+      pulled.tick,
+      landing + PPQ / 2,
+      `${where}: the pull-off is not an eighth after the chord`,
+    );
+    assert.equal((pulled.pitch - root + 120) % 12, 7, `${where}: the pull-off is not to the 5th`);
+    const from = notesOf(take, "chords").find(
+      (note) => note.tick === landing && !note.slur && note.pitch === pulled.pitch + step,
+    );
+    assert.ok(
+      from && top.includes(from.pitch),
+      `${where}: no 6th on the top two strings to pull off from`,
+    );
+    const touch = (2 * 10 * style.feel.humanize) / 100 + 1;
+    assert.ok(
+      Math.abs(pulled.velocity - from.velocity * pullOff.level) <= touch,
+      `${where}: the pull-off at ${pulled.velocity} after a strike at ${from.velocity}`,
+    );
+  }
+  assert.ok(stung > enough(90), `only ${stung} stingers`);
+});

@@ -375,6 +375,21 @@ export function validateBassStyle(bass: BassStyle): string[] {
     }
   }
 
+  const home = walks?.ending;
+  if (home) {
+    if (home.velocity.length !== 4)
+      problems.push("walks, ending: a level for each of the bar's four beats.");
+    home.velocity.forEach((velocity, beat) => {
+      level(velocity, `walks, ending, beat ${beat + 1}`, LOUDEST_ENDING);
+    });
+    share(home.length, "walks, ending, its notes' length");
+    const last = home.velocity[home.velocity.length - 1] ?? 0;
+    if (bass.ending.velocity < last)
+      problems.push(
+        `walks, ending: the final root (${bass.ending.velocity}) is struck at least as hard as the walk's last note (${last}).`,
+      );
+  }
+
   // Choosing by the phrase.
   const phrase = bass.phrase;
   if (phrase) {

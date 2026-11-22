@@ -146,5 +146,7 @@ export const countryChords: ChordStyle = {
   // A groove keeps its figure under a soloist (CH-68): the hand plays as if nobody were
   // soloing, so its strokes are short there (the quiet half notes, below).
   listening: null,
-  ending: { velocity: 92, soft: 72, accent: 12 },
+  // The stinger on the final tonic: the 6th pulled off to the 5th an eighth later, 10% softer,
+  // where the grip has it on its top two strings (EN-49, ST-country-10).
+  ending: { velocity: 92, soft: 72, accent: 12, pullOff: { level: 0.9 } },
 };

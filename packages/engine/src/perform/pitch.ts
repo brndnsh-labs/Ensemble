@@ -104,7 +104,9 @@ export function pitchCurve(move: PitchMove, secondsPerTick: number, seconds: num
  * pitch (the one it is held at longest, and the recording a sampler takes),
  * stands at the first's pitch until the second's time and jumps to it there,
  * shakes as the second shakes from where the second's shake starts, and
- * sounds until the second ends. A slurred note with nothing before it is
+ * sounds until the second ends. Where the seat's notes before it are a chord
+ * struck together (a guitar's stinger, EN-49), it is joined to the one on its
+ * string: the nearest in pitch, the one above it of two as near. A slurred note with nothing before it is
  * struck. Anything that makes sound, and the MIDI file, read the
  * performance through this; everything else reads the notes as written.
  */
@@ -116,16 +118,33 @@ export function asStruck(
   if (!events.some((event) => event.kind === "note" && event.slur)) return [...events];
   const out: PerformanceEvent[] = [];
   const last = new Map<string, number>();
+  // Each seat's notes struck at its latest written tick: one, or a chord.
+  const struckTogether = new Map<string, { tick: number; notes: number[] }>();
+  const onString = (event: NoteEvent): number | undefined => {
+    const group = struckTogether.get(event.seat);
+    if (!group || group.notes.length < 2) return last.get(event.seat);
+    const gap = (index: number) => (out[index] as NoteEvent).pitch - event.pitch;
+    // The nearest in pitch; of two as near, the one above, which a finger pulls off from.
+    return group.notes.reduce((best, index) =>
+      Math.abs(gap(index)) < Math.abs(gap(best)) ||
+      (Math.abs(gap(index)) === Math.abs(gap(best)) && gap(index) > 0)
+        ? index
+        : best,
+    );
+  };
   for (const event of events) {
     if (event.kind !== "note") {
       out.push(event);
       continue;
     }
-    const at = last.get(event.seat);
+    const at = event.slur ? onString(event) : undefined;
     const first = at === undefined ? undefined : (out[at] as NoteEvent);
     if (!event.slur || first === undefined) {
       const { slur: _, ...struck } = event;
       last.set(event.seat, out.length);
+      const group = struckTogether.get(event.seat);
+      if (group?.tick === event.tick) group.notes.push(out.length);
+      else struckTogether.set(event.seat, { tick: event.tick, notes: [out.length] });
       out.push(struck);
       continue;
     }

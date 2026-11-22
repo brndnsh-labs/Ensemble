@@ -15,6 +15,7 @@ import { byBassCritic } from "./critique.ts";
 import { finalNotes, strikeBefore } from "./ending.ts";
 import type { Piece } from "./form.ts";
 import { lineAt, pieces, tierAt } from "./form.ts";
+import { homeRoot, walkedBar, walkHome } from "./home.ts";
 import type { LeadIn, LeadInRequest } from "./leadin.ts";
 import { applyLeadIn, leadIn, leadInChance, OCTAVE } from "./leadin.ts";
 import type { LineNote } from "./line.ts";
@@ -228,6 +229,25 @@ export function performer(
       };
 
       if (piece.ending === "final") {
+        // A style that walks home walks every ending it can, whatever the plan offered (EN-46).
+        const home = bass.walks?.ending;
+        const walked = home ? walkedBar(form, i) : null;
+        if (home && walked && moving) {
+          const landing = homeRoot(bassPitchClass(piece.chord!));
+          const notes = walkHome(
+            home,
+            moving,
+            parts[i - 1] ?? [],
+            state.root,
+            piece,
+            landing,
+            walked.length === 2,
+          );
+          if (notes) {
+            parts[i - 1] = notes;
+            return { state: { line: state.line, root: landing }, walked: null };
+          }
+        }
         const rested = leaving === undefined || leaving.chord === null;
         const landing = land(
           lowestRoot(bassPitchClass(piece.chord!)),
