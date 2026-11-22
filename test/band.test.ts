@@ -69,9 +69,26 @@ test("the same chart, style, options, and seed give the identical performance, d
 test("a different seed is a different take", () => {
   for (const style of STYLES) {
     for (const chart of ownCharts(style)) {
-      const performances = SEEDS.map((seed) =>
-        JSON.stringify(render(chart.text, style, { mode: "jam", passes: 3, seed }).events),
+      // The library's short jams of the chart, where it is played on every seed; a chart a push
+      // plays on one seed (one in a meter other than 4/4) is played here on each.
+      const played = takes(
+        (jam) =>
+          jam.style === style &&
+          jam.chart === chart &&
+          jam.options.mode === "jam" &&
+          jam.options.passes === 2 &&
+          !jam.options.open &&
+          !jam.options.solo,
       );
+      // One of them for each seed, or they are not what this compares.
+      const eachSeed =
+        played.length === SEEDS.length &&
+        new Set(played.map((jam) => jam.options.seed)).size === SEEDS.length;
+      const performances = (
+        eachSeed
+          ? played.map((jam) => jam.take)
+          : SEEDS.map((seed) => render(chart.text, style, { mode: "jam", passes: 3, seed }))
+      ).map((take) => JSON.stringify(take.events));
       assert.equal(new Set(performances).size, SEEDS.length, chart.file);
     }
   }
@@ -277,10 +294,12 @@ test("a take with a count-in is the same music as one without, a bar later", () 
 test("a chart with mistakes in it still plays", () => {
   for (const style of STYLES) {
     // The corpus is a parser's corpus; what a band adds is that it can play whatever
-    // parsed. On a push each style plays a third of it, a different third each.
-    const turn = styleIds().indexOf(style.id) % 3;
+    // parsed. On a push each style plays its share of it, every style's row a different one
+    // (the row's place counted round the styles), so between them they play all of it.
+    const styles = styleIds();
+    const turn = styles.indexOf(style.id);
     const broken = [
-      ...corpus.filter((_, i) => FULL || i % 3 === turn).map((row) => row.text),
+      ...corpus.filter((_, i) => FULL || i % styles.length === turn).map((row) => row.text),
       "",
       "\n\n",
       "| | |",
@@ -304,7 +323,8 @@ test("a chart with mistakes in it still plays", () => {
 });
 
 test("every take is a valid MIDI file: one track per playing seat after the tempo track, drums on channel 10", () => {
-  for (const { style, chart, take } of takes()) {
+  // On a push, one take in three: the five kinds come round in turn, so every kind is written.
+  for (const { style, chart, take } of takes().filter((_, i) => FULL || i % 3 === 0)) {
     const file = readSmf(toMidi(take.plan, take.events, style));
     assert.equal(file.format, 1, chart.file);
     assert.equal(file.ppq, PPQ);
@@ -430,8 +450,9 @@ test("where a chord is written the bass plays a tone of that chord, and at a cha
 test("a timed jam has a shape: it does not start at its peak, and it ends above where it started", () => {
   for (const style of STYLES) {
     for (const passes of [3, 4, 6, 9, 14]) {
-      const take = render(LIBRARY[0]!.text, style, { mode: "jam", passes, seed: 1 });
-      const body = take.plan.bars.filter(
+      // The roadmap alone answers this: nobody needs to play it.
+      const roadmap = plan(parse(LIBRARY[0]!.text).chart, style, { mode: "jam", passes, seed: 1 });
+      const body = roadmap.bars.filter(
         (bar) => bar.kind === "music" && bar.section.role === "body",
       );
       const mean = (bars: readonly PlanBar[]) =>
@@ -460,8 +481,14 @@ test("a timed jam has a shape: it does not start at its peak, and it ends above 
 test("a level the player sets is held: every pass plays at that level, with no arc and no lift", () => {
   for (const style of STYLES) {
     for (const energy of [0.2, 0.5, 0.9]) {
-      const take = render(LIBRARY[0]!.text, style, { mode: "jam", passes: 5, seed: 1, energy });
-      const body = take.plan.bars.filter(
+      // The roadmap alone answers this too.
+      const roadmap = plan(parse(LIBRARY[0]!.text).chart, style, {
+        mode: "jam",
+        passes: 5,
+        seed: 1,
+        energy,
+      });
+      const body = roadmap.bars.filter(
         (bar) => bar.kind === "music" && bar.section.role === "body",
       );
       const firstPass = body.filter((bar) => bar.pass === 0).map((bar) => bar.energy);
