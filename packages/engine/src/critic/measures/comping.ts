@@ -319,8 +319,8 @@ function hemiolaInThree(take: Take): Measurement | null {
     const bar = take.plan.bars.findLast((candidate) => candidate.start <= note.tick);
     if (!bar) continue;
     const list = struck.get(bar.index) ?? [];
-    if (!list.some((hit) => hit.tick === note.tick))
-      list.push({ tick: note.tick - bar.start, length: note.duration });
+    const tick = note.tick - bar.start;
+    if (!list.some((hit) => hit.tick === tick)) list.push({ tick, length: note.duration });
     struck.set(bar.index, list);
   }
   const phrases = new Map<string, PlanBar[]>();

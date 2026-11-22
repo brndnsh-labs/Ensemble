@@ -222,13 +222,13 @@
     "inTarget": 1
   },
   "chords.lowest-note": {
-    "mean": 59.1568,
+    "mean": 59.1569,
     "p10": 57.4407,
     "p90": 60.882,
     "inTarget": 0.79
   },
   "chords.colour": {
-    "mean": 0.9032,
+    "mean": 0.9031,
     "p10": 0.7956,
     "p90": 1,
     "inTarget": 1
@@ -252,9 +252,9 @@
     "inTarget": 1
   },
   "chords.hemiola-in-three": {
-    "mean": 0,
+    "mean": 0.1833,
     "p10": 0,
-    "p90": 0,
+    "p90": 0.5,
     "inTarget": 1
   },
   "chords.thin-bars-under-the-solo-in-three": {
@@ -276,15 +276,15 @@
     "inTarget": 1
   },
   "chords.strikes-per-bar-in-three": {
-    "mean": 1.7648,
+    "mean": 1.7503,
     "p10": 1.2128,
     "p90": 2.3617,
     "inTarget": 1
   },
   "chords.on-one-in-three": {
-    "mean": 0.2574,
-    "p10": 0.1702,
-    "p90": 0.4545,
+    "mean": 0.2708,
+    "p10": 0.1875,
+    "p90": 0.4476,
     "inTarget": 1
   },
   "chords.strikes-per-bar-in-six": {

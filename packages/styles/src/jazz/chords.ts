@@ -462,6 +462,20 @@ const rhythmInThree: RhythmBook = {
         // F7: beat 2, held (Kelly bars 76, 78).
         { name: "two, held", weight: 2, grid: ".... x--- ----" },
       ],
+      // F1, the hemiola: three short chords over two bars, a chord every two beats (Kelly
+      // behind the melody of the head's A sections, bars 38-43 and 53-60, 6 to 8 bars at a time,
+      // and stopped at the section's end; never under the soloist, study 2.1). A whole phrase
+      // now and then: about one in five with the band to itself, the engineer's call (no
+      // source gives a rate). Each chord the style's stab.
+      twoBars: {
+        figure: {
+          name: "the hemiola",
+          weight: 1,
+          groove: true,
+          grid: "x... .... x... .... x... ....",
+        },
+        chance: 0.2,
+      },
       // Two a bar through the level (Kelly behind Davis: 1.9 a bar, study 1.1), so that a bar
       // laid out under the line to one strike counts as thinned (the critic's floor is the aim
       // rounded down): six-eight's 1.6 to 2.2 left 45% of the bars under a solo thin.
