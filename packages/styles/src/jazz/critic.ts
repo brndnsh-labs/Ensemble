@@ -157,6 +157,23 @@ export const jazzCritic: CriticStyle = {
     "chords.top-leaps-under-the-solo": { max: 0.01, kind: "intent", minCases: 20 },
     // Louder is harder, not busier: 1.9 strikes a bar under a hot solo (deaf 2.2).
     "chords.strikes-per-bar-under-a-hot-solo": { max: 3, kind: "intent", minCases: 8 },
+    // ── the piano in a waltz (3/4) ── (the study, `prompts/jazz-waltz-study.md`: Kelly behind
+    // Davis, 16 bars counted, 31 strikes, 1 to 4 a bar, 6 of the 16 struck on 1, 2 of one strike)
+    // Under a solo: as ST-jazz-30 asks of four, under 21% of bars thin (one strike or none).
+    "chords.thin-bars-under-the-solo-in-three": { max: 0.21, kind: "intent", minCases: 12 },
+    // About two a bar (1.9 counted), one to four.
+    "chords.strikes-per-bar-in-three-under-the-solo": {
+      min: 1.5,
+      max: 2.6,
+      kind: "intent",
+      minCases: 12,
+    },
+    // Beat 1 left to the bass more often than it is played (1.1, 4.4).
+    "chords.on-one-in-three-under-the-solo": { max: 0.5, kind: "intent", minCases: 12 },
+    // With the band to itself, at every level: one to four a bar (AU-94), and not every bar
+    // on 1, which is the pad (the quiet level's "and" of 1 and beat 2 held, F5 and F7).
+    "chords.strikes-per-bar-in-three": { min: 1, max: 4, kind: "intent", minCases: 12 },
+    "chords.on-one-in-three": { max: 0.9, kind: "intent", minCases: 12 },
     // ── solo ──
     // Measured over 200 takes of the seven jazz charts, each also played taking the first
     // candidate every time and a candidate at random (ME-10).

@@ -251,6 +251,36 @@
     "p90": 0,
     "inTarget": 1
   },
+  "chords.thin-bars-under-the-solo-in-three": {
+    "mean": 0.9368,
+    "p10": 0.9362,
+    "p90": 0.9375,
+    "inTarget": 0
+  },
+  "chords.strikes-per-bar-in-three-under-the-solo": {
+    "mean": 1.0632,
+    "p10": 1.0625,
+    "p90": 1.0638,
+    "inTarget": 0
+  },
+  "chords.on-one-in-three-under-the-solo": {
+    "mean": 1,
+    "p10": 1,
+    "p90": 1,
+    "inTarget": 0
+  },
+  "chords.strikes-per-bar-in-three": {
+    "mean": 1.0635,
+    "p10": 1.0629,
+    "p90": 1.0638,
+    "inTarget": 1
+  },
+  "chords.on-one-in-three": {
+    "mean": 1,
+    "p10": 1,
+    "p90": 1,
+    "inTarget": 0
+  },
   "chords.strikes-per-bar-in-six": {
     "mean": 2.461,
     "p10": 1.8983,

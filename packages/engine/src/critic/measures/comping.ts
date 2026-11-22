@@ -262,7 +262,95 @@ function strikesInSix(take: Take): number[][] {
     .map((bar) => [...(struck.get(bar.index) ?? [])]);
 }
 
+/**
+ * The chords struck in each bar of three (3/4) the seat plays, short of the ending bar, at
+ * every level, as ticks from the barline: under a soloist, or with the band to itself. The
+ * 4/4 reading above does not read these bars.
+ */
+function strikesInThree(take: Take, soloing: boolean): number[][] {
+  const struck = new Map<number, Set<number>>();
+  for (const note of notesOf(take, "chords")) {
+    if (note.voice === MUTED || note.voice === PICKED) continue;
+    const bar = take.plan.bars.findLast((candidate) => candidate.start <= note.tick);
+    if (!bar) continue;
+    let ticks = struck.get(bar.index);
+    if (!ticks) {
+      ticks = new Set();
+      struck.set(bar.index, ticks);
+    }
+    ticks.add(note.tick - bar.start);
+  }
+  return take.plan.bars
+    .filter(
+      (bar) =>
+        bar.kind === "music" &&
+        !bar.ending &&
+        bar.meter.beats === 3 &&
+        bar.meter.unit === 4 &&
+        bar.seats.chords !== null &&
+        (bar.solo !== null) === soloing,
+    )
+    .map((bar) => [...(struck.get(bar.index) ?? [])]);
+}
+
+/** In three: how many chords a bar, the share of bars of one or none, and of bars struck on 1. */
+const inThree = {
+  perBar: (take: Take, soloing: boolean) =>
+    mean(strikesInThree(take, soloing).map((ticks) => ticks.length)),
+  thin(take: Take, soloing: boolean) {
+    const bars = strikesInThree(take, soloing);
+    return share(bars.filter((ticks) => ticks.length <= 1).length, bars.length);
+  },
+  onOne(take: Take, soloing: boolean) {
+    const bars = strikesInThree(take, soloing);
+    return share(bars.filter((ticks) => ticks.includes(0)).length, bars.length);
+  },
+};
+
 export const compingMeasures: readonly Measure[] = [
+  // A waltz (3/4), with a soloist and without: what a pianist comping one does (the study in
+  // `prompts/jazz-waltz-study.md`, 1.1 and 4.4: behind a soloist about two chords a bar, one
+  // to four, and beat 1 left to the bass more often than not).
+  {
+    id: "chords.thin-bars-under-the-solo-in-three",
+    seat: "chords",
+    idiom: true,
+    says: "In three, under a solo, few bars have one strike or none: the hand is sparse under the line and still keeps the time (ST-jazz-30, in four under 21%).",
+    unit: "share",
+    of: (take) => inThree.thin(take, true),
+  },
+  {
+    id: "chords.strikes-per-bar-in-three-under-the-solo",
+    seat: "chords",
+    idiom: true,
+    says: "In three, under a solo, the piano strikes about two chords a bar, one to four.",
+    unit: "per bar",
+    of: (take) => inThree.perBar(take, true),
+  },
+  {
+    id: "chords.on-one-in-three-under-the-solo",
+    seat: "chords",
+    idiom: true,
+    says: "In three, under a solo, the piano leaves beat 1 to the bass more often than it plays it: the share of bars it strikes on 1.",
+    unit: "share",
+    of: (take) => inThree.onOne(take, true),
+  },
+  {
+    id: "chords.strikes-per-bar-in-three",
+    seat: "chords",
+    idiom: true,
+    says: "In three, with the band to itself, the piano strikes one to four chords a bar at every level: not one chord a bar held, the pad.",
+    unit: "per bar",
+    of: (take) => inThree.perBar(take, false),
+  },
+  {
+    id: "chords.on-one-in-three",
+    seat: "chords",
+    idiom: true,
+    says: "In three, with the band to itself, the share of bars the piano strikes on 1: some bars leave the One to the bass, a pad never does.",
+    unit: "share",
+    of: (take) => inThree.onOne(take, false),
+  },
   {
     id: "chords.strikes-per-bar-in-six",
     seat: "chords",
