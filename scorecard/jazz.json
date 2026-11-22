@@ -174,13 +174,13 @@
     "inTarget": 1
   },
   "chords.top-holds": {
-    "mean": 0.4244,
+    "mean": 0.4243,
     "p10": 0.25,
     "p90": 0.5844,
     "inTarget": 1
   },
   "chords.top-steps": {
-    "mean": 0.4386,
+    "mean": 0.4387,
     "p10": 0.313,
     "p90": 0.5833,
     "inTarget": 1
@@ -198,13 +198,13 @@
     "inTarget": 1
   },
   "chords.top-movement": {
-    "mean": 1.2043,
+    "mean": 1.2049,
     "p10": 0.7304,
     "p90": 1.617,
     "inTarget": 1
   },
   "chords.floor-clearance": {
-    "mean": 3.735,
+    "mean": 3.73,
     "p10": 0,
     "p90": 7,
     "inTarget": 1
@@ -216,25 +216,25 @@
     "inTarget": 1
   },
   "chords.closest-to-bass": {
-    "mean": 9.805,
+    "mean": 9.765,
     "p10": 5,
     "p90": 14,
     "inTarget": 1
   },
   "chords.lowest-note": {
-    "mean": 59.1534,
+    "mean": 59.1568,
     "p10": 57.4407,
     "p90": 60.882,
     "inTarget": 0.79
   },
   "chords.colour": {
-    "mean": 0.9037,
+    "mean": 0.9032,
     "p10": 0.7956,
     "p90": 1,
     "inTarget": 1
   },
   "chords.written-tensions": {
-    "mean": 0.9987,
+    "mean": 0.9988,
     "p10": 1,
     "p90": 1,
     "inTarget": 1
@@ -252,34 +252,34 @@
     "inTarget": 1
   },
   "chords.thin-bars-under-the-solo-in-three": {
-    "mean": 0.9368,
-    "p10": 0.9362,
-    "p90": 0.9375,
-    "inTarget": 0
+    "mean": 0.1847,
+    "p10": 0.1354,
+    "p90": 0.234,
+    "inTarget": 0.5
   },
   "chords.strikes-per-bar-in-three-under-the-solo": {
-    "mean": 1.0632,
-    "p10": 1.0625,
-    "p90": 1.0638,
-    "inTarget": 0
+    "mean": 1.9099,
+    "p10": 1.8511,
+    "p90": 1.9688,
+    "inTarget": 1
   },
   "chords.on-one-in-three-under-the-solo": {
-    "mean": 1,
-    "p10": 1,
-    "p90": 1,
-    "inTarget": 0
+    "mean": 0.2486,
+    "p10": 0.1354,
+    "p90": 0.3617,
+    "inTarget": 1
   },
   "chords.strikes-per-bar-in-three": {
-    "mean": 1.0635,
-    "p10": 1.0629,
-    "p90": 1.0638,
+    "mean": 1.7648,
+    "p10": 1.2128,
+    "p90": 2.3617,
     "inTarget": 1
   },
   "chords.on-one-in-three": {
-    "mean": 1,
-    "p10": 1,
-    "p90": 1,
-    "inTarget": 0
+    "mean": 0.2574,
+    "p10": 0.1702,
+    "p90": 0.4545,
+    "inTarget": 1
   },
   "chords.strikes-per-bar-in-six": {
     "mean": 2.461,

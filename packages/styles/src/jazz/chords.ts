@@ -402,6 +402,111 @@ const rhythmInSixEight: RhythmBook = {
   candidates: rhythm.candidates,
 };
 
+// ── in three: the jazz waltz ────────────────────────────────────────────────
+// A bar of 3/4: twelve sixteenths grouped by beat, swung as four is, so only a
+// beat's first and third characters are struck (ST-jazz-06). Every figure is
+// one the study read from a published transcription (`prompts/jazz-waltz-study.md`,
+// F1 to F12: Wynton Kelly comping on Miles Davis's "Someday My Prince Will Come",
+// 1961, as Pamies Rodríguez transcribed it, 2021; the two off-beats as Josh Walsh
+// teaches them). What no source gives (a velocity, a length, a weight) is jazz's
+// own touch, carried from its six-eight book (a bar of six eighths too) and from four.
+// Behind a soloist the hand leaves beat 1 to the bass more often than it plays it,
+// about two strikes a bar (study 1.1, 4.4); the working book is where it stays then
+// (`listening.busiest`), sparse under the line and answering in the breaths.
+
+const rhythmInThree: RhythmBook = {
+  tiers: {
+    // Quiet: one chord laid in and held, on 1, on the "and" of 1, or on 2. A bar may be left
+    // to the bass and the ride, as in every jazz book (ST-jazz-28), less often than there: no
+    // bar of Kelly's is empty (study 1.1).
+    low: {
+      draw: "quiet",
+      articulation: STAB,
+      figures: [
+        // F4: one chord laid in and held through the bar (Kelly's bridge and arrivals, 1.3).
+        { name: "one, held", weight: 3, grid: "x--- ---- ----" },
+        // F5: the "and" of 1, held to the barline (Kelly bars 61-63, the tension released).
+        { name: "and of one, held", weight: 3, grid: "..X- ---- ----" },
+        // F7: beat 2, held (Kelly bars 76, 78).
+        { name: "two, held", weight: 2, grid: ".... x--- ----" },
+      ],
+      answers: [
+        // ST-jazz-28, the style's own: a bar whose chord is held over is not struck again.
+        { name: "rest", weight: 2, grid: ".... .... ...." },
+      ],
+      // Six-eight's: a bar of six eighths.
+      busy: { from: 0.8, to: 1.3 },
+      arrival: { level: 74, steps: 12 },
+    },
+
+    // The working level: the two off-beats and their mixes, 1 and 3, the dotted-quarter cell,
+    // beat 2 held. A section's own figure is a two-strike cell (the off-beats and the
+    // dotted-quarter cell lead, study 1.1, 1.2); the one-strike cells are answers.
+    mid: {
+      draw: "working",
+      articulation: STAB,
+      figures: [
+        // F6: the "and" of 1 and the "and" of 2, short (Kelly bar 79; Walsh's two up-beats).
+        { name: "the ands of one and two", weight: 4, grid: "..X. ..X. ...." },
+        // F2: 1 held a dotted quarter, then the "and" of 2 short (Kelly bars 37, 77, 93-99).
+        { name: "the dotted quarter", weight: 3, grid: "x--- --X. ...." },
+        // F8: 1 and 3, short (Kelly bars 74, 82).
+        { name: "one and three", weight: 2, grid: "x... .... x..." },
+      ],
+      answers: [
+        // F9: the "and" of 2 alone, short (Kelly bar 73; Walsh's second rhythm).
+        { name: "and of two", weight: 3, grid: ".... ..X. ...." },
+        // F6's mix: the "and" of 1 alone (Walsh: "sometimes hitting the and-of-one, sometimes
+        // the and-of-two").
+        { name: "and of one", weight: 2, grid: "..X. .... ...." },
+        // F7: beat 2, held (Kelly bars 76, 78).
+        { name: "two, held", weight: 2, grid: ".... x--- ----" },
+      ],
+      // Two a bar through the level (Kelly behind Davis: 1.9 a bar, study 1.1), so that a bar
+      // laid out under the line to one strike counts as thinned (the critic's floor is the aim
+      // rounded down): six-eight's 1.6 to 2.2 left 45% of the bars under a solo thin.
+      busy: { from: 2, to: 2.4 },
+      arrival: { level: 78, steps: 4 },
+    },
+
+    // Hot, with the band to itself: the working cells (the tiers share the draw, so a
+    // section's figure is the same cell grown), the dotted-quarter cell and its variants, and
+    // where a phrase ends on the dotted-quarter cell, the denser bar Kelly plays at the end of
+    // a phrase (F12, study 4.2: "dense voicings to emphasize the end of the 8 bar phrase").
+    high: {
+      draw: "working",
+      articulation: STAB,
+      figures: [
+        // F6 with the "and" of 3 (Kelly bar 72: all three "ands", short).
+        { name: "the ands of one, two and three", weight: 4, grid: "..X. ..X. ..X." },
+        // F2's variant, the "and" of 3 accented after it (Kelly bar 96).
+        {
+          name: "the dotted quarter, and the and of three",
+          weight: 3,
+          grid: "x--- --X. ..X.",
+          turn: "..X. x.X. ..X.",
+        },
+        // F3: two dotted quarters, both held (Kelly bar 98, the peak of the build).
+        { name: "two dotted quarters", weight: 2, grid: "x--- --X- ----" },
+      ],
+      answers: [
+        // F2 (Kelly bars 93-99), turned at a phrase's end as above (F12, Kelly bar 75).
+        { name: "the dotted quarter", weight: 3, grid: "x--- --X. ....", turn: "..X. x.X. ..X." },
+        // F6, F8, F9: the working figures.
+        { name: "the ands of one and two", weight: 2, grid: "..X. ..X. ...." },
+        { name: "one and three", weight: 2, grid: "x... .... x..." },
+        { name: "and of two", weight: 1, grid: ".... ..X. ...." },
+      ],
+      // Six-eight's.
+      busy: { from: 2, to: 2.8 },
+      arrival: { level: 80, steps: 4 },
+    },
+  },
+  hold: rhythm.hold,
+  forms: rhythm.forms,
+  candidates: rhythm.candidates,
+};
+
 export const jazzChords: ChordStyle = {
   idiom: "keys",
   kinds: { rootless },
@@ -410,10 +515,15 @@ export const jazzChords: ChordStyle = {
   // hand around C4 (ST-jazz-25, CH-19: 58 to 64), so the top is aimed at Bb4, a step under
   // the blues piano's C5. Led freely within a major third of that.
   register: { floor: 52, ceiling: 81, target: 70, reach: 4 },
-  // The pad, for a meter the book is not written in (CH-54): the jazz waltz.
+  // The pad, for a meter the book is not written in (CH-54): 5/4, 7/8, 9/8.
   plain: { length: 0.95, velocity: { beat: 74, offbeat: 80, restrike: 60 } },
   rhythm,
-  meters: { "6/4": rhythmInSix, "12/8": rhythmInTwelve, "6/8": rhythmInSixEight },
+  meters: {
+    "6/4": rhythmInSix,
+    "12/8": rhythmInTwelve,
+    "6/8": rhythmInSixEight,
+    "3/4": rhythmInThree,
+  },
   // The hand leans into a change at the barline a quarter of the time when quiet, more as the
   // band gets louder (ST-jazz-41, CH-39: the added "and" of 4 at 25%, 40%, 45%). A change
   // inside the bar is always played early by a strike in the eighth before it, which ties

@@ -58,7 +58,7 @@ export const GOLDENS: readonly Golden[] = [
     style: "jazz",
     options: { mode: "jam", passes: 4, seed: 1, solo: true },
   },
-  // Jazz: a timed jam in three, where the piano and the bass leave their 4/4 books.
+  // Jazz: a timed jam in three, where the piano comps from its waltz book and the bass leaves its 4/4 one.
   {
     file: "jazz-waltz-f.mid",
     chart: "jazz-waltz-f.chart",
