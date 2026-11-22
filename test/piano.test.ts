@@ -634,10 +634,10 @@ const playsTwoBars = (style: (typeof STYLES)[number], bar: PlanBar): boolean => 
 const HEMIOLA_HELD: readonly TakeOptions[] = [
   // With the soloist not heard, the hemiola in bars 18 to 24 and 33 to 36, under the alto.
   { mode: "jam", passes: 3, solo: true, energy: 0.55, seed: 3 },
-  // With a run let go on over a section's top: bars 49 to 52 go on over the fourth chorus's top.
-  { mode: "jam", passes: 4, energy: 0.55, seed: 3 },
-  // With a run let go on past eight bars: bars 113 to 124, a run of twelve.
-  { mode: "jam", passes: 8, energy: 0.55, seed: 7 },
+  // With a run let go on over a section's top: two passes, over the second chorus's top.
+  { mode: "jam", passes: 2, energy: 0.55, seed: 41 },
+  // With a run let go on past eight bars: three passes, a run of twelve.
+  { mode: "jam", passes: 3, energy: 0.55, seed: 19 },
 ];
 
 /**
