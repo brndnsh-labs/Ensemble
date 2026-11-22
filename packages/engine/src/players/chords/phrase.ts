@@ -112,13 +112,14 @@ export function compStrikes(
 
   // A figure of two bars a whole phrase may be played on (`RhythmTier.twoBars`): drawn for the
   // phrase each time through, from its first bar, and never where a soloist has the lead in it.
+  // Asked of the bars an open jam is only looking ahead to as well, as they will be played.
   const soloed = new Set(
-    plan.bars
+    [...plan.bars, ...plan.lookahead]
       .filter((bar) => bar.kind === "music" && bar.solo !== null)
       .map((bar) => `${bar.section.occurrence}/${bar.phrase.index}`),
   );
   const runsOn = once((bar): CompFigure | null => {
-    const first = plan.bars[bar.index - bar.phrase.bar];
+    const first = planBar(plan, bar.index - bar.phrase.bar);
     if (!first || !comps(first, chords)) return null;
     const across = bookOf(first).tiers[tierAt(first)].twoBars;
     if (!across || soloed.has(`${first.section.occurrence}/${first.phrase.index}`)) return null;
@@ -226,10 +227,12 @@ export function compStrikes(
   });
 
   // Whether the hand leans into the next bar: one decision per barline, each time through
-  // (CH-36). Never into the ending bar, a bar the seat sits out or comes in on, or a rest.
+  // (CH-36). Never into the ending bar, a bar the seat sits out or comes in on, or a rest; nor
+  // into a phrase played on a figure of two bars, which opens on its own first stroke.
   const pushAfter = once((bar): boolean => {
     const next = planBar(plan, bar.index + 1);
     if (!changeAfter(bar) || !comps(next, chords) || next.enters?.includes("chords")) return false;
+    if (runsOn(next) !== null) return false;
     const last = own(bar).at(-1)!;
     const figure = asPlayed(bar, runsOn(bar) ?? home(bar));
     const tier = tierAt(bar);

@@ -174,7 +174,7 @@
     "inTarget": 1
   },
   "chords.top-holds": {
-    "mean": 0.4243,
+    "mean": 0.4242,
     "p10": 0.25,
     "p90": 0.5844,
     "inTarget": 1
@@ -198,7 +198,7 @@
     "inTarget": 1
   },
   "chords.top-movement": {
-    "mean": 1.2049,
+    "mean": 1.205,
     "p10": 0.7304,
     "p90": 1.617,
     "inTarget": 1
@@ -222,7 +222,7 @@
     "inTarget": 1
   },
   "chords.lowest-note": {
-    "mean": 59.1569,
+    "mean": 59.1571,
     "p10": 57.4407,
     "p90": 60.882,
     "inTarget": 0.79
@@ -270,13 +270,13 @@
     "inTarget": 1
   },
   "chords.on-one-in-three-under-the-solo": {
-    "mean": 0.2486,
-    "p10": 0.1354,
+    "mean": 0.2538,
+    "p10": 0.1458,
     "p90": 0.3617,
     "inTarget": 1
   },
   "chords.strikes-per-bar-in-three": {
-    "mean": 1.7503,
+    "mean": 1.7489,
     "p10": 1.2128,
     "p90": 2.3617,
     "inTarget": 1
