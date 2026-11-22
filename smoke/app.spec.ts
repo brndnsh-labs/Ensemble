@@ -243,9 +243,13 @@ test("the app counts its use on production only, and only what it says it counts
 
   // Taken for production: each of those is counted, with its fields and nothing more.
   const production = await visit({ production: true });
-  const events = [
+  // A screen come to is a view: no name and no data. The chart's own count goes first, as its
+  // screen's does before the app's.
+  const events: { name?: string; data?: object }[] = [
+    {},
     { name: "session_class", data: { device: "desktop", installed: false } },
     { name: "chart_opened", data: { from: "library", chart: "blues-12-bar-a" } },
+    {},
     {
       name: "play_started",
       data: { style: "blues", meter: "4/4", mode: "jam", soloist: "none", chart: "blues-12-bar-a" },
@@ -253,7 +257,7 @@ test("the app counts its use on production only, and only what it says it counts
     { name: "play_ended", data: { how: "stopped", length: "0-1" } },
     { name: "style_changed", data: { style: "rock" } },
   ];
-  const paths = ["/", "/chart", "/chart", "/chart", "/chart"];
+  const paths = ["/", "/", "/chart", "/chart", "/chart", "/chart", "/chart"];
   const payloads = events.map((event, i) => ({
     type: "event",
     payload: {

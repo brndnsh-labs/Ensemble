@@ -8,7 +8,7 @@ import { address, cameBack, go, routeOf, subscribeAddress } from "./address.ts";
 import { Browse } from "./Browse.tsx";
 import { CreditsView } from "./CreditsView.tsx";
 import { findChart, ownCharts, subscribeCharts } from "./charts.ts";
-import { count } from "./counts.ts";
+import { count, countView } from "./counts.ts";
 import { arrived, screenOf } from "./motion.ts";
 import type { Saving } from "./offline.ts";
 import { saveInstruments } from "./offline.ts";
@@ -80,6 +80,9 @@ export function App() {
 
   const route = routeOf(hash);
   useArrival(route);
+  // Each screen come to is counted as a view (`counts.ts`: its fixed path, once a screen).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the address is what a view follows
+  useEffect(() => countView(), [hash]);
   if (route.screen === "credits") return <CreditsView packsUrl={PACKS_URL} />;
   if (route.screen === "take") {
     const take = findTake(route.id);

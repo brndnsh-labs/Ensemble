@@ -1,9 +1,10 @@
 // Counting the app's use: a few anonymous events, posted to the owner's own
 // Umami from production only. Nothing is kept in the browser, no cookie is
-// sent and nothing identifies anyone: each event is its name, the screen it
-// happened on (a fixed path, never the address, which can name a chart of the
-// player's own), and the few fields its line below allows. Off production, or
-// with do-not-track set, it does nothing at all. A send that fails is let go.
+// sent and nothing identifies anyone: each screen come to is a page view, and
+// each event is its name, the screen it happened on (a fixed path, never the
+// address, which can name a chart of the player's own), and the few fields its
+// line below allows. Off production, or with do-not-track set, it does nothing
+// at all. A send that fails is let go.
 //
 // Umami's send endpoint (docs.umami.is, "Sending stats"): a POST of
 // `{ type: "event", payload: { website, hostname, url, title, referrer, language, screen, name, data } }`
@@ -92,11 +93,8 @@ function screenPath(): string {
   return `/${route.screen}`;
 }
 
-/** Send one event, or do nothing. Never throws, never waits, never tries again. */
-export function count<E extends Event>(
-  event: E,
-  ...data: Events[E] extends Nothing ? [] : [Events[E]]
-): void {
+/** Post one thing to Umami, or do nothing. Never throws, never waits, never tries again. */
+function send(what: { name: string; data?: object } | undefined): void {
   if (!counting()) return;
   try {
     fetch(ENDPOINT, {
@@ -112,8 +110,7 @@ export function count<E extends Event>(
           referrer: "",
           language: navigator.language,
           screen: `${screen.width}x${screen.height}`,
-          name: event,
-          ...(data[0] ? { data: data[0] } : {}),
+          ...what,
         },
       }),
       keepalive: true,
@@ -124,6 +121,29 @@ export function count<E extends Event>(
   } catch {
     // A browser that will not send it: nothing is counted, and nothing else is touched.
   }
+}
+
+/** Send one event, or do nothing. */
+export function count<E extends Event>(
+  event: E,
+  ...data: Events[E] extends Nothing ? [] : [Events[E]]
+): void {
+  send({ name: event, ...(data[0] ? { data: data[0] } : {}) });
+}
+
+let viewed: string | undefined;
+
+/**
+ * A screen come to: what Umami calls a page view, the thing with no name that its overview
+ * counts visitors and views from (events alone leave it empty). The screen's fixed path and
+ * nothing else; once for each screen arrived at, so another chart on the chart's screen is
+ * not another view (`chart_opened` counts that).
+ */
+export function countView(): void {
+  const path = screenPath();
+  if (path === viewed) return;
+  viewed = path;
+  send(undefined);
 }
 
 /** Once as the app opens: what kind of device, and whether it runs installed. */
