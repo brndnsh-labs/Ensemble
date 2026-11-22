@@ -117,13 +117,23 @@ export function planBars(
           soloSection(run.bars[0]!.sectionLabel),
         )
       : undefined;
-  // The soloist's turn on each pass, as the jam set out: what the band builds under.
-  const turn = setOut
-    ? (pass: number) => {
+  // The soloist's turn on each pass, as the jam set out: what the band builds under. A pass with
+  // two Solo sections is read by the one that ends a solo, if one does, and by its last otherwise.
+  const turn: Turn = setOut
+    ? (pass) => {
         const at = setOut.findLastIndex((run) => run.part === "body" && run.pass === pass);
-        return at < 0 ? null : soloArc(at, setOut.length, false);
+        if (at < 0) return null;
+        let read = at;
+        for (let i = at; i >= 0 && setOut[i]!.pass === pass; i--) {
+          const mark = soloArc(i, setOut.length, false);
+          if (setOut[i]!.part === "body" && mark.of > 1 && mark.chorus === mark.of - 1) {
+            read = i;
+            break;
+          }
+        }
+        return soloArc(read, setOut.length, false);
       }
-    : (pass: number) => soloTurn(pass, planned, open, top);
+    : (pass) => soloTurn(pass, planned, open, top);
   const climax = soloClimax(options, planned, open, top || named, turn);
   const breath = climax === undefined ? undefined : soloBreath(climax, planned, turn);
   const rise = (pass: number) =>
@@ -212,11 +222,21 @@ export function planBars(
   }
 
   const asSet = soloMarks(drafts, options, planned, open, top, setOut?.length);
+  // A solo under way when the band is told to finish makes the told pass's last chorus its last
+  // (SO-05): every chorus of that solo in the pass, from its first there (the last that starts a
+  // solo, where one does) on. A chorus before it in the pass ends an earlier solo, as set out.
+  const toldPass = (i: number) => told !== undefined && drafts[i]!.run.pass === told;
+  let from = 0;
+  let lastChorus = 0;
+  let before: SoloMark | null = null;
+  for (const [i, mark] of asSet.entries()) {
+    if (!mark || !toldPass(i)) continue;
+    if (mark.chorus === 0 && before?.chorus !== 0) from = i;
+    lastChorus = mark.chorus;
+    before = mark;
+  }
   const solos = asSet.map((mark, i) =>
-    // A solo under way when the band is told to finish makes this chorus its last (SO-05).
-    mark && told !== undefined && drafts[i]!.run.pass === told
-      ? { chorus: mark.chorus, of: mark.chorus + 1 }
-      : mark,
+    mark && toldPass(i) && i >= from ? { chorus: mark.chorus, of: lastChorus + 1 } : mark,
   );
 
   // Who is in: now and then a seat sits out a section or a pass at a low point of the arc.
@@ -697,7 +717,12 @@ function soloTurn(pass: number, passes: number, open: boolean, fromTop: boolean)
   return { chorus, of: open ? SOLO_CHORUSES : Math.min(SOLO_CHORUSES, passes - (pass - chorus)) };
 }
 
-/** The soloist's turn on a pass of a jam as it set out, wherever its marks come from. */
+/**
+ * The soloist's turn on a pass of a jam as it set out, wherever its marks come from: the chorus
+ * the band reads the pass by. Where a pass has two or more, one ends a solo or the pass's last
+ * is followed by its solo's last chorus on the next pass, so counting a pass a chorus from it
+ * still finds the pass the solo ends on.
+ */
 type Turn = (pass: number) => SoloMark | null;
 
 /**
