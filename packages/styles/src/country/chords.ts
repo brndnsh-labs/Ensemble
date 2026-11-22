@@ -21,9 +21,10 @@ import type {
  * there. A plain major triad on the I or the IV of a major key takes the major
  * 6th (C6 is x32210, G6 320000 on the top four strings, D6 xx0202); on the V, a
  * minor chord, a seventh chord or anything with no degree in the key it stays a
- * triad (ST-country-06). A sixth or seventh chord's fifth is the shape's to hold
- * or leave (CH-24): C6 x32210 and C7 x32310 have none, A13 x02022 and E13
- * 020120 have one beside the 13th. A triad keeps its fifth: Dsus4 is xx0233.
+ * triad (ST-country-06). The 6th chord's fifth is the shape's to hold or leave:
+ * open C6 is x32210, with none, and the chick sounds its top four, E3 A3 C4 E4.
+ * The final chord of an ending holds it (the engine voices it whole). A triad
+ * keeps its fifth (Dsus4 is xx0233); the sevenths wait for #2304.
  */
 const open: VoicingKind = {
   position: "close",
@@ -35,7 +36,7 @@ const open: VoicingKind = {
       free: ["5"],
     },
     { when: { lacks: ["7"] }, voices: ["R", "3", "5", "T"] },
-    { voices: ["R", "3", "T", "7"], free: ["5"] },
+    { voices: ["R", "3", ["T", "5"], "7"] },
   ],
 };
 

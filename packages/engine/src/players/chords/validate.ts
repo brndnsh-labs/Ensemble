@@ -156,13 +156,15 @@ export function validateChordStyle(chords: ChordStyle): string[] {
       ];
       for (const tone of tones) say(VOICE_TONES.includes(tone), `${at}: "${tone}" is not a tone.`);
       const voiced = new Set(stacks.flat().flatMap((voice: Voice) => voice));
-      for (const tone of recipe.free ?? []) {
+      const free = recipe.free ?? [];
+      free.forEach((tone, k) => {
         say(
           VOICE_TONES.includes(tone) && (tone as string) !== "T",
           `${at}: free "${tone}" is not a tone.`,
         );
         say(!voiced.has(tone), `${at}: "${tone}" is both a voice and free.`);
-      }
+        if (free.indexOf(tone) !== k) say(false, `${at}: free "${tone}" is listed twice.`);
+      });
       for (const voice of stacks.flat()) {
         say(typeof voice === "string" || voice.length > 0, `${at}: a voice lists no tones.`);
       }

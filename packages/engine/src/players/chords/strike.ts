@@ -56,6 +56,12 @@ export interface Strike {
    * this share of the strike's level.
    */
   readonly pullOff?: number;
+  /**
+   * The final chord of an ending: voiced whole, a recipe's free tones voices
+   * like the rest (`Recipe.free`). A chord that rings as the end leaves
+   * nothing out; the freedom is a short stroke's, with the bass under it.
+   */
+  readonly whole?: true;
 }
 
 /**

@@ -73,9 +73,16 @@ export interface Recipe {
   /**
    * Tones the hand may sound or leave out, on top of `voices`: a guitar's grip
    * may fret one where its shape has it, as often as it likes, or none at all.
-   * Open C6 is x32210 and C7 x32310, with no fifth, and A13 is x02022, with
-   * one (CH-24): the open shape's fifth is free. A keyboard leaves a free tone
-   * out.
+   * Open C6 is x32210, with no fifth: CH-24 lets an open shape's fifth double
+   * freely, and lets a seventh chord drop it over a bassist (C7 as x32310).
+   * A keyboard leaves a free tone out. The final chord of an ending is voiced
+   * whole: there a free tone is a voice (`Strike.whole`).
+   *
+   * A free tone is honoured literally: `"5"` frees whatever fifth the chord
+   * has, b5 and #5 too, and no alteration takes its seat. So a recipe that
+   * also serves altered or diminished chords must not free the fifth until
+   * the engine frees only a perfect fifth and lets an alteration take the
+   * free seat (the sevenths, #2304).
    */
   readonly free?: readonly Exclude<VoiceTone, "T">[];
 }

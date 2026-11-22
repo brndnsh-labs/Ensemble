@@ -299,6 +299,20 @@ export function voiceStrikes(
 ): VoicedStrike[] {
   const ways = new Map<string, Way>();
   const wayAt = new Map<string, Way>();
+  // The strikes voiced whole: an ending's final chord, and every strike of it the hand holds
+  // into the ending from where the chord was struck before it (CH-31).
+  const wholeAt = new Set<Strike>();
+  const chordOf = (s: Strike) => {
+    const chord = s.arrival.chord;
+    return chord ? `${s.kind} ${JSON.stringify([chord.root, chord.quality, chord.bass])}` : null;
+  };
+  for (let i = strikes.length - 1; i >= 0; i--) {
+    if (!strikes[i]!.whole) continue;
+    const held = chordOf(strikes[i]!);
+    for (let j = i; j >= 0 && chordOf(strikes[j]!) === held && !wholeAt.has(strikes[j]!); j--) {
+      wholeAt.add(strikes[j]!);
+    }
+  }
   const voiced: VoicedStrike[] = [];
   let previous: Voicing | null = null;
   // The chord the hand last played, for an instrument that holds its shape while the chord stays.
@@ -311,7 +325,12 @@ export function voiceStrikes(
     const chord = strike.arrival.chord;
     const kind = chords.kinds[strike.kind];
     if (!chord || !kind) return null;
-    const at = `${strike.kind} ${strike.arrival.index}`;
+    // The final chord of an ending is voiced whole: its free tones are voices. A guitarist holds
+    // a grip while the chord stays (CH-31), so where the final chord was struck before the
+    // ending bar, every strike of it takes the grip the hand will end on.
+    const isWhole = wholeAt.has(strike);
+    const whole = isWhole ? " whole" : "";
+    const at = `${strike.kind} ${strike.arrival.index}${whole}`;
     let way = wayAt.get(at);
     if (!way) {
       const context = contextOf(harmony, strike.arrival);
@@ -320,17 +339,23 @@ export function voiceStrikes(
       const colour = `${JSON.stringify(chord.quality)} ${scale.name} ${scale.intervals.join(" ")}`;
       // A kind whose recipes read the chord's place in the key voices it again in another key.
       const inKey = readsTheKey(kind) ? ` ${keyToString(context.key)}` : "";
-      const name = `${strike.kind} ${root} ${colour}${inKey}`;
+      const name = `${strike.kind} ${root} ${colour}${inKey}${whole}`;
       way = ways.get(name);
       if (!way) {
         // A spread offers each of its recipe's stackings; close position has the one.
         const recipe = recipeFor(kind, chord, scale, context.key);
         const stacks =
           kind.position === "spread" ? [recipe.voices, ...(recipe.also ?? [])] : [recipe.voices];
+        // Voiced whole, the free tones join the voices; otherwise they stay the hand's to leave.
+        const free = recipe.free ?? [];
+        const fitted = (voices: (typeof stacks)[number]) =>
+          isWhole || free.length === 0
+            ? { voices: isWhole ? [...voices, ...free] : voices }
+            : { voices, free };
         const family = chordFamily(chord.quality);
         const every = stacks.flatMap((voices) =>
           idiom.candidates(
-            fitRecipe({ voices, ...(recipe.free ? { free: recipe.free } : {}) }, chord, scale),
+            fitRecipe(fitted(voices), chord, scale),
             root,
             chords.register,
             kind.position,
