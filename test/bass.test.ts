@@ -211,12 +211,13 @@ test("a bass note outside its chord's scale only passes: it is stepped into and 
 });
 
 test(
-  "blues: the bass keeps its line: away from the quiet level, a phrase opens on the same shape each time its section comes round at that level",
+  "blues: the bass keeps its line: away from the quiet level, a phrase opens on the same shape each time its section comes round at that level on the same kind of chord in the same place in the key",
   only("blues"),
   () => {
     let compared = 0;
     for (const { chart, options, take } of takes(bluesWritten)) {
       const bass = notesOf(take, "bass");
+      const harmony = arrivals(take.plan);
       const openings = new Map<string, string>();
       for (const bar of take.plan.bars) {
         if (bar.kind !== "music" || bar.ending || bar.seats.bass === null) continue;
@@ -242,7 +243,14 @@ test(
           .map((note) => `${note.tick - bar.start}:${note.pitch - notes[0]!.pitch}`)
           .join(" ");
         const quality = JSON.stringify(here.quality);
-        const key = `${bar.section.identity} ${tierOf(bar.seats.bass)} ${quality}`;
+        // The bass takes its shape from the chord's scale (BA-30: one box where the scale has
+        // the flat seventh, another where it has not), and a chord written the same way has a
+        // different scale in a different place in the key: a plain V has the flat seventh
+        // where a plain I has not. They are not one kind of chord, and are not compared.
+        const arrival = harmony.find((at) => at.tick === bar.start);
+        if (!arrival?.chord) continue;
+        const scale = chordScale(arrival.chord, contextOf(harmony, arrival)).intervals.join(",");
+        const key = `${bar.section.identity} ${tierOf(bar.seats.bass)} ${quality} ${scale}`;
         const known = openings.get(key);
         if (known === undefined) openings.set(key, shape);
         else {
