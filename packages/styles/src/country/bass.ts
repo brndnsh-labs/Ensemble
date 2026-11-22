@@ -30,15 +30,28 @@ const BOOM = {
 } as const;
 
 /**
+ * The waltz (3/4): one boom a bar, root and fifth bar by bar while the chord holds, the fifth
+ * under the root where the instrument has it; a chord struck is its root (ST-country-05, BA-56).
+ */
+const waltzTones: Line["tones"] = [
+  { when: { slash: true }, bars: [["R"], ["1"]] },
+  { bars: [["R"], ["5"]] },
+];
+const WALTZ = {
+  hold: "song",
+  options: [{ name: "waltz", weight: 1, grid: "x----------- ", under: true }],
+} as const;
+
+/**
  * A tier: how long a note sounds. Quiet, the share of the half note it is
  * written as (BA-52: 92%). Louder, a share of a beat at most (`gap` 4): 55% at
  * the working level, 75% hot. A walking note sounds as long as the line's own.
  */
-const line = (length: number, gap?: number): Line => ({
-  tones,
-  figures: BOOM,
-  // In any other meter: the root on the first pulse, held. The waltz's root and fifth bar by
-  // bar (ST-country-05) is the country waltz's, a build of its own.
+const line = (length: number, gap?: number, waltz = false): Line => ({
+  tones: waltz ? waltzTones : tones,
+  figures: waltz ? WALTZ : BOOM,
+  // In any meter but these two: the root on the first pulse, held (6/8, 12/8 and 6/4 are not
+  // country's own).
   otherMeters: "downbeat",
   // A3: nothing climbs; a fifth is under its root or a fifth over, a walk two steps over it.
   ceiling: 57,
@@ -155,6 +168,14 @@ export const countryBass: BassStyle = {
     low: line(0.92),
     mid: line(0.55, 4),
     high: line(0.75, 4),
+  },
+  // The waltz: quiet the boom rings through the bar, louder it is as short as in four.
+  meters: {
+    "3/4": {
+      low: line(0.92, undefined, true),
+      mid: line(0.55, 4, true),
+      high: line(0.75, 4, true),
+    },
   },
   leadIn,
   walks,

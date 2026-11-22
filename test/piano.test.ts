@@ -24,6 +24,7 @@ import {
   tierOf,
 } from "@ensemble/engine";
 import {
+  barsOnChord,
   bluesWritten,
   chordsUnder,
   harmonyOf,
@@ -1938,7 +1939,7 @@ test(
 );
 
 test(
-  "country: in three with no bassist the guitar's pick takes the boom on 1 of every bar it plays that is not a rest or the final chord: one plucked note, the chord's bass note where the chord is struck and its bass note or its fifth while it holds, under every note the chick plays in the bar (ST-country-07, CH-26)",
+  "country: in three with no bassist the guitar's pick takes the boom on 1 of every bar it plays that is not a rest or the final chord: one plucked note, the lowest the guitar sounds in the bar, the chord's bass in the bar it is struck in and every second bar it holds after, its alternate bass (the fifth; over a chord standing on another note, its own root) in the bars between, as the waltz bass alternates (ST-country-07, CH-26, BA-56)",
   only("country"),
   () => {
     const country = STYLES.find((style) => style.id === "country")!;
@@ -1950,15 +1951,11 @@ test(
           const { take } = takeOf({ style: country, chart, options });
           const plucked = pluckedOf(take);
           const strikes = strikesOf(take);
-          let chord: string | null = null;
+          const counts = barsOnChord(take, "chords");
           for (const bar of take.plan.bars) {
             const first = bar.spans[0]?.chord ?? null;
-            const name = first ? `${first.root}${first.quality}/${first.bass ?? ""}` : null;
-            const struck = name !== chord || bar.barInSection === 0;
-            chord = bar.spans.at(-1)?.chord
-              ? `${bar.spans.at(-1)!.chord!.root}${bar.spans.at(-1)!.chord!.quality}/${bar.spans.at(-1)!.chord!.bass ?? ""}`
-              : null;
-            if (bar.kind !== "music" || bar.ending || bar.seats.chords === null || !first) continue;
+            const cycle = counts.get(bar.index);
+            if (bar.kind !== "music" || bar.ending || cycle === undefined || !first) continue;
             const where = `${chart.file} seed ${seed} at ${energy} bar ${bar.index}`;
             const inBar = (tick: number) => tick >= bar.start && tick < bar.start + bar.ticks;
             const boom = plucked.filter((note) => note.tick === bar.start);
@@ -1969,19 +1966,19 @@ test(
               (pitchClass(first.root) +
                 (chordTones(first.quality).find((tone) => tone.role === "fifth")?.interval ?? 7)) %
               12;
-            const allowed = struck
-              ? [standsOn]
-              : [standsOn, standsOn !== pitchClass(first.root) ? pitchClass(first.root) : fifth];
-            assert.ok(
-              allowed.includes(pitch % 12),
-              `${where}: the boom ${pitch} is not the chord's bass`,
+            const other = standsOn !== pitchClass(first.root) ? pitchClass(first.root) : fifth;
+            const odd = cycle % 2 === 1;
+            assert.equal(
+              pitch % 12,
+              odd ? other : standsOn,
+              `${where}: ${cycle} bars into the chord, the boom ${pitch} where the ${odd ? "alternate bass" : "bass"} belongs`,
             );
             const chick = strikes
               .filter((strike) => inBar(strike.tick))
               .flatMap((strike) => strike.pitches);
             assert.ok(
-              chick.every((other) => other > pitch),
-              `${where}: the boom ${pitch} is not under the chick (${Math.min(...chick)})`,
+              chick.every((note) => note >= pitch),
+              `${where}: the boom ${pitch} is over the chick (${Math.min(...chick)})`,
             );
             booms++;
           }

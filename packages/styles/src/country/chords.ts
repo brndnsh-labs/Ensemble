@@ -44,6 +44,7 @@ const open: VoicingKind = {
 //   h  the top four strings, held          c  the chick: the top four, choked after an eighth
 //   C  the chick, leaned on                .  the hand passes
 //   B  the pick on the shape's root        v  the pick on the alternate bass, the chord's fifth
+//   a  the pick on the root or the alternate bass, bar by bar while the chord holds
 
 const HAND: Articulation = {
   // Quiet: the top four strings, let ring with the bass's half notes.
@@ -55,6 +56,9 @@ const HAND: Articulation = {
   // upright would: 100 then 92 (BA-51).
   B: { level: 92, steps: 4, pluck: ["bass"] },
   v: { level: 86, steps: 4, pluck: ["fifth"] },
+  // The waltz's boom, root one bar and the alternate bass the next while the chord holds, as
+  // the bass in three plays it (BA-56): at the root's level.
+  a: { level: 92, steps: 4, pluck: ["alternating"] },
 };
 
 /** A groove: one figure for the section, the same in every bar, and the same with no bassist but for the boom. */
@@ -113,6 +117,30 @@ const rhythm: RhythmBook = {
   candidates: 1,
 };
 
+/**
+ * The waltz (3/4): with a bassist, what the plain rhythm plays, the chick on 2 and 3 on the top
+ * four strings at every level, no tiers of its own. With no bassist the pick takes the boom on
+ * 1 on the shape's low strings (ST-country-07, CH-26): the root in the bar its chord is struck
+ * in and every second bar it holds, the alternate bass between, as the waltz bass alternates
+ * (BA-56); then the chick.
+ */
+const WALTZ = groove("boom-chick-chick", 1, ".... c... c...", "a... c... c...");
+const waltzTier = (draw: string) => ({
+  draw,
+  articulation: HAND,
+  figures: [WALTZ],
+  answers: [],
+  busy: { from: 2, to: 2 },
+  arrival: { level: 84, steps: 2, top: 4 },
+});
+
+const rhythmInThree: RhythmBook = {
+  tiers: { low: waltzTier("quiet"), mid: waltzTier("working"), high: waltzTier("hot") },
+  hold: 0.95,
+  forms: [{ weight: 1, bars: "a a a a" }],
+  candidates: 1,
+};
+
 export const countryChords: ChordStyle = {
   // Open position (CH-24), up to six strings, open strings on, every fretted note at or below
   // the 4th fret where the chord has such a shape, standing on its root. The strums take its
@@ -132,10 +160,17 @@ export const countryChords: ChordStyle = {
   voicing: { low: "open", mid: "open", high: "open" },
   // The guitar's low E to C5, the top aimed at E4.
   register: { floor: 40, ceiling: 72, target: 64, reach: 4 },
-  // Any meter but 4/4: the chick on every pulse but the first, which is the bass's (the
-  // waltz's boom-chick-chick is its own build).
-  plain: { length: 0.5, pulse: "offbeats", velocity: { beat: 84, offbeat: 84, restrike: 84 } },
+  // Any other meter: the chick on every pulse but the first, which is the bass's, on the top
+  // four strings while a bassist plays (ST-country-07). With no bassist in 6/8, 12/8 or 6/4,
+  // not country's own meters, the One is left empty.
+  plain: {
+    length: 0.5,
+    pulse: "offbeats",
+    top: 4,
+    velocity: { beat: 84, offbeat: 84, restrike: 84 },
+  },
   rhythm,
+  meters: { "3/4": rhythmInThree },
   // None from the comp: the boom states the chord on the One (ST-country-09).
   anticipation: {
     barline: { low: 0, mid: 0, high: 0 },

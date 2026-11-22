@@ -20,7 +20,7 @@ import {
   strongPulses,
   tierOf,
 } from "@ensemble/engine";
-import { bluesWritten, harmonyOf } from "./reading.ts";
+import { barsOnChord, bluesWritten, harmonyOf } from "./reading.ts";
 import type { LibraryChart } from "./takes.ts";
 import {
   enough,
@@ -346,11 +346,21 @@ test("in a style whose bass walks home, every ending that is one chord struck on
         const roomy = [-24, -12, 0, 12, 24].some(
           (shift) => inRegister(home.pitch + shift) && inRegister(home.pitch + shift - 4),
         );
+        // The run the climb would take: the 7th the chord's own a whole step under the root
+        // where it has one, else the leading tone; the major 6th where the scale has it or the
+        // 7th is the leading tone. A 6th outside the scale only passes, a step from the note
+        // on 1 (X-A-26).
+        const seventh = chordTones(last.quality).some(
+          (tone) => (pitchClass(last.root) + tone.interval) % 12 === (home.pitch - 2) % 12,
+        )
+          ? home.pitch - 2
+          : home.pitch - 1;
+        const sixth =
+          inScale(home.pitch - 3) || seventh === home.pitch - 1 ? home.pitch - 3 : home.pitch - 4;
+        const byName = (a: number, b: number) =>
+          Math.min((((a - b) % 12) + 12) % 12, (((b - a) % 12) + 12) % 12);
         assert.ok(
-          motion > 7 ||
-            !roomy ||
-            (!inScale(home.pitch - 3) && !inScale(home.pitch - 4)) ||
-            (!inScale(home.pitch - 1) && !inScale(home.pitch - 2)),
+          motion > 7 || !roomy || (!inScale(sixth) && byName(sixth, one.pitch) > 2),
           `${where}: the bar goes in on beat 3 alone where its run would fit`,
         );
       }
@@ -504,7 +514,7 @@ test("in a style whose bass walks home, every ending that is one chord struck on
 });
 
 test(
-  "country: in a bar of three the bass plays one note on 1, the root where its chord is struck, and while the chord holds the next bar takes its fifth (under the root wherever the instrument has it; over a chord standing on another note, its own root), then the root again, bar by bar",
+  "country: in a bar of three the bass plays one note on 1, the root in the bar its chord is struck in and every second bar it holds after, its fifth in the bars between (under the root wherever the instrument has it; over a chord standing on another note, its own root)",
   only("country"),
   () => {
     const country = STYLES.find((style) => style.id === "country")!;
@@ -521,35 +531,15 @@ test(
       ),
     ]) {
       const bass = notesOf(take, "bass");
+      const counts = barsOnChord(take, "bass");
       const music = take.plan.bars.filter((bar) => bar.kind === "music");
       const last = music.at(-1)!;
-      // Bars of the chord sounding at the barline spent before this one, counted from where it was
-      // struck; null where there is no chord to count.
-      let chord: string | null = null;
-      let cycle = 0;
       let root: number | null = null;
-      // A chord arriving inside a bar is counted from the next barline (BA-97): that bar is its
-      // first.
-      const arrivesInside = (bar: PlanBar) => {
-        const lastSpan = bar.spans.at(-1);
-        if (bar.spans.length < 2 || !lastSpan?.chord || bar.seats.bass === null) return;
-        const name = chordToString(lastSpan.chord);
-        if (name !== chord) {
-          chord = name;
-          cycle = -1;
-        }
-      };
       for (const bar of music) {
-        const first = bar.spans[0];
-        const name = first && first.start === 0 && first.chord ? chordToString(first.chord) : null;
-        const struck =
-          bar.seats.bass === null || name === null || name !== chord || bar.barInSection === 0;
-        cycle = struck ? 0 : cycle + 1;
-        chord = bar.seats.bass === null ? null : name;
+        const cycle = counts.get(bar.index);
         // The bar before an ending that walks home, and the ending, are their own (above).
         const home = bar.index >= last.index - 1 && Boolean(last.ending);
-        if (!inThree(bar) || bar.seats.bass === null || name === null || bar.ending || home) {
-          arrivesInside(bar);
+        if (!inThree(bar) || cycle === undefined || bar.ending || home) {
           root = null;
           continue;
         }
@@ -561,33 +551,28 @@ test(
         assert.ok(one, `${where}: nothing on 1`);
         if (bar.spans.length === 1)
           assert.equal(on.length, 1, `${where}: ${on.length} notes in a bar of one chord`);
-        const c = first!.chord!;
+        const c = bar.spans[0]!.chord!;
         const standsOn = pitchClass(c.bass ?? c.root);
         const fifth =
           (pitchClass(c.root) +
             (chordTones(c.quality).find((tone) => tone.role === "fifth")?.interval ?? 7)) %
           12;
         const other = standsOn !== pitchClass(c.root) ? pitchClass(c.root) : fifth;
-        const wanted = cycle % 2 === 0 ? standsOn : other;
+        const odd = cycle % 2 === 1;
         assert.equal(
           one.pitch % 12,
-          wanted,
-          `${where}: ${cycle} bars into ${name}, ${one.pitch} on 1 where the ${cycle % 2 === 0 ? "root" : "fifth"} belongs`,
+          odd ? other : standsOn,
+          `${where}: ${cycle} bars into ${chordToString(c)}, ${one.pitch} on 1 where the ${odd ? "fifth" : "root"} belongs`,
         );
-        if (cycle % 2 === 1) {
+        if (odd) {
           held++;
-          if (
-            root !== null &&
-            other === fifth &&
-            root - 12 + ((one.pitch - root + 120) % 12) >= LOW_E
-          )
+          if (root !== null && other === fifth && root - 5 >= LOW_E)
             assert.ok(
               one.pitch < root,
               `${where}: the fifth ${one.pitch} over the root ${root} where it fits under`,
             );
         }
-        root = cycle % 2 === 0 ? one.pitch : root;
-        arrivesInside(bar);
+        root = odd ? null : one.pitch;
       }
     }
     assert.ok(held > enough(300), `only ${held} bars of three on a held chord`);
