@@ -213,7 +213,6 @@ export function planBars(
           open,
           ends,
           without,
-          ...(told === undefined ? {} : { told }),
           ...(climax === undefined ? {} : { climax }),
           ...(breath === undefined ? {} : { breath }),
           rise,
@@ -744,8 +743,12 @@ function soloRise(
 const LAY_OUT_BAND = 3;
 /** The first pass a seat may sit out: the band states the tune, then gets going, before it thins. */
 const LAY_OUT_FROM = 2;
-/** At most one lay-out in any run of this many passes. */
-const LAY_OUT_EVERY = 4;
+/** Nor before this many bars of music, however short the form. */
+const LAY_OUT_FIRST_BAR = 16;
+/** After a lay-out, everyone is in for at least this many whole passes... */
+const LAY_OUT_PASSES_BETWEEN = 3;
+/** ...and at least this many bars, however short the form, before another starts. */
+const LAY_OUT_BARS_BETWEEN = 64;
 
 interface Shape {
   readonly planned: number;
@@ -753,8 +756,6 @@ interface Shape {
   readonly open: boolean;
   readonly ends: boolean;
   readonly without: ReadonlySet<Seat>;
-  /** The pass the band was told to finish on. */
-  readonly told?: number;
   readonly climax?: number;
   readonly breath?: number;
   readonly rise: (pass: number) => number | undefined;
@@ -762,14 +763,23 @@ interface Shape {
 
 /**
  * The seat each bar of a jam lays out by the style's own say (`ArcStyle.layOut`), or null. A
- * seat goes out at the top of a section or a pass and is back at the top of the next, in a
- * pass low on the arc as the jam set out: never the first two passes, the last, or the peak,
- * and never a level the player holds. A jam planned shorter than four passes, a band of two
- * seats, and the soloist are left alone, and at most one pass in four thins. Each pass draws
- * from the seed by its own number, and only what the passes before it drew can stop it, so a
- * jam made longer, or told to finish, keeps every lay-out it had played. The pass it is told
- * to finish on is its last, and everyone is in for it from its second phrase, where the band
- * can first have been told.
+ * seat goes out at the top of a section or a pass and is back at the top of the next.
+ *
+ * Where: in a jam of a set length, a pass no higher on the arc as the jam set out than `below`
+ * of the way from its opening pass to its peak, read at the pass's middle: the breath, a pass
+ * settled after the peak, and a building pass short of the top (the pass just before the peak
+ * among them: a drop before everyone comes in for the top). Never the peak, the last pass, the
+ * first two passes or the first 16 bars. Under the soloist, never the last chorus of a solo
+ * (its peak, SO-05), so never a solo of one chorus. An open jam has no arc to be low on (its
+ * lift only climbs to a cap) and no peak: there it is the spacing and the chance alone.
+ *
+ * How often: after a lay-out, everyone is in for three whole passes and 64 bars at least, and
+ * each pass draws its chance. Never a level the player holds, a band of two seats, or the
+ * soloist. A jam planned shorter than four passes lays nobody out by these rules alone.
+ *
+ * Each pass draws from the seed by its own number, and only what the passes before it drew can
+ * stop it, so a jam made longer keeps every lay-out it had. The pass it is told to finish on is
+ * its last, and everyone is in for it.
  */
 function layOuts(
   drafts: readonly Draft[],
@@ -793,26 +803,34 @@ function layOuts(
   const ceiling = timed.first + data.below * (timed.climax - timed.first);
   const peak = shape.open ? undefined : (shape.climax ?? defaultClimax(shape.planned));
   const rng = createRng(options.seed);
-  let last = Number.NEGATIVE_INFINITY;
+  // The last lay-out: its pass, and the bar after it (bars counted from the first of the music).
+  let lastPass = Number.NEGATIVE_INFINITY;
+  let lastEnd = Number.NEGATIVE_INFINITY;
   for (const [pass, bars] of byPass) {
-    if (pass < LAY_OUT_FROM || pass === peak || pass - last < LAY_OUT_EVERY) continue;
-    const toldHere = pass === shape.told;
-    if (shape.ends && pass === shape.passes - 1 && !toldHere) continue;
+    if (pass < LAY_OUT_FROM || pass === peak) continue;
+    if (pass - lastPass <= LAY_OUT_PASSES_BETWEEN) continue;
+    if (shape.ends && pass === shape.passes - 1) continue;
     const soloing = (i: number) => solos[i] !== null && !shape.without.has("solo");
-    if (data.under === "solo" ? !bars.every(soloing) : bars.some(soloing)) continue;
-    const rise = shape.rise(pass);
-    const height = arcOffset(style.arc, {
-      pass,
-      passes: shape.planned,
-      open: shape.open,
-      part: "body",
-      phraseStart: 0.5,
-      phraseEnd: 0.5,
-      ...(shape.climax === undefined ? {} : { climax: shape.climax }),
-      ...(shape.breath === undefined ? {} : { breath: shape.breath }),
-      ...(rise === undefined ? {} : { rise }),
-    });
-    if (height > ceiling) continue;
+    if (data.under === "solo") {
+      if (!bars.every(soloing)) continue;
+      // Never the last chorus of a solo: it is the solo's peak, and the band is all in for it.
+      if (bars.some((i) => solos[i]!.chorus === solos[i]!.of - 1)) continue;
+    } else if (bars.some(soloing)) continue;
+    if (!shape.open) {
+      const rise = shape.rise(pass);
+      const height = arcOffset(style.arc, {
+        pass,
+        passes: shape.planned,
+        open: false,
+        part: "body",
+        phraseStart: 0.5,
+        phraseEnd: 0.5,
+        ...(shape.climax === undefined ? {} : { climax: shape.climax }),
+        ...(shape.breath === undefined ? {} : { breath: shape.breath }),
+        ...(rise === undefined ? {} : { rise }),
+      });
+      if (height > ceiling) continue;
+    }
     const draw = rng.fork("lay-out", style.id, pass);
     if (!draw.chance(data.chance)) continue;
     const seat = draw.pick(seats);
@@ -825,16 +843,11 @@ function layOuts(
         : new Set([
             draw.pick([...levels].filter(([, level]) => level === lowest).map(([run]) => run)),
           ]);
-    const top = drafts[bars[0]!]!.run;
-    for (const i of bars) {
-      if (!chosen.has(drafts[i]!.run)) continue;
-      // Told to finish on a pass a seat was to sit out from its top: the band was told at a
-      // phrase top after it, so the seat sits out the first phrase as it was going to, and is in
-      // from the second for the ending. One that was to go out later in the pass stays in.
-      if (toldHere && (drafts[i]!.run !== top || drafts[i]!.phrase.index > 0)) continue;
-      outs[i] = seat;
-    }
-    last = pass;
+    const out = bars.filter((i) => chosen.has(drafts[i]!.run));
+    if (out[0]! < LAY_OUT_FIRST_BAR || out[0]! - lastEnd < LAY_OUT_BARS_BETWEEN) continue;
+    for (const i of out) outs[i] = seat;
+    lastPass = pass;
+    lastEnd = out.at(-1)! + 1;
   }
   return outs;
 }
