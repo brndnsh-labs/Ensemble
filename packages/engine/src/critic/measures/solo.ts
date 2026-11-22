@@ -812,6 +812,16 @@ export const soloMeasures: readonly Measure[] = [
     (reading) => perSoloBar(reading, (note) => note.move?.glide?.length === 2),
   ),
   idiom(
+    "whole-step-bends",
+    "share",
+    "Of the notes bent into, the share pushed up a whole step (the steel's bend into a root or a fifth) and not a half (the curl into the major third): both are heard.",
+    (reading) => {
+      const bends = reading.events.filter((note) => note.move?.glide?.length === 2);
+      const whole = bends.filter((note) => Math.round(note.move!.glide![0]!.semitones) === -2);
+      return share(whole.length, bends.length);
+    },
+  ),
+  idiom(
     "shakes",
     "per bar",
     "How often a held note is shaken, in notes with vibrato for each bar of the solo: the long notes, not the line (SO-52).",

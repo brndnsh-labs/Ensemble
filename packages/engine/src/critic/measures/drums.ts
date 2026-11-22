@@ -393,4 +393,67 @@ export const drumMeasures: readonly Measure[] = [
       return share(hits.length, bars.length);
     },
   },
+  sectionShare(
+    "drums.two-step",
+    "mid",
+    "Of the sections the band plays at the working level, most are the two-step (the hat on every eighth) and the rest the light train: a section's groove drawn once and kept, so it is counted over every take.",
+    (bar, notes) => evenEighths(bar, notes, "closedHat"),
+  ),
+  sectionShare(
+    "drums.lattice",
+    "high",
+    "Of the hot sections in four, most play the train's sixteenth lattice on the snare, unbroken, and the rest steady eighths: counted over every take.",
+    (bar, notes) =>
+      bar.meter.beats === 4 &&
+      bar.meter.unit === 4 &&
+      Array.from({ length: 16 }, (_, step) => bar.start + step * STEP).every((tick) =>
+        notes.some((note) => note.tick === tick && note.pitch === 38),
+      ),
+  ),
 ];
+
+/** Whether a piece strikes every eighth of the bar. */
+function evenEighths(bar: PlanBar, notes: readonly NoteEvent[], voice: string): boolean {
+  const eighths = bar.ticks / (PPQ / 2);
+  return Array.from({ length: eighths }, (_, i) => bar.start + (i * PPQ) / 2).every((tick) =>
+    notes.some((note) => note.tick === tick && note.voice === voice),
+  );
+}
+
+/**
+ * The share of sections at a tier whose groove is of a kind, over every take: each section of
+ * a take once (its groove is drawn once and kept every time it comes round), read in its first
+ * bar of plain time at that tier.
+ */
+function sectionShare(
+  id: string,
+  tier: "mid" | "high",
+  says: string,
+  is: (bar: PlanBar, notes: readonly NoteEvent[]) => boolean,
+): Measure {
+  return {
+    id,
+    seat: "drums",
+    idiom: true,
+    says,
+    unit: "share",
+    of: () => null,
+    across(takes) {
+      let sections = 0;
+      let hits = 0;
+      for (const take of takes) {
+        const drums = notesOf(take, "drums");
+        const seen = new Set<string>();
+        for (const bar of timeBars(take)) {
+          if (drumTier(bar) !== tier || bar.meter.beats !== 4 || bar.meter.unit !== 4) continue;
+          const section = JSON.stringify(bar.section.identity);
+          if (seen.has(section)) continue;
+          seen.add(section);
+          sections++;
+          if (is(bar, notesIn(drums, bar))) hits++;
+        }
+      }
+      return share(hits, sections);
+    },
+  };
+}

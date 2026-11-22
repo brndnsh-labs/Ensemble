@@ -921,4 +921,92 @@ export const bassMeasures: readonly Measure[] = [
     },
   },
   ...idiomMeasures,
+  {
+    id: "bass.boom-chick",
+    seat: "bass",
+    idiom: true,
+    says: "The two-beat bass: in a bar of four on one chord, its root on 1 and its fifth on 3 (over a chord standing on its fifth, the chord's own root), 2 and 4 left to the chick.",
+    unit: "share",
+    of(take) {
+      const bass = notesOf(take, "bass");
+      let bars = 0;
+      let boom = 0;
+      for (const bar of fourOnOneChord(take)) {
+        const chord = bar.spans[0]!.chord!;
+        const notes = notesIn(bass, bar);
+        const on = (beat: number) => notes.find((note) => note.tick === bar.start + beat * PPQ);
+        const [one, three] = [on(0), on(2)];
+        bars++;
+        const root = pitchClass(chord.root);
+        const standsOn = pitchClass(chord.bass ?? chord.root);
+        const fifth =
+          chordTones(chord.quality).find((tone) => tone.role === "fifth")?.interval ?? 7;
+        const other = standsOn !== root ? root : mod12(root + fifth);
+        if (one && mod12(one.pitch) === standsOn && three && mod12(three.pitch) === other) boom++;
+      }
+      return share(boom, bars);
+    },
+  },
+  {
+    id: "bass.notes-per-beat",
+    seat: "bass",
+    idiom: true,
+    says: "How busy the line is, in notes a beat over its bars of four: two a bar is a two-beat bass, a walk adds one or two.",
+    unit: "per beat",
+    of(take) {
+      const bass = notesOf(take, "bass");
+      let beats = 0;
+      let notes = 0;
+      for (const bar of musicBars(take)) {
+        if (bar.ending || bar.seats.bass === null || bar.meter.beats !== 4 || bar.meter.unit !== 4)
+          continue;
+        beats += 4;
+        notes += notesIn(bass, bar).length;
+      }
+      return beats === 0 ? null : { value: notes / beats, cases: beats };
+    },
+  },
+  {
+    id: "bass.changes-walked",
+    seat: "bass",
+    idiom: true,
+    says: "Above the quiet level, some changes of bass note at a barline are walked into from the bar before: the root held, and a step on 4 (and on 3) into the new root; most are not.",
+    unit: "share",
+    of(take) {
+      const bass = notesOf(take, "bass");
+      let cases = 0;
+      let walked = 0;
+      for (const change of bassChanges(take)) {
+        if (change.tick !== change.bar.start || change.bar.ending) continue;
+        const before = take.plan.bars[change.bar.index - 1];
+        if (before?.kind !== "music" || before.meter.beats !== 4) continue;
+        const tier = bassTier(before);
+        if (tier === null || tier === "low" || before.spans.length !== 1) continue;
+        const landing = bass.find((note) => note.tick === change.tick);
+        if (!landing) continue;
+        cases++;
+        const notes = notesIn(bass, before);
+        const on = (beat: number) => notes.find((note) => note.tick === before.start + beat * PPQ);
+        const [three, four] = [on(2), on(3)];
+        const step = (a: number, b: number) => a !== b && Math.abs(a - b) <= 2;
+        if (four && step(four.pitch, landing.pitch) && (!three || step(three.pitch, four.pitch)))
+          walked++;
+      }
+      return share(walked, cases);
+    },
+  },
 ];
+
+/** Bars of four on one chord, struck on the downbeat, with the bass in and short of the ending. */
+function fourOnOneChord(take: Take): PlanBar[] {
+  return musicBars(take).filter(
+    (bar) =>
+      !bar.ending &&
+      bar.seats.bass !== null &&
+      bar.meter.beats === 4 &&
+      bar.meter.unit === 4 &&
+      bar.spans.length === 1 &&
+      bar.spans[0]!.chord !== null &&
+      bar.spans[0]!.start === 0,
+  );
+}
