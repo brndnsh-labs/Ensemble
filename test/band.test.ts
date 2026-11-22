@@ -1358,7 +1358,23 @@ const WHO_KINDS: readonly PlanOptions[] = [
       ] as const)
     : []),
 ];
-const WHO_SEEDS = Array.from({ length: FULL ? 24 : 4 }, (_, i) => i + 1);
+const WHO_SEEDS = Array.from({ length: FULL ? 24 : 3 }, (_, i) => i + 1);
+
+/**
+ * The kinds a push plans for a style: a jam too short to thin, one of eight passes and an open
+ * one, each with the soloist where the style thins under one and without where it thins alone,
+ * so that every clause meets a take that thins. The full run plans every kind for every style.
+ */
+const whoKinds = (style: StylePack): readonly PlanOptions[] => {
+  if (FULL) return WHO_KINDS;
+  const solo = style.arc.layOut?.under === "solo";
+  return WHO_KINDS.filter(
+    (kind) =>
+      kind.passes === 3 ||
+      (kind.passes === 8 && (kind.solo === true) === solo) ||
+      (kind.open === true && (kind.solo === true) === solo),
+  );
+};
 
 /** A take's lay-outs, in order: the seat, and the first and last bar out, counted in bars of music. */
 function stretchesOf(
@@ -1387,13 +1403,20 @@ test("who is in: now and then a jam lays one seat out, by its style's say, for a
     let seen = 0;
     let rendered = false;
     let shortest:
-      | { text: string; where: string; at: PlanBar; open: boolean; options: TakeOptions }
+      | {
+          text: string;
+          where: string;
+          at: PlanBar;
+          open: boolean;
+          seconds: number;
+          options: TakeOptions;
+        }
       | undefined;
     for (const file of ownCharts(style)) {
       const chart = parse(file.text).chart;
       const arranged = chart.arrangement?.lines != null;
       for (const seed of WHO_SEEDS) {
-        for (const kind of WHO_KINDS) {
+        for (const kind of whoKinds(style)) {
           const options = { ...kind, seed };
           const where = `${file.file} seed ${seed} ${JSON.stringify(kind)}`;
           if (!data) {
@@ -1514,13 +1537,16 @@ test("who is in: now and then a jam lays one seat out, by its style's say, for a
           const better =
             shortest === undefined ||
             (open && !shortest.open) ||
-            (open === shortest.open && at !== undefined && at.index < shortest.at.index);
+            (open === shortest.open &&
+              at !== undefined &&
+              secondsAt(roadmap, at.start) < shortest.seconds);
           if (first && at && better) {
             shortest = {
               text: file.text,
               where,
               at,
               open,
+              seconds: secondsAt(roadmap, at.start),
               options: {
                 ...options,
                 ...(open ? { passes: first.from.pass + 1 } : {}),
@@ -1549,7 +1575,9 @@ test("who is in: now and then a jam lays one seat out, by its style's say, for a
       // wherever the band with nobody laid out does.
       const { text, where, at, options } = shortest!;
       const take = render(text, style, options);
-      const base = render(text, none, options);
+      // The band with nobody laid out, which up to the word plays as when it was never told.
+      const { toldAt: _word, ...knew } = options;
+      const base = render(text, none, knew);
       const toldOuts = laidOut(take.plan);
       assert.ok(toldOuts.size > 0, `${where}: told, the lay-out before it is gone`);
       const inBar = (t: Take, seat: string, bar: PlanBar) =>
