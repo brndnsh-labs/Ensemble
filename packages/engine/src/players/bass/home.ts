@@ -273,7 +273,10 @@ export function walkHome(
     return found;
   };
 
-  // Each way in its order, in the lowest octave it fits.
+  // A run the walk places itself is taken in the first way that fits, in the lowest octave it
+  // fits: only the rising run into E to Ab needs the octave over the open string's. A walk that
+  // goes in from the line's own note lands on the lowest root it can go in to, by whichever of
+  // its notes fits there (EN-47, EN-48). The ways come in the same order in every octave.
   const landings: number[] = [];
   for (let pitch = lowestRoot(pc); pitch <= register.highest; pitch += 12)
     if (pitch >= low) landings.push(pitch);
@@ -282,7 +285,12 @@ export function walkHome(
   for (let k = 0; k < count; k++) {
     for (const [i, list] of byOctave.entries()) {
       const way = list[k];
-      if (way && ok(way)) return { notes: way.notes, landing: landings[i]! };
+      if (way && !half && way.placed && ok(way)) return { notes: way.notes, landing: landings[i]! };
+    }
+  }
+  for (const [i, list] of byOctave.entries()) {
+    for (const way of list) {
+      if ((half || !way.placed) && ok(way)) return { notes: way.notes, landing: landings[i]! };
     }
   }
   return null;
