@@ -44,6 +44,7 @@ import {
   STYLES,
   soloistTakes,
   stressTakes,
+  takeOf,
   takes,
   WRITTEN,
   written,
@@ -1899,3 +1900,94 @@ test("in a style whose guitar pulls off its final chord, the stinger is played o
   }
   assert.ok(stung > enough(90), `only ${stung} stingers`);
 });
+
+test(
+  "country: while a bassist plays, the guitar strums only its top four strings (ST-country-07): no stroke before the final chord sounds under the D string's open D3, in any meter",
+  only("country"),
+  () => {
+    const country = STYLES.find((style) => style.id === "country")!;
+    const lowest = OPEN[2]!;
+    const others = ["3/4", "6/8", "12/8", "6/4"].map(
+      (meter) => LIBRARY.find((chart) => chart.meter === meter)!,
+    );
+    let outside = 0;
+    for (const { chart, options, take } of [
+      ...takes((jam) => jam.style === country),
+      ...others.flatMap((chart) =>
+        [0.3, 0.85].map((energy) =>
+          takeOf({
+            style: country,
+            chart,
+            options: { mode: "jam", passes: 1, energy, seed: SEEDS.length },
+          }),
+        ),
+      ),
+    ]) {
+      for (const strike of strikesOf(take)) {
+        const bar = take.plan.bars.findLast((candidate) => candidate.start <= strike.tick)!;
+        if (bar.kind !== "music" || bar.ending || bar.seats.bass === null) continue;
+        if (bar.meter.beats !== 4 || bar.meter.unit !== 4) outside++;
+        assert.ok(
+          strike.pitches[0]! >= lowest,
+          `${chart.file} seed ${options.seed} ${JSON.stringify(options)} bar ${bar.index}: ${strike.pitches} under the top four strings`,
+        );
+      }
+    }
+    assert.ok(outside > enough(600), `only ${outside} strokes outside 4/4`);
+  },
+);
+
+test(
+  "country: in three with no bassist the guitar's pick takes the boom on 1 of every bar it plays that is not a rest or the final chord: one plucked note, the chord's bass note where the chord is struck and its bass note or its fifth while it holds, under every note the chick plays in the bar (ST-country-07, CH-26)",
+  only("country"),
+  () => {
+    const country = STYLES.find((style) => style.id === "country")!;
+    let booms = 0;
+    for (const chart of LIBRARY.filter((candidate) => candidate.meter === "3/4")) {
+      for (const energy of [0.3, 0.6, 0.85]) {
+        for (const seed of SEEDS) {
+          const options: TakeOptions = { mode: "jam", passes: 2, energy, seed, without: ["bass"] };
+          const { take } = takeOf({ style: country, chart, options });
+          const plucked = pluckedOf(take);
+          const strikes = strikesOf(take);
+          let chord: string | null = null;
+          for (const bar of take.plan.bars) {
+            const first = bar.spans[0]?.chord ?? null;
+            const name = first ? `${first.root}${first.quality}/${first.bass ?? ""}` : null;
+            const struck = name !== chord || bar.barInSection === 0;
+            chord = bar.spans.at(-1)?.chord
+              ? `${bar.spans.at(-1)!.chord!.root}${bar.spans.at(-1)!.chord!.quality}/${bar.spans.at(-1)!.chord!.bass ?? ""}`
+              : null;
+            if (bar.kind !== "music" || bar.ending || bar.seats.chords === null || !first) continue;
+            const where = `${chart.file} seed ${seed} at ${energy} bar ${bar.index}`;
+            const inBar = (tick: number) => tick >= bar.start && tick < bar.start + bar.ticks;
+            const boom = plucked.filter((note) => note.tick === bar.start);
+            assert.equal(boom.length, 1, `${where}: ${boom.length} plucked notes on 1`);
+            const pitch = boom[0]!.pitches[0]!;
+            const standsOn = pitchClass(first.bass ?? first.root);
+            const fifth =
+              (pitchClass(first.root) +
+                (chordTones(first.quality).find((tone) => tone.role === "fifth")?.interval ?? 7)) %
+              12;
+            const allowed = struck
+              ? [standsOn]
+              : [standsOn, standsOn !== pitchClass(first.root) ? pitchClass(first.root) : fifth];
+            assert.ok(
+              allowed.includes(pitch % 12),
+              `${where}: the boom ${pitch} is not the chord's bass`,
+            );
+            const chick = strikes
+              .filter((strike) => inBar(strike.tick))
+              .flatMap((strike) => strike.pitches);
+            assert.ok(
+              chick.every((other) => other > pitch),
+              `${where}: the boom ${pitch} is not under the chick (${Math.min(...chick)})`,
+            );
+            booms++;
+          }
+        }
+      }
+    }
+    assert.ok(booms > enough(600), `only ${booms} bars with no bassist`);
+  },
+);
