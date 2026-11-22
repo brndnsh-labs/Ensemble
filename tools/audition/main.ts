@@ -86,6 +86,11 @@ async function perform(): Promise<Performance> {
     ...(params.get("fromtop") === "1" ? { soloFromTop: true } : {}),
     // `breathe=1` lets the tempo breathe with the arc, as the CLI's --breathe does.
     ...(params.get("breathe") === "1" ? { breathe: true } : {}),
+    // `open=1` plays an open jam of `passes` passes, as the app does; `endafter=N` and `toldat=T`
+    // tell it to finish on pass N (from 0) at tick T, as the app's Finish does.
+    ...(params.get("open") === "1" ? { open: true } : {}),
+    ...(params.has("endafter") ? { endAfter: Number(params.get("endafter")) } : {}),
+    ...(params.has("toldat") ? { toldAt: Number(params.get("toldat")) } : {}),
   });
   const only = params.get("only")?.split(",");
   // `packs=chords:electric-piano` puts another instrument in a seat: for hearing a pack
