@@ -1410,7 +1410,8 @@ button:active:not(:disabled, .row-play, .last-play, .go, .player, .opt, .menu-li
 .play {
   display: flex;
   flex-direction: column;
-  height: 100dvh;
+  /* Less the strip that says a new version is ready, while it is up. */
+  height: calc(100dvh - var(--new-version, 0px));
   padding-top: env(safe-area-inset-top);
   overflow: hidden;
 }
@@ -3772,4 +3773,41 @@ button.mark[aria-expanded="true"] {
   .sentence button.part:hover {
     box-shadow: inset 0 -1.3em 0 0 color-mix(in srgb, var(--spot) 62%, transparent);
   }
+}
+
+/* ── A new version ───────────────────────────────────────────────────────── */
+
+/* A strip along the foot of the screen when a newer build has taken over behind the page. It
+   asks; it never reloads by itself. The screen makes room for it: a chart's screen is that
+   much shorter, and a page that scrolls goes on that much further (the room after it, in
+   which the strip is announced). */
+.new-version-room {
+  height: var(--new-version, 0px);
+}
+
+.new-version {
+  position: fixed;
+  inset: auto 0 0;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  padding: 10px max(var(--gutter), env(safe-area-inset-right))
+    calc(10px + env(safe-area-inset-bottom)) max(var(--gutter), env(safe-area-inset-left));
+  border-top: 2px solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/* The words take what is left; the two buttons stay side by side, below them on a phone. */
+.new-version p {
+  flex: 1 1 12em;
+  margin: 0;
+  font-weight: 700;
+}
+
+.new-version-acts {
+  display: flex;
+  gap: 10px;
 }

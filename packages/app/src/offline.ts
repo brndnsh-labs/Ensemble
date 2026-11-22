@@ -54,10 +54,55 @@ const AT_ONCE = 24;
 /** A moment for the page to draw and for a tune to be opened before the connection is used for later. */
 const SETTLE_MS = 1500;
 
-/** Register the service worker. In development there is none: it would serve yesterday's code. */
+/** A newer build has taken over from the one this page is running. */
+let newer = false;
+const watching = new Set<() => void>();
+
+/** Whether a newer build of the app is on the device, ready the next time the page is loaded. */
+export const newVersion = (): boolean => newer;
+
+/** Be told when a newer build of the app has taken over (for `useSyncExternalStore`). */
+export function subscribeNewVersion(tell: () => void): () => void {
+  watching.add(tell);
+  return () => watching.delete(tell);
+}
+
+/**
+ * Register the service worker, and look for a newer build whenever the app is brought back
+ * to the front: a phone can keep it open for days, and the browser looks by itself only when
+ * a page is opened. In development there is none: it would serve yesterday's code.
+ */
 export function keepOffline(): void {
   if (!import.meta.env.PROD || !("serviceWorker" in navigator)) return;
-  void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`);
+  const { serviceWorker } = navigator;
+  // A page the worker had in hand when it opened runs that worker's build, and a worker that
+  // takes over later brings a newer one. A page with none is a first visit or a hard reload,
+  // and came from the server: the first worker to take it over carries the build it runs, and
+  // only one after that is newer. The case missed: a hard reload with the worker already
+  // current is never taken over by it, so the next release is taken for the page's own.
+  let kept = serviceWorker.controller !== null;
+  serviceWorker.addEventListener("controllerchange", () => {
+    if (!kept) {
+      kept = true;
+      return;
+    }
+    if (newer) return;
+    newer = true;
+    for (const tell of watching) tell();
+  });
+  serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).then(
+    (registration) => {
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState !== "visible") return;
+        registration.update().catch(() => {
+          // No connection: the next time it is brought back, or opened, it looks again.
+        });
+      });
+    },
+    () => {
+      // Not served securely, or storage refused: the app runs, and keeps nothing.
+    },
+  );
 }
 
 /**

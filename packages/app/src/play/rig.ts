@@ -48,6 +48,8 @@ export class Rig {
   /** Packs being fetched for a band someone is about to hear, and who is waiting for them to land. */
   #fetching = 0;
   #landed: (() => void)[] = [];
+  /** Who wants to know when a band starts or stops. */
+  readonly #watching = new Set<() => void>();
   /** Who is told that the sound was cut off under a playing band. */
   #cutOff = new Set<() => void>();
   /** The page has been out of view since the sound last stopped. */
@@ -182,6 +184,15 @@ export class Rig {
     return { ...mix, channels };
   }
 
+  /** Whether a band is playing (for `useSyncExternalStore`, with `subscribe`). */
+  readonly playing = (): boolean => this.#player !== undefined;
+
+  /** Be told when a band starts or stops. */
+  readonly subscribe = (tell: () => void): (() => void) => {
+    this.#watching.add(tell);
+    return () => this.#watching.delete(tell);
+  };
+
   /** Play sounds from the top. `seat` must have finished for the band that plays them. */
   play(sounds: readonly Sound[]): Player {
     this.stop();
@@ -189,14 +200,17 @@ export class Rig {
     player.start();
     this.#player = player;
     void this.#keepAwake();
+    for (const tell of this.#watching) tell();
     return player;
   }
 
   stop(): void {
+    const was = this.#player;
     this.#player?.stop();
     this.#player = undefined;
     void this.#wake?.release();
     this.#wake = undefined;
+    if (was) for (const tell of this.#watching) tell();
   }
 
   /** Seconds between a sound being scheduled and being heard, as far as the browser can say. */
