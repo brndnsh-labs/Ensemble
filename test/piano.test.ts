@@ -518,6 +518,59 @@ test("jazz: in six and twelve the piano comps round the pulses, not a pad (AU-94
   );
 });
 
+test('jazz: in a waltz the piano comps, not a pad (prompts/jazz-waltz-study.md): no bar of three it comps is struck more than four times, besides a lean into the next bar on the "and" of 3; quiet, with the band to itself, a bar of one chord is one chord laid in on 1, the "and" of 1 or beat 2 and held, to the barline or to the lean (F4, F5, F7), or left alone; and from the working level, away from a soloist, two bars in five or more strike the "and" of 1 or of 2 (F6, F9, F2)', {
+  skip: only("jazz").skip || !LIBRARY.some((chart) => chart.meter === "3/4"),
+}, () => {
+  const jazz = STYLES.find((style) => style.id === "jazz")!;
+  const counted = { bars: 0, quiet: 0, working: 0, ands: 0 };
+  for (const { chart, options, take } of [
+    ...takes((jam) => jam.style.id === "jazz" && jam.chart.meter === "3/4"),
+    ...heldTakes(jazz, "3/4", false, true),
+    ...heldTakes(jazz, "3/4", true, true),
+  ]) {
+    const byBar = strikesByBar(take);
+    for (const bar of take.plan.bars) {
+      if (bar.kind !== "music" || bar.ending || bar.seats.chords === null) continue;
+      if (bar.meter.beats !== 3 || bar.meter.unit !== 4) continue;
+      const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
+      const end = bar.start + bar.ticks;
+      const own = byBar.get(bar.index) ?? [];
+      // The lean into the next bar: the "and" of 3, ringing over the barline.
+      const lean = own.find((strike) => strike.tick === end - PPQ / 2 && strike.ends > end);
+      const body = own.filter((strike) => strike !== lean);
+      const steps = body.map((strike) => (strike.tick - bar.start) / STEP);
+      counted.bars++;
+      assert.ok(body.length <= 4, `${where}: ${body.length} strikes (${steps.join(" ")})`);
+      if (bar.solo !== null) continue;
+      if (tierOf(bar.seats.chords) === "low") {
+        if (bar.spans.filter((span) => !span.tied).length !== 1 || bar.spans[0]!.chord === null)
+          continue;
+        counted.quiet++;
+        assert.ok(body.length <= 1, `${where}: quiet, and ${body.length} strikes`);
+        for (const strike of body) {
+          assert.ok([0, 2, 4].includes(steps[0]!), `${where}: quiet, a chord at ${steps[0]}`);
+          const until = Math.min(lean?.tick ?? end, end);
+          assert.ok(
+            strike.ends >= until - PPQ / 4,
+            `${where}: quiet, a chord at ${steps[0]} let go ${until - strike.ends} ticks early`,
+          );
+        }
+        continue;
+      }
+      counted.working++;
+      if (steps.some((step) => step === 2 || step === 6)) counted.ands++;
+    }
+  }
+  assert.ok(
+    counted.bars > 500 && counted.quiet > 20 && counted.working > 100,
+    `only ${JSON.stringify(counted)}`,
+  );
+  assert.ok(
+    counted.ands >= 0.4 * counted.working,
+    `an "and" of 1 or of 2 struck in ${counted.ands} of ${counted.working} working bars`,
+  );
+});
+
 test(
   "neo-soul: in six and twelve the Rhodes holds and leans:away from a soloist, in a bar of one chord, it is never struck on every pulse, and from the working level up it leans into a pulse, struck on an eighth between them (the lazy re-strike, or a chord laid in late)",
   only("neosoul"),

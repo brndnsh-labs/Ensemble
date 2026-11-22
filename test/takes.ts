@@ -66,7 +66,7 @@ export const LIBRARY: readonly LibraryChart[] = readdirSync(libraryDir)
  * makes up from its 4/4 parts, and only the rules that hold of any bar are asked of it.
  */
 export const WRITTEN: Readonly<Record<string, readonly string[]>> = {
-  jazz: ["6/4", "6/8", "12/8"],
+  jazz: ["6/4", "6/8", "12/8", "3/4"],
   blues: ["12/8", "6/8"],
   rock: ["12/8", "6/8"],
   acoustic: ["6/8", "12/8"],
