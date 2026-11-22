@@ -60,13 +60,13 @@ export const LIBRARY: readonly LibraryChart[] = readdirSync(libraryDir)
   });
 
 /**
- * The meters a style has written a band for besides 4/4 (DECISIONS.md, "the band in six and
+ * The meters a style has written a band for besides 4/4 (docs/decisions/meters.md, "the band in six and
  * twelve"). A style's own rules, and the rules that hold wherever a band plays from its
  * own parts, are held in these as they are in 4/4. In any other meter a style plays a bar it
  * makes up from its 4/4 parts, and only the rules that hold of any bar are asked of it.
  */
 export const WRITTEN: Readonly<Record<string, readonly string[]>> = {
-  jazz: ["6/4", "6/8", "12/8"],
+  jazz: ["6/4", "6/8", "12/8", "3/4"],
   blues: ["12/8", "6/8"],
   rock: ["12/8", "6/8"],
   acoustic: ["6/8", "12/8"],
@@ -109,6 +109,12 @@ function render1(spec: JamSpec): Jam {
   return jam;
 }
 
+/**
+ * A take a property makes for itself, kept with the library's takes: one asked for twice, or one
+ * the library's takes already hold, is rendered once.
+ */
+export const takeOf = (spec: JamSpec): Jam => render1(spec);
+
 function renderOnly(specs: readonly JamSpec[], only: (spec: JamSpec) => boolean): Jam[] {
   return specs.filter(only).map(render1);
 }
@@ -129,7 +135,7 @@ const KINDS: readonly Omit<TakeOptions, "seed">[] = [
 /**
  * How many charts written for other styles each style is handed: twenty on a push, and every
  * one of them on the full run, which held the floors of the blues' properties when the library
- * lost three blues charts that differed only by a setting (DECISIONS.md, the library's standards).
+ * lost three blues charts that differed only by a setting (docs/decisions/engine.md, the library's standards).
  */
 const BORROWED = FULL ? Number.POSITIVE_INFINITY : 20;
 
@@ -280,17 +286,36 @@ const STRESS_KINDS: readonly Omit<TakeOptions, "seed">[] = [
   { mode: "jam", passes: 3, solo: true },
 ];
 
-const STRESS_SPECS: readonly JamSpec[] = STYLES.flatMap((style) =>
-  STRESS.flatMap((chart) =>
+/**
+ * A chart with a section labelled Solo, where a jam's soloist has the lead every time round
+ * and nowhere else. No tune in the library has one; it is played as a jam of three passes with
+ * the soloist and without, on one seed, in every style.
+ */
+export const SOLO_SECTION: LibraryChart = testChart("solo-section.chart");
+
+/**
+ * A chart with two Solo sections in one time through the form, each the next chorus of the
+ * soloist's solo. Written here, not in the stress charts: only plan-only properties read it.
+ */
+export const TWO_SOLOS =
+  "title: Two solos\nkey: C\n\n[Verse]\n| C | F | G | C |\n\n[Solo]\n| C | F | G | C |\n\n[Chorus]\n| F | G | C | C |\n\n[Solo 2]\n| Am | F | G7 | C |\n";
+
+const STRESS_SPECS: readonly JamSpec[] = STYLES.flatMap((style) => [
+  ...STRESS.flatMap((chart) =>
     SEEDS.slice(0, 4).flatMap((seed) =>
       STRESS_KINDS.map((kind) => ({ style, chart, options: { ...kind, seed } })),
     ),
   ),
-);
+  ...[{ solo: false }, { solo: true }].map(({ solo }) => ({
+    style,
+    chart: SOLO_SECTION,
+    options: { mode: "jam" as const, passes: 3, seed: 1, ...(solo ? { solo } : {}) },
+  })),
+]);
 
 /**
  * The stress charts at each level and as a jam with an arc and an ending, over a few seeds,
- * those that pass `only`.
+ * and the chart with a Solo section, those that pass `only`.
  */
 export function stressTakes(only: (spec: JamSpec) => boolean = () => true): Jam[] {
   return renderOnly(STRESS_SPECS, only);
@@ -363,6 +388,8 @@ export function notesOf(take: Take, seat?: Seat): NoteEvent[] {
 export interface SmfTrackSummary {
   name: string;
   readonly tempos: number[];
+  /** Each tempo as the file says it: where (in ticks) and how long a quarter note lasts (in microseconds). */
+  readonly tempoMap: { readonly tick: number; readonly micros: number }[];
   readonly channels: Set<number>;
   noteOns: number;
   noteOffs: number;
@@ -391,16 +418,20 @@ export function readSmf(bytes: Uint8Array): SmfSummary {
     const track: SmfTrackSummary = {
       name: "",
       tempos: [],
+      tempoMap: [],
       channels: new Set(),
       noteOns: 0,
       noteOffs: 0,
     };
     let ended = false;
+    let tick = 0;
     while (at < end) {
       if (ended) throw new Error(`track ${t}: events after end of track`);
       // Delta time: a variable-length quantity.
-      while (bytes[at]! & 0x80) at++;
-      at++;
+      let delta = 0;
+      while (bytes[at]! & 0x80) delta = (delta << 7) | (bytes[at++]! & 0x7f);
+      delta = (delta << 7) | bytes[at++]!;
+      tick += delta;
       const status = bytes[at]!;
       if (status === 0xff) {
         const type = bytes[at + 1]!;
@@ -409,9 +440,9 @@ export function readSmf(bytes: Uint8Array): SmfSummary {
         const data = bytes.subarray(at + 3, at + 3 + length);
         if (type === 0x03) track.name ||= new TextDecoder().decode(data);
         if (type === 0x51) {
-          track.tempos.push(
-            Math.round(60_000_000 / ((data[0]! << 16) | (data[1]! << 8) | data[2]!)),
-          );
+          const micros = (data[0]! << 16) | (data[1]! << 8) | data[2]!;
+          track.tempos.push(Math.round(60_000_000 / micros));
+          track.tempoMap.push({ tick, micros });
         }
         if (type === 0x2f) ended = true;
         at += 3 + length;

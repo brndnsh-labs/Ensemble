@@ -21,7 +21,7 @@ import type { Piece } from "./form.ts";
 import { lineAt, linesIn, tierAt } from "./form.ts";
 import { leadInChance } from "./leadin.ts";
 import type { LineNote, ShapeChoice } from "./line.ts";
-import type { BassStyle, Figure, LineShape, ToneSequence, Walk } from "./style.ts";
+import type { BassStyle, Figure, LineShape, ToneSequence, Walk, WalkPolicy } from "./style.ts";
 import { aboveBass, bassPitchClass, inHarmony, playable, sequenceFor, shapesIn } from "./tones.ts";
 
 /** What a bassist carries from note to note. */
@@ -125,9 +125,11 @@ export function playPhrases(
   const walking =
     walks !== undefined &&
     Object.values(walks.kinds).some((list) => list.length > 0) &&
-    [...Object.values(walks.offer.end), ...Object.values(walks.offer.inside)].some(
-      (chance) => chance > 0,
-    );
+    [
+      ...Object.values(walks.offer.end),
+      ...Object.values(walks.offer.inside),
+      ...Object.values(walks.offer.intoSection ?? {}),
+    ].some((chance) => chance > 0);
   // A walked line is a new line every time it is drawn, and a riff may turn: both are choices.
   const walked = lines.some((line) => line.walked !== undefined);
   const turning = lines.some(
@@ -360,7 +362,7 @@ function plansFor(
       { length: stays },
       (_, s) => s > 0 && answerable[s]! && draw.fork("answer", s).chance(policy.answers),
     );
-    const walk = walks !== undefined && draw.fork("walk").chance(walks.offer.end[tierAt(last)]);
+    const walk = walks !== undefined && draw.fork("walk").chance(walkOffer(walks, last, next));
     const ending: Into = walk
       ? { walk: draw.fork("which"), chance: null }
       : k === 0 || next === undefined
@@ -398,6 +400,20 @@ function plansFor(
     plans.push({ answers, ending, inside, leads, walked: draw.fork("walked"), turn });
   }
   return plans;
+}
+
+/**
+ * How likely a plan is to walk into the next line: into a new section (or a
+ * new time through one) at the style's chance for that, where it has one.
+ */
+function walkOffer(walks: WalkPolicy, last: Piece, next: Piece | undefined): number {
+  const tier = tierAt(last);
+  const top =
+    next !== undefined &&
+    !next.bar.ending &&
+    next.start === next.bar.start &&
+    next.bar.barInSection === 0;
+  return top && walks.offer.intoSection ? walks.offer.intoSection[tier] : walks.offer.end[tier];
 }
 
 /**

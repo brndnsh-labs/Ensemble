@@ -1,0 +1,12 @@
+title: The Two Before the Five
+key: A
+tempo: 116
+style: country
+
+// The I and the IV, then the II7 for two bars before the V: the change a
+// country rhythm section is asked for most after the three chords.
+[A]
+| A  | A  | D  | A  |
+| A  | A  | B7 | B7 |
+| E7 | E7 | A  | A  |
+| D  | A  | E7 | A  |

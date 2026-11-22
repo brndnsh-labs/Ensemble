@@ -47,6 +47,18 @@ export interface VoicingCondition {
   readonly has?: readonly VoiceTone[];
   /** Tones the chord must be unable to give. */
   readonly lacks?: readonly VoiceTone[];
+  /**
+   * What the chord's root is in the key: a numeral of the major scale counted
+   * from the tonic, in major and minor keys alike, with a flat or sharp where it
+   * is off that scale (`I`, `IV`, `bVII`). Read by pitch, so A# and Bb in C are
+   * both `bVII`. Every chord is measured against the key its bar is in; a
+   * secondary dominant's root is where it sounds (V7/ii in C is `VI`). The
+   * pedal steel's 6th on a plain I or IV, never on V (ST-country-06), and the
+   * add9 by the chord's job in the key (ST-acoustic-21) are conditions on this.
+   */
+  readonly degrees?: readonly string[];
+  /** Only in a key of this mode. */
+  readonly mode?: "major" | "minor";
 }
 
 export interface Recipe {
@@ -223,14 +235,20 @@ export interface PlainRhythm {
  *   fifth on one of the two strings over the bass (E2 with B2); and with no
  *   fifth there, the bass again
  * - `upper`: the next string of the grip above those two
+ * - `fifth`: the boom-chick's alternate bass (ST-country-07): the chord's
+ *   fifth on the low strings, never the bass again. Under the bass on the
+ *   string below where the hand has it (the thumb over the neck may fret the
+ *   low string, at the fourth fret or under); else the grip's own fifth on the
+ *   two strings over the bass; else the fifth over the bass on the next string
+ *   up, fretted with the grip. Only with no fifth anywhere there, the bass.
  *
  * and each finger one: `1`, `2`, `3` are the grip's strings counted from the
  * top, as a guitarist numbers them. On a grip with fewer strings than a place
  * asks for, the place is the nearest string the grip has. Under a new chord
  * the thumb's first note is its bass, whichever of its places is written.
  */
-export type PickPlace = "bass" | "alternate" | "upper" | 1 | 2 | 3;
-export const PICK_PLACES: readonly PickPlace[] = ["bass", "alternate", "upper", 1, 2, 3];
+export type PickPlace = "bass" | "alternate" | "fifth" | "upper" | 1 | 2 | 3;
+export const PICK_PLACES: readonly PickPlace[] = ["bass", "alternate", "fifth", "upper", 1, 2, 3];
 
 /**
  * How the hand plays one written symbol of a figure: how hard, and for how
@@ -261,6 +279,16 @@ export interface Attack {
    * single string cannot state a chord (ST-acoustic-30).
    */
   readonly pluck?: readonly PickPlace[];
+  /**
+   * The stroke crosses only the guitar's top this many strings: it sounds the
+   * grip's notes on those strings and nothing under them, a string the grip
+   * leaves silent counting as one of them. On a guitar only. A boom-chick
+   * guitar's chick on the top four strings, over the low strings the thumb
+   * plays as the boom (ST-country-07). An upstroke among them catches the
+   * style's `strum.up` of their top notes, as any upstroke does. Left out, a
+   * downstroke crosses the whole grip.
+   */
+  readonly top?: number;
 }
 
 /** The symbols a figure may be written in, and how each is played. */
@@ -363,6 +391,32 @@ export interface RhythmTier {
    * it (CH-48: 64 against 80). Left out, that strike is played as written.
    */
   readonly restrike?: number;
+  /**
+   * Figures of two bars that a whole phrase may be played on instead of its
+   * plan: one thought across the barline, each written as one grid twice a bar
+   * long (the waltz's hemiola, three chords over two bars, in either phase). The
+   * phrase plays a figure's first bar in the phrase's first bar and every other
+   * bar after, and its second bar between, so it starts where the phrase does
+   * and stops where the phrase does. It is a groove: played as written in every
+   * bar of the phrase, it answers nothing and leans into a change only on a
+   * stroke it has, and the hand does not lean into a phrase played on it. Drawn
+   * phrase by phrase, each time through the section, with this chance, and
+   * never in a phrase where a soloist has the lead. A phrase drawn straight
+   * after one played on it goes on with the same figure as one run, while the
+   * run is no longer than `longest` bars and, unless `crossesSections`, does
+   * not go on over the first bar of a section (a chorus's top is one); where it
+   * cannot go on, that phrase is played from its plan. Which figure a run takes
+   * is drawn by the figures' weights. Left out, every phrase is played from its
+   * plan.
+   */
+  readonly twoBars?: {
+    readonly figures: readonly CompFigure[];
+    readonly chance: number;
+    /** The most bars a run of phrases on these figures may take. */
+    readonly longest: number;
+    /** Whether a run may go on over the first bar of a section. */
+    readonly crossesSections: boolean;
+  };
 }
 
 /**
@@ -493,5 +547,18 @@ export interface ChordStyle {
     readonly soft: number;
     /** How much harder a short final hit (the button) is than the held chord. */
     readonly accent: number;
+    /**
+     * The stinger (EN-49): on a final tonic that rings, a guitar strikes the
+     * chord with its 6th (the b6 over a minor tonic) on the B or the high E
+     * string and pulls it off to the 5th on the same string an eighth later,
+     * which then rings. The 6th is the grip's own where it has one there with
+     * the 5th under it on that string; otherwise, where the final chord is a
+     * new chord, the grip's 5th there is fretted up to it, where the four-fret
+     * hand reaches. Never where the 6th
+     * is a half step under another note of the grip; a shape with neither has
+     * no stinger. `level` is the pulled-off note's share of the strike's level
+     * (0.9: 10% softer). A guitar's only: a keyboard has no string to pull off.
+     */
+    readonly pullOff?: { readonly level: number };
   };
 }

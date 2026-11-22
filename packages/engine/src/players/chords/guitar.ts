@@ -282,6 +282,69 @@ function heardBy(voicing: Voicing, chord: Chord | null): number[] {
   );
 }
 
+/** The note a stinger strikes on one string of the grip and the one it pulls off to (EN-49). */
+interface Stinger {
+  /** Which note of the grip, low to high. */
+  readonly at: number;
+  readonly struck: number;
+  readonly pulled: number;
+}
+
+/**
+ * Where a grip has a stinger over its chord: the 6th (the b6 over a minor
+ * chord) on one of the guitar's top two strings, the B or the high E, pulled
+ * off to the 5th a step under it on the same string. The grip's own 6th there is taken first, top string
+ * first, where the 5th is on that string under it; then its 5th there, fretted
+ * up to the 6th. The hand holds both frets inside its four and with its
+ * fingers, the 6th keeps the strings' pitch rising, and it is never a half
+ * step under another note of the grip. Null where there is none: an open
+ * shape whose 6th is an open string, or whose 5th lies lower in the grip.
+ * `frets`: the 5th may be fretted up to the 6th. Not where the chord carries
+ * on from the bar before: the hand holding its grip moves only where the chord
+ * does, so there only a 6th the grip already holds is pulled off.
+ */
+export function stingerOf(voicing: Voicing, chord: Chord, frets: boolean): Stinger | null {
+  const strings = voicing.strings;
+  const fifth = toneInterval(chord.quality, "fifth");
+  if (!strings || fifth !== 7) return null;
+  const third = toneInterval(chord.quality, "third");
+  const sixth = third === 3 ? 8 : 9;
+  const root = pitchClass(chord.root);
+  const { pitches } = voicing;
+  const held = fretsOf(strings, pitches);
+  const holds = (at: number, extra: number) => {
+    const all = [...held.slice(0, at), extra, ...held.slice(at)];
+    const fretted = all.filter((fret) => fret > 0);
+    if (fretted.length > 0 && Math.max(...fretted) - Math.min(...fretted) > HAND_SPAN) return false;
+    return Math.max(...all) <= TOP_FRET && fingered(all);
+  };
+  const rubs = (pitch: number, at: number) =>
+    pitches.some((other, k) => k !== at && mod12(other - pitch) === 1);
+  // The B and the high E strings: a 6th on a lower string, or under a silent B, is not on top.
+  const top = [pitches.length - 1, pitches.length - 2].filter(
+    (at) => at >= 0 && strings[at]! >= OPEN_STRINGS.length - 2,
+  );
+  const found = (at: number, struck: number, pulled: number, fret: number): Stinger | null =>
+    fret >= 0 && holds(at, fret) && !rubs(struck, at) && (pitches[at + 1] ?? Infinity) > struck
+      ? { at, struck, pulled }
+      : null;
+  for (const at of top) {
+    const pitch = pitches[at]!;
+    if (mod12(pitch - root) !== sixth) continue;
+    const pulled = pitch - (sixth - fifth);
+    const stinger = found(at, pitch, pulled, held[at]! - (sixth - fifth));
+    if (stinger) return stinger;
+  }
+  for (const at of frets ? top : []) {
+    const pitch = pitches[at]!;
+    if (mod12(pitch - root) !== fifth) continue;
+    const struck = pitch + (sixth - fifth);
+    const stinger = found(at, struck, pitch, held[at]! + (sixth - fifth));
+    if (stinger) return stinger;
+  }
+  return null;
+}
+
 /** One string sounding one note. */
 interface Plucked {
   readonly string: number;
@@ -323,6 +386,47 @@ function alternate(voicing: Voicing, chord: Chord | null): Plucked {
   return { string: strings[k]!, pitch: voicing.pitches[k]! };
 }
 
+/** The highest fret a thumb over the neck stops the low string at, beside a grip (ST-country-07). */
+const THUMB_FRET = 4;
+
+/**
+ * The boom-chick's alternate bass (ST-country-07): the chord's fifth on the low
+ * strings and never the bass again. The fifth under the bass a string down,
+ * as the alternating thumb takes it, or there with the thumb over the neck at
+ * the fourth fret or under; else the grip's own fifth on the two strings over
+ * the bass; else the fifth over the bass on the next string up, where the hand
+ * holding the grip can fret it. With no fifth anywhere there, the bass.
+ */
+function boomFifth(voicing: Voicing, chord: Chord | null): Plucked {
+  const strings = voicing.strings ?? voicing.pitches.map((_, k) => k);
+  const [string, bass] = [strings[0]!, voicing.pitches[0]!];
+  const fifth = chord
+    ? mod12(pitchClass(chord.root) + (toneInterval(chord.quality, "fifth") ?? 7))
+    : -1;
+  const thumbed = alternate(voicing, chord);
+  if (thumbed.pitch < bass) return thumbed;
+  const below = string - 1;
+  if (below >= 0 && mod12(bass - 5) === fifth) {
+    const fret = bass - 5 - OPEN_STRINGS[below]!;
+    if (fret >= 0 && fret <= THUMB_FRET) return { string: below, pitch: bass - 5 };
+  }
+  if (thumbed.pitch !== bass) return thumbed;
+  const up = string + 1;
+  const free = !strings.includes(up) && up < OPEN_STRINGS.length;
+  if (free && mod12(bass + 7) === fifth) {
+    const fret = bass + 7 - OPEN_STRINGS[up]!;
+    const frets = fretsOf(strings, voicing.pitches);
+    // A bass on the low string at the fourth fret or under is the thumb's, over the neck:
+    // the fingers have the rest.
+    const thumb = string === 0 && frets[0]! <= THUMB_FRET;
+    const fingers = thumb ? [fret, ...frets.slice(1)] : [frets[0]!, fret, ...frets.slice(1)];
+    if (fret >= 0 && fingered(fingers)) {
+      return { string: up, pitch: bass + 7 };
+    }
+  }
+  return thumbed;
+}
+
 /** The string a place of the picking hand is, in the grip the hand is holding. */
 function placeIn(voicing: Voicing, chord: Chord | null, place: PickPlace): Plucked {
   const strings = voicing.strings ?? voicing.pitches.map((_, k) => k);
@@ -330,6 +434,7 @@ function placeIn(voicing: Voicing, chord: Chord | null, place: PickPlace): Pluck
   // A finger's string is counted from the top of the grip, as a guitarist numbers them.
   if (typeof place === "number") return at(Math.max(0, strings.length - place));
   if (place === "bass") return at(0);
+  if (place === "fifth") return boomFifth(voicing, chord);
   const other = alternate(voicing, chord);
   if (place === "alternate") return other;
   // The upper string: the next one of the grip over the bass and its alternate.
@@ -498,7 +603,16 @@ export function guitar(style: Guitar): InstrumentIdiom {
         // as it takes to sound every tone the chord is heard by (X-B-13), and to leave no
         // growl on the bottom of what it sounds: a grip with the 13th under the 7th is clean
         // from its root, and its top three strings are not (Q-03).
-        let from = upstroke ? Math.max(0, voicing.pitches.length - up) : 0;
+        // A stroke written across only the top N strings sounds the grip's notes on those
+        // strings and nothing under them: a string the grip leaves silent is one of the N.
+        const floor =
+          strike.top === undefined
+            ? 0
+            : Math.max(
+                0,
+                strings.findIndex((s) => s >= OPEN_STRINGS.length - strike.top!),
+              );
+        let from = Math.max(floor, upstroke ? Math.max(0, voicing.pitches.length - up) : 0);
         if (from > 0) {
           const needed = heardBy(voicing, strike.arrival.chord);
           const family = strike.arrival.chord ? chordFamily(strike.arrival.chord.quality) : null;
@@ -508,25 +622,55 @@ export function guitar(style: Guitar): InstrumentIdiom {
             family !== null &&
             !growls(voicing, family) &&
             growls({ pitches: voicing.pitches.slice(from) }, family);
-          while (from > 0 && (needed.some((pitch) => !caught(pitch)) || growl())) from--;
+          // An upstroke reaches down to the top strings' floor for a growl-free sound, and any
+          // stroke below it only for a tone the chord is heard by that the top strings lack.
+          while (from > floor && (needed.some((pitch) => !caught(pitch)) || growl())) from--;
+          while (from > 0 && needed.some((pitch) => !caught(pitch))) from--;
         }
         const [lowest, highest] = [strings[from]!, strings.at(-1)!];
         const across = (highest - lowest) * roll;
+        // The stinger: the 6th struck with the chord and pulled off to the 5th an eighth later,
+        // which rings on to the chord's end (EN-49).
+        const stinger =
+          strike.pullOff !== undefined &&
+          !strike.muted &&
+          strike.arrival.chord &&
+          duration > PPQ / 2 + SHORTEST
+            ? stingerOf(
+                voicing,
+                strike.arrival.chord,
+                strike.arrival.changed || strike.arrival.index === 0,
+              )
+            : null;
         for (let k = from; k < voicing.pitches.length; k++) {
           // Low string first going down, high string first coming up (CH-29), the whole
           // stroke centred on its place in the grid. Feel adds the nudge to the pocket.
           const reached = (upstroke ? highest - strings[k]! : strings[k]! - lowest) * roll;
           const nudge = (reached - across / 2) * ticksPerMs;
+          const velocity = Math.max(1, strike.velocity - (upstroke ? lighter : 0));
+          const stung = stinger?.at === k;
           notes.push({
             seat: "chords",
             bar: strike.bar,
             tick: strike.tick,
-            duration,
-            pitch: voicing.pitches[k]!,
-            velocity: Math.max(1, strike.velocity - (upstroke ? lighter : 0)),
+            duration: stung ? PPQ / 2 : duration,
+            pitch: stung ? stinger.struck : voicing.pitches[k]!,
+            velocity,
             ...(strike.muted ? { voice: MUTED } : {}),
             ...(nudge === 0 ? {} : { nudge }),
           });
+          if (stung) {
+            notes.push({
+              seat: "chords",
+              bar: strike.bar,
+              tick: strike.tick + PPQ / 2,
+              duration: duration - PPQ / 2,
+              pitch: stinger.pulled,
+              velocity: Math.max(1, Math.round(velocity * strike.pullOff!)),
+              slur: true,
+              ...(nudge === 0 ? {} : { nudge }),
+            });
+          }
         }
       });
       return notes;

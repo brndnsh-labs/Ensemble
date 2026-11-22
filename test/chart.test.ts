@@ -194,7 +194,7 @@ const TWELVE_MINOR_KEYS = [
 ];
 
 /**
- * LEFT FOR THE ENGINEER (the library's standards, DECISIONS.md): charts that do not come home
+ * LEFT FOR THE ENGINEER (the library's standards, docs/decisions/engine.md): charts that do not come home
  * through every key, held out of that one check and nothing else. Each spells a chromatic chord
  * by its less usual name, as the tune is written (F#m7 in A-flat and in D-flat, C#m7 F#7 in
  * B-flat, F#dim7 passing up from F, Bb7 in B), and in some key that name is also what the usual degree spells (#VI and

@@ -6,6 +6,11 @@ import type { CriticStyle } from "@ensemble/engine";
 
 export const neosoulCritic: CriticStyle = {
   targets: {
+    // Everyone stays in (docs/decisions/styles.md, who is in).
+    "band.takes-thinned": { max: 0, kind: "intent" },
+    "drums.laid-out": { max: 0, kind: "intent" },
+    "bass.laid-out": { max: 0, kind: "intent" },
+    "chords.laid-out": { max: 0, kind: "intent" },
     // ── drums ──
     // A section keeps its kick in at least 90% of bars (ST-neosoul-12).
     "drums.kick-on-one": { min: 0.9, kind: "intent" },

@@ -6,6 +6,11 @@ import type { CriticStyle } from "@ensemble/engine";
 
 export const acousticCritic: CriticStyle = {
   targets: {
+    // Everyone stays in (docs/decisions/styles.md, who is in).
+    "band.takes-thinned": { max: 0, kind: "intent" },
+    "drums.laid-out": { max: 0, kind: "intent" },
+    "bass.laid-out": { max: 0, kind: "intent" },
+    "chords.laid-out": { max: 0, kind: "intent" },
     // ── drums ──
     "drums.kick-on-one": { min: 0.95, kind: "intent", minCases: 8 },
     "drums.same-groove": { min: 0.75, kind: "intent", minCases: 8 },

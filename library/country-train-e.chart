@@ -1,0 +1,9 @@
+title: Two-Chord Train
+key: E
+tempo: 150
+style: country
+
+// A train on two chords: the I for four bars, the V7 for two, home for two.
+[A]
+| E  | E  | E | E |
+| B7 | B7 | E | E |

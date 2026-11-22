@@ -3,10 +3,13 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { PlanBar, Take } from "@ensemble/engine";
+import type { PlanBar, Take, TakeOptions } from "@ensemble/engine";
 import {
+  chordAt,
   chordFamily,
   chordTones,
+  fingering,
+  fretsOf,
   isCompound,
   lastPulse,
   onAnd,
@@ -518,6 +521,219 @@ test("jazz: in six and twelve the piano comps round the pulses, not a pad (AU-94
   );
 });
 
+test('jazz: in a waltz the piano comps, not a pad (prompts/jazz-waltz-study.md): no bar of three it comps is struck more than four times, besides a lean into the next bar on the "and" of 3; quiet, with the band to itself, a bar of one chord is one chord laid in on 1, the "and" of 1 or beat 2 and held, to the barline or to the lean (F4, F5, F7), or left alone; and from the working level, away from a soloist, two bars in five or more strike the "and" of 1 or of 2 (F6, F9, F2); and on the full run, pooled over the bars under a soloist from the working level up, each of the six eighths of the bar struck in 15% to 55% of them (Kelly: 31% to 44%, study 1.1) and 30% of them at most with one strike or none (Kelly: 4 bars of 16)', {
+  skip: only("jazz").skip || !LIBRARY.some((chart) => chart.meter === "3/4"),
+}, () => {
+  const jazz = STYLES.find((style) => style.id === "jazz")!;
+  const counted = { bars: 0, quiet: 0, working: 0, ands: 0, takes: 0 };
+  const underTheSolo = { bars: 0, thin: 0, eighths: [0, 0, 0, 0, 0, 0] };
+  // On the full run, twelve more jams of the waltz with the soloist, so the pooled shares are
+  // read over a dozen sections' figures and more (the waltz is one section of sixteen bars).
+  const waltz = LIBRARY.find((chart) => chart.file === "jazz-waltz-f.chart");
+  const more = FULL && waltz ? Array.from({ length: 12 }, (_, i) => i + 1) : [];
+  for (const { chart, options, take } of [
+    ...takes((jam) => jam.style.id === "jazz" && jam.chart.meter === "3/4"),
+    ...heldTakes(jazz, "3/4", false, true),
+    ...heldTakes(jazz, "3/4", true, true),
+    ...more.map((seed) => {
+      const options: TakeOptions = { mode: "jam", passes: 4, solo: true, seed: 100 + seed };
+      return { chart: waltz!, options, take: render(waltz!.text, jazz, options) };
+    }),
+  ]) {
+    const byBar = strikesByBar(take);
+    if (options.solo) counted.takes++;
+    for (const bar of take.plan.bars) {
+      if (bar.kind !== "music" || bar.ending || bar.seats.chords === null) continue;
+      if (bar.meter.beats !== 3 || bar.meter.unit !== 4) continue;
+      const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
+      const end = bar.start + bar.ticks;
+      const own = byBar.get(bar.index) ?? [];
+      // The lean into the next bar: the "and" of 3, ringing over the barline.
+      const lean = own.find((strike) => strike.tick === end - PPQ / 2 && strike.ends > end);
+      const body = own.filter((strike) => strike !== lean);
+      const steps = body.map((strike) => (strike.tick - bar.start) / STEP);
+      counted.bars++;
+      assert.ok(body.length <= 4, `${where}: ${body.length} strikes (${steps.join(" ")})`);
+      if (bar.solo !== null) {
+        if (tierOf(bar.seats.chords) === "low") continue;
+        underTheSolo.bars++;
+        if (own.length <= 1) underTheSolo.thin++;
+        for (const strike of own) underTheSolo.eighths[(strike.tick - bar.start) / (PPQ / 2)]!++;
+        continue;
+      }
+      if (tierOf(bar.seats.chords) === "low") {
+        if (bar.spans.filter((span) => !span.tied).length !== 1 || bar.spans[0]!.chord === null)
+          continue;
+        counted.quiet++;
+        assert.ok(body.length <= 1, `${where}: quiet, and ${body.length} strikes`);
+        for (const strike of body) {
+          assert.ok([0, 2, 4].includes(steps[0]!), `${where}: quiet, a chord at ${steps[0]}`);
+          const until = Math.min(lean?.tick ?? end, end);
+          assert.ok(
+            strike.ends >= until - PPQ / 4,
+            `${where}: quiet, a chord at ${steps[0]} let go ${until - strike.ends} ticks early`,
+          );
+        }
+        continue;
+      }
+      counted.working++;
+      if (steps.some((step) => step === 2 || step === 6)) counted.ands++;
+    }
+  }
+  assert.ok(
+    counted.bars > 500 && counted.quiet > 20 && counted.working > 100,
+    `only ${JSON.stringify(counted)}`,
+  );
+  assert.ok(
+    counted.ands >= 0.4 * counted.working,
+    `an "and" of 1 or of 2 struck in ${counted.ands} of ${counted.working} working bars`,
+  );
+  // Pooled: a proportion, read over enough bars to mean one (the full run's waltz takes with a
+  // soloist; a push sees too few).
+  if (!FULL) return;
+  const pooled = `${underTheSolo.bars} bars under a soloist in ${counted.takes} takes`;
+  const shares = underTheSolo.eighths.map((n) => n / underTheSolo.bars);
+  assert.ok(underTheSolo.bars > 600, `only ${pooled}`);
+  assert.ok(
+    underTheSolo.thin <= 0.3 * underTheSolo.bars,
+    `${pooled}: ${underTheSolo.thin} with one strike or none`,
+  );
+  assert.ok(
+    shares.every((share) => share >= 0.15 && share <= 0.55),
+    `${pooled}: struck on 1 1& 2 2& 3 3& in ${shares.map((share) => `${Math.round(share * 100)}%`).join(" ")}`,
+  );
+});
+
+/**
+ * A bar of the waltz's hemiola (three short chords over two bars, F1 of the study), as it is
+ * played: its first bar 1 and 3, its second bar 2, each a stab (in the other phase the same
+ * two bars the other way round). The bar of 2 is the one no other figure plays; a chord
+ * arriving on 3 may be struck in it.
+ */
+function hemiolaBar(bar: PlanBar, strikes: readonly Strike[], half: 0 | 1): boolean {
+  const stab = (strike: Strike | undefined) =>
+    strike !== undefined && strike.ends - strike.sounds <= PPQ / 2 + POCKET;
+  const at = strikes.map((strike) => strike.tick - bar.start);
+  if (half === 0) return strikes.every(stab) && at.length === 2 && at[0] === 0 && at[1] === 2 * PPQ;
+  // The stab on 2; a chord arriving on 3 is laid in there as any chord is.
+  return stab(strikes[0]) && at[0] === PPQ && at.every((tick) => tick === PPQ || tick >= 2 * PPQ);
+}
+
+/** Whether a style's book for a bar's meter, at the bar's level, has a figure of two bars. */
+const playsTwoBars = (style: (typeof STYLES)[number], bar: PlanBar): boolean => {
+  const book =
+    bar.meter.beats === 4 && bar.meter.unit === 4
+      ? style.chords.rhythm
+      : style.chords.meters?.[`${bar.meter.beats}/${bar.meter.unit}`];
+  return book?.tiers[tierOf(bar.seats.chords ?? bar.energy)].twoBars !== undefined;
+};
+
+/**
+ * Takes held on a push for the hemiola's rules, each one whose draw would break a rule if the
+ * rule were not kept (found by planting the fault): a jam with the soloist whose draw puts the
+ * hemiola in a solo phrase were the soloist not heard; a long one whose draw runs phrases on
+ * past eight bars and over a chorus's top were a run not stopped.
+ */
+const HEMIOLA_HELD: readonly TakeOptions[] = [
+  // With the soloist not heard, the hemiola in bars 18 to 24 and 33 to 36, under the alto.
+  { mode: "jam", passes: 3, solo: true, energy: 0.55, seed: 3 },
+  // With a run let go on over a section's top: two passes, over the second chorus's top.
+  { mode: "jam", passes: 2, energy: 0.55, seed: 41 },
+  // With a run let go on past eight bars: three passes, a run of twelve.
+  { mode: "jam", passes: 3, energy: 0.55, seed: 19 },
+];
+
+/**
+ * A phrase played on the hemiola: its bars alternate the figure's two bars from the phrase's
+ * first, in either phase (1 and 3 then 2, or 2 then 1 and 3). Null where it is not.
+ */
+function hemiolaPhase(bars: readonly PlanBar[], strikes: (bar: PlanBar) => Strike[]): 0 | 1 | null {
+  for (const phase of [0, 1] as const)
+    if (bars.every((bar) => hemiolaBar(bar, strikes(bar), ((bar.phrase.bar + phase) % 2) as 0 | 1)))
+      return phase;
+  return null;
+}
+
+test("jazz: in a waltz, with the band to itself at the working level, the piano now and then plays a whole phrase as the hemiola (three short chords over two bars, F1, in either phase): from the phrase's first bar every bar plays it, and it stops where the phrase does; a run of such phrases is eight bars at most and never goes on over the first bar of a section or of a chorus; never where a soloist has the lead; in a minority of the phrases", {
+  skip: only("jazz").skip || !LIBRARY.some((chart) => chart.meter === "3/4"),
+}, () => {
+  const jazz = STYLES.find((style) => style.id === "jazz")!;
+  const waltz = LIBRARY.find((chart) => chart.file === "jazz-waltz-f.chart")!;
+  const counted = { phrases: 0, runs: 0, longest: 0 };
+  for (const { chart, options, take } of [
+    ...takes((jam) => jam.style.id === "jazz" && jam.chart.meter === "3/4"),
+    ...heldTakes(jazz, "3/4", false, true),
+    ...heldTakes(jazz, "3/4", true, true),
+    ...HEMIOLA_HELD.map((options) => ({
+      chart: waltz,
+      options,
+      take: render(waltz.text, jazz, options),
+    })),
+  ]) {
+    const byBar = strikesByBar(take);
+    const strikes = (bar: PlanBar) => byBar.get(bar.index) ?? [];
+    const phrases = new Map<string, PlanBar[]>();
+    for (const bar of take.plan.bars) {
+      if (bar.kind !== "music" || bar.ending || bar.seats.chords === null) continue;
+      if (bar.meter.beats !== 3 || bar.meter.unit !== 4) continue;
+      const place = `${bar.section.occurrence}/${bar.phrase.index}`;
+      phrases.set(place, [...(phrases.get(place) ?? []), bar]);
+    }
+    // The run of phrases on the hemiola that ends at the phrase before: its bars, its last bar.
+    let run = { bars: 0, last: -1 };
+    for (const bars of phrases.values()) {
+      const first = bars[0]!;
+      const where = `${chart.file} ${JSON.stringify(options)} bars ${first.index} to ${bars.at(-1)!.index}`;
+      const band = bars.every((bar) => bar.solo === null);
+      const whole = first.phrase.bar === 0 && bars.length === first.phrase.length;
+      if (band && whole && tierOf(first.seats.chords!) === "mid") counted.phrases++;
+      // Under a soloist: no phrase of it is the hemiola throughout.
+      if (!band) {
+        assert.equal(hemiolaPhase(bars, strikes), null, `${where}: the hemiola under a soloist`);
+        run = { bars: 0, last: -1 };
+        continue;
+      }
+      // With the band alone a bar of the hemiola that no other figure plays (a lone stab on 2)
+      // says the phrase is played on it, and then all of it is.
+      const said = bars.some((bar) => hemiolaBar(bar, strikes(bar), 1));
+      if (!said) {
+        run = { bars: 0, last: -1 };
+        continue;
+      }
+      const at = bars.map((bar) =>
+        strikes(bar)
+          .map((strike) => (strike.tick - bar.start) / STEP)
+          .join(" "),
+      );
+      assert.equal(first.phrase.bar, 0, `${where}: the hemiola, not from the phrase's top`);
+      assert.notEqual(
+        hemiolaPhase(bars, strikes),
+        null,
+        `${where}: not the hemiola throughout (${at.join(" | ")})`,
+      );
+      assert.equal(tierOf(first.seats.chords!), "mid", `${where}: the hemiola, not working`);
+      assert.ok(
+        first.phrase.length >= 4 && first.phrase.length <= 8,
+        `${where}: a phrase of ${first.phrase.length}`,
+      );
+      counted.runs++;
+      const goesOn = run.last === first.index - 1;
+      assert.ok(
+        !goesOn || first.barInSection !== 0,
+        `${where}: the hemiola goes on over the top of a section`,
+      );
+      run = { bars: (goesOn ? run.bars : 0) + bars.length, last: bars.at(-1)!.index };
+      counted.longest = Math.max(counted.longest, run.bars);
+      assert.ok(run.bars <= 8, `${where}: a run of the hemiola ${run.bars} bars long`);
+    }
+  }
+  assert.ok(counted.phrases > 20 && counted.runs > 0, `only ${JSON.stringify(counted)}`);
+  assert.ok(
+    counted.runs < 0.5 * counted.phrases,
+    `the hemiola in ${counted.runs} of ${counted.phrases} working phrases`,
+  );
+});
+
 test(
   "neo-soul: in six and twelve the Rhodes holds and leans:away from a soloist, in a bar of one chord, it is never struck on every pulse, and from the working level up it leans into a pulse, struck on an eighth between them (the lazy re-strike, or a chord laid in late)",
   only("neosoul"),
@@ -620,9 +836,9 @@ test(
   },
 );
 
-test("a section keeps its figure: away from a solo, every phrase opens on the same rhythm each time the section comes round at the same level", () => {
+test("a section keeps its figure: away from a solo, every phrase opens on the same rhythm each time the section comes round at the same level, but a phrase played whole on a figure of two bars (the waltz's hemiola), which opens on that figure", () => {
   let compared = 0;
-  for (const { chart, options, take } of takes(written)) {
+  for (const { style, chart, options, take } of takes(written)) {
     const byBar = strikesByBar(take);
     const openings = new Map<string, string>();
     for (const bar of take.plan.bars) {
@@ -633,6 +849,16 @@ test("a section keeps its figure: away from a solo, every phrase opens on the sa
       if (bar.solo !== null) continue;
       // A bar with one chord: where a chord changes inside the bar, the hand owes it a strike.
       if (bar.spans.filter((span) => !span.tied).length !== 1 || bar.spans[0]!.chord === null)
+        continue;
+      // A phrase on a figure of two bars, where the book has one: its second bar says so.
+      const next = take.plan.bars[bar.index + 1];
+      if (
+        playsTwoBars(style, bar) &&
+        next?.phrase.index === bar.phrase.index &&
+        (hemiolaBar(next, byBar.get(next.index) ?? [], 1) ||
+          (hemiolaBar(bar, byBar.get(bar.index) ?? [], 1) &&
+            hemiolaBar(next, byBar.get(next.index) ?? [], 0)))
+      )
         continue;
       // Leave out the first eighth and the last beat, where a push comes and goes with the
       // harmony (a pushed chord is not struck again; the beat before a push is cleared for it).
@@ -832,13 +1058,33 @@ function holdable(
   return place(0, 0, Infinity, -Infinity, false);
 }
 
-test("a guitar's chords can be held: every stroke is three notes or more and no more than the guitar has strings (four, where it grips three), one to a string, inside a four-fret hand, none over the 15th fret; on neighbouring strings and none open, unless the style's guitar may mute a string inside its grip or plays open strings", {
+/**
+ * The top strings a style's every strum crosses in a bar of four, where its book writes them
+ * all across the top N strings (`Attack.top`); otherwise none.
+ */
+const topStrings = (style: (typeof STYLES)[number]): number | null => {
+  const book = style.chords.rhythm;
+  if (!book) return null;
+  const tops = [book.tiers.low, book.tiers.mid, book.tiers.high].flatMap((tier) => [
+    tier.arrival,
+    ...[tier.articulation, ...tier.figures.map((figure) => figure.articulation ?? {})].flatMap(
+      (articulation) => Object.values(articulation),
+    ),
+  ]);
+  const strums = tops.filter((attack) => attack.pluck === undefined && !attack.muted);
+  const top = strums[0]?.top;
+  return top !== undefined && strums.every((attack) => attack.top === top) ? top : null;
+};
+
+test("a guitar's chords can be held: every stroke is three notes or more and no more than the guitar has strings (four, where it grips three), one to a string, inside a four-fret hand, none over the 15th fret; on neighbouring strings and none open, unless the style's guitar may mute a string inside its grip or plays open strings; and a strum across the top N strings sounds nothing under the N-th string's open pitch", {
   skip: guitars.length === 0,
 }, () => {
   let strokes = 0;
+  let topped = 0;
   for (const { style, chart, options, take } of [...takes(strummed), ...stressTakes(strummed)]) {
     const idiom = style.chords.idiom;
     if (idiom === "keys") continue;
+    const top = topStrings(style);
     for (const stroke of [...strikesOf(take), ...strikesOf(take, true)]) {
       strokes++;
       const where = `${chart.file} seed ${options.seed} at tick ${stroke.tick}: ${stroke.pitches}`;
@@ -847,9 +1093,43 @@ test("a guitar's chords can be held: every stroke is three notes or more and no 
         `${where}: the strings`,
       );
       assert.ok(holdable(stroke.pitches, idiom), `${where}: no hand holds this`);
+      // In a bar of four the book plays, short of the ending, every strum crosses the top strings.
+      if (top === null) continue;
+      const bar = take.plan.bars.findLast((candidate) => candidate.start <= stroke.tick);
+      if (!bar || bar.ending || bar.meter.beats !== 4 || bar.meter.unit !== 4) continue;
+      topped++;
+      const lowest = OPEN[OPEN.length - top]!;
+      // Under them only a tone the chord is heard by (its third or suspension, its seventh or
+      // sixth, a written alteration) that the top strings lack, reached for as an upstroke
+      // reaches (X-B-13): the guitar's own rule.
+      const chord = chordAt(take, stroke.tick);
+      const altered = { b5: 6, "#5": 8, b9: 1, "#9": 3, "#11": 6, b13: 8 } as const;
+      const heard = (pitch: number) =>
+        chord !== null &&
+        [
+          ...chordTones(chord.quality)
+            .filter(
+              (tone, _, all) =>
+                ["third", "sus", "seventh", "sixth"].includes(tone.role) ||
+                // An eleventh chord's eleventh stands where the third would (the voicing's 3).
+                (tone.role === "eleventh" &&
+                  !all.some((other) => other.role === "third" || other.role === "sus")),
+            )
+            .map((tone) => tone.interval),
+          ...chord.quality.alterations.map((alteration) => altered[alteration]),
+        ].some((interval) => (pitchClass(chord.root) + interval) % 12 === pitch % 12);
+      const over = stroke.pitches.filter((pitch) => pitch >= lowest);
+      for (const pitch of stroke.pitches.filter((pitch) => pitch < lowest)) {
+        assert.ok(
+          heard(pitch) && !over.some((other) => (other - pitch) % 12 === 0),
+          `${where}: a strum across the top ${top} strings sounds ${pitch}, under ${lowest}`,
+        );
+      }
     }
   }
   assert.ok(strokes > enough(20000), `only ${strokes} strokes`);
+  if (STYLES.some((style) => topStrings(style) !== null))
+    assert.ok(topped > enough(30000), `only ${topped} strums across the top strings`);
 });
 
 test("a guitarist holds a grip: the notes under the hand change only where the chord does (or leaning into it), a scratch deadens the grip being held and never goes back to the last one, and after a chord leant into nothing is stroked until it has rung an eighth", {
@@ -995,6 +1275,64 @@ const pickers = guitars.filter((style) => {
   );
 });
 const picked = (jam: { style: (typeof STYLES)[number] }) => pickers.includes(jam.style);
+/** The symbols a figure's grid strikes with, by what each attack is. */
+const attacksOf = (style: (typeof STYLES)[number]) => {
+  const book = style.chords.rhythm;
+  if (!book) return [];
+  return [book.tiers.low, book.tiers.mid, book.tiers.high].flatMap((tier) =>
+    tier.figures.map((figure) => {
+      const articulation = { ...tier.articulation, ...(figure.articulation ?? {}) };
+      const attacks = (grid: string) =>
+        [...grid].flatMap((symbol) => (articulation[symbol] ? [articulation[symbol]!] : []));
+      return { grid: attacks(figure.grid), alone: figure.alone ? attacks(figure.alone) : null };
+    }),
+  );
+};
+/**
+ * A guitar that picks with the band: a figure it plays with a bassist has plucked strings in it.
+ * Its plucks are common, so the rule below must see enough of them; a guitar that picks only the
+ * boom with no bassist (country's, ST-country-07) is held to the rule on every string it plucks,
+ * and to no count of them.
+ */
+const picksWithTheBand = (style: (typeof STYLES)[number]): boolean =>
+  attacksOf(style).some(({ grid }) => grid.some((attack) => attack.pluck !== undefined));
+/**
+ * A guitar that plucks with no bassist: a figure's second grid has plucked strings in it, the
+ * Travis hand's or a boom-chick's boom. Every bar it plucks with the bass out is read below.
+ */
+/**
+ * Where a style's figures write the boom-chick's alternate (`fifth`), with no bassist: the
+ * sixteenths of a bar of four. Read from the figures' second grids, so a hand told to take the
+ * chord's fifth is held to it wherever the data says so, and nowhere else.
+ */
+const fifthsWritten = (style: (typeof STYLES)[number]): ReadonlySet<number> => {
+  const steps = new Set<number>();
+  const book = style.chords.rhythm;
+  if (!book) return steps;
+  for (const tier of [book.tiers.low, book.tiers.mid, book.tiers.high]) {
+    for (const figure of tier.figures) {
+      const articulation = { ...tier.articulation, ...(figure.articulation ?? {}) };
+      const grid = [...(figure.alone ?? "")].filter((symbol) => symbol !== " ");
+      if (grid.length !== 16) continue;
+      grid.forEach((symbol, step) => {
+        if (articulation[symbol]?.pluck?.includes("fifth")) steps.add(step);
+      });
+    }
+  }
+  return steps;
+};
+const plucksAlone = (style: (typeof STYLES)[number]): boolean =>
+  attacksOf(style).some(({ alone }) => alone?.some((attack) => attack.pluck !== undefined));
+/**
+ * A guitar that picks a whole bar with no bassist: a figure's second grid that is all plucked
+ * strings, the Travis hand. Such a bar is asked a string on every pulse besides; a boom-chick's
+ * bar with no bassist strums its chick between.
+ */
+const picksAlone = (style: (typeof STYLES)[number]): boolean =>
+  attacksOf(style).some(
+    ({ alone }) =>
+      alone !== null && alone.length > 0 && alone.every((attack) => attack.pluck !== undefined),
+  );
 
 test("a picked note is a string of the shape the hand is holding: everything the guitar plucks under one chord, with whatever it strums there, is no more notes than it has strings and one shape a hand can hold; and a plucked string rings on under the hand until it is plucked again, never past its chord and never into a strum", {
   skip: pickers.length === 0,
@@ -1080,30 +1418,36 @@ test("a picked note is a string of the shape the hand is holding: everything the
       });
     });
   }
-  assert.ok(
-    chords > enough(1200) && plucks > enough(9000) && rang > enough(7000),
-    `only ${chords} picked chords, ${plucks} plucked notes, ${rang} that rang on`,
-  );
+  if (STYLES.some(picksWithTheBand))
+    assert.ok(
+      chords > enough(1200) && plucks > enough(9000) && rang > enough(7000),
+      `only ${chords} picked chords, ${plucks} plucked notes, ${rang} that rang on`,
+    );
   if (guitarsInSix.length > 0) assert.ok(six > PICKED_IN_SIX, `only ${six} chords picked in six`);
   if (guitarsInTwelve.length > 0)
     assert.ok(twelve > PICKED_IN_TWELVE, `only ${twelve} chords picked in twelve`);
 });
 
-test("with no bassist the picking thumb is the bass: in a bar of four, or of six or twelve where the style has written it, the guitar picks while the bass is out, a string is plucked on every pulse a chord sounds on, and the first one plucked on a pulse under a chord is that chord's root, with nothing in the bar under it but the fifth below", {
+test("with no bassist the picking thumb is the bass: in a bar of four, or of six or twelve where the style has written it, wherever the guitar plucks while the bass is out (strumming between or not), the first string plucked on a pulse under a chord is that chord's root, with nothing plucked in the bar under it but the fifth below; a string plucked where the figure asks the boom's fifth sounds the chord's fifth, never the bass again; and a guitar that picks the whole bar plucks a string on every pulse a chord sounds on", {
   skip: pickers.length === 0,
 }, () => {
   let bars = 0;
   let stated = 0;
+  let plucking = 0;
+  let booms = 0;
+  let fifths = 0;
   let six = 0;
   let twelve = 0;
   const played = [
-    ...takes(picked).map(({ chart, options, take }) => ({
+    ...takes(picked).map(({ style, chart, options, take }) => ({
       where: `${chart.file} seed ${options.seed}`,
+      style,
       take,
     })),
     ...sixesOnce(),
   ];
-  for (const { where: of, take } of played) {
+  for (const { where: of, style, take } of played) {
+    const toFifth = fifthsWritten(style);
     const harmony = harmonyOf(take);
     const plucked = pluckedOf(take);
     const strums = strikesOf(take);
@@ -1115,10 +1459,15 @@ test("with no bassist the picking thumb is the bass: in a bar of four, or of six
       if (bar.seats.bass !== null || !(four || inSix || inTwelve)) continue;
       const end = bar.start + bar.ticks;
       const own = plucked.filter((note) => note.tick >= bar.start && note.tick < end);
-      if (own.length === 0 || strums.some((s) => s.tick >= bar.start && s.tick < end)) continue;
-      bars++;
-      if (inSix) six++;
-      if (inTwelve) twelve++;
+      if (own.length === 0) continue;
+      // A bar picked whole, the Travis hand; or one where the pick plays the boom between strums.
+      const whole = !strums.some((s) => s.tick >= bar.start && s.tick < end);
+      plucking++;
+      if (whole) {
+        bars++;
+        if (inSix) six++;
+        if (inTwelve) twelve++;
+      }
       const where = `${of} bar ${bar.index}`;
       // The chords of the bar, each from where it arrives (or the barline) to the next.
       const at = harmony.findLastIndex((arrival) => arrival.tick <= bar.start);
@@ -1135,10 +1484,12 @@ test("with no bassist the picking thumb is the bass: in a bar of four, or of six
           const beat = bar.start + pulse;
           if (beat < starts || beat >= stops) continue;
           const thumb = own.filter((note) => note.tick === beat).map((note) => note.pitches[0]!);
-          assert.ok(thumb.length > 0, `${where}: no string plucked on the pulse at ${beat}`);
-          if (!first) continue;
+          if (whole)
+            assert.ok(thumb.length > 0, `${where}: no string plucked on the pulse at ${beat}`);
+          if (thumb.length === 0 || !first) continue;
           first = false;
-          stated++;
+          if (whole) stated++;
+          else booms++;
           const bass = Math.min(...thumb);
           assert.equal(bass % 12, root, `${where}: ${chord.text} is first given ${bass}`);
           // Nothing under the bass but the alternate bass, a fourth below it.
@@ -1150,13 +1501,42 @@ test("with no bassist the picking thumb is the bass: in a bar of four, or of six
             `${where}: ${chord.text} has ${under.map((note) => note.pitches[0])} under its bass ${bass}`,
           );
         }
+        // A string plucked as the boom's alternate (`fifth`) sounds the chord's fifth (its own root
+        // over a slash chord on its fifth), never the bass again: where the chord is already
+        // stated, for under a new chord the thumb's first note is its bass.
+        if (four) {
+          const fifth = chordTones(chord.quality).find((tone) => tone.role === "fifth");
+          const wanted = [(root + (fifth?.interval ?? 7)) % 12];
+          if (chord.bass && pitchClass(chord.bass) === wanted[0]) wanted.push(root);
+          for (const step of toFifth) {
+            const tick = bar.start + step * STEP;
+            if (tick <= starts || tick >= stops) continue;
+            if (!own.some((note) => note.tick >= starts && note.tick < tick)) continue;
+            const at = own.filter((note) => note.tick === tick).map((note) => note.pitches[0]!);
+            if (at.length === 0) continue;
+            fifths++;
+            const thumb = Math.min(...at) % 12;
+            assert.ok(
+              wanted.includes(thumb),
+              `${where}: ${chord.text} is plucked ${Math.min(...at)} where the figure asks its fifth`,
+            );
+          }
+        }
       }
     }
   }
-  assert.ok(
-    bars > enough(60) && stated > enough(60),
-    `only ${bars} bars picked with no bassist, ${stated} chords stated`,
-  );
+  if (STYLES.some((style) => fifthsWritten(style).size > 0))
+    assert.ok(fifths > enough(60), `only ${fifths} strings plucked as a chord's fifth`);
+  if (STYLES.some(picksAlone))
+    assert.ok(
+      bars > enough(60) && stated > enough(60),
+      `only ${bars} bars picked with no bassist, ${stated} chords stated`,
+    );
+  if (STYLES.some(plucksAlone))
+    assert.ok(
+      plucking > enough(60) && stated + booms > enough(60),
+      `only ${plucking} bars plucked with no bassist, ${stated + booms} chords stated`,
+    );
   if (guitarsInSix.length > 0)
     assert.ok(six > ALONE_IN_SIX, `only ${six} bars of six picked alone`);
   if (guitarsInTwelve.length > 0)
@@ -1405,3 +1785,117 @@ test(
       );
   },
 );
+
+test(
+  'funk: in four the guitar\'s line has a stab in the bar\'s last eighth from the working level up, on the "and" of 4 or its "a", so that it can lean into the chord coming (ST-funk-38)',
+  only("funk"),
+  () => {
+    let bars = 0;
+    for (const { chart, options, take } of takes(
+      (jam) => jam.style.id === "funk" && written(jam),
+    )) {
+      const stabs = new Set(strikesOf(take).map((strike) => strike.tick));
+      for (const bar of take.plan.bars) {
+        if (bar.kind !== "music" || bar.ending || bar.seats.chords === null) continue;
+        if (bar.meter.beats !== 4 || bar.meter.unit !== 4) continue;
+        if (tierOf(bar.seats.chords) === "low" || bar.spans.some((span) => span.chord === null))
+          continue;
+        bars++;
+        assert.ok(
+          stabs.has(bar.start + 14 * STEP) || stabs.has(bar.start + 15 * STEP),
+          `${chart.file} ${JSON.stringify(options)} bar ${bar.index}: no stab in the last eighth`,
+        );
+      }
+    }
+    assert.ok(bars > enough(2000), `only ${bars} bars`);
+  },
+);
+
+test("in a style whose guitar pulls off its final chord, the stinger is played on the final tonic of an ending that rings, and nowhere else: the 6th (the b6 over a minor chord) struck on the B or the high E string and pulled off to the 5th under it on that string an eighth later, softer by the style's share; where the strike has a 6th there that its string can pull off from within the hand, without a half step over it, it always is; and no other chord note is pulled off or hammered on", {
+  skip: !STYLES.some((style) => style.chords.ending.pullOff),
+}, () => {
+  let stung = 0;
+  for (const { style, chart, options, take } of [...takes(), ...stressTakes()]) {
+    const slurs = notesOf(take, "chords").filter((note) => note.slur);
+    const where = `${chart.file} seed ${options.seed} ${JSON.stringify(options)}`;
+    const pullOff = style.chords.ending.pullOff;
+    const idiom = style.chords.idiom;
+    if (!pullOff || idiom === "keys") {
+      assert.equal(slurs.length, 0, `${where}: a chord note pulled off in a style that does not`);
+      continue;
+    }
+    const last = take.plan.bars.findLast((bar) => bar.kind === "music");
+    const ending = last?.ending;
+    const landing = last && ending ? last.start + ending.at : -1;
+    const final = harmonyOf(take).findLast((arrival) => arrival.tick <= landing)?.chord ?? null;
+    const rings =
+      last !== undefined &&
+      ending !== undefined &&
+      ending !== null &&
+      (ending.gesture.kind === "hold" || ending.gesture.kind === "soft") &&
+      ending.ring > PPQ &&
+      final !== null &&
+      pitchClass(final.root) === pitchClass(last.key.tonic);
+    if (!rings || !final) {
+      assert.equal(slurs.length, 0, `${where}: a pull-off where no final tonic rings`);
+      continue;
+    }
+    const root = pitchClass(final.root);
+    const minor = chordTones(final.quality).some(
+      (tone) => tone.role === "third" && tone.interval === 3,
+    );
+    const step = minor ? 1 : 2;
+    const sixth = minor ? 8 : 9;
+    // At most one, an eighth after the final chord lands, to its 5th: whatever is struck there.
+    assert.ok(slurs.length <= 1, `${where}: ${slurs.length} pull-offs`);
+    const [pulled] = slurs;
+    if (pulled) {
+      assert.equal(
+        pulled.tick,
+        landing + PPQ / 2,
+        `${where}: the pull-off is not an eighth after the chord`,
+      );
+      assert.equal((pulled.pitch - root + 120) % 12, 7, `${where}: the pull-off is not to the 5th`);
+    }
+    const strike = strikesOf(take).find((one) => one.tick === landing);
+    if (!strike) {
+      assert.equal(slurs.length, 0, `${where}: a pull-off with no final chord struck`);
+      continue;
+    }
+    // The guitar's top two strings, the B and the high E: a note under a silent B is not on top.
+    const strings = fingering(idiom, strike.pitches);
+    const frets = strings ? fretsOf(strings, strike.pitches) : [];
+    const top = strike.pitches.filter((_, k) => (strings?.[k] ?? -1) >= 4);
+    // Where the strike's 6th on one of those strings can pull off to the 5th: within the hand,
+    // and nothing a half step over it.
+    const fretted = frets.filter((fret) => fret > 0);
+    const can = top.some((pitch) => {
+      const k = strike.pitches.indexOf(pitch);
+      const to = frets[k]! - step;
+      const reach = to === 0 || Math.max(...fretted) - Math.min(to, ...fretted) <= 3;
+      return (
+        (pitch - root + 120) % 12 === sixth &&
+        to >= 0 &&
+        reach &&
+        !strike.pitches.some((other) => (((other - pitch) % 12) + 12) % 12 === 1)
+      );
+    });
+    if (can)
+      assert.equal(slurs.length, 1, `${where}: the final tonic ${strike.pitches} has no stinger`);
+    if (!pulled) continue;
+    stung++;
+    const from = notesOf(take, "chords").find(
+      (note) => note.tick === landing && !note.slur && note.pitch === pulled.pitch + step,
+    );
+    assert.ok(
+      from && top.includes(from.pitch),
+      `${where}: no 6th on the top two strings to pull off from`,
+    );
+    const touch = (2 * 10 * style.feel.humanize) / 100 + 1;
+    assert.ok(
+      Math.abs(pulled.velocity - from.velocity * pullOff.level) <= touch,
+      `${where}: the pull-off at ${pulled.velocity} after a strike at ${from.velocity}`,
+    );
+  }
+  assert.ok(stung > enough(90), `only ${stung} stingers`);
+});

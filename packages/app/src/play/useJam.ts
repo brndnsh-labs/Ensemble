@@ -5,6 +5,8 @@ import type { Player } from "@ensemble/audio";
 import type { Seat, StylePack, TakeRecipe } from "@ensemble/engine";
 import { seconds } from "@ensemble/engine";
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { CountedChart } from "../counts.ts";
+import { count, lengthOf } from "../counts.ts";
 import type { Made } from "./band.ts";
 import { perform, Unplayable, warmUp } from "./band.ts";
 import type { Call, Performance, Place } from "./jam.ts";
@@ -76,6 +78,20 @@ interface Running {
   extending: boolean;
   /** When the band was told to finish, on the page's clock. */
   toldAt: number | undefined;
+  /** When the band started, on the page's clock. */
+  readonly startedAt: number;
+  /** Its end has been counted: once for each start, however it ended. */
+  ended: boolean;
+}
+
+/** Count a run's end, unless it has been counted already. */
+function countEnd(
+  run: Running,
+  how: "finished" | "ran-out" | "stopped" | "interrupted" | "closed",
+): void {
+  if (run.ended) return;
+  run.ended = true;
+  count("play_ended", { how, length: lengthOf((performance.now() - run.startedAt) / 1000) });
 }
 
 const newSeed = (): number => Math.floor(Math.random() * 2 ** 31);
@@ -86,8 +102,16 @@ const passesOf = (recipe: TakeRecipe): number => recipe.options.passes ?? OPEN_P
  * `changed`, when given, is told each time the take changes, as `take` is. It
  * is told even as the screen closes, when the band is stopped and an open jam
  * becomes the passes it got to, which `take` can no longer show.
+ *
+ * `chart` is the chart as it is counted (`counts.ts`): the band starting and
+ * ending are counted here, where each happens once.
  */
-export function useJam(rig: Rig, call: Call, changed?: (take: TakeRecipe) => void): Jam {
+export function useJam(
+  rig: Rig,
+  call: Call,
+  chart: CountedChart,
+  changed?: (take: TakeRecipe) => void,
+): Jam {
   const [phase, setPhase] = useState<Phase>("idle");
   const [playing, setPlaying] = useState<Performance>();
   const [now, setNow] = useState<{ place: Place | undefined; elapsed: number }>({
@@ -95,6 +119,8 @@ export function useJam(rig: Rig, call: Call, changed?: (take: TakeRecipe) => voi
     elapsed: 0,
   });
   const [take, setShownTake] = useState<TakeRecipe>();
+  const counted = useRef(chart);
+  counted.current = chart;
   const tell = useRef(changed);
   tell.current = changed;
   const setTake = useCallback((next: TakeRecipe) => {
@@ -124,23 +150,31 @@ export function useJam(rig: Rig, call: Call, changed?: (take: TakeRecipe) => voi
     }
   }, [rig, packs]);
 
-  const stop = useCallback(() => {
-    presses.current++;
-    const run = running.current;
-    const position = run?.player.position;
-    if (run && position !== undefined && run.made.plan.open) {
-      // An open jam that was not told to finish is, as a take, the passes it got to.
-      const bar = placeAt(run.made.plan, Math.max(0, position - rig.latency))?.bar;
-      const passes = bar?.kind === "music" ? bar.pass + 1 : 1;
-      setTake({ ...run.recipe, options: { ...run.recipe.options, passes } });
-    }
-    running.current = undefined;
-    rig.stop();
-    setPhase("idle");
-    setSeats(undefined);
-    setTold(false);
-    setNow({ place: undefined, elapsed: 0 });
-  }, [rig, setTake]);
+  /**
+   * Silence. `ended` is why: the take came to its end, the phone cut the sound off, or
+   * anything else stopped it.
+   */
+  const stop = useCallback(
+    (ended: "ran-out" | "interrupted" | "stopped" = "stopped") => {
+      presses.current++;
+      const run = running.current;
+      if (run) countEnd(run, ended === "ran-out" && run.toldAt !== undefined ? "finished" : ended);
+      const position = run?.player.position;
+      if (run && position !== undefined && run.made.plan.open) {
+        // An open jam that was not told to finish is, as a take, the passes it got to.
+        const bar = placeAt(run.made.plan, Math.max(0, position - rig.latency))?.bar;
+        const passes = bar?.kind === "music" ? bar.pass + 1 : 1;
+        setTake({ ...run.recipe, options: { ...run.recipe.options, passes } });
+      }
+      running.current = undefined;
+      rig.stop();
+      setPhase("idle");
+      setSeats(undefined);
+      setTold(false);
+      setNow({ place: undefined, elapsed: 0 });
+    },
+    [rig, setTake],
+  );
 
   const play = () => {
     rig.wake();
@@ -168,7 +202,18 @@ export function useJam(rig: Rig, call: Call, changed?: (take: TakeRecipe) => voi
           onsets: onsetsOf(made.sounds, made.plan),
           extending: false,
           toldAt: undefined,
+          startedAt: performance.now(),
+          ended: false,
         };
+        const { beats, unit } = made.chart.meter;
+        const options = recipe.options;
+        count("play_started", {
+          style: style.id,
+          meter: `${beats}/${unit}`,
+          mode: made.plan.mode,
+          soloist: options.solo ? (options.soloInstrument ?? style.solo.instrument) : "none",
+          chart: counted.current,
+        });
         setPlaying(made);
         setTake(recipe);
         setPhase("playing");
@@ -273,7 +318,7 @@ export function useJam(rig: Rig, call: Call, changed?: (take: TakeRecipe) => voi
         extend(run, position);
       }
       if (!plan.open && position > seconds(plan) + RING) {
-        stop();
+        stop("ran-out");
         return;
       }
       const heard = position - rig.latency;
@@ -300,7 +345,22 @@ export function useJam(rig: Rig, call: Call, changed?: (take: TakeRecipe) => voi
   }, [rig]);
 
   // Leaving the screen stops the band.
-  useEffect(() => stop, [stop]);
+  useEffect(() => () => stop(), [stop]);
+
+  // So does the phone cutting the sound off: the screen must not show a band that is not heard.
+  useEffect(() => rig.whenCutOff(() => stop("interrupted")), [rig, stop]);
+
+  // The page closed while the band plays: that is its end. A page kept by the browser and come
+  // back to plays on, and its end has been counted. Hidden is not closed: a phone puts a page
+  // away while it plays.
+  useEffect(() => {
+    const closed = () => {
+      const run = running.current;
+      if (run) countEnd(run, "closed");
+    };
+    addEventListener("pagehide", closed);
+    return () => removeEventListener("pagehide", closed);
+  }, []);
 
   const bar = now.place?.bar;
   const canFinish =

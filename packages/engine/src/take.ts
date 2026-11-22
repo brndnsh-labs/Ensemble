@@ -8,9 +8,11 @@ import { transpose } from "./chart/transpose.ts";
 import type { Diagnostic } from "./chart/types.ts";
 import { PPQ } from "./chart/types.ts";
 import type { PerformanceEvent } from "./perform/notes.ts";
-import { perform } from "./perform/perform.ts";
+import { performed } from "./perform/perform.ts";
+import { quartersAt } from "./perform/time.ts";
 import { planBars } from "./plan/plan.ts";
-import type { Plan, PlanOptions } from "./plan/types.ts";
+import type { Plan, PlanBar, PlanOptions } from "./plan/types.ts";
+import type { MovedIdea } from "./players/solo/play.ts";
 import type { Seat, StylePack } from "./style/types.ts";
 import type { Key } from "./theory/pitch.ts";
 
@@ -71,11 +73,20 @@ export interface Take {
   readonly diagnostics: readonly Diagnostic[];
   readonly plan: Plan;
   readonly events: readonly PerformanceEvent[];
+  /**
+   * The phrases where the soloist drew an idea to say a beat away, and what became of each
+   * (`solo.moved-played`): what the take's notes cannot show. Not kept with a take: a take
+   * made again from its recipe makes it again.
+   */
+  readonly moved: readonly MovedIdea[];
 }
 
 /** The roadmap of a performance, without playing it. */
 export function plan(chart: Chart, style: StylePack, options: PlanOptions): Plan {
-  return planBars(expand(chart), chart.tempo, chart.meter, style, options);
+  // A chart with an arrangement of its own is played as its writer arranged it: the band lays
+  // nobody out of a jam on it by itself either.
+  const arranged = chart.arrangement?.lines != null;
+  return planBars(expand(chart), chart.tempo, chart.meter, style, options, arranged);
 }
 
 /**
@@ -95,14 +106,32 @@ export function render(text: string, style: StylePack, options: TakeOptions): Ta
     ...(before.open ? { passes: Math.max(before.passes ?? 1, Math.floor(endAfter) + 1) } : {}),
   });
   const told = whole(text, style, options);
-  const join = toldAt - (JOIN_LEAD * told.plan.quarters * PPQ) / 60;
+  const join = toldAt - (JOIN_LEAD * quartersAt(told.plan, toldAt) * PPQ) / 60;
   const time = (event: PerformanceEvent) =>
     event.kind === "note" ? event.tick + event.offset : event.tick;
+  // Up to where it was told the take is the jam as it was going to be: who was in is that
+  // jam's, so the plan says of every bar what its notes are. From there everyone is in.
+  const asWas = (bar: PlanBar) => untold.plan.bars[bar.index] ?? bar;
   return {
     ...told,
+    plan: {
+      ...told.plan,
+      bars: told.plan.bars.map((bar) => {
+        if (bar.start >= toldAt) return bar;
+        // Nor does a seat come in on a bar from before the word (`PlanBar.enters`): told later
+        // in the pass, the seat was still out there.
+        const { enters: _told, ...rest } = bar;
+        return { ...rest, seats: asWas(bar).seats };
+      }),
+    },
     events: [
       ...untold.events.filter((event) => time(event) < join),
       ...told.events.filter((event) => time(event) >= join),
+    ],
+    // Each phrase as the take plays it: from the jam as it was going to be up to the join.
+    moved: [
+      ...untold.moved.filter((idea) => idea.tick < join),
+      ...told.moved.filter((idea) => idea.tick >= join),
     ],
   };
 }
@@ -115,10 +144,6 @@ function whole(text: string, style: StylePack, options: TakeOptions): Take {
     options.soloInstrument === undefined
       ? style
       : { ...style, solo: { ...style.solo, instrument: options.soloInstrument } };
-  return {
-    chart,
-    diagnostics: parsed.diagnostics,
-    plan: roadmap,
-    events: perform(roadmap, played, options.seed),
-  };
+  const { events, moved } = performed(roadmap, played, options.seed);
+  return { chart, diagnostics: parsed.diagnostics, plan: roadmap, events, moved };
 }

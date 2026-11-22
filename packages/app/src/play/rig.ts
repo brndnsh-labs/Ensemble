@@ -26,6 +26,12 @@ const fixedParts = (mix: Mix): string =>
     ]),
   ]);
 
+/**
+ * How long the sound may be stopped under a playing band before it counts as cut off,
+ * in milliseconds. A phone locking stops the sound a moment before it says the page is hidden.
+ */
+const CUT_OFF_MS = 300;
+
 export class Rig {
   readonly context: AudioContext;
   readonly #packsUrl: string;
@@ -44,6 +50,10 @@ export class Rig {
   #landed: (() => void)[] = [];
   /** Who wants to know when a band starts or stops. */
   readonly #watching = new Set<() => void>();
+  /** Who is told that the sound was cut off under a playing band. */
+  #cutOff = new Set<() => void>();
+  /** The page has been out of view since the sound last stopped. */
+  #away = false;
 
   constructor(packsUrl: string) {
     this.#packsUrl = packsUrl;
@@ -56,10 +66,36 @@ export class Rig {
     // A phone that was locked or switched away from stops the audio clock and drops the
     // wake lock. Coming back, a band that was playing carries on.
     document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState !== "visible" || !this.#player) return;
+      if (document.visibilityState !== "visible") {
+        this.#away = true;
+        return;
+      }
+      if (!this.#player) return;
       void this.context.resume();
       void this.#keepAwake();
     });
+    // The phone can stop the sound with the page still in view: an earphone taken out, a
+    // call. Nothing brings it back but a tap, so a band that was playing has been stopped.
+    this.context.addEventListener("statechange", () => {
+      const player = this.#player;
+      if (this.context.state === "running" || !player) return;
+      this.#away = document.visibilityState !== "visible";
+      setTimeout(() => {
+        if (this.#player !== player || this.context.state === "running") return;
+        if (this.#away || document.visibilityState !== "visible") return;
+        for (const tell of [...this.#cutOff]) tell();
+      }, CUT_OFF_MS);
+    });
+  }
+
+  /**
+   * Be told when the sound is cut off under a playing band with the page in view, and
+   * stays off. A page put away is not that: its band carries on when it comes back.
+   * Returns how to stop being told.
+   */
+  whenCutOff(tell: () => void): () => void {
+    this.#cutOff.add(tell);
+    return () => this.#cutOff.delete(tell);
   }
 
   /** Call inside the tap that starts the music, before anything is awaited: a browser lets sound start only then. */

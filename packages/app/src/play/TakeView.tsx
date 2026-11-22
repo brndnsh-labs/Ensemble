@@ -8,6 +8,7 @@ import { keyToString, recipeText, seconds } from "@ensemble/engine";
 import { styleById } from "@ensemble/styles";
 import { useEffect, useMemo, useState } from "react";
 import { swap, TAKES } from "../address.ts";
+import { chartCalled, count } from "../counts.ts";
 import { download, fileName } from "../download.ts";
 import type { LibraryChart } from "../library.ts";
 import { notePlayed } from "../recent.ts";
@@ -110,7 +111,8 @@ function TakeStage({
     }),
     [recipe, heard],
   );
-  const band = useJam(rig, call);
+  // A take whose chart is no longer here is counted as one of the player's own: built-ins stay.
+  const band = useJam(rig, call, chartCalled(chart));
   // A press of play here is what puts the take at the top of the home screen.
   const jam = {
     ...band,
@@ -155,7 +157,10 @@ function TakeStage({
   const exportMidi = () => {
     setProblem(undefined);
     midiOf(recipe).then(
-      (bytes) => download(bytes, "audio/midi", fileName(named, "take", ".mid")),
+      (bytes) => {
+        download(bytes, "audio/midi", fileName(named, "take", ".mid"));
+        count("midi_downloaded");
+      },
       () => setProblem("The MIDI file could not be made."),
     );
   };
@@ -178,6 +183,7 @@ function TakeStage({
           A take kept {dayOf(take.kept)}: {heard.style.name} in {keyToString(heard.chart.key)},{" "}
           {Math.round(plan.tempo)} bpm, {clock(seconds(plan))}
           {soloWords(recipe.options) && `, ${soloWords(recipe.options)}`}
+          {recipe.options.breathe && ", the tempo breathing"}
         </p>
       }
       players={players}

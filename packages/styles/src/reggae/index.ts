@@ -40,15 +40,31 @@ export const reggae: StylePack = {
     swing: { unit: "sixteenth", amount: 20 },
     lean: { bass: 8, chords: 5, solo: 12 },
     humanize: 30,
+    // None: the hat keeps the grid as the reference (AU-74) and the arc is played at half depth.
+    breathe: 0,
   },
   arc: {
     ...DEFAULT_ARC,
+    // A section labelled Solo at the level of a plain one: at the usual 0.65 it sits a hair under
+    // the line it may not cross, and the band has no room to build under a second solo there
+    // (docs/decisions/soloist.md, a chart with a Solo section).
+    levels: [["solo", DEFAULT_ARC.defaultLevel], ...DEFAULT_ARC.levels],
     // The song-length arc at half depth: a plain chart's climax reaches about 0.65, so the build
     // and the breath are heard in dynamics only (ST-reggae-34).
     depth: 0.5,
     // No build, arc or lift carries a section from the one drop into steppers or rockers, or
     // back (ST-reggae-33).
     liftsCrossHigh: false,
+    // Now and then the dub's drop to the riddim: the skank out of a section where the band plays
+    // alone (docs/decisions/styles.md, who is in).
+    layOut: {
+      seats: ["chords"],
+      under: "band",
+      span: "section",
+      below: 0.75,
+      chance: 0.18,
+      openChance: 0.12,
+    },
   },
   ending: {
     // The plain triad, I or i (ST-reggae-31).

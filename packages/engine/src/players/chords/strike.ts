@@ -42,12 +42,20 @@ export interface Strike {
    * the grip under it is the one a strum would sound.
    */
   readonly pluck?: readonly PickPlace[];
+  /** The stroke crosses only the grip's top this many strings (`Attack.top`). */
+  readonly top?: number;
   /**
    * The chord just struck, struck again: an ending's button (EN-17). The hand
    * has not moved, so it sounds the notes the strike before it did, whatever
    * the soloist has done since.
    */
   readonly again?: true;
+  /**
+   * The final chord's stinger (`ChordStyle.ending.pullOff`): where the grip
+   * has one, its 6th is struck and pulled off to the 5th an eighth later, at
+   * this share of the strike's level.
+   */
+  readonly pullOff?: number;
 }
 
 /**

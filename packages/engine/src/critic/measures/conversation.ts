@@ -98,14 +98,28 @@ function read(take: Take): Reading | null {
       .filter((hit) => bars.has(hit.bar))
       .sort((a, b) => a.tick - b.tick);
     const end = take.plan.ticks;
-    const breaths = breathsOf(all, line, BREATH * STEP, end).filter((breath) =>
-      bars.has(barOf(breath.from + BREATH * STEP - 1)),
+    // A breath that runs on into a bar the piano sits out of while the band plays (#2240) is
+    // not one it could answer: it is not read. With nobody laid out, every breath is read as it was.
+    const away = laidOutOf(take);
+    const breaths = breathsOf(all, line, BREATH * STEP, end).filter(
+      (breath) =>
+        bars.has(barOf(breath.from + BREATH * STEP - 1)) &&
+        !away.some((bar) => breath.from < bar.start + bar.ticks && breath.to > bar.start),
     );
     const heard = line.filter((note) => bars.has(barOf(note.tick)));
     reading = { bars, line, heard, hits, breaths };
   }
   readings.set(take, reading);
   return reading;
+}
+
+/** The bars the piano is laid out of while the band plays on, in a take where it plays at all. */
+function laidOutOf(take: Take): PlanBar[] {
+  const music = take.plan.bars.filter((bar) => bar.kind === "music");
+  if (!music.some((bar) => bar.seats.chords !== null)) return [];
+  return music.filter(
+    (bar) => bar.seats.chords === null && (bar.seats.drums !== null || bar.seats.bass !== null),
+  );
 }
 
 const under = (reading: Reading, hit: Hit) => reading.line.some((note) => soundsAt(note, hit.tick));

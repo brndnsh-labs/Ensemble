@@ -63,6 +63,7 @@ export function validateSoloStyle(solo: SoloStyle): string[] {
       shake === null || (shake.depth > 0 && shake.rate > 0 && shake.after >= 0 && shake.grows >= 0),
       `instrument "${name}": a shake has a depth and a rate, and starts and grows in seconds.`,
     );
+    say(instrument.fastest > 0, `instrument "${name}": its fastest run is some notes a second.`);
   }
 
   const names = solo.levels.map((level) => level.name);
@@ -285,6 +286,25 @@ export function validateSoloStyle(solo: SoloStyle): string[] {
   chance(displace.early, "habits, displace early");
   for (const role of displace.roles ?? []) {
     say(ROLES.includes(role), `habits, displace: "${role}" is not a letter of a form.`);
+  }
+  const double = solo.doubleTime;
+  say(
+    Number.isInteger(double.perPulse) && double.perPulse >= 2 && double.perPulse % 2 === 0,
+    "doubleTime: twice a running subdivision is an even number of notes a pulse.",
+  );
+  chance(double.chance, "doubleTime");
+  say(
+    double.bars.shortest >= 0.5 &&
+      double.bars.shortest <= double.bars.longest &&
+      double.bars.longest <= 2,
+    "doubleTime: a burst is half a bar to two bars long, its shortest no longer than its longest.",
+  );
+  if (double.slow) {
+    chance(double.slow.from, "doubleTime, slow from");
+    say(
+      double.slow.longest >= double.bars.shortest && double.slow.longest <= double.bars.longest,
+      "doubleTime, slow: its longest is a length a burst may be.",
+    );
   }
   chance(solo.habits.bend.third, "habits, bend into a third");
   chance(solo.habits.bend.rootOrFifth, "habits, bend into a root or fifth");

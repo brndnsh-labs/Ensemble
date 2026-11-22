@@ -6,12 +6,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { PlanBar, Take } from "@ensemble/engine";
 import {
+  burstPhrases,
   isCompound,
   PPQ,
   parse,
   plan,
   pulseStarts,
-  render,
   STEP,
   strongPulses,
   TIER_MID,
@@ -20,6 +20,7 @@ import {
 import { POCKET } from "./reading.ts";
 import {
   enough,
+  FULL,
   heldTakes,
   type Jam,
   LIBRARY,
@@ -28,6 +29,7 @@ import {
   ownCharts,
   STYLES,
   soloistTakes,
+  takeOf,
   takes,
   WRITTEN,
   written,
@@ -339,7 +341,7 @@ const jazzPlayed = (): Jam[] => [
 ];
 
 test(
-  'jazz: the whole band plays eighths only: in a bar of quarter-note beats nothing between a beat and its swung "and"; in a bar of dotted pulses, its own triplet, nothing between the eighths and nothing swings them, the fills and the soloist too',
+  'jazz: the whole band plays eighths only: in a bar of quarter-note beats nothing between a beat and its swung "and"; in a bar of dotted pulses, its own triplet, nothing between the eighths and nothing swings them, the fills and the soloist too (but for runs in double time in a solo, held to a property of their own)',
   only("jazz"),
   () => {
     let compoundNotes = 0;
@@ -351,13 +353,21 @@ test(
       ...soloistTakes().filter(compoundOwn),
       ...jazzPlayed().filter(compoundOwn),
     ]) {
+      const doubled = new Set(
+        (jazz ? burstPhrases(take, jazz) : []).flatMap(({ burst }) =>
+          burst.notes.map((note) => note.tick),
+        ),
+      );
       for (const note of (["drums", "bass", "chords", "solo"] as const).flatMap((seat) =>
         notesOf(take, seat),
       )) {
         const bar = take.plan.bars.findLast((candidate) => candidate.start <= note.tick)!;
         if (bar.kind !== "music" || (bar.meter.unit !== 4 && !isCompound(bar.meter))) continue;
         const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}: the ${note.seat} (${note.voice})`;
-        assert.equal((note.tick - bar.start) % (2 * STEP), 0, `${where} between the eighths`);
+        const run = note.seat === "solo" && doubled.has(note.tick);
+        if (!run) {
+          assert.equal((note.tick - bar.start) % (2 * STEP), 0, `${where} between the eighths`);
+        }
         if (!isCompound(bar.meter)) continue;
         compoundNotes++;
         assert.ok(Math.abs(note.offset) <= POCKET, `${where} moved ${note.offset}`);
@@ -369,7 +379,7 @@ test(
 );
 
 test(
-  "jazz: once the band has opened up the ride is on every pulse, through the fills too, unless a crash takes the One or the stick goes round the toms; the hat foot closes on the pulse after each strong one (2 and 4 in four and in twelve; in 6/4, 2 and 5; in six-eight the second pulse) and on no other; the snare stays off the One and off the foot's pulses",
+  "jazz: once the band has opened up the ride is on every pulse, through the fills too, unless a crash takes the One or the stick goes round the toms; the hat foot closes on the pulse after each strong one (2 and 4 in four and in twelve; in 6/4, 2 and 5; in six-eight the second pulse; in a waltz, 3/4, on 2 and 3, the variant a source names, since the drums in three are the fit and not written) and on no other; the snare stays off the One and off the foot's pulses",
   only("jazz"),
   () => {
     let bars = 0;
@@ -382,10 +392,12 @@ test(
         meters.set(chart.meter, (meters.get(chart.meter) ?? 0) + 1);
         const pulses = pulseStarts(bar.meter);
         const beats = pulses.map((tick) => tick / STEP);
-        // The second pulse of each half: the pulse after each strong one.
-        const foot = strongPulses(bar.meter).map(
-          (tick) => pulses[pulses.indexOf(tick) + 1]! / STEP,
-        );
+        // The second pulse of each half: the pulse after each strong one. In a waltz, every
+        // pulse after the One (the study's D3: "the hi-hat on 'two' and 'three'", S6).
+        const waltz = bar.meter.beats === 3 && bar.meter.unit === 4;
+        const foot = waltz
+          ? beats.slice(1)
+          : strongPulses(bar.meter).map((tick) => pulses[pulses.indexOf(tick) + 1]! / STEP);
         const toms = TOMS.some((voice) => kit.has(voice));
         for (const beat of beats) {
           if (toms && beat >= beats.at(-2)!) continue;
@@ -712,23 +724,40 @@ const anyCompound = LIBRARY.some((chart) => compound({ chart }));
 
 /**
  * The bars of dotted pulses a style plays time in: every take of the library's in six-eight
- * or twelve-eight that it is handed, and each such chart held quiet and held loud.
+ * or twelve-eight that it is handed, and each such chart held quiet and held loud (on a push, the
+ * style's own). Read once, for both the properties of six and twelve below.
  */
-function compoundBars(): { where: string; bar: PlanBar; kit: Kit; held: number | undefined }[] {
+type CompoundBar = { where: string; bar: PlanBar; kit: Kit; held: number | undefined };
+let compoundRead: CompoundBar[] | undefined;
+function compoundBars(): CompoundBar[] {
+  compoundRead ??= readCompound();
+  return compoundRead;
+}
+function readCompound(): CompoundBar[] {
   const played = [
     ...takes(compound).map(({ style, chart, options, take }) => ({
       where: `${style.id} ${chart.file} seed ${options.seed}`,
       take,
       held: undefined,
     })),
+    // On a push only the style's own charts are held (it is handed the rest among the
+    // library's takes above); the full run holds every one. A style with none of its own in
+    // six or twelve holds the library's on a push too: it is still handed them, and both
+    // levels have to be heard from it.
     ...STYLES.flatMap((style) =>
-      LIBRARY.filter((chart) => compound({ chart })).flatMap((chart) =>
-        [0.3, 0.85].map((held) => ({
-          where: `${style.id} ${chart.file} at ${held}`,
-          take: render(chart.text, style, { mode: "jam", passes: 2, energy: held, seed: 1 }),
-          held,
-        })),
-      ),
+      (FULL || !ownCharts(style).some((chart) => compound({ chart })) ? LIBRARY : ownCharts(style))
+        .filter((chart) => compound({ chart }))
+        .flatMap((chart) =>
+          [0.3, 0.85].map((held) => ({
+            where: `${style.id} ${chart.file} at ${held}`,
+            take: takeOf({
+              style,
+              chart,
+              options: { mode: "jam", passes: 2, energy: held, seed: 1 },
+            }).take,
+            held,
+          })),
+        ),
     ),
   ];
   return played.flatMap(({ where, take, held }) =>

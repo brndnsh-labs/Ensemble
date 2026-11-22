@@ -25,6 +25,9 @@ const TYPES: Readonly<Record<string, string>> = {
   ".wav": "audio/wav",
   ".m4a": "audio/mp4",
   ".mp3": "audio/mpeg",
+  ".png": "image/png",
+  ".svg": "image/svg+xml",
+  ".css": "text/css; charset=utf-8",
   ".md": "text/plain; charset=utf-8",
   ".mid": "audio/midi",
 };

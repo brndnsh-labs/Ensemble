@@ -309,7 +309,7 @@ const slideAsWritten = (line: Line, note: Written): PitchMove => {
 /** The guitar's hand as the soloist plays it now (`instruments.ts`, driven-guitar). */
 const SHAKE = { depth: 60, rate: 5.5, after: 0.35, grows: 0.3 };
 const BEND_TAKES = 0.1;
-/** The build's rule (SO-52 and DECISIONS.md): held a dotted quarter, and sounding 0.65 s. */
+/** The build's rule (SO-52 and docs/decisions/soloist.md): held a dotted quarter, and sounding 0.65 s. */
 const isShaken = (note: Written, length: number) => note.beats >= 1.5 && length >= 0.65;
 /** The shake, starting its 0.35 s `into` seconds after the note is struck. */
 const shake = (into = 0): NonNullable<PitchMove["vibrato"]> => ({

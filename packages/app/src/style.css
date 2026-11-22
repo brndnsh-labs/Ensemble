@@ -6,19 +6,25 @@
    blue-violet of a duplicated band chart; the paper is cool, not cream. */
 :root {
   color-scheme: light dark;
+  /* The paper and the ink, here and in the dark block below, are also set inline in
+     index.html for the first paint: the two places must agree. */
   --paper: #eef0f4;
   --ink: #1e1a4f;
   --faint: #5f5d86;
+  /* A hairline between things that are told apart without it: rows, a menu's lines. */
   --rule: #c5c6d6;
+  /* A line that carries meaning (a bar line, the edge of a box to type in or press), at
+     three to one on the paper. */
+  --line: #8887a6;
   --marker: #ffe53b;
   --on-marker: #1e1a4f;
-  --pencil: #cf3d35;
+  --pencil: #c5352d;
   /* The ink as it prints on a spot colour: the same in either theme, since the colour
      under it is. A spot colour is always a field with this printed on it, never the
      colour of type on paper. */
   --press: #1e1a4f;
 
-  /* The eight inks, one for each style, and one for a style the app has not been given a
+  /* The nine inks, one for each style, and one for a style the app has not been given a
      colour for (and for a chart that names no style). A new style is given its colour
      here and in the list under these tokens. */
   --ink-blues: #5aa9ff;
@@ -29,6 +35,7 @@
   --ink-neosoul: #a99bff;
   --ink-reggae: #45c95f;
   --ink-acoustic: #d9a968;
+  --ink-country: #b8c454;
   --ink-other: #b7bcd3;
   /* The spot colour in force: whatever carries `data-style` sets it for everything inside. */
   --spot: var(--ink-other);
@@ -39,6 +46,8 @@
   --under: var(--paper);
 
   --gutter: 16px;
+  /* The paper showing between two blocks of colour, so that neighbours in one ink are two. */
+  --gap: 6px;
   /* How tall anything pressed is: a fingertip on a phone, a little less under a mouse. */
   --control: 44px;
   /* A breath of ink: under a pointer, and the hatching of what is only pencilled in. */
@@ -74,6 +83,7 @@
 @media (min-width: 900px) {
   :root {
     --gutter: 32px;
+    --gap: 8px;
   }
 }
 
@@ -83,6 +93,7 @@
     --ink: #eceaff;
     --faint: #9b99c2;
     --rule: #3a3760;
+    --line: #625f88;
     --marker: #ffd83b;
     --pencil: #ff8176;
   }
@@ -115,6 +126,9 @@
 }
 [data-style="acoustic"] {
   --spot: var(--ink-acoustic);
+}
+[data-style="country"] {
+  --spot: var(--ink-country);
 }
 
 *,
@@ -206,7 +220,13 @@ fieldset {
   border: 0;
 }
 
-/* On a spot colour the ring is the press ink, which shows on all eight. */
+/* Text chosen is marked with the highlighter, not the browser's own blue. */
+::selection {
+  background: var(--marker);
+  color: var(--on-marker);
+}
+
+/* On a spot colour the ring is the press ink, which shows on all nine. */
 :focus-visible {
   outline: 2.5px solid var(--focus, var(--ink));
   outline-offset: 2px;
@@ -721,11 +741,12 @@ button:active:not(:disabled, .row-play, .last-play, .go, .player, .opt, .menu-li
   height: 24px;
 }
 
-/* The two before it: smaller bills, pasted under. */
+/* The two before it: smaller bills, pasted under, a gap of paper round each. */
 .lately {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  margin: 0;
+  gap: var(--gap);
+  margin: var(--gap) 0 0;
   padding: 0;
   list-style: none;
 }
@@ -814,9 +835,11 @@ button:active:not(:disabled, .row-play, .last-play, .go, .player, .opt, .menu-li
   margin-top: 34px;
 }
 
-/* The wall: a bill for each style, edge to edge, and each a way into the library. */
+/* The wall: a bill for each style, a gap of paper between them, and each a way into
+   the library. */
 .wall {
   display: flex;
+  gap: var(--gap);
   margin-top: 12px;
 }
 
@@ -824,6 +847,7 @@ button:active:not(:disabled, .row-play, .last-play, .go, .player, .opt, .menu-li
   display: flex;
   flex: 1 1 0;
   flex-direction: column;
+  gap: var(--gap);
   min-width: 0;
 }
 
@@ -1636,12 +1660,12 @@ button:active:not(:disabled, .row-play, .last-play, .go, .player, .opt, .menu-li
   align-items: center;
   min-width: 0;
   padding: 0 0.14em;
-  border-left: max(1px, 0.03em) solid var(--rule);
+  border-left: max(1px, 0.03em) solid var(--line);
   isolation: isolate;
 }
 
 .bar:last-child {
-  border-right: max(1px, 0.03em) solid var(--rule);
+  border-right: max(1px, 0.03em) solid var(--line);
 }
 
 /* The highlighter: a stroke of marker, not a tidy box. */
@@ -2463,7 +2487,7 @@ button:active:not(:disabled, .row-play, .last-play, .go, .player, .opt, .menu-li
   position: relative;
   flex: 1;
   min-height: 0;
-  border: 2px solid var(--rule);
+  border: 2px solid var(--line);
 }
 
 .source:focus-within {
@@ -3199,7 +3223,7 @@ button.mark[aria-expanded="true"] {
   height: 44px;
   padding: 0;
   overflow: hidden;
-  border: 2px solid var(--rule);
+  border: 2px solid var(--line);
   background: none;
 }
 
@@ -3449,11 +3473,11 @@ button.mark[aria-expanded="true"] {
   padding: 0 14px;
 }
 
-/* A style to choose is its bill, small, in its own ink; the one being played has the press
-   ink's frame round it. */
+/* A style to choose is its bill, small, in its own ink, a gap of paper between them as on
+   the wall; the one being played has the press ink's frame round it. */
 .styles-opts {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0;
+  gap: var(--gap);
 }
 
 .style-opt,
@@ -3716,6 +3740,26 @@ button.mark[aria-expanded="true"] {
 
 .menu .field.menu-name {
   margin: 8px 0;
+}
+
+/* A choice of two in a line of its own: how the band keeps time. */
+.menu-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 0 12px;
+  font-size: 1.0625rem;
+  font-weight: 650;
+}
+
+/* Joined, as how the chords are written is. */
+.menu-choice .opts {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+}
+
+.menu-choice .opt + .opt {
+  border-left: 0;
 }
 
 @media (hover: hover) {

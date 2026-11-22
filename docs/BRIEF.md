@@ -175,7 +175,7 @@ A separate package that consumes events. It contains no music theory.
 
 ## 11. The app
 
-A static, installable PWA that works offline. No server.
+A static, installable PWA that works offline. No server. The one exception: from production only, the app posts a few anonymous counts of its use (a chart opened, a play started, a style changed) to the owner's own Umami, and nothing when do-not-track is set (`packages/app/src/counts.ts`).
 
 **Views:**
 
@@ -226,7 +226,7 @@ The CLI is the main feedback loop during the engine stages, and it is a first-cl
 ## 13. Non-goals
 
 - Listening to the user's playing (audio or MIDI input) and reacting to it.
-- Any server, accounts, sync, or sharing.
+- Any server, accounts, sync, or sharing. The counts of use sent to the owner's own Umami from production are the exception, and they never carry an identifier, a cookie, a referrer, the address, or a chart of the player's own beyond the word "own".
 - Convincing wind or lead-guitar sounds in the browser.
 - Melody or lyric entry.
 - Live MIDI output to a DAW. File export only for now.
@@ -237,7 +237,7 @@ The CLI is the main feedback loop during the engine stages, and it is a first-cl
 
 - Follow `docs/MILESTONES.md`. Each stage ends with audition files and a short report for a human listening gate.
 - Follow `docs/TESTING.md`. It is binding.
-- Keep `DECISIONS.md` at the repo root: date, decision, one line of why. Include every place you departed from these docs.
+- Keep the decisions in `docs/decisions/`, a file for each area: date, decision, one line of why. Include every place you departed from these docs.
 - Prefer a small, legible codebase over a clever one. Brandon reads the code.
 - When a listening gate produces feedback, restate it as a property or critic metric, confirm the current build fails it, then fix.
 

@@ -1,0 +1,186 @@
+# The release, called by ci.yml and by nothing else (ci.yml says when, and holds the
+# one-at-a-time lock around the whole of this). Four jobs, in order:
+#
+#   plan        what is released, and whether; holds no secret
+#   test        the image to the test site, confirmed serving the commit
+#   journeys    the smoke journeys against the test site; holds no secret and is not on
+#               the tailnet, so the app's dependencies never run where the release key is
+#   production  the same image to production, confirmed serving the commit
+#
+# A job that fails stops the ones after it: the run is red and production keeps what
+# it had. Run again from the failed job once the cause is gone; if main has moved on
+# by then, the jobs that release do nothing, and the newer commit's run is the one to read.
+name: release
+
+on:
+  workflow_call:
+    inputs:
+      by_hand:
+        description: Put production on a named commit; no journeys, and the test site only if asked
+        type: boolean
+        default: false
+      commit:
+        description: By hand, the commit to release (empty for the tip of main)
+        type: string
+        default: ""
+      test:
+        description: By hand, release to the test site as well
+        type: boolean
+        default: false
+    secrets:
+      TS_OAUTH_CLIENT_ID:
+        required: true
+      TS_OAUTH_SECRET:
+        required: true
+      API_RELEASE_SSH_KEY:
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  IMAGE: ghcr.io/brndnsh-labs/ensemble-web
+
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      sha: ${{ steps.plan.outputs.sha }}
+      go: ${{ steps.plan.outputs.go }}
+      test: ${{ steps.plan.outputs.test }}
+      journeys: ${{ steps.plan.outputs.journeys }}
+    steps:
+      # What a person typed reaches the script through the environment, never written
+      # into it, and is used only once it has been read as a whole commit.
+      - name: What is being released
+        id: plan
+        env:
+          BY_HAND: ${{ inputs.by_hand }}
+          COMMIT: ${{ inputs.commit }}
+          ALSO_TEST: ${{ inputs.test }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          go=true
+          if [[ "$BY_HAND" == true ]]; then
+            sha="${COMMIT:-$GITHUB_SHA}"
+            [[ "$sha" =~ ^[0-9a-f]{40}$ ]] \
+              || { echo '::error::The commit must be a whole commit of main: 40 characters, 0-9 and a-f'; exit 1; }
+            # A commit of main: the tip of main is that commit or ahead of it. The registry
+            # also holds images from before this repository was rewritten, and an image
+            # alone would let one of those through.
+            where=$(gh api "repos/$GITHUB_REPOSITORY/compare/$sha...$GITHUB_SHA" --jq .status) \
+              || { echo "::error::$sha is not a commit of this repository"; exit 1; }
+            [[ "$where" == ahead || "$where" == identical ]] \
+              || { echo "::error::$sha is not on main (main is $where of it)"; exit 1; }
+            # Only `build` on main pushes an image. Asked of the registry as anyone may ask
+            # (the package is public), before anything touches the host.
+            docker manifest inspect "$IMAGE:sha-$sha" > /dev/null \
+              || { echo "::error::No image for $sha in the registry: a commit that main only passed through, or one whose build failed, has none."; exit 1; }
+            # Putting production back does not wait on the journeys, and leaves the test
+            # site alone unless asked.
+            test=false
+            if [[ "$ALSO_TEST" == true ]]; then test=true; fi
+            journeys=false
+          else
+            sha="$GITHUB_SHA"
+            test=true
+            journeys=true
+            # Releases run one at a time in the order they began to wait, which is the
+            # order their builds finished, not the order of the commits. So a commit that
+            # main has already moved on from is not released: the newer commit's run does
+            # it, or has. This is what keeps a merge from moving a site backwards.
+            tip=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)
+            if [[ "$tip" != "$sha" ]]; then
+              go=false
+              echo "::notice::main has moved on to $tip, so $sha is not released: that commit's run releases."
+            fi
+          fi
+          {
+            echo "sha=$sha"
+            echo "go=$go"
+            echo "test=$test"
+            echo "journeys=$journeys"
+          } >> "$GITHUB_OUTPUT"
+          echo "$sha: release $go, test site $test, journeys $journeys"
+
+  test:
+    needs: plan
+    if: needs.plan.outputs.go == 'true' && needs.plan.outputs.test == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      # Only for the action below. The token is not left behind in the checkout.
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github
+          persist-credentials: false
+
+      - uses: ./.github/actions/release
+        with:
+          site: ensembletest
+          sha: ${{ needs.plan.outputs.sha }}
+          host: ${{ vars.PROD_DEPLOY_DOCKER_HOST }}
+          ts-oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          ts-oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          release-key: ${{ secrets.API_RELEASE_SSH_KEY }}
+          only-the-tip: ${{ !inputs.by_hand }}
+          token: ${{ github.token }}
+
+  # The journeys again, this time against the site a visitor reaches, serving the image
+  # production is about to get.
+  journeys:
+    needs: [plan, test]
+    if: needs.plan.outputs.go == 'true' && needs.plan.outputs.journeys == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      # As in `build`: the time budgets are reported here, not kept.
+      ENSEMBLE_BUDGET: report
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: The smoke journeys against the test site
+        env:
+          SMOKE_URL: https://ensembletest.brndn.zip
+        run: pnpm smoke
+
+  production:
+    needs: [plan, test, journeys]
+    # By hand, the two jobs before this one may be skipped, and a job whose need was
+    # skipped is skipped too unless it says otherwise (`!cancelled()`). So it says exactly
+    # what it waits for: whatever the plan asked for must have succeeded.
+    if: >-
+      ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.go == 'true' &&
+      (needs.plan.outputs.test != 'true' || needs.test.result == 'success') &&
+      (needs.plan.outputs.journeys != 'true' || needs.journeys.result == 'success') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github
+          persist-credentials: false
+
+      - uses: ./.github/actions/release
+        with:
+          site: ensemble
+          sha: ${{ needs.plan.outputs.sha }}
+          host: ${{ vars.PROD_DEPLOY_DOCKER_HOST }}
+          ts-oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          ts-oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          release-key: ${{ secrets.API_RELEASE_SSH_KEY }}
+          only-the-tip: ${{ !inputs.by_hand }}
+          token: ${{ github.token }}

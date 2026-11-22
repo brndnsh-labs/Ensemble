@@ -9,6 +9,7 @@ import { address, cameBack, go, routeOf, subscribeAddress } from "./address.ts";
 import { Browse } from "./Browse.tsx";
 import { CreditsView } from "./CreditsView.tsx";
 import { findChart, ownCharts, subscribeCharts } from "./charts.ts";
+import { count, countView } from "./counts.ts";
 import { arrived, screenOf } from "./motion.ts";
 import type { Saving } from "./offline.ts";
 import { newVersion, saveInstruments, subscribeNewVersion } from "./offline.ts";
@@ -60,7 +61,19 @@ export function App() {
 
   // Once the app is open, bring the instruments onto the device for next time.
   useEffect(() => {
-    saveInstruments(PACKS_URL, setSaving, () => rig.idle()).catch(() => {
+    // Counted when this visit brought the last of them in: a report said some were still to
+    // fetch, and the last says every one is here. A visit that finds them all here (it reports
+    // so twice) counts nothing.
+    let wanting = false;
+    const report = (now: Saving) => {
+      setSaving(now);
+      if (now.done < now.total) wanting = true;
+      else if (now.finished && wanting) {
+        wanting = false;
+        count("instruments_saved_offline");
+      }
+    };
+    saveInstruments(PACKS_URL, report, () => rig.idle()).catch(() => {
       // No connection, or no room: whatever was saved stays, and the next visit tries again.
     });
   }, []);
@@ -72,6 +85,9 @@ export function App() {
 
   const route = routeOf(hash);
   useArrival(route);
+  // Each screen come to is counted as a view (`counts.ts`: its fixed path, once a screen).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the address is what a view follows
+  useEffect(() => countView(), [hash]);
   // Never over a band that is playing, nor with the pencil down: a bar being changed is held
   // only in the page, and a reload would lose it.
   const nudge = newer && !later && !playing && route.screen !== "edit";

@@ -152,7 +152,7 @@ Findings in `/review`'s format (`.claude/skills/review/SKILL.md`, "Reporting"): 
 - Never pass or fail on taste.
 - Never edit a file in the repository, commit, or push. You write only under your scratch
   folder (transcriptions, a worktree of the base), and you remove the worktree when done.
-- Never treat the builder's report, a commit message or a `DECISIONS.md` line as true.
+- Never treat the builder's report, a commit message or a line in `docs/decisions/` as true.
   Check it against the notes printed and the code.
 
 ## What a transcription cannot show

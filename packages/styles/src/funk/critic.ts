@@ -6,6 +6,9 @@ import type { CriticStyle } from "@ensemble/engine";
 
 export const funkCritic: CriticStyle = {
   targets: {
+    // How many jams thin at all, of those that could, on this scorecard's jams, which are mostly
+    // short: a jam of eight passes thins about half the time (docs/decisions/styles.md, who is in).
+    "band.takes-thinned": { min: 0.03, max: 0.18, kind: "measured" },
     // ── drums ──
     // The One and the backbeat in every bar of time (ST-funk-14: 95% and 90%).
     "drums.kick-on-one": { min: 0.95, kind: "intent" },
@@ -153,6 +156,13 @@ export const funkCritic: CriticStyle = {
     // the ceiling stays because `score --check` has held the share under it since.
     "solo.cost": { max: 2.4, kind: "measured" },
     // ── band ──
+    // A hundred takes in four, each its first section's groove at the working level, and how many
+    // are a groove no take before had played. 55% from five kicks, five riffs and three guitar
+    // lines (gate 4 counted 57 on one chart); 92% from eight, nine and seven (#2242). The floor:
+    // the pool's size says a seat's new figures taken away would read 80% (the lines) to 86% (the
+    // kicks or the riffs), and one figure about a point, so 88% keeps the widening and lets a
+    // figure be retuned.
+    "band.new-grooves": { min: 0.88, kind: "measured" },
   },
   weights: {
     // What a phrase of the solo costs. Each was set to zero in turn over 120 takes (ME-10);

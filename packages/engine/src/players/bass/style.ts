@@ -25,6 +25,13 @@ import type { ChordFamily } from "../../theory/chord.ts";
  *        dominant or a minor seventh, the sixth of a sixth chord; on a chord with none, the
  *        major sixth where its scale has one, or else the root (ST-neosoul-14)
  * - `8`  the octave above the bass note
+ * - `M7` the seventh of the chord's scale: the major seventh, or the flat seventh where
+ *        the scale has that and not the major (a dominant's, a minor chord's). Over a plain
+ *        triad, where `7` is the sixth that stands in for a seventh, this is the leading
+ *        note down from the root: C, B, A into G (ST-country-05, EN-47)
+ * - `1`  the chord's own root: the bass note itself, but under a slash chord the
+ *        root its name gives (over C/G, the C), which `R` is not (BA-51: a two-beat
+ *        bass over a chord standing on its fifth alternates with the root)
  *
  * The third and fifth are read from the chord. The second, fourth, sixth and
  * flat seventh are played as written unless the chord's scale holds a different
@@ -40,7 +47,21 @@ import type { ChordFamily } from "../../theory/chord.ts";
  * after in the same direction, and never on a held note (BA-15, X-A-26). A
  * shape that would land one anywhere else is not played on that chord.
  */
-export type Tone = "R" | "2" | "b3" | "3" | "4" | "#4" | "5" | "b6" | "6" | "b7" | "7" | "8";
+export type Tone =
+  | "R"
+  | "2"
+  | "b3"
+  | "3"
+  | "4"
+  | "#4"
+  | "5"
+  | "b6"
+  | "6"
+  | "b7"
+  | "7"
+  | "M7"
+  | "8"
+  | "1";
 export const TONES: readonly Tone[] = [
   "R",
   "2",
@@ -53,7 +74,9 @@ export const TONES: readonly Tone[] = [
   "6",
   "b7",
   "7",
+  "M7",
   "8",
+  "1",
 ];
 
 /** What a chord must be for a sequence to be played over it. Every condition given must hold. */
@@ -134,7 +157,9 @@ export interface Figure {
   /**
    * The tones it names are taken under the root, not over it, wherever the
    * instrument has the note: a pickup that climbs into the One, the deep shape
-   * of a riff whose fifth falls a fourth below (BA-68).
+   * of a riff whose fifth falls a fourth below (BA-68). So are the tones of the
+   * line's sequence its `x`s play: a two-beat bass's fifth under its root
+   * (BA-51). A chord's arrival is its bass note wherever it falls.
    */
   readonly under?: boolean;
   /**
@@ -438,6 +463,17 @@ export interface LeadInPolicy {
    * place becomes the half step below.
    */
   readonly playsNextRoot?: boolean;
+  /**
+   * The line keeps its shape toward a change: a note that already lies a step
+   * from the next root, in any octave, is played where the figure put it, and
+   * no step is added from it, unless the coin asks for a lead-in. Left out (or
+   * false), such a note is moved beside the next root, or a step into it added
+   * on the last beat, whatever the coin says (BA-07): a two-beat bass's fifth
+   * under its root would go over it, and a quiet bar would gain a third note
+   * (BA-51, BA-52). A leap of more than an octave onto the arrival is still
+   * bridged.
+   */
+  readonly keepsShape?: boolean;
   /** The weight of each kind by how the bass note moves. All zero: never lead into that move (BA-11). */
   readonly kinds: Readonly<Record<RootMotion, Readonly<Record<LeadInKind, number>>>>;
 }
@@ -465,16 +501,66 @@ export interface Walk {
    * being left (X-A-26). It obeys every rule a lead-in obeys.
    */
   readonly last: "half" | "whole";
+  /**
+   * The walk's own rhythm, one bar of the grid a figure is written in (`x` a
+   * note, `-` held, `.` silence), striking one more note than `tones` has:
+   * `x------- x--- x---` is the root held from 1 and two steps on 3 and 4
+   * (BA-53). It replaces the bar's figure where the walk is played, so a line
+   * whose figure strikes fewer notes than the walk needs (a two-beat bass) can
+   * still walk. A bar of another length than the grid is never walked this
+   * way, and a grid must be a bar of 4/4 or of a meter the line is written
+   * for. The grid may also name tones as a riff does (`5` the chord's fifth):
+   * those are the figure's, played around the walk under the root where the
+   * instrument has the note, and are not steps of it, so `x------- 5--- x---`
+   * keeps the boom-chick and walks in on beat 4 alone (EN-47). Left out, the
+   * walk is played on the bar's own figure's strokes.
+   */
+  readonly grid?: string;
+  /**
+   * How much of its space each note of the walk sounds, the gap a line's notes
+   * keep (`length.gap`) aside: a walk connects, where the line's own notes may
+   * be short (BA-52: walking notes at 92%). Left out, as the line's notes.
+   */
+  readonly length?: number;
 }
 
 export interface WalkPolicy {
   /**
    * How likely a plan the bassist weighs is to walk into the next line, and
    * into a change inside one. The critic decides which plan is played.
+   *
+   * `intoSection`: into the first bar of a section or of a new time through it
+   * (EN-51: a country bass walks up into a new section far more often than
+   * inside one). Left out, as `end`. The final chord is always `end`'s.
    */
-  readonly offer: { readonly end: PerTier<number>; readonly inside: PerTier<number> };
+  readonly offer: {
+    readonly end: PerTier<number>;
+    readonly inside: PerTier<number>;
+    readonly intoSection?: PerTier<number>;
+  };
   /** The walks for each way the bass note can move. A move with none is never walked. */
   readonly kinds: Readonly<Partial<Record<RootMotion, readonly Walk[]>>>;
+  /**
+   * The walk home (EN-45 to EN-48): the bar before an ending that is one chord
+   * struck on its downbeat, in 4/4, is walked into the final root every time,
+   * at any level, whatever is offered above. The root on 1, then the 5th, 6th
+   * and 7th counted from the landing on beats 2, 3 and 4, the 7th the chord's
+   * own tone a whole step under the landing where it has one, else the leading
+   * tone; over the V its root, the run's 5th, holds through beat 2; from the IV
+   * the line walks down (its root held, the landing's 3rd and 2nd); a root
+   * inside the run keeps the line and goes in on beat 4 alone; a chord struck
+   * on beat 3 keeps its root there and adds at most one note on 4. The run and
+   * the final root lie in the lowest octave whose 5th is on the instrument.
+   * A note on 4 never rubs a half step over the chord it is played on.
+   * `velocity`: the written level on each beat, 1 to 4 (a note held from 1 is
+   * played at the first); the final root is at least as loud as the last
+   * (`BassStyle.ending.velocity`). `length`: how much of its beat each note
+   * sounds.
+   */
+  readonly ending?: {
+    readonly velocity: readonly [number, number, number, number];
+    readonly length: number;
+  };
 }
 
 /** How the bassist chooses a phrase: plans drawn, each played out, and the critic picks one. */

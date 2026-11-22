@@ -16,6 +16,9 @@ import type { Plan, PlanBar } from "../../plan/types.ts";
 import type { Rng } from "../../rng.ts";
 import type { ToneRole } from "../../theory/chord.ts";
 import { pitchClass } from "../../theory/pitch.ts";
+import { burstOf } from "./burst.ts";
+import { owedBreath } from "./critique.ts";
+import type { Pool } from "./harmony.ts";
 import { climb, EIGHTH, isChordTone, landing, onlyPasses } from "./harmony.ts";
 import type { LineBar, Spot } from "./line.ts";
 import { contourOf, settled, spotsOf, writeBends, writeLine } from "./line.ts";
@@ -38,6 +41,12 @@ export interface PhraseBar {
    * the barline into it (SO-38).
    */
   readonly tied: boolean;
+  /**
+   * Its downbeat is not struck: a note of an idea said a beat away, struck anywhere
+   * in the bar before and sounding to the barline, is held over into it whole
+   * (`habits.displace.holds`). Such a bar is `tied` too: its first pitch is that note.
+   */
+  readonly held?: boolean;
   /** A pitch for each attack of the cell, in order: for a tied bar, the first is the note held into it. */
   readonly pitches: readonly number[];
   /** For each of those, the semitones under it a string was pushed up from, or 0 for a note played plain. */
@@ -65,11 +74,47 @@ export interface Phrase {
    */
   readonly displaced?: Phrase;
   /**
+   * The same idea said a beat away by the stricter rules of a style that holds a note over
+   * the barline (`displace.holds`): offered only where `displaced`, main's, is refused.
+   */
+  readonly admitted?: Phrase;
+  /** This is an idea moved that main's rules refuse, admitted by the stricter ones. */
+  readonly newly?: boolean;
+  /**
    * This is an idea said a beat away, and this the idea where it was: what the
    * solo remembers if this one is played, so what follows is made from the idea
    * as it was stated and the shift is not carried on.
    */
   readonly inPlace?: Phrase;
+  /**
+   * This phrase has a run in double time in it (`burst.ts`), and this is the phrase it
+   * doubles: what the solo remembers if this one is played, so that what follows is made
+   * from the line as it runs and no burst is said again.
+   */
+  readonly plain?: Phrase;
+  /** Where its run in double time starts, and the tick of the note it lands on. */
+  readonly burst?: { readonly from: number; readonly lands: number };
+  /**
+   * An idea said a beat away is played with the lengths its notes sounded where it was:
+   * one for each note of `line`, in order.
+   */
+  readonly sounds?: readonly Sounded[];
+  /** An idea said a beat away: the pitch each note of `line` has in the idea it says again. */
+  readonly idea?: readonly number[];
+}
+
+/** How long a note sounds, and its length in the rhythm, in ticks. */
+export interface Sounded {
+  readonly duration: number;
+  readonly value: number;
+}
+
+/** What the soloist asks of the phrases made for a slot, beyond the phrases. */
+export interface Hooks {
+  /** Told each time an idea said again whole is drawn to be said a beat away. */
+  readonly drawn?: () => void;
+  /** How the notes of a phrase sound as it is played: what a moved idea keeps. */
+  readonly sounds?: (phrase: Phrase) => readonly Sounded[];
 }
 
 export interface Placed {
@@ -79,6 +124,8 @@ export interface Placed {
   readonly lead?: boolean;
   /** Semitones under the note that a string is struck at and pushed up from (SO-53). */
   readonly bend?: number;
+  /** A note of a run in double time. */
+  readonly burst?: boolean;
 }
 
 export interface Memory {
@@ -149,6 +196,25 @@ function lineBars(world: World, slot: Slot, bars: readonly BarPlan[]): LaidBar[]
   // needs both notes to be there; an idea come back in another place may have lost one.
   bars.forEach((plan, b) => {
     const [before, here, bar] = [laid[b - 1], laid[b], slot.bars[b - 1]];
+    if (plan.held && before && here && bar) {
+      // A note of a moved idea held over the barline: struck anywhere in the bar before,
+      // sounding to its end, and going on into this one. It is the chord's it is struck
+      // over, or the next one's where it leans into it (X-B-07).
+      const [from, into] = [before.spots.at(-1), here.spots[0]];
+      if (!from || from.tick + from.hold !== bar.start + bar.ticks) return;
+      if (into?.onset !== 0 || into.tick !== bar.start + bar.ticks) return;
+      const hold = from.hold + into.hold;
+      const { pool, leans } = world.poolFor(from.tick, hold);
+      laid[b - 1] = {
+        ...before,
+        spots: [
+          ...before.spots.slice(0, -1),
+          { ...from, hold, pool: pool ?? from.pool, lands: from.lands || leans },
+        ],
+      };
+      laid[b] = { ...here, spots: here.spots.slice(1), tied: true };
+      return;
+    }
     if (!plan.tied || !before || !here || !bar) return;
     const [from, into] = [before.spots.at(-1), here.spots[0]];
     if (!from || from.tick !== bar.start + bar.ticks - EIGHTH || from.hold < EIGHTH) return;
@@ -185,6 +251,12 @@ export function phrasesFor(
   rng: Rng,
   /** The note a pickup made by the pass before leads to: the phrase opens on it, on the one. */
   led: number | null = null,
+  /**
+   * The longest run in double time, in bars, where this phrase is offered one (`burst.ts`):
+   * each phrase made is offered with a run in it too, first, where one will go.
+   */
+  burst: number | null = null,
+  hooks: Hooks = {},
 ): Phrase[] {
   const { instrument } = world;
   // The rhythms are those written for the phrase's meter, where the style has written any.
@@ -453,56 +525,115 @@ export function phrasesFor(
    * strikes, as laid in this slot, moved by that much, its rhythm and its line the same
    * and its pitches and bends those it would have had where it was, fitted to the
    * chords now under them (SO-33). A note carried over a barline stops at it, as every
-   * note but a tie does. Null where it does not fit: a note pulled before the phrase's
-   * first bar or pushed past its last, one that lands under no chord or without the
-   * room an end bar keeps for its breath, or more air than the phrase may leave.
+   * note but a tie does, unless the style holds it over (`displace.holds`): then it
+   * sounds on whole into the next bar, a tone of every chord it is held into. Null where
+   * it does not fit: a note pulled before the phrase's first bar or pushed past its
+   * last, one that lands under no chord or without the room an end bar keeps for its
+   * breath, one that would be held over a barline and is not, or more air than the
+   * phrase may leave.
    */
-  const displaced = (kind: string, plans: readonly BarPlan[], ask: Ask, by: number) => {
+  const displaced = (
+    kind: string,
+    plans: readonly BarPlan[],
+    ask: Ask,
+    by: number,
+    inPlace: Phrase,
+    /**
+     * The stricter rules for an idea main's refuse (`displace.holds`): lengths as sounded,
+     * notes held over a barline, the shape kept. Without, the rules main plays by.
+     */
+    newly: boolean,
+  ): Phrase | null => {
     const bars = slot.bars.map((_, i) => plans[i] ?? REST);
     const laid = lineBars(world, slot, bars);
     const first = slot.bars[0]!.start;
     const last = slot.bars.at(-1)!;
     const end = last.start + last.ticks;
-    const moved = laid.flatMap((line, b) =>
-      line.spots.map((spot, k) => ({
-        b,
-        spot,
-        tick: spot.tick + by * STEP,
-        // The note an end bar lands on: its bar stays an end bar wherever it is moved to.
-        lands: bars[b]!.part === "E" && k === line.spots.length - 1,
-      })),
-    );
+    const moved = laid
+      .flatMap((line, b) =>
+        line.spots.map((spot, k) => ({
+          b,
+          spot,
+          tick: spot.tick + by * STEP,
+          // The note an end bar lands on: its bar stays an end bar wherever it is moved to.
+          lands: bars[b]!.part === "E" && k === line.spots.length - 1,
+        })),
+      )
+      .map((note, i) => ({ ...note, i }));
     if (moved.length === 0 || moved.some((note) => note.tick < first || note.tick >= end)) {
       return null;
     }
+    // How long each note sounded where it was, breath and all: what it is held for moved.
+    const sounded = newly ? hooks.sounds?.(inPlace) : undefined;
+    if (sounded && sounded.length !== moved.length) return null;
+    const lengthOf = (note: { i: number; spot: Spot }) =>
+      sounded ? sounded[note.i]!.duration : note.spot.hold;
+    type Moved = (typeof moved)[number];
+    const holds = newly && solo.habits.displace.holds;
     const barAt = (tick: number) => slot.bars.findLastIndex((bar) => bar.start <= tick);
-    const placed = slot.bars.map((bar, b) => {
+    // A note held over into a bar from the bar before, and the sixteenths it sounds there.
+    const carried: ({ readonly note: Moved; readonly steps: number } | undefined)[] = [];
+    const placed: ({ plan: BarPlan; notes: Moved[] } | null)[] = [];
+    slot.bars.forEach((bar, b) => {
       const notes = moved.filter((note) => barAt(note.tick) === b);
-      if (notes.length === 0) return { plan: REST, notes };
-      const symbols = new Array<string>(Math.round(bar.ticks / STEP)).fill(".");
-      let crosses = false;
+      const into = carried[b];
+      if (notes.length === 0 && into === undefined) {
+        placed.push({ plan: REST, notes });
+        return;
+      }
+      const length = Math.round(bar.ticks / STEP);
+      const stepOf = (note: Moved) => Math.round((note.tick - bar.start) / STEP);
+      const symbols = new Array<string>(length).fill(".");
+      let fails = false;
+      if (into) {
+        // Held over whole: nothing of the idea is struck under it.
+        if (notes[0] && stepOf(notes[0]) < into.steps) fails = true;
+        symbols[0] = "x";
+        for (let k = 1; k < into.steps; k++) symbols[k] = "-";
+      }
       notes.forEach((note, n) => {
-        const at = Math.round((note.tick - bar.start) / STEP);
-        const held = Math.max(1, Math.round(note.spot.hold / STEP));
-        // The idea's last note may stop at the barline: it gives up a pulse at most.
-        if (at + held > symbols.length && note !== moved.at(-1)) crosses = true;
-        const until = Math.min(
-          symbols.length,
-          at + held,
-          notes[n + 1] ? Math.round((notes[n + 1]!.tick - bar.start) / STEP) : symbols.length,
-        );
+        const at = stepOf(note);
+        // Whether it crosses the barline is read from how long it sounded where it was, not
+        // from its rhythm: a note that stopped short of its barline for a breath stops as short
+        // moved, and is not held over a barline it never sounded across.
+        const stops = note.tick + lengthOf(note);
+        const barline = bar.start + bar.ticks;
+        // By main's rules, a note is as long as its rhythm, and crosses where that does.
+        const held = newly
+          ? Math.max(1, Math.ceil((Math.min(stops, barline) - note.tick) / STEP))
+          : Math.max(1, Math.round(note.spot.hold / STEP));
+        const over = Math.ceil((stops - barline) / STEP);
+        const crosses = newly ? stops - barline > STEP / 2 : at + held > length;
+        // The idea's last note may stop at the barline: it gives up a pulse at most. Any other
+        // is held over into the next bar of the phrase where the style holds it there.
+        if (crosses && note !== moved.at(-1)) {
+          const following = slot.bars[b + 1];
+          if (holds && following && over <= Math.round(following.ticks / STEP)) {
+            carried[b + 1] = { note, steps: over };
+          } else {
+            fails = true;
+          }
+        }
+        const until = Math.min(length, at + held, notes[n + 1] ? stepOf(notes[n + 1]!) : length);
         symbols[at] = "x";
         for (let k = at + 1; k < until; k++) symbols[k] = "-";
       });
-      if (crosses) return null;
+      if (fails) {
+        placed.push(null);
+        return;
+      }
       const part: Part = notes.some((note) => note.lands) ? "E" : "L";
-      return { plan: { part, cell: symbols.join(""), ...PLAIN }, notes };
+      placed.push({
+        plan: { part, cell: symbols.join(""), ...PLAIN, ...(into ? { held: true } : {}) },
+        // The note held into the bar is its first attack, as a tied bar's is.
+        notes: into ? [into.note, ...notes] : notes,
+      });
     });
-    // A note held over the barline it is moved across is not held to its length: it is
-    // not moved there. (The last may stop at the barline, a pulse short at most, and the
-    // breath after it is judged when it is played.)
+    // A note held over the barline it is moved across, where the style holds none, is not
+    // held to its length: it is not moved there. (The last may stop at the barline, a pulse
+    // short at most, and the breath after it is judged when it is played.)
     if (placed.some((bar) => bar === null)) return null;
-    const laidOut = placed as { plan: BarPlan; notes: typeof moved }[];
+    const laidOut = placed as { plan: BarPlan; notes: Moved[] }[];
     const empty = laidOut.filter((bar) => bar.plan.part === "R").length;
     if (empty > emptyAllowed || (memory.endedEmpty && laidOut[0]!.plan.part === "R")) return null;
     // Each moved note keeps the pitch and the bend it had where it was.
@@ -526,8 +657,26 @@ export function phrasesFor(
         },
       },
     );
-    // Every note it had, or it is not the idea.
-    return phrase.line.length === moved.length ? phrase : null;
+    // Every note it had, each note to be held over a barline held there (not where the bar
+    // it is held into cannot take it: under N.C.), or it is not the idea; and a note held
+    // over the barline is a tone of every chord it is held into, or the idea is not moved there.
+    if (phrase.line.length !== moved.length) return null;
+    // An idea main's rules admit is played as main plays it.
+    if (!newly) return phrase;
+    if (phrase.bars.some((bar) => bar.held && !bar.tied)) return null;
+    if (!phrase.line.every((note) => !heldOver(note.spot) || holdsOver(world, note))) return null;
+    // Its shape: each move from one note to the next within a whole step of the idea's, as
+    // the idea is remembered and moved the way the form asked (SO-33, SO-24): fitted to the
+    // chords now under it, a note may move a little, not leap where the idea stepped.
+    if (inPlace.line.length !== phrase.line.length) return null;
+    const idea = moved.map((note, k) => ask.given?.(note.b, note.spot) ?? inPlace.line[k]!.pitch);
+    const keepsShape = phrase.line.every(
+      (note, k) =>
+        k === 0 ||
+        Math.abs(note.pitch - phrase.line[k - 1]!.pitch - (idea[k]! - idea[k - 1]!)) <= 2,
+    );
+    if (!keepsShape) return null;
+    return { ...phrase, idea, newly: true, ...(sounded ? { sounds: sounded } : {}) };
   };
 
   /**
@@ -537,13 +686,22 @@ export function phrasesFor(
   const remade = (kind: string, plans: readonly BarPlan[], ask: Ask): Phrase => {
     const phrase = compose(kind, plans, ask);
     if (shift === 0) return phrase;
+    hooks.drawn?.();
     // The way drawn, else the other where the style goes that way at all.
     const { early } = solo.habits.displace;
     const may = (by: number) => (by < 0 ? early > 0 : lateAllowed && early < 1);
-    const twin =
-      (may(shift) ? displaced(kind, plans, ask, shift) : null) ??
-      (may(-shift) ? displaced(kind, plans, ask, -shift) : null);
-    return twin ? { ...phrase, displaced: { ...twin, inPlace: phrase } } : phrase;
+    const twin = (newly: boolean) =>
+      (may(shift) ? displaced(kind, plans, ask, shift, phrase, newly) : null) ??
+      (may(-shift) ? displaced(kind, plans, ask, -shift, phrase, newly) : null);
+    // The idea moved as main moves it; and where the style holds a note over the barline,
+    // the idea moved by the stricter rules, offered only if main's is refused (`soloPart`).
+    const old = twin(false);
+    const strict = solo.habits.displace.holds ? twin(true) : null;
+    return {
+      ...phrase,
+      ...(old ? { displaced: { ...old, inPlace: phrase } } : {}),
+      ...(strict ? { admitted: { ...strict, inPlace: phrase } } : {}),
+    };
   };
 
   // ── the ways of making a phrase ──────────────────────────────────────────
@@ -724,7 +882,9 @@ export function phrasesFor(
     let fresh = 0;
     return ways.flatMap((way) => {
       const phrase = made(way, way.make === "new" ? fresh++ : 0);
-      return phrase?.displaced ? [phrase.displaced, phrase] : [phrase];
+      return phrase
+        ? [phrase.displaced, phrase.admitted, phrase].filter((one) => one !== undefined)
+        : [phrase];
     });
   };
 
@@ -764,7 +924,8 @@ export function phrasesFor(
     if (!phrase?.bars.some((bar) => bar.pitches.length > 0)) return false;
     const key = phrase.bars
       .map((bar) => `${bar.tied ? "~" : ""}${bar.cell}:${bar.pitches.join(",")}`)
-      .join("|");
+      .join("|")
+      .concat(phrase.newly ? "|new" : "");
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -776,8 +937,46 @@ export function phrasesFor(
   const kept = phrases.filter(honours);
   const fallback =
     kept.length > 0 ? kept : [statement({ name: "statement", make: "new", oneRhythm: true }, 9)];
-  return fallback.map((phrase) =>
+  const written = fallback.map((phrase) =>
     withPickup(world, phrase, memory, rng, opensPass(world.plan, slot.bars[0]!)),
+  );
+  if (burst === null) return written;
+  // A run in double time is offered first, beside the phrase it doubles: the slot drew it,
+  // and it wins a tie. An idea said a beat away is not doubled as well.
+  return written.flatMap((phrase, n) => {
+    const doubled = phrase.inPlace
+      ? null
+      : burstOf(world, phrase, { longest: burst, ending }, rng.fork("burst", n));
+    return doubled ? [doubled, phrase] : [phrase];
+  });
+}
+
+/** A note held past the end of the bar it is struck in: over the barline, inside its phrase. */
+const heldOver = (spot: Spot): boolean => spot.tick + spot.hold > spot.bar.start + spot.bar.ticks;
+
+/** The chords that arrive while a note held over the barline sounds after it is struck. */
+function chordsHeldInto(world: World, spot: Spot): (Pool | null)[] {
+  const pools: (Pool | null)[] = [];
+  const here = world.arrivalAt(spot.tick);
+  for (let a = (here?.index ?? -1) + 1; a < world.harmony.length; a++) {
+    const arrival = world.harmony[a]!;
+    if (arrival.tick >= spot.tick + spot.hold) break;
+    if (arrival.tick <= spot.tick || (!arrival.changed && arrival.chord !== null)) continue;
+    // The chord it leans into is the one it was fitted to (X-B-07).
+    if (arrival.index === spot.pool.arrival.index) continue;
+    pools.push(world.poolOf(arrival));
+  }
+  return pools;
+}
+
+/**
+ * Whether a note held over the barline is a tone of every chord that arrives while it
+ * sounds (SO-02, SO-33: a note held across a change is a tone of the new chord; one held
+ * into N.C. is not held).
+ */
+function holdsOver(world: World, note: Placed): boolean {
+  return chordsHeldInto(world, note.spot).every(
+    (pool) => pool !== null && isChordTone(pool, note.pitch),
   );
 }
 
@@ -864,6 +1063,7 @@ function leadIn(world: World, into: Into, draw: Rng): Placed[] | null {
   // short and off the beat (SO-36).
   const leans = habit.approach && draw.fork("approach").chance(solo.habits.chromatic);
   const breath = breathOf(world);
+  const owed = owedBreath(world);
   const within = (pitch: number) => pitch >= into.low && pitch <= into.high;
 
   for (const figure of tries) {
@@ -875,7 +1075,10 @@ function leadIn(world: World, into: Into, draw: Rng): Placed[] | null {
     }
     // It lives in the air the phrase before left, and leaves that air its breath, as heard:
     // swing carries a note's end on an "and" later, and a breath on paper may not be one.
+    // And on paper too, the breath a listener is owed (`owedBreath`): a pickup that is a
+    // breath only once swung is heard as the phrase before running on, not as a pickup.
     if (heardAt(world, spots[0]!.tick) - heardAt(world, into.air) < breath) continue;
+    if (spots[0]!.tick - into.air < owed) continue;
     // A tone from outside the chord's scale leads to the note a half step on, here as in
     // the line: the phrase's first note, for the last of the pickup.
     const leadingOn = (notes: readonly Placed[]): Placed[] =>

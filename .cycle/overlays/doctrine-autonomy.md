@@ -1,11 +1,11 @@
 **Decided up front with Brandon (2026-11-20), so these are not stops:**
 
-- **A musical fork never waits on him.** Voicing, rhythm, register, which idiom, how often: pick one from `docs/MUSIC_NOTES.md` and the style's notes, log it in `DECISIONS.md`, and build. He overrules by ear afterwards. Such an issue is `status:ready`, not `status:needs-decision`.
+- **A musical fork never waits on him.** Voicing, rhythm, register, which idiom, how often: pick one from `docs/MUSIC_NOTES.md` and the style's notes, log it in `docs/decisions/` (its area's file), and build. He overrules by ear afterwards. Such an issue is `status:ready`, not `status:needs-decision`.
 - **His ear never blocks the queue.** Work that can be heard or seen merges on green, goes to `status:needs-ear` with its page, and the next issue starts.
 - **No more than two unheard changes on one seat.** Before picking an issue, count the open `status:needs-ear` issues carrying its `area:*` label: at two, skip it (in `/cycle --all`, without stopping) and take the next issue on another seat. A verdict of "not right" must not undo a stack built on top of it.
-- **Silence after production is a pass.** `/deploy-prod`'s preflight names every `status:needs-ear` issue in what is shipping. Once a production release has carried one and he has said nothing against it by the next `/unblock` or `/wrap-up`, close it with the comment "passed by silence: on production since <commit>". He can reopen anything by ear at any time.
+- **Silence is not a pass.** Production follows every merge now (#2266), so being on production says nothing about whether he has heard a change: a `status:needs-ear` issue closes on his word, at `/unblock`, and not before. (Until 2026-11-21 a production release was his own act, with the unheard issues named to him first, and silence after it closed them.)
 - **Big work on an established pattern is pickable.** A new style, a style in a new meter, a new pack for an existing seat: each has been built several times from a brief (`prompts/style-*.md`, `prompts/meter-*.md`). Write the brief, build it, review it in its own clone.
-- **Still his, every time:** a production release, the §5 brakes, and anything that makes a new kind of sound (a new instrument, a new articulation, a change to the mix): build a study page of alternatives first and let him choose, as with the slides and the horn's moves.
+- **Still his, every time:** running the release by hand, the §5 brakes, and anything that makes a new kind of sound (a new instrument, a new articulation, a change to the mix): build a study page of alternatives first and let him choose, as with the slides and the horn's moves.
 
 **Measured before asked.** A change to what the band plays is sorted by measurement, in this order, before his ear is asked:
 

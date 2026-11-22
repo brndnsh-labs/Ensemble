@@ -24,15 +24,36 @@ import { TIER_MID } from "../../style/types.ts";
 import type { ToneRole } from "../../theory/chord.ts";
 import { mod12, pitchClass } from "../../theory/pitch.ts";
 import type { Heard, SoloCandidate, SoloPick, Sounding } from "./critique.ts";
-import { bassStruck, bySoloCritic, SOLO_FEATURES } from "./critique.ts";
+import { bassStruck, bySoloCritic, rhythmsAgain, runOf, SOLO_FEATURES } from "./critique.ts";
 import { EIGHTH, isChordTone, onlyPasses } from "./harmony.ts";
 import { soloVoice } from "./instruments.ts";
 import { placeOf, spotsOf } from "./line.ts";
 import type { Memory, PassPickup, Phrase } from "./phrases.ts";
 import { opensPass, passPickup, phrasesFor } from "./phrases.ts";
 import type { Slot, World } from "./slots.ts";
-import { worldOf } from "./slots.ts";
+import { doubleChanceOf, fourPulses, levelIndex, worldOf } from "./slots.ts";
 import type { Form, Role } from "./style.ts";
+
+/**
+ * A phrase of a solo where an idea said again whole was drawn to be said a beat early or
+ * late, and what became of it: the scorecard's `solo.moved-played` reads these, since the
+ * notes cannot show a phrase that was drawn and not played.
+ */
+export interface MovedIdea {
+  /** Where the phrase starts. */
+  readonly tick: number;
+  /** The idea was played a beat away. */
+  readonly played: boolean;
+  /** Played by the stricter rules: an idea main's rules refuse (`Phrase.newly`). */
+  readonly newly: boolean;
+  /** Its notes held over a barline: where each is struck, and the barline it is held over. */
+  readonly held: readonly { readonly tick: number; readonly barline: number }[];
+  /**
+   * Played a beat away, each of its notes: where it is struck, and the pitch it has in the
+   * idea it says again (`Phrase.idea`).
+   */
+  readonly notes: readonly { readonly tick: number; readonly was: number }[];
+}
 
 /** The shortest note: half a sixteenth (SO-19). */
 const SHORTEST = STEP / 2;
@@ -54,6 +75,8 @@ interface SoloNote {
   readonly ends: boolean;
   /** Its length in the rhythm, in ticks. */
   readonly value: number;
+  /** How long it lasts as a note of the line, what a shake is judged by: its rhythm, its space, or where it is stopped. */
+  readonly lasts?: number;
   /** A note of a pickup into the phrase. */
   readonly lead: boolean;
 }
@@ -93,6 +116,8 @@ export function soloPart(
   context: PlayerContext,
   pick?: SoloPick,
   report?: (choice: SoloChoice) => void,
+  /** Told of each phrase drawn to say an idea a beat away, and what became of it. */
+  moved?: (idea: MovedIdea) => void,
 ): WrittenNote[] {
   const { plan, style, rng, heard } = context;
   const world = worldOf(plan, style, bassStruck((heard.bass ?? []).flat()));
@@ -109,6 +134,13 @@ export function soloPart(
   let solo = -1;
   /** The last line before this one fell. */
   let fell = false;
+  /** This solo has played its run in double time. */
+  let doubled = false;
+  /** What the solo played: its first chorus's notes and beats, and the phrase before's. */
+  let firstChorus = { notes: 0, beats: 0 };
+  let lastPhrase: PlayedPhrase | null = null;
+  /** Every note this solo has played, by where it is struck: as long as it was heard. */
+  let playedAt = new Map<number, SoloNote>();
   /** A pickup into the top of a pass, made from the pass before (`passPickup`). */
   const intoPass = (bar: PlanBar, previous: Slot | undefined): PassPickup | null => {
     if (!opensPass(plan, bar)) return null;
@@ -127,7 +159,10 @@ export function soloPart(
   };
   const writeLead = (lead: PassPickup, bar: PlanBar): SoloNote[] => {
     const notes = realiseLead(world, lead, bar);
-    for (const note of notes) written.push(writtenOf(note, voice, true));
+    for (const note of notes) {
+      written.push(writtenOf(note, voice, true));
+      playedAt.set(note.tick, note);
+    }
     return notes;
   };
   world.slots.forEach((slot, s) => {
@@ -138,12 +173,37 @@ export function soloPart(
       // into it leaves that note its breath.
       memory = { ...NOTHING, restEnds: memory.restEnds };
       earlier = [];
+      playedAt = new Map();
       fell = false;
+      doubled = false;
+      firstChorus = { notes: 0, beats: 0 };
+      lastPhrase = null;
     }
     const lead = intoPass(first, world.slots[s - 1]);
     if (slot.index === 0) form = chorusForm(world, rng, slot, memory.motif !== null);
     const role = form[slot.index % form.length] ?? "s";
 
+    let drawn = false;
+    // Where the pass before's pickup into this phrase starts, if it leads in: a phrase's
+    // first breath is taken from there.
+    const from = lead ? realiseLead(world, lead, first)[0]?.tick : undefined;
+    // An idea said again, where it was, as it sounded: the notes of the latest phrase of the
+    // solo heard with the idea's notes where they fall here, the same distances apart and the
+    // same line (`rhythmsAgain`, unmoved), each as long as it was played. That phrase is what
+    // the idea moved a pulse is heard against (`displacedFrom`). Where none is, as the idea
+    // sounds laid in this slot, with its own lengths, not stopped at a change of this slot's it
+    // is not a tone of (a moved note is checked against the chords it is moved onto).
+    const asHeard = (inPlace: Phrase): SoloNote[] => {
+      const laid = realise(world, inPlace, accent, from, true).filter((note) => !note.lead);
+      const here: Heard = { slot, notes: laid.map((note) => sounding(world, note)) };
+      const all = [...earlier.flatMap((one) => one.notes), ...here.notes];
+      const found = rhythmsAgain(here, earlier, all).find((one) => one.inBar === 0 && one.line);
+      const heard = laid.map((note) => {
+        const j = found?.notes.findIndex((one) => one.tick === note.tick) ?? -1;
+        return j < 0 ? undefined : playedAt.get(found!.source[j]!.tick);
+      });
+      return heard.every((note) => note !== undefined) ? (heard as SoloNote[]) : laid;
+    };
     const offered = phrasesFor(
       world,
       slot,
@@ -151,34 +211,84 @@ export function soloPart(
       memory,
       heldRng(rng, "phrase", "phrase", first),
       lead?.first ?? null,
+      doubled || !earned(lastPhrase, firstChorus)
+        ? null
+        : doubleTimeAt(world, s, heldRng(rng, "double time", "phrase", first)),
+      {
+        drawn: () => {
+          drawn = true;
+        },
+        sounds: (phrase) =>
+          asHeard(phrase).map((note) => ({
+            duration: note.duration,
+            value: note.lasts ?? note.value,
+          })),
+      },
     );
     // The pass before's pickup into this phrase is played as it was made, whichever is chosen.
     const leading = lead ? writeLead(lead, first) : [];
-    const from = leading[0]?.tick;
     // An idea said a beat away keeps every note's length and shake, its last note a pulse
     // shorter at most for its breath; where it cannot, it is not offered (SO-08, SO-17).
     const realised = offered.map((phrase) => realise(world, phrase, accent, from));
-    const keeps = offered.map(
-      (phrase, i) =>
-        !phrase.inPlace || keepsLengths(realise(world, phrase.inPlace, accent, from), realised[i]!),
-    );
+    // An idea moved as main moves it is held to main's check; one moved by the stricter
+    // rules only where main's of the same idea is refused, and then to the stricter check.
+    const mainKept = new Set<Phrase>();
+    const keeps = offered.map((phrase, i) => {
+      const { inPlace } = phrase;
+      if (!inPlace) return !phrase.burst || landsHeld(world, phrase.burst.lands, realised[i]!);
+      if (!phrase.newly) {
+        const kept = asLong(realise(world, inPlace, accent, from), realised[i]!);
+        if (kept) mainKept.add(inPlace);
+        return kept;
+      }
+      return !mainKept.has(inPlace) && keepsLengths(asHeard(inPlace), realised[i]!);
+    });
     const phrases = offered.filter((_, i) => keeps[i]);
     const notes = realised.filter((_, i) => keeps[i]);
-    const candidates = phrases.map(
-      (phrase, i): SoloCandidate => ({
+    const candidates = phrases.map((phrase, i): SoloCandidate => {
+      const heard = [...leading, ...notes[i]!].map((note) => sounding(world, note));
+      const run = runOf(world, heard);
+      return {
         kind: phrase.kind,
         slot,
-        notes: [...leading, ...notes[i]!].map((note) => sounding(world, note)),
+        notes: heard,
+        ...(run && { run }),
         earlier,
         ...(phrase.inPlace && { moved: true }),
         world,
-      }),
-    );
+      };
+    });
     const chosen = choose(candidates);
     const at = Math.max(0, candidates.indexOf(chosen));
     report?.({ slot, role, candidates: score(candidates, SOLO_FEATURES, weights), chosen });
 
     const phrase = phrases[at]!;
+    if (drawn) {
+      // A note held over a barline: one sounding past the end of its bar into a bar held into.
+      const { inPlace } = phrase;
+      const held = inPlace
+        ? phrase.line.flatMap(({ spot }) => {
+            const barline = spot.bar.start + spot.bar.ticks;
+            const into = phrase.bars[slot.bars.indexOf(spot.bar) + 1];
+            return into?.held && spot.tick + spot.hold > barline
+              ? [{ tick: spot.tick, barline }]
+              : [];
+          })
+        : [];
+      const said = inPlace
+        ? phrase.line.map((note, k) => ({
+            tick: note.spot.tick,
+            was: phrase.idea?.[k] ?? inPlace.line[k]!.pitch,
+          }))
+        : [];
+      moved?.({
+        tick: first.start,
+        played: inPlace !== undefined,
+        newly: phrase.newly === true,
+        held,
+        notes: said,
+      });
+    }
     // How the horn plays the phrase chosen: what it does with the pitch of the notes it
     // arrives on and of the notes it leaves. Drawn by place, after the choice, so the
     // phrase is the one the critic chose whatever it does.
@@ -186,24 +296,35 @@ export function soloPart(
     // And how a guitarist's left hand plays it: a landing slid into, a note hammered on or
     // pulled off.
     const played = slurs(world, phrase, slideInto(world, phrase, horned.notes, rng), rng);
+    lastPhrase = playedIn(slot, played);
+    if (slot.chorus === 0) {
+      firstChorus = {
+        notes: firstChorus.notes + lastPhrase.notes,
+        beats: firstChorus.beats + lastPhrase.beats,
+      };
+    }
     fell = horned.fell;
+    if (phrase.burst) doubled = true;
     const opens = slot.bars[0]!.start;
     for (const note of played) {
       // A pickup struck before the phrase's first bar leads into it, from wherever it is played.
       written.push(writtenOf(note, voice, note.tick < opens));
+      playedAt.set(note.tick, note);
     }
     const last = played.at(-1);
     // A new idea is the idea from now on, wherever in the form it turned up; and so is
     // what was played where the form asked for one stated, changed, set apart or brought
     // back. Said again or answered, the idea stays what it was.
     const stated = memory.motif === null || phrase.fresh || "svcb".includes(role);
+    // A phrase with a run in double time is remembered as the line it doubles.
+    const kept = phrase.plain ?? phrase;
     earlier = [...earlier, candidates[at]!];
     memory = {
       // The climb to the top note is a use of the idea, not a new one. An idea said a beat
       // away is remembered where it was: what follows is made from it as it was stated.
-      motif: slot.peak ? memory.motif : stated ? (phrase.inPlace ?? phrase) : memory.motif,
-      theme: memory.theme ?? phrase,
-      opening: slot.index === 0 ? phrase : memory.opening,
+      motif: slot.peak ? memory.motif : stated ? (phrase.inPlace ?? kept) : memory.motif,
+      theme: memory.theme ?? kept,
+      opening: slot.index === 0 ? kept : memory.opening,
       rest: last?.pitch ?? memory.rest,
       highest: Math.max(memory.highest, ...played.map((note) => note.pitch)),
       restEnds: last ? last.tick + last.duration : memory.restEnds,
@@ -224,9 +345,87 @@ export function soloPart(
 export const playSolo: Player = (context) => soloPart(context);
 
 /**
+ * Whether the phrase in a slot is offered a run in double time, and how long it may be in
+ * bars: late in a solo (its last chorus, never its first phrase), earned (at the style's
+ * busiest level, or the climb to the top note, straight after a phrase at the busiest level),
+ * where the style plays it (the climb alone where it says so), never where the tune ends; on a
+ * ballad only from the setting the style says; then as often as the style and the setting say,
+ * drawn by the phrase's place. Null where not. Whether one will go, and at what speed, is the
+ * phrase's own (`burstOf`).
+ */
+function doubleTimeAt(world: World, s: number, draw: Rng): number | null {
+  const { plan, solo, slots } = world;
+  const slot = slots[s]!;
+  const before = slots[s - 1];
+  const { doubleTime } = solo;
+  const busiest = solo.levels.length - 1;
+  if (slot.chorus !== slot.of - 1 || slot.first || slot.bars.at(-1)!.ending !== null) return null;
+  if (doubleTime.climbOnly && !slot.peak) return null;
+  if (levelIndex(solo, slot.level) !== busiest && !slot.peak) return null;
+  if (!before || before.solo !== slot.solo || levelIndex(solo, before.level) !== busiest)
+    return null;
+  const slow = fourPulses(plan, slot.bars[0]!) > solo.tempo.slowBar ? doubleTime.slow : null;
+  if (slow && (plan.soloDensity ?? 0.5) < slow.from) return null;
+  if (!draw.chance(doubleChanceOf(plan, solo))) return null;
+  return slow ? slow.longest : doubleTime.bars.longest;
+}
+
+/** What a phrase of the solo played: its notes struck in its own bars, its beats, its empty bars. */
+interface PlayedPhrase {
+  readonly notes: number;
+  readonly beats: number;
+  readonly empty: boolean;
+}
+
+function playedIn(slot: Slot, notes: readonly SoloNote[]): PlayedPhrase {
+  const own = notes.filter((note) => note.tick >= slot.bars[0]!.start);
+  return {
+    notes: own.length,
+    beats: slot.bars.reduce((sum, bar) => sum + bar.ticks, 0) / PPQ,
+    empty: slot.bars.some((bar) => !own.some((note) => note.bar === bar)),
+  };
+}
+
+/**
+ * Whether the phrase before has earned a run in double time, judged on what it played: no
+ * empty bar, and at least the notes a beat the solo played in its first chorus.
+ */
+function earned(before: PlayedPhrase | null, first: { notes: number; beats: number }): boolean {
+  if (before === null || before.empty || first.beats === 0) return false;
+  return before.notes / before.beats >= first.notes / first.beats;
+}
+
+/**
+ * Whether a run in double time lands held: the note it runs into sounds a pulse at least, as
+ * heard, once its breath is taken.
+ */
+function landsHeld(world: World, at: number, notes: readonly SoloNote[]): boolean {
+  const note = notes.find((one) => one.tick === at && !one.lead);
+  if (!note) return false;
+  const pulse = pulseTicks(note.bar.meter)[0]!;
+  return soundsFor(world, note.bar, note.tick, note.duration) >= pulse;
+}
+
+/**
  * Whether an idea said a beat away is as long as where it was: the same notes, each
  * sounding as long and shaken where it was shaken; the last may give up a pulse for the
  * breath after it, and is still shaken if it was.
+ */
+function asLong(was: readonly SoloNote[], now: readonly SoloNote[]): boolean {
+  const [from, to] = [was.filter((note) => !note.lead), now.filter((note) => !note.lead)];
+  if (from.length !== to.length) return false;
+  return to.every((note, i) => {
+    const before = from[i]!;
+    const last = i === to.length - 1;
+    const give = last ? pulseTicks(note.bar.meter)[0]! : 0;
+    const shaken = before.move?.vibrato === undefined || note.move?.vibrato !== undefined;
+    return note.duration >= before.duration - give && shaken;
+  });
+}
+
+/**
+ * Whether an idea moved by the stricter rules keeps the idea's lengths: each note within a
+ * sixteenth of the idea's, both ways, the last a pulse shorter at most, shaken where it was.
  */
 function keepsLengths(was: readonly SoloNote[], now: readonly SoloNote[]): boolean {
   const [from, to] = [was.filter((note) => !note.lead), now.filter((note) => !note.lead)];
@@ -236,7 +435,12 @@ function keepsLengths(was: readonly SoloNote[], now: readonly SoloNote[]): boole
     const last = i === to.length - 1;
     const give = last ? pulseTicks(note.bar.meter)[0]! : 0;
     const shaken = before.move?.vibrato === undefined || note.move?.vibrato !== undefined;
-    return note.duration >= before.duration - give && shaken;
+    // Neither shorter nor longer: within a sixteenth of it, both ways.
+    return (
+      note.duration >= before.duration - give - STEP &&
+      note.duration <= before.duration + STEP &&
+      shaken
+    );
   });
 }
 
@@ -382,7 +586,14 @@ function moveOf(
  * seconds, before whatever follows (Q-47, SU-B-15); a note stops at a change
  * of chord unless it belongs to the new one (X-B-07).
  */
-function realise(world: World, phrase: Phrase, accent: number, breathedAt?: number): SoloNote[] {
+function realise(
+  world: World,
+  phrase: Phrase,
+  accent: number,
+  breathedAt?: number,
+  /** Not stopped at a change it is not a tone of: the idea's own lengths, as a measure. */
+  uncut = false,
+): SoloNote[] {
   const { solo, instrument, harmony } = world;
   const { slot } = phrase;
   const touch = solo.touch;
@@ -441,14 +652,21 @@ function realise(world: World, phrase: Phrase, accent: number, breathedAt?: numb
     }
 
     const space = next ? next.spot.tick - tick : Number.POSITIVE_INFINITY;
-    const endsLine = !next || next.spot.tick - (tick + spot.hold) >= PPQ || next.spot.bar !== bar;
     // A note tied over the barline ends in the bar it is held into (SO-38).
     const inSlot = slot.bars.indexOf(bar);
     const over = tick + spot.hold > bar.start + bar.ticks ? slot.bars[inSlot + 1] : undefined;
     const endsIn = over ?? bar;
+    const held = over !== undefined && phrase.bars[inSlot + 1]?.held === true;
+    const endsLine = !next || next.spot.tick - (tick + spot.hold) >= PPQ || next.spot.bar !== bar;
     const part = phrase.bars[over ? inSlot + 1 : inSlot]?.part;
-    let duration = spot.hold;
-    if (endsLine && (part === "E" || !next) && !lead) {
+    // An idea said a beat away sounds as long as it did where it was (`Phrase.sounds`): its
+    // breaths are where they were, a pulse on; its last note may give up a pulse to the end
+    // of the phrase.
+    const at = i - phrase.pickup.length;
+    const kept = lead ? undefined : phrase.sounds?.[at];
+    const keptLength = kept !== undefined && at < phrase.line.length - 1;
+    let duration = keptLength ? Math.min(kept.duration, space) : spot.hold;
+    if (!keptLength && endsLine && (part === "E" || !next) && !lead) {
       // The breath is taken by shortening the note that sounds into it, never by leaving it
       // out. It is a breath as heard: measured after the swing has moved the note's end.
       const bend = (at: number) => (bar.meter.unit === 4 ? swing(at, world.feel) : at);
@@ -461,15 +679,16 @@ function realise(world: World, phrase: Phrase, accent: number, breathedAt?: numb
       duration = Math.min(duration, Math.max(EIGHTH, Math.floor(breathed + lungs - tick - STEP)));
     }
     // In the rhythm the note is as long as its space, however the hand lifts off it.
-    let value = duration;
-    if (duration >= space) {
+    let value = keptLength ? Math.min(kept.value, space) : duration;
+    if (kept !== undefined && !keptLength) duration = Math.min(duration, kept.duration);
+    if (!keptLength && duration >= space) {
       value = space;
       duration = Math.round(space * touch.legato);
     }
 
     // Held over a change, it must be a tone of the new chord; otherwise it stops there.
     const here = world.arrivalAt(tick);
-    for (let a = (here?.index ?? -1) + 1; a < harmony.length; a++) {
+    for (let a = (here?.index ?? -1) + 1; a < harmony.length && !uncut; a++) {
       const arrival = harmony[a]!;
       if (arrival.tick >= tick + duration) break;
       if (arrival.tick <= tick || (!arrival.changed && arrival.chord !== null)) continue;
@@ -499,7 +718,10 @@ function realise(world: World, phrase: Phrase, accent: number, breathedAt?: numb
     // always has one before whatever follows.
     let ends = !next;
     if (next) {
-      const gap = heard(next.spot.tick, next.spot.bar) - heard(tick + duration, bar);
+      // A moved idea's note held over the barline ends in the bar it is held into, and is
+      // heard there as the band swings that bar.
+      const stops = held && tick + duration >= endsIn.start ? endsIn : bar;
+      const gap = heard(next.spot.tick, next.spot.bar) - heard(tick + duration, stops);
       if (gap >= breath) breathed = next.spot.tick;
       ends = gap >= breath && !lead;
     }
@@ -514,6 +736,7 @@ function realise(world: World, phrase: Phrase, accent: number, breathedAt?: numb
         velocity,
         ...move,
         value: spot.hold,
+        lasts: value,
         ends,
         lead: lead === true,
       },

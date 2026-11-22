@@ -16,6 +16,27 @@ import type { SoloInstrument, SoloStyle } from "./style.ts";
  */
 const SLIDE = { fret: 0.0285, oneFret: 0.057 } as const;
 
+/**
+ * The fastest a run in double time may go on each instrument, in notes a second. Nothing here
+ * can time a player and no number is recalled, so there is one ceiling: the fastest single line
+ * any seat of the band is asked to play, rock's sixteenths at rock's fastest, 160 (ST-rock-22's
+ * bursts on the lead guitar, ST-rock-09's sixteenth tom run on the kit), since no instrument's
+ * line is known to be slower than that. The alto, a guitar picked with a plectrum and the
+ * vibraphone (two mallets by turns, as a drummer's two sticks) take it.
+ *
+ * The ceiling is on the run's grid as the band's swing places it, even notes, not on the notes
+ * as the feel plays them: the player's own placement (humanize, lean) moves single notes a few
+ * milliseconds, so one gap between two notes of a run may come as quick as about 11.4 a second
+ * where the grid's is 10.67.
+ *
+ * The steel and nylon guitars take less: a fingerpicked or flatpicked lead on them is asked no
+ * more than acoustic's busiest line, a sixteenth pair (`.xx-`) at acoustic's fastest, 120.
+ */
+const FASTEST = {
+  line: (160 / 60) * 4,
+  fingers: (120 / 60) * 4,
+} as const;
+
 export const SOLO_INSTRUMENTS: Readonly<Record<string, SoloInstrument>> = {
   // Three octaves from F3. Its solo voice sits an octave over middle C, above the piano's
   // hand; the bars ring by themselves, so it need not breathe. A bar's pitch does not move.
@@ -31,6 +52,7 @@ export const SOLO_INSTRUMENTS: Readonly<Record<string, SoloInstrument>> = {
     shake: null,
     scoop: null,
     fall: null,
+    fastest: FASTEST.line,
   },
   // The comfortable solo register, with the ends kept for climaxes (SO-01). It breathes:
   // eight seconds is a long phrase on one breath, and a breath takes half a second (Q-47).
@@ -53,6 +75,7 @@ export const SOLO_INSTRUMENTS: Readonly<Record<string, SoloInstrument>> = {
     shake: { depth: 30, rate: 5, after: 0.4, grows: 0.6, upward: false, on: "last", shortest: 0.7 },
     scoop: { below: 1, takes: 0.06 },
     fall: { semitones: 6, takes: 0.5 },
+    fastest: FASTEST.line,
   },
   // The lead guitar: an overdriven guitar's solo register, G3 to E6, at home on B4 (SO-01).
   // Its hand is the one Brandon's ear chose from nine (scripts/pitch-study.ts, clips 5 and
@@ -71,6 +94,7 @@ export const SOLO_INSTRUMENTS: Readonly<Record<string, SoloInstrument>> = {
     shake: { depth: 60, rate: 5.5, after: 0.35, grows: 0.3, upward: true, on: "held" },
     scoop: null,
     fall: null,
+    fastest: FASTEST.line,
   },
   // The clean electric guitar's solo register, G3 to D6, at home on A4 (SO-01): a lead behind
   // a singer (ST-neosoul-43). The overdriven guitar's hand: the same string, the same bend
@@ -87,6 +111,7 @@ export const SOLO_INSTRUMENTS: Readonly<Record<string, SoloInstrument>> = {
     shake: { depth: 60, rate: 5.5, after: 0.35, grows: 0.3, upward: true, on: "held" },
     scoop: null,
     fall: null,
+    fastest: FASTEST.line,
   },
   // The nylon-string guitar as a lead: E3 to A5, at home on F#4 (SO-01), the verse melody's
   // cousin (ST-acoustic-37). Its hand does not bend: a nylon string is not pushed up a whole
@@ -106,6 +131,7 @@ export const SOLO_INSTRUMENTS: Readonly<Record<string, SoloInstrument>> = {
     shake: { depth: 20, rate: 5, after: 0.35, grows: 0.3, upward: false, on: "held" },
     scoop: null,
     fall: null,
+    fastest: FASTEST.fingers,
   },
   // The steel-string acoustic guitar as a lead: the nylon guitar's register and its hand.
   // Heavier strings at higher tension than an electric's are not pushed up a whole step, and
@@ -123,6 +149,7 @@ export const SOLO_INSTRUMENTS: Readonly<Record<string, SoloInstrument>> = {
     shake: { depth: 20, rate: 5, after: 0.35, grows: 0.3, upward: false, on: "held" },
     scoop: null,
     fall: null,
+    fastest: FASTEST.fingers,
   },
 };
 

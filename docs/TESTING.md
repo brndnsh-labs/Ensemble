@@ -41,7 +41,7 @@ A fixed chart, style, and seed that must produce exactly a stored MIDI file.
 
 - One or two per style. Ten to twenty in total.
 - They detect unintended change. They do not prove the music is good.
-- Updating a golden requires a line in `DECISIONS.md` saying why the output changed.
+- Updating a golden requires a line in `docs/decisions/` (its area's file) saying why the output changed.
 
 ### 4. Browser smoke journeys
 
@@ -52,6 +52,7 @@ Playwright specs for things only a real browser can prove. The list is fixed:
 3. A chart typed in the editor renders, and an error shows a diagnostic in place.
 4. Pressing play starts audio and advances the playhead.
 5. Export downloads a MIDI file that matches the CLI's output for the same take.
+6. The app counts its use only where it is told it is production, and only what it says: off production a chart opened, played and given another style sends nothing to another origin; taken for production the same sends exactly its events, each with only its allowed fields, to a stub of the endpoint; with do-not-track set, nothing.
 
 - No spec waits for music to play in real time. Timing logic is checked in the engine with an injected clock.
 - No sleeps, no retries. A flaky spec is fixed or deleted the same day.
@@ -79,19 +80,21 @@ Musical quality is statistical. "Is the soloist aimless" is a distribution over 
 3. **Every test names its rule** in plain musical or user-facing language. If the rule cannot be named, the test does not exist.
 4. **A bug found by ear becomes a stronger property or a new critic metric.** A one-off example test is the last resort and needs a comment saying why no property could express it.
 5. **Deleting a test that no longer earns its place is normal maintenance.**
-6. **Playwright is for looking, not for accumulating.** Drive the app freely to verify your own work in a headless session. Do not commit a spec unless it is one of the five journeys.
+6. **Playwright is for looking, not for accumulating.** Drive the app freely to verify your own work in a headless session. Do not commit a spec unless it is one of the six journeys.
 
 ## Budgets
 
 | Suite | Limit | When it runs |
 |---|---|---|
-| Engine (corpus, properties, goldens) | 12 seconds with three styles, 2 more for each style after the third, and 2 more for each meter beyond 4/4 that the style with the most of them has written (28 at eight styles and three meters) | every push |
-| Engine, six seeds | three times the push budget (72) | before a gate |
-| Scorecard | 2 minutes | every push, report only except for tolerance failures |
-| Browser smoke | 60 seconds total | merge to main |
+| Engine (corpus, properties, goldens) | 4 CPU seconds, and 24 more for each style (220 at nine styles) | every push |
+| Engine, six seeds | three times the push budget (660) | before a gate |
+| Scorecard | 150 CPU seconds | every push, report only except for tolerance failures |
+| Browser smoke | 60 seconds on the clock | merge to main |
 
-CI fails when a budget is exceeded. The response to an exceeded budget is to consolidate or delete, never to raise the limit without a `DECISIONS.md` entry.
+A budget for work the machine does is counted in **CPU seconds**: the processor time the command and everything it started used. That is the work done, and it hardly moves with what else the machine is doing; the time on the clock does (the engine suite measured alone, back to back, beside a scorecard run and two at once: the clock ranged from 26.0 to 39.7 seconds, the CPU time from 182.5 to 190.3). The browser journeys wait on a browser, so theirs is time on the clock. `scripts/budget.ts` measures both and prints the clock beside the CPU time.
 
-The engine's budget grows with what the band can play and with nothing else. Every style is held to every property, each in a process of its own, so a style added is the same rules checked on one more band, and a meter a style has written its parts for is the same rules checked on one more bar: the cost is real and is not the suite growing. The styles run side by side, so the suite takes as long as its longest style, and the meters are counted on the style that has written the most. What is rationed is the rules. A new property, a new kind of take, or more seeds on a push still has to fit inside the budget as it stands, by consolidating or deleting.
+A budget is kept on the machine the work is done on; CI says the figure and does not judge it. The response to an exceeded budget is to consolidate or delete, never to raise the limit without an entry in `docs/decisions/`.
+
+The engine's budget grows with what the band can play and with nothing else. Every style is held to every property, in a process of its own, so a style added is the same rules checked on one more band: the cost is real (about 22.6 CPU seconds a style, beside the others) and is not the suite growing, and `budget.ts` works the limit out from the styles that ship. A meter a style writes its parts for, and a chart added to the library, cost almost nothing here (a style's tests cost the same with a written meter taken away, and jazz's twenty charts cost little more than another style's seven), so neither earns anything. What is rationed is the rules. A new property, a new kind of take, or more seeds on a push still has to fit inside the budget as it stands, by consolidating or deleting.
 
 Property tests can use a small seed count on every push and a larger one nightly, so long as the push run stays inside the budget.

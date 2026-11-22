@@ -14,10 +14,11 @@ import type { Arrival } from "../../perform/harmony.ts";
 import { contextOf } from "../../perform/harmony.ts";
 import { onPulse } from "../../perform/meter.ts";
 import type { NoteEvent } from "../../perform/notes.ts";
-import type { Heard, SoloCandidate, Sounding } from "../../players/solo/critique.ts";
+import type { Burst, Heard, SoloCandidate, Sounding } from "../../players/solo/critique.ts";
 import {
   bassStruck,
   body,
+  burstsIn,
   closest,
   displacedFrom,
   likeness,
@@ -84,10 +85,21 @@ function read(take: Take, style: StylePack): Reading | null {
       const before = solos[phrase.slot.solo]!;
       return { ...phrase, kind: "", earlier: before.slice(0, before.indexOf(phrase)), world };
     });
-    const costs = score(candidates, SOLO_FEATURES, style.critic.weights.solo ?? {}).map(
-      (scored) => scored.cost,
-    );
-    reading = { world, events, notes, phrases, solos: solos.filter(Boolean), costs };
+    // Costed when a measure asks: most readers of a take want its notes, not its costs.
+    let costs: number[] | undefined;
+    reading = {
+      world,
+      events,
+      notes,
+      phrases,
+      solos: solos.filter(Boolean),
+      get costs() {
+        costs ??= score(candidates, SOLO_FEATURES, style.critic.weights.solo ?? {}).map(
+          (scored) => scored.cost,
+        );
+        return costs;
+      },
+    };
   }
   readings.set(take, reading);
   return reading;
@@ -175,7 +187,7 @@ function displacements(reading: Reading): DisplacedPhrase[] {
     const moved = new Set<Heard>();
     return solo.flatMap((phrase, i): DisplacedPhrase[] => {
       if (i === 0 || body(phrase).length < 3) return [];
-      const heard = displacedFrom(phrase, solo.slice(0, i), all);
+      const heard = displacedFrom(phrase, solo.slice(0, i), all, moved);
       if (heard?.line) moved.add(phrase);
       const stated = solo.slice(0, i).filter((other) => !moved.has(other));
       const carriesLate = rhythmsAgain(phrase, stated, all).some((one) => one.by === 1);
@@ -205,6 +217,42 @@ function displacements(reading: Reading): DisplacedPhrase[] {
 export function displacedPhrases(take: Take, style: StylePack): DisplacedPhrase[] {
   const reading = read(take, style);
   return reading ? displacements(reading).filter((one) => one.by !== null || one.carriesLate) : [];
+}
+
+/** A run in double time in a phrase of a solo, and the phrase of the solo before it. */
+export interface BurstPhrase {
+  readonly phrase: Heard;
+  readonly previous: Heard | null;
+  readonly burst: Burst;
+  /** Every phrase of its solo, in order. */
+  readonly solo: readonly Heard[];
+}
+const bursting = new WeakMap<Reading, BurstPhrase[]>();
+function bursts(reading: Reading): BurstPhrase[] {
+  const known = bursting.get(reading);
+  if (known) return known;
+  const found = reading.solos.flatMap((solo) =>
+    solo.flatMap((phrase, i) =>
+      burstsIn(reading.world, phrase.notes).map((burst) => ({
+        phrase,
+        previous: solo[i - 1] ?? null,
+        burst,
+        solo,
+      })),
+    ),
+  );
+  bursting.set(reading, found);
+  return found;
+}
+
+/**
+ * The runs in double time in a take's solos, read from the notes (`burstsIn`), each with
+ * its phrase and the phrase before it: what `solo.bursts` counts, for a property or a page
+ * that wants to find them.
+ */
+export function burstPhrases(take: Take, style: StylePack): BurstPhrase[] {
+  const reading = read(take, style);
+  return reading ? bursts(reading) : [];
 }
 
 const seconds = (reading: Reading, ticks: number) => ticks / reading.world.ticksPerSecond;
@@ -382,6 +430,16 @@ export const soloMeasures: readonly Measure[] = [
     },
   ),
   measure(
+    "bursts",
+    "share",
+    "Late in a solo, now and then, the line runs in double time for half a bar to two bars and lands: the share of a solo's phrases (with any note) that have a run in double time.",
+    (reading) => {
+      const phrases = reading.phrases.filter((phrase) => phrase.notes.length > 0);
+      const burst = new Set(bursts(reading).map((one) => one.phrase));
+      return share(burst.size, phrases.length);
+    },
+  ),
+  measure(
     "displaced-early",
     "share",
     "Of the ideas said again a beat away (solo.displaced), the share said a beat early: an idea that opens on the one cannot go early without crossing the barline, which is a pickup's ground, so most go late.",
@@ -390,6 +448,14 @@ export const soloMeasures: readonly Measure[] = [
       return share(moved.filter((one) => one.by === -1).length, moved.length);
     },
   ),
+  {
+    id: "solo.moved-played",
+    seat: "solo",
+    unit: "share",
+    says: "Of the phrases where the soloist drew an idea said again whole to be said a beat early or late, the share where it was: the rest were not moved because the idea would not fit moved (a note pulled out of the phrase, a note that could not keep its length), or the critic preferred another phrase. Read from the take's record of what the soloist drew, since the notes cannot show a phrase not played.",
+    // Read from the take's record of the soloist's draws (`Take.moved`), not from its notes.
+    of: (take) => share(take.moved.filter((idea) => idea.played).length, take.moved.length),
+  },
   measure(
     "bars-that-rhyme",
     "share",
@@ -716,13 +782,18 @@ export const soloMeasures: readonly Measure[] = [
   idiom(
     "barlines-tied",
     "share",
-    "Of the barlines a run crosses (a note on the last eighth of the bar, running straight on), the share where that note is held over the barline and the downbeat is not struck: a line that does not treat the barline as a wall (SO-38).",
+    "Of the barlines a run crosses (a note on the last eighth of the bar, running straight on), the share where that note is held over the barline and the downbeat is not struck: a line that does not treat the barline as a wall (SO-38). A note of an idea said a beat away is the idea's, held as long as it was where it was stated, and is not counted either way.",
     (reading) => {
+      const moved = new Set(
+        displacements(reading)
+          .filter((one) => one.line)
+          .flatMap((one) => one.notes),
+      );
       let crossed = 0;
       let tied = 0;
       reading.notes.forEach((note, i) => {
         const end = note.bar.start + note.bar.ticks;
-        if (note.tick !== end - PPQ / 2) return;
+        if (note.tick !== end - PPQ / 2 || moved.has(note)) return;
         const next = reading.notes[i + 1];
         const over = note.ends > end + PPQ / 4;
         if (!over && next?.tick !== end) return;
@@ -739,6 +810,16 @@ export const soloMeasures: readonly Measure[] = [
     // A bend's glide is two points, from under the note to it; a slide's stands on each fret
     // and jumps to the next, and is not a bend.
     (reading) => perSoloBar(reading, (note) => note.move?.glide?.length === 2),
+  ),
+  idiom(
+    "whole-step-bends",
+    "share",
+    "Of the notes bent into, the share pushed up a whole step (the steel's bend into a root or a fifth) and not a half (the curl into the major third): both are heard.",
+    (reading) => {
+      const bends = reading.events.filter((note) => note.move?.glide?.length === 2);
+      const whole = bends.filter((note) => Math.round(note.move!.glide![0]!.semitones) === -2);
+      return share(whole.length, bends.length);
+    },
   ),
   idiom(
     "shakes",

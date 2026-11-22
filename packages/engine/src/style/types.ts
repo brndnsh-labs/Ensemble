@@ -68,6 +68,12 @@ export interface FeelStyle {
   readonly lean: Readonly<Record<PitchedSeat, number>>;
   /** 0 to 100. At 100 a note moves at most 9 ms and its velocity at most 10. */
   readonly humanize: number;
+  /**
+   * How far the tempo breathes with the arc when a take asks it to (`PlanOptions.breathe`): the
+   * most a bar's tempo moves from the tempo as set, as a share of it, either way. 0 for a band
+   * played to a grid or a machine's pulse; never more than 0.02 (`BREATHE_MOST`).
+   */
+  readonly breathe: number;
 }
 
 export interface ArcStyle {
@@ -111,6 +117,44 @@ export interface ArcStyle {
    * high tier is a different groove that a band would not flip into mid-take.
    */
   readonly liftsCrossHigh: boolean;
+  /**
+   * A band builds by who is in as well as by how hard (#2240): in a jam, now and then, one
+   * seat sits out a section or a pass at a low point of the arc, and everyone is back for the
+   * top. Left out, the style keeps everyone in.
+   */
+  readonly layOut?: LayOutStyle;
+}
+
+/**
+ * Where and how often a jam lays a seat out. The planner holds the rest whatever the style
+ * says: never the opening two passes, the last pass or the peak; never a jam shorter than four
+ * passes, a song, a chart with an arrangement of its own, a level the player holds, or a band
+ * of two seats; never the soloist; at most one seat, and at most one lay-out in four passes.
+ */
+export interface LayOutStyle {
+  /** The seats that may sit out, one at a time. Those not named hold the band together. */
+  readonly seats: readonly Exclude<Seat, "solo">[];
+  /**
+   * Under the soloist's chorus (the jazz piano strolling: the band thins under the line), or
+   * only where the band plays without one (a breakdown).
+   */
+  readonly under: "solo" | "band";
+  /** For the whole pass, or for one section of it: the pass's lowest, by its own level. */
+  readonly span: "pass" | "section";
+  /**
+   * How high on the arc a pass may be, read at its middle: 0 no higher than the opening pass,
+   * 1 as high as the peak (which is never chosen).
+   */
+  readonly below: number;
+  /** In a jam of a set length, the chance a pass that may lay a seat out does. */
+  readonly chance: number;
+  /**
+   * In an open jam, the chance a pass from the third on lays a seat out. An open jam has no arc
+   * to be low on and no peak (its lift only climbs to a cap), so there it is this chance and the
+   * spacing alone: set lower than `chance`, since every pass may where a jam of a set length
+   * offers a low pass or two.
+   */
+  readonly openChance: number;
 }
 
 export type EndingGesture =

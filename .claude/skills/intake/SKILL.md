@@ -2,7 +2,7 @@
 name: intake
 description: Turn a plain-English idea into an actionable ensemble issue — look up the facts yourself, ask Brandon only the decisions that change the issue (in rounds, each question led by your recommended answer), show the draft, then file and route it. Usage `/intake <the idea>` (or bare, and it'll ask).
 ---
-<!-- cycle:rendered template=skills/intake.md.tmpl hash=b61e3ca2dd66 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/intake.md.tmpl hash=7fc128aa41d8 — managed by the-cycle; edit the template, not this file -->
 
 # /intake — idea → actionable issue
 
@@ -21,7 +21,7 @@ moment it's there.
   answer, so a round can be accepted in a word. A question that depends on an unanswered one waits
   for the next round. Reflect each answer back in a sentence.
 - The usual gaps: what "done" looks like, verifiably (the load-bearing one); what's explicitly out of
-  scope; whether it touches a §5 brake (a production release, or anything done on the Docker host, anything that would publish a secret, a private address, a network detail or a private email (the repository is public), the release path: the release job in `.github/workflows/ci.yml`, `hosting/`, `scripts/image.sh`, repository secrets and variables, branch protection, a sample pack's source or licence: `scripts/packs/sources.ts`, a pack's `LICENCE` file, the credits, what the app keeps in the browser: the stored lists (`packages/app/src/stored.ts` and the keys and shapes kept through it) and the service worker (`packages/app/service-worker.js`, `offline.ts`), loosening a gate: raising a time budget or a scorecard tolerance, accepting a scorecard drop, deleting or weakening a property) — if so, say so in the body; and whether
+  scope; whether it touches a §5 brake (running the release by hand (it puts production on a named commit), or anything done on the Docker host, anything that would publish a secret, a private address, a network detail or a private email (the repository is public), the release path: the release in `.github/workflows/` (`ci.yml`'s release jobs, `release.yml`) and `.github/actions/release/`, `hosting/`, `scripts/image.sh`, repository secrets and variables, branch protection, a sample pack's source or licence: `scripts/packs/sources.ts`, a pack's `LICENCE` file, the credits, what the app keeps in the browser: the stored lists (`packages/app/src/stored.ts` and the keys and shapes kept through it) and the service worker (`packages/app/service-worker.js`, `offline.ts`), loosening a gate: raising a budget's figures or changing its rule (a budget that grows by `docs/TESTING.md`'s own rule, a style added, is not raised), raising a scorecard tolerance, accepting a scorecard drop, deleting or weakening a property) — if so, say so in the body; and whether
   it's really a decision rather than a task.
 - One or two rounds is normal. Five questions in one round means the idea wants splitting.
 

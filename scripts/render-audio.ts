@@ -3,7 +3,8 @@
 // faster than real time and hands the file back.
 //
 //   node scripts/render-audio.ts <name> chart=jazz-blues-f.chart [style=jazz] [seed=1] \
-//       [passes=4] [solo=alto-sax] [density=0..1] [fromtop=1] [layers=1] [only=bass,drums] \
+//       [passes=4] [solo=alto-sax] [density=0..1] [fromtop=1] [breathe=1] [open=1 endafter=N toldat=T] \
+//       [layers=1] [only=bass,drums] [energy=0.3] [song=1] [without=bass] \
 //       [mix='{...}'] [live=1]
 //
 // The file is written to out/audio/<name>.wav, with <name>.json beside it.
@@ -34,7 +35,8 @@ export async function renderAudio(
   });
   let facts: Record<string, unknown> = {};
   const server = await serve({
-    port: 0,
+    // Any free port, or the one `RENDER_PORT` names where only some may be used.
+    port: Number(process.env.RENDER_PORT ?? 0),
     host: "127.0.0.1",
     saved: (file, path) => {
       if (file.endsWith(".json")) {

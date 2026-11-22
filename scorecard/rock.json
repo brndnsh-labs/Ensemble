@@ -347,6 +347,18 @@
     "p90": 0,
     "inTarget": null
   },
+  "solo.bursts": {
+    "mean": 0,
+    "p10": 0,
+    "p90": 0,
+    "inTarget": null
+  },
+  "solo.moved-played": {
+    "mean": 0,
+    "p10": 0,
+    "p90": 0,
+    "inTarget": null
+  },
   "solo.bars-that-rhyme": {
     "mean": 0.8478,
     "p10": 0.6897,
@@ -508,6 +520,30 @@
     "p10": 2.7125,
     "p90": 4.0155,
     "inTarget": null
+  },
+  "drums.laid-out": {
+    "mean": 0,
+    "p10": 0,
+    "p90": 0,
+    "inTarget": 1
+  },
+  "bass.laid-out": {
+    "mean": 0,
+    "p10": 0,
+    "p90": 0,
+    "inTarget": 1
+  },
+  "chords.laid-out": {
+    "mean": 0,
+    "p10": 0,
+    "p90": 0,
+    "inTarget": 1
+  },
+  "band.takes-thinned": {
+    "mean": 0,
+    "p10": 0,
+    "p90": 0,
+    "inTarget": 1
   },
   "band.backbeat-swell": {
     "mean": 8.3291,

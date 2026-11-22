@@ -14,13 +14,16 @@ import type {
 } from "../chart/types.ts";
 import { PPQ } from "../chart/types.ts";
 import { tempoPulse } from "../perform/meter.ts";
+import { createRng } from "../rng.ts";
 import { tempoRange } from "../style/meters.ts";
 import type { Seat, StylePack } from "../style/types.ts";
 import { LEVEL_ENERGY, SEATS, TIER_HIGH, TIER_MID, tierOf } from "../style/types.ts";
 import { chordFamily, chordToString, makeQuality } from "../theory/chord.ts";
 import type { Key } from "../theory/pitch.ts";
 import { pitchClass } from "../theory/pitch.ts";
+import type { ArcPosition } from "./arc.ts";
 import { arcOffset, defaultClimax } from "./arc.ts";
+import { arcHighest, barQuarters, breatheAmount, breaths } from "./tempo.ts";
 import type { EndingMark, FillMark, Plan, PlanBar, PlanOptions, SoloMark } from "./types.ts";
 
 /** A timed jam with no stated length. */
@@ -46,6 +49,8 @@ export function planBars(
   meter: Meter,
   style: StylePack,
   options: PlanOptions,
+  /** The chart has an arrangement block of its own: nobody is laid out but as it says. */
+  ownArrangement = false,
 ): Plan {
   const tempo = clampTempo(options.tempo ?? chartTempo ?? tempoRange(style, meter).default);
   // How busy the soloist is goes on the plan only where the player set it.
@@ -55,6 +60,10 @@ export function planBars(
       : {};
   // A tick is a fraction of a quarter note, so time is kept in quarter notes a minute.
   const quarters = tempo * tempoPulse(meter);
+  // Only a jam's arc moves the tempo: a song, and a level the player set, keep the tempo as set.
+  const amount =
+    options.breathe === true && options.mode === "jam" ? breatheAmount(style, meter, tempo) : 0;
+  const breathes = amount > 0;
   // The jam as it set out: how many passes, or none in particular. The arc and the solos are
   // shaped by this even when the band is told to finish early, so that what was played stands.
   const open = options.mode === "jam" && options.open === true;
@@ -97,14 +106,38 @@ export function planBars(
 
   // The soloist has the lead from the first pass, where the player asked for it in a jam, and
   // where the chart does not say where it solos itself, in a section named for it.
-  const top =
-    options.mode === "jam" &&
-    options.soloFromTop === true &&
-    !runs.some((run) => sectionIdentity(run.bars[0]!.sectionLabel).startsWith("solo"));
-  const climax = soloClimax(options, planned, open, top);
-  const breath = climax === undefined ? undefined : soloBreath(climax, planned, open, top);
+  const named = runs.some((run) => soloSection(run.bars[0]!.sectionLabel));
+  const top = options.mode === "jam" && options.soloFromTop === true && !named;
+  // In a jam of a set length on a chart with a section labelled Solo, each time that section
+  // comes round in the jam as it set out is the next chorus of the soloist's solo, so a jam told
+  // to finish early keeps the solos it was playing.
+  const setOut =
+    named && options.mode === "jam" && !open
+      ? layOut(expanded, options, planned, false).filter((run) =>
+          soloSection(run.bars[0]!.sectionLabel),
+        )
+      : undefined;
+  // The soloist's turn on each pass, as the jam set out: what the band builds under. A pass with
+  // two Solo sections is read by the one that ends a solo, if one does, and by its last otherwise.
+  const turn: Turn = setOut
+    ? (pass) => {
+        const at = setOut.findLastIndex((run) => run.part === "body" && run.pass === pass);
+        if (at < 0) return null;
+        let read = at;
+        for (let i = at; i >= 0 && setOut[i]!.pass === pass; i--) {
+          const mark = soloArc(i, setOut.length, false);
+          if (setOut[i]!.part === "body" && mark.of > 1 && mark.chorus === mark.of - 1) {
+            read = i;
+            break;
+          }
+        }
+        return soloArc(read, setOut.length, false);
+      }
+    : (pass) => soloTurn(pass, planned, open, top);
+  const climax = soloClimax(options, planned, open, top || named, turn);
+  const breath = climax === undefined ? undefined : soloBreath(climax, planned, turn);
   const rise = (pass: number) =>
-    climax === undefined ? undefined : soloRise(pass, climax, planned, open, top);
+    climax === undefined ? undefined : soloRise(pass, climax, planned, turn);
 
   // First the music, bar by bar, without marks that depend on a neighbour.
   const drafts: Draft[] = [];
@@ -132,20 +165,33 @@ export function planBars(
       // Energy steps at phrase tops, never mid-phrase: read the arc at the phrase's middle,
       // and in the last pass at the phrase's end so the closing phrase is at full level.
       const phraseStart = barInPass - barInPhrase;
+      const position: ArcPosition = {
+        pass: run.pass,
+        passes: planned,
+        open,
+        part: run.part,
+        phraseStart: phraseStart / bodyBarsPerPass,
+        phraseEnd: Math.min(1, (phraseStart + phraseLength) / bodyBarsPerPass),
+        ...(climax === undefined ? {} : { climax }),
+        ...(breath === undefined ? {} : { breath }),
+        ...(rise(run.pass) === undefined ? {} : { rise: rise(run.pass)! }),
+      };
       const offset =
         options.mode === "jam"
+          ? arcOffset(style.arc, told === undefined ? position : { ...position, told })
+          : 0;
+      // The tempo follows the pass's level on the arc as the jam set out, before anyone told it to
+      // finish (a jam told to finish keeps the time of what was played, wherever it is told), read
+      // at the pass's middle so no phrase inside it moves the tempo. A written ending is its last
+      // pass's.
+      const arcAsSet =
+        breathes && options.energy === undefined
           ? arcOffset(style.arc, {
-              pass: run.pass,
-              passes: planned,
-              open,
-              part: run.part,
-              phraseStart: phraseStart / bodyBarsPerPass,
-              phraseEnd: Math.min(1, (phraseStart + phraseLength) / bodyBarsPerPass),
-              ...(told === undefined ? {} : { told }),
-              ...(climax === undefined ? {} : { climax }),
-              ...(breath === undefined ? {} : { breath }),
-              ...(rise(run.pass) === undefined ? {} : { rise: rise(run.pass)! }),
-            })
+              ...position,
+              part: run.part === "ending" ? "body" : run.part,
+              phraseStart: 0.5,
+              phraseEnd: 0.5,
+            }) * style.arc.depth
           : 0;
       // A level the player set is held: the band must not drift away from it (CO-05, CO-06).
       const base =
@@ -160,6 +206,7 @@ export function planBars(
         level,
         base,
         energy: options.energy === undefined ? level + offset * style.arc.depth : base,
+        arc: arcAsSet,
         barInSection: i,
         barInPass,
         phrase: { index: phraseIndex, bar: barInPhrase, length: phraseLength },
@@ -174,12 +221,40 @@ export function planBars(
     occurrence++;
   }
 
-  const solos = soloMarks(drafts, options, planned, open, top).map((mark, i) =>
-    // A solo under way when the band is told to finish makes this chorus its last (SO-05).
-    mark && told !== undefined && drafts[i]!.run.pass === told
-      ? { chorus: mark.chorus, of: mark.chorus + 1 }
-      : mark,
+  const asSet = soloMarks(drafts, options, planned, open, top, setOut?.length);
+  // A solo under way when the band is told to finish makes the told pass's last chorus its last
+  // (SO-05): every chorus of that solo in the pass, from its first there (the last that starts a
+  // solo, where one does) on. A chorus before it in the pass ends an earlier solo, as set out.
+  const toldPass = (i: number) => told !== undefined && drafts[i]!.run.pass === told;
+  let from = 0;
+  let lastChorus = 0;
+  let before: SoloMark | null = null;
+  for (const [i, mark] of asSet.entries()) {
+    if (!mark || !toldPass(i)) continue;
+    if (mark.chorus === 0 && before?.chorus !== 0) from = i;
+    lastChorus = mark.chorus;
+    before = mark;
+  }
+  const solos = asSet.map((mark, i) =>
+    mark && toldPass(i) && i >= from ? { chorus: mark.chorus, of: lastChorus + 1 } : mark,
   );
+
+  // Who is in: now and then a seat sits out a section or a pass at a low point of the arc.
+  const { outs, enters } =
+    options.mode === "jam" && !ownArrangement
+      ? // The solos as the jam set out: one cut short by the word is not where a seat was to sit out.
+        layOuts(drafts, asSet, style, options, {
+          planned,
+          passes,
+          open,
+          ends,
+          without,
+          ...(told === undefined ? {} : { told }),
+          ...(climax === undefined ? {} : { climax }),
+          ...(breath === undefined ? {} : { breath }),
+          rise,
+        })
+      : { outs: drafts.map(() => null), enters: drafts.map(() => null) };
 
   // The one-bar build into a bigger section, then the rule about the high-tier line.
   const energies = drafts.map((draft, i) => {
@@ -207,6 +282,21 @@ export function planBars(
   let tick = countIn ? firstMeterTicks : 0;
   const offsetIndex = countIn ? 1 : 0;
 
+  // One tempo a bar, in the order the bars are played: each its own pass's level against the
+  // opening pass's, scaled so the arc's highest pass asks for the whole amount. The opening pass
+  // (its intro too) is at the tempo as set.
+  const opening = drafts.find((draft) => draft.run.part === "body" && draft.run.pass === 0)?.arc;
+  const span = arcHighest(style.arc, open) - (opening ?? 0);
+  const shares =
+    breathes && opening !== undefined && span > 0
+      ? breaths(
+          drafts.map((draft) =>
+            draft.run.pass === 0
+              ? 0
+              : amount * Math.max(-1, Math.min(1, (draft.arc - opening) / span)),
+          ),
+        )
+      : drafts.map(() => 0);
   const bars: PlanBar[] = [];
   drafts.forEach((draft, i) => {
     const next = drafts[i + 1];
@@ -275,13 +365,18 @@ export function planBars(
       barInSection: draft.barInSection,
       barInPass: draft.barInPass,
       phrase: draft.phrase,
+      quarters: barQuarters(quarters, shares[i]!),
       energy,
       level: draft.level,
       seats: silent
         ? seatEnergies(energy, new Set(SEATS))
         : seatEnergies(
             energy,
-            solos[i] ? without : new Set([...without, "solo" as const]),
+            new Set([
+              ...without,
+              ...(solos[i] ? [] : ["solo" as const]),
+              ...(outs[i] ? [outs[i]] : []),
+            ]),
             draft.line,
           ),
       solo: silent || without.has("solo") ? null : solos[i]!,
@@ -290,6 +385,7 @@ export function planBars(
       lastPass: ends && options.mode === "jam" && draft.run.pass === passes - 1,
       ending: endingMark,
       source: flat.source,
+      ...(enters[i] ? { enters: [enters[i]] } : {}),
     });
     tick += flat.ticks;
   });
@@ -334,6 +430,8 @@ interface Draft {
    */
   readonly base: number;
   readonly energy: number;
+  /** Its pass's level on the arc as the jam set out, read at the pass's middle: what the tempo breathes with, 0 where it does not. */
+  readonly arc: number;
   readonly barInSection: number;
   readonly barInPass: number;
   readonly phrase: { readonly index: number; readonly bar: number; readonly length: number };
@@ -544,6 +642,21 @@ function seatEnergies(
 /** A solo is one arc of at most this many choruses, then the soloist lays out for one (SO-04, SO-05). */
 const SOLO_CHORUSES = 3;
 
+/** A section labelled "Solo" (or "Solo 2", "Solos"): the chart says the soloist has it. */
+function soloSection(label: string): boolean {
+  return sectionIdentity(label).startsWith("solo");
+}
+
+/**
+ * The `index`th of `count` choruses the soloist has, as the next chorus of an arc of at most
+ * three; an arc cut short by the end knows it is shorter, and an open jam's never are.
+ */
+function soloArc(index: number, count: number, open: boolean): SoloMark {
+  const chorus = index % SOLO_CHORUSES;
+  const of = open ? SOLO_CHORUSES : Math.min(SOLO_CHORUSES, count - (index - chorus));
+  return { chorus, of };
+}
+
 /**
  * Where the soloist has the lead, bar by bar. It rests through an intro and a
  * written ending. A section labelled "Solo" is a solo whenever it comes round.
@@ -551,7 +664,9 @@ const SOLO_CHORUSES = 3;
  * solos of three choruses with a chorus of rest between them; a solo cut short
  * by the end of the jam knows it is shorter, so it still peaks in its last
  * chorus. In a song with no "Solo" section it plays the body through as one
- * chorus. An open jam's solos never depend on how long the jam turns out to be.
+ * chorus. An open jam's solos never depend on how long the jam turns out to be,
+ * and a jam told to finish keeps the solos it set out with: `setOut` is how many
+ * times a "Solo" section comes round in the jam as it set out.
  */
 function soloMarks(
   drafts: readonly Draft[],
@@ -559,29 +674,25 @@ function soloMarks(
   passes: number,
   open: boolean,
   fromTop: boolean,
+  setOut: number | undefined,
 ): (SoloMark | null)[] {
   if (options.solo !== true) return drafts.map(() => null);
   const body = (draft: Draft) => draft.run.part === "body" && draft.flat.role === "body";
-  const arc = (index: number, count: number): SoloMark => {
-    const chorus = index % SOLO_CHORUSES;
-    const of = open ? SOLO_CHORUSES : Math.min(SOLO_CHORUSES, count - (index - chorus));
-    return { chorus, of };
-  };
 
   // An arrangement says where the soloist has the lead: each section it is in is a chorus of a solo.
   if (drafts.some((draft) => draft.line)) {
     const leads = (draft: Draft) => draft.line !== undefined && draft.line.seats.solo !== "out";
     const times = [...new Set(drafts.filter(leads).map((draft) => draft.occurrence))];
     return drafts.map((draft) =>
-      leads(draft) ? arc(times.indexOf(draft.occurrence), times.length) : null,
+      leads(draft) ? soloArc(times.indexOf(draft.occurrence), times.length, open) : null,
     );
   }
 
-  const named = (draft: Draft) => sectionIdentity(draft.flat.sectionLabel).startsWith("solo");
+  const named = (draft: Draft) => soloSection(draft.flat.sectionLabel);
   if (drafts.some(named)) {
     const times = [...new Set(drafts.filter(named).map((draft) => draft.occurrence))];
     return drafts.map((draft) =>
-      named(draft) ? arc(times.indexOf(draft.occurrence), times.length) : null,
+      named(draft) ? soloArc(times.indexOf(draft.occurrence), setOut ?? times.length, open) : null,
     );
   }
   if (options.mode === "song") {
@@ -607,16 +718,26 @@ function soloTurn(pass: number, passes: number, open: boolean, fromTop: boolean)
 }
 
 /**
+ * The soloist's turn on a pass of a jam as it set out, wherever its marks come from: the chorus
+ * the band reads the pass by. Where a pass has two or more, one ends a solo or the pass's last
+ * is followed by its solo's last chorus on the next pass, so counting a pass a chorus from it
+ * still finds the pass the solo ends on.
+ */
+type Turn = (pass: number) => SoloMark | null;
+
+/**
  * The pass a jam with a soloist peaks on: the last chorus of a solo, the one
  * nearest to where the jam would have peaked anyway. A solo starts low and
  * peaks in its last chorus (SO-05), and the band under it does the same, or the
  * band would be at its loudest while the soloist is still finding its idea.
+ * `fromTop`: the soloist may have the lead from the first pass.
  */
 function soloClimax(
   options: PlanOptions,
   passes: number,
   open: boolean,
   fromTop: boolean,
+  turn: Turn,
 ): number | undefined {
   // A solo of two choruses or more: from the second pass, or from the top.
   if (options.solo !== true || options.mode !== "jam" || open || passes < (fromTop ? 2 : 3)) {
@@ -625,8 +746,8 @@ function soloClimax(
   const wanted = defaultClimax(passes);
   let best: number | undefined;
   for (let pass = fromTop ? 0 : 1; pass < passes; pass++) {
-    const turn = soloTurn(pass, passes, open, fromTop);
-    if (!turn || turn.of === 1 || turn.chorus !== turn.of - 1) continue;
+    const mark = turn(pass);
+    if (!mark || mark.of === 1 || mark.chorus !== mark.of - 1) continue;
     // Of two as near, the later; but not the last pass, which the jam's own closing lift
     // carries from lower down, so that the pass before it would be the louder.
     const [here, there] = [Math.abs(pass - wanted), Math.abs((best ?? pass) - wanted)];
@@ -643,16 +764,11 @@ function soloClimax(
  * the band's own; -1 where there is no chorus of rest after the peak to take
  * it on.
  */
-function soloBreath(
-  climax: number,
-  passes: number,
-  open: boolean,
-  fromTop: boolean,
-): number | undefined {
+function soloBreath(climax: number, passes: number, turn: Turn): number | undefined {
   const last = passes - 1;
-  if (soloTurn(last - 1, passes, open, fromTop) === null) return undefined;
+  if (turn(last - 1) === null) return undefined;
   for (let pass = last - 1; pass > climax; pass--) {
-    if (soloTurn(pass, passes, open, fromTop) === null) return pass;
+    if (turn(pass) === null) return pass;
   }
   return -1;
 }
@@ -664,17 +780,140 @@ function soloBreath(
  * for a solo of one chorus, and for one that runs into the last pass, which
  * the jam's own closing lift carries.
  */
-function soloRise(
-  pass: number,
-  climax: number,
-  passes: number,
-  open: boolean,
-  fromTop: boolean,
-): number | undefined {
-  const turn = soloTurn(pass, passes, open, fromTop);
-  if (!turn || turn.of < 2 || pass <= climax) return undefined;
-  if (pass - turn.chorus + turn.of - 1 >= passes - 1) return undefined;
-  return turn.chorus / (turn.of - 1);
+function soloRise(pass: number, climax: number, passes: number, turn: Turn): number | undefined {
+  const mark = turn(pass);
+  if (!mark || mark.of < 2 || pass <= climax) return undefined;
+  if (pass - mark.chorus + mark.of - 1 >= passes - 1) return undefined;
+  return mark.chorus / (mark.of - 1);
+}
+
+// ── who is in ───────────────────────────────────────────────────────────────
+
+/** The fewest band seats a jam may lay one out of: a band of two keeps both. */
+const LAY_OUT_BAND = 3;
+/** The first pass a seat may sit out: the band states the tune, then gets going, before it thins. */
+const LAY_OUT_FROM = 2;
+/** Nor before this many bars of music, however short the form. */
+const LAY_OUT_FIRST_BAR = 16;
+/** After a lay-out, everyone is in for at least this many whole passes... */
+const LAY_OUT_PASSES_BETWEEN = 3;
+/** ...and at least this many bars, however short the form, before another starts. */
+const LAY_OUT_BARS_BETWEEN = 64;
+
+interface Shape {
+  readonly planned: number;
+  readonly passes: number;
+  readonly open: boolean;
+  readonly ends: boolean;
+  readonly without: ReadonlySet<Seat>;
+  /** The pass the band was told to finish on. */
+  readonly told?: number;
+  readonly climax?: number;
+  readonly breath?: number;
+  readonly rise: (pass: number) => number | undefined;
+}
+
+/**
+ * The seat each bar of a jam lays out by the style's own say (`ArcStyle.layOut`), or null. A
+ * seat goes out at the top of a section or a pass and is back at the top of the next.
+ *
+ * Where: in a jam of a set length, a pass no higher on the arc as the jam set out than `below`
+ * of the way from its opening pass to its peak, read at the pass's middle: the breath, a pass
+ * settled after the peak, and a building pass short of the top (the pass just before the peak
+ * among them: a drop before everyone comes in for the top). Never the peak, the last pass, the
+ * first two passes or the first 16 bars. Under the soloist, never the last chorus of a solo
+ * (its peak, SO-05), so never a solo of one chorus. An open jam has no arc to be low on (its
+ * lift only climbs to a cap) and no peak: there it is the spacing and the style's open-jam
+ * chance alone (`LayOutStyle.openChance`).
+ *
+ * How often: after a lay-out, everyone is in for three whole passes and 64 bars at least, and
+ * each pass draws its chance. Never a level the player holds, a band of two seats, or the
+ * soloist. A jam planned shorter than four passes lays nobody out by these rules alone.
+ *
+ * Each pass draws from the seed by its own number, and only what the passes before it drew can
+ * stop it, so a jam made longer keeps every lay-out it had. The pass it is told to finish on is
+ * its last, and everyone is in for it.
+ */
+function layOuts(
+  drafts: readonly Draft[],
+  solos: readonly (SoloMark | null)[],
+  style: StylePack,
+  options: PlanOptions,
+  shape: Shape,
+): { outs: (Seat | null)[]; enters: (Seat | null)[] } {
+  const outs: (Seat | null)[] = drafts.map(() => null);
+  const enters: (Seat | null)[] = drafts.map(() => null);
+  const none = { outs, enters };
+  const data = style.arc.layOut;
+  if (!data || options.seed === undefined || options.energy !== undefined) return none;
+  const band = (["drums", "bass", "chords"] as const).filter((seat) => !shape.without.has(seat));
+  const seats = data.seats.filter((seat) => !shape.without.has(seat));
+  if (band.length < LAY_OUT_BAND || seats.length === 0) return none;
+
+  const byPass = Map.groupBy(
+    drafts.flatMap((draft, i) => (draft.run.part === "body" ? [i] : [])),
+    (i) => drafts[i]!.run.pass,
+  );
+  const timed = style.arc.timed;
+  const ceiling = timed.first + data.below * (timed.climax - timed.first);
+  const peak = shape.open ? undefined : (shape.climax ?? defaultClimax(shape.planned));
+  const rng = createRng(options.seed);
+  // The last lay-out: its pass, and the bar after it (bars counted from the first of the music).
+  let lastPass = Number.NEGATIVE_INFINITY;
+  let lastEnd = Number.NEGATIVE_INFINITY;
+  for (const [pass, bars] of byPass) {
+    if (pass < LAY_OUT_FROM || pass === peak) continue;
+    if (pass - lastPass <= LAY_OUT_PASSES_BETWEEN) continue;
+    const toldHere = pass === shape.told;
+    if (shape.ends && pass === shape.passes - 1 && !toldHere) continue;
+    const soloing = (i: number) => solos[i] !== null && !shape.without.has("solo");
+    if (data.under === "solo") {
+      if (!bars.every(soloing)) continue;
+      // Never the last chorus of a solo: it is the solo's peak, and the band is all in for it.
+      if (bars.some((i) => solos[i]!.chorus === solos[i]!.of - 1)) continue;
+    } else if (bars.some(soloing)) continue;
+    if (!shape.open) {
+      const rise = shape.rise(pass);
+      const height = arcOffset(style.arc, {
+        pass,
+        passes: shape.planned,
+        open: false,
+        part: "body",
+        phraseStart: 0.5,
+        phraseEnd: 0.5,
+        ...(shape.climax === undefined ? {} : { climax: shape.climax }),
+        ...(shape.breath === undefined ? {} : { breath: shape.breath }),
+        ...(rise === undefined ? {} : { rise }),
+      });
+      if (height > ceiling) continue;
+    }
+    const draw = rng.fork("lay-out", style.id, pass);
+    if (!draw.chance(shape.open ? data.openChance : data.chance)) continue;
+    const seat = draw.pick(seats);
+    // A section: the pass's lowest, by its own level; of several as low, one drawn.
+    const levels = new Map(bars.map((i) => [drafts[i]!.run, drafts[i]!.level]));
+    const lowest = Math.min(...levels.values());
+    const chosen =
+      data.span === "pass"
+        ? new Set(levels.keys())
+        : new Set([
+            draw.pick([...levels].filter(([, level]) => level === lowest).map(([run]) => run)),
+          ]);
+    const out = bars.filter((i) => chosen.has(drafts[i]!.run));
+    if (out[0]! < LAY_OUT_FIRST_BAR || out[0]! - lastEnd < LAY_OUT_BARS_BETWEEN) continue;
+    if (toldHere) {
+      // Told to finish on a pass the seat was to sit out from its top: everyone is in for it,
+      // but the seat was not going to play its first bar, so it comes in there as it comes back
+      // from any lay-out, and nobody leans into it from the bar before, which is played as the
+      // jam as planned played it.
+      if (out[0] === bars[0]) enters[out[0]!] = seat;
+      continue;
+    }
+    for (const i of out) outs[i] = seat;
+    lastPass = pass;
+    lastEnd = out.at(-1)! + 1;
+  }
+  return none;
 }
 
 /** Add a lift without leaving the tier the bar is in. */

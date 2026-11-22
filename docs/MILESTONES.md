@@ -154,7 +154,7 @@ Build in this order, with a short gate after each part.
 
 **Done when**
 
-- The five smoke journeys in `docs/TESTING.md` pass inside their budget.
+- The six smoke journeys in `docs/TESTING.md` pass inside their budget.
 - From a cold start on a phone, a jam is playing within a few taps.
 
 **Gate 6: play over it**

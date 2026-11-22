@@ -39,6 +39,11 @@ export interface Settings {
   readonly soloDensity: number;
   /** In a jam, the soloist has the lead from the first time round, not after the band has played the form once. */
   readonly soloFromTop: boolean;
+  /**
+   * In a jam, the tempo breathes with the band: a touch quicker as it builds, easing as it
+   * settles. Off unless chosen: the tempo set, in every bar, is what someone practises to.
+   */
+  readonly breathe: boolean;
   readonly charts: Readonly<Record<string, ChartChoices>>;
 }
 
@@ -51,6 +56,7 @@ const DEFAULTS: Settings = {
   band: { drums: true, bass: true, chords: true, solo: false },
   soloDensity: 0.5,
   soloFromTop: false,
+  breathe: false,
   charts: {},
 };
 
@@ -68,6 +74,7 @@ export function loadSettings(): Settings {
           ? density
           : DEFAULTS.soloDensity,
       soloFromTop: stored.soloFromTop === true,
+      breathe: stored.breathe === true,
     };
   } catch {
     return DEFAULTS;

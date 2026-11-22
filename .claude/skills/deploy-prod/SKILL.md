@@ -2,7 +2,7 @@
 name: deploy-prod
 description: Deploy ensemble to production — preflight (clean pushed main, exactly what's shipping, any migration), then STOP for Brandon's explicit go, then deploy and independently verify the public origin. Never runs unattended. Usage `/deploy-prod`.
 ---
-<!-- cycle:rendered template=skills/deploy-prod.md.tmpl hash=16f63399dce9 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/deploy-prod.md.tmpl hash=20f0392451fd — managed by the-cycle; edit the template, not this file -->
 
 # /deploy-prod — ship to production
 
@@ -11,13 +11,13 @@ and every unattended path are forbidden from invoking it (§5).
 
 **Environments.** Test is https://ensembletest.brndn.zip, production https://ensemble.brndn.zip. Each says what it serves at `/build.json` (the commit, written into the image by `pnpm image`).
 
-**Test** is not deployed by hand: every merge or push to `main` runs the `ci` workflow, which builds the image, pushes it under `sha-<commit>` and releases it to the test site.
+**Neither is deployed by hand.** Every merge or push to `main` runs the `ci` workflow, which builds the image, pushes it under `sha-<commit>`, releases it to the test site, runs the smoke journeys against that site, and then releases the same image to production. A step that fails stops the run there and production keeps what it had.
 
-**Production** is the same workflow run by hand from the tip of `main`: `gh workflow run ci -f production=true`. It checks and builds again, releases to test, then to production. The box pulls the tag, waits for the container to be healthy and puts the previous one back if it is not. There is no data migration: the app is a static site, and what a player keeps lives in their browser.
+**This skill is for putting production on a named commit**: putting it back when what a merge released is wrong and the fix is not a quick revert. `gh workflow run ci -f commit=<sha>` builds nothing: it releases the image that commit already has (only a commit pushed to `main` has one; the run refuses any other before it touches the host), to production, and to the test site too with `-f test=true`. It does not run the journeys. The box pulls the tag, waits for the container to be healthy and puts the previous one back if it is not. **The next merge to `main` moves production forward again**, so say that in the report, and if `main` itself is the problem the revert still has to land. There is no data migration: the app is a static site, and what a player keeps lives in their browser.
 
-**Preflight here.** What is live: `curl -s https://ensemble.brndn.zip/build.json`, then `git log <that commit>..origin/main --oneline`. Say whether the range touches what the app keeps in the browser or the service worker (§5): that is where a release can cost Brandon his saved charts. Check the test site already serves the tip of `main` and that anything `status:needs-ear` in the range is called out as unheard.
+**Preflight here.** Nothing releasing or waiting to (`gh run list --workflow ci --limit 5`): a merge's release that is already waiting runs after the restore and undoes it. What is live: `curl -s https://ensemble.brndn.zip/build.json`. What going to the named commit changes: `git log <named>..<live> --oneline` going back (or `<live>..<named>` going forward). Say whether the range touches what the app keeps in the browser or the service worker (§5): an older build reading what a newer one stored is where this can cost Brandon his saved charts. The "clean tree, on `main`, pushed" check below does not apply: nothing local is shipped.
 
-**Verify.** Watch the run (`gh run watch <id> -i 30`), then read `/build.json` on the public production origin yourself and confirm it names the commit. Load the site once (`node scripts/look.ts <out.png> 390x844 https://ensemble.brndn.zip`) and, for the journeys, `SMOKE_URL=https://ensemble.brndn.zip pnpm smoke`.
+**Verify.** Watch the run (`gh run watch <id> -i 30`), then read `/build.json` on the public production origin yourself and confirm it names the commit. Load the site once (`node scripts/look.ts <out.png> 390x844 https://ensemble.brndn.zip`) and, for the journeys, `SMOKE_URL=https://ensemble.brndn.zip pnpm smoke` (run from a checkout of the commit that was released, since the journeys belong to their commit).
 
 **Never** work on the host directly from here; the release account can run exactly one command and that is the whole path.
 
@@ -37,7 +37,7 @@ go. If you're unsure whether you have one, you don't.
 
 ## 3. Deploy
 
-`gh workflow run ci -f production=true`
+`gh workflow run ci -f commit=<all 40 characters of the commit to put production on>`
 
 What that command does — backups, migrations, health waits — is the `deploy` overlay's job to say;
 assume none of them unless it does.

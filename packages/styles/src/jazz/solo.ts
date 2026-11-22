@@ -503,8 +503,19 @@ export const jazzSolo: SoloStyle = {
   // Busier than its arc: a bebop alto's line is eighth notes, and its room is the 25% space
   // jazz shares with rock (SO-11). Half of the phrases that can go a level up do, and four tenths of
   // its room is given up: its line is near all eighths by then, so the setting's top half has
-  // somewhere to go. To move the default, change these two numbers (DECISIONS.md, a busier soloist).
+  // somewhere to go. To move the default, change these two numbers (docs/decisions/soloist.md, a busier soloist).
   busier: { lift: 0.5, room: 0.4 },
+
+  // Double time is the bebop horn's own (sixteenths against the band's swung eighths): it
+  // runs four a beat, even as heard. Most at home here: anywhere in the last chorus once the
+  // line is at its busiest, and on a ballad only toward the top of the setting and short.
+  doubleTime: {
+    perPulse: 4,
+    chance: 0.3,
+    bars: { shortest: 0.5, longest: 2 },
+    climbOnly: false,
+    slow: { from: 0.75, longest: 0.5 },
+  },
 
   habits: {
     // A bar seldom comes straight back (SO-18); when it does it is a sequence.
@@ -539,8 +550,12 @@ export const jazzSolo: SoloStyle = {
     // style that does it most, 0.6 of the phrases that could. Drawn early as often as late
     // where it could go either way; in practice about one in seven goes early, since an idea
     // that opens on the one cannot go early without crossing the barline, a pickup's ground.
-    // Not the bridge's return (`b`), which is heard where it was.
-    displace: { chance: 0.6, early: 0.5, roles: ["r", "v"] },
+    // Not the bridge's return (`b`), which is heard where it was. A note that, a beat late,
+    // sounds over the barline is held over it (a line that ties, SO-38), into a chord it is a
+    // tone of; few are, since a bebop line's notes are short and breathe before the barline.
+    // (Held so only where main's rules would not move the idea: the ideas they move are
+    // played as they were.)
+    displace: { chance: 0.6, early: 0.5, roles: ["r", "v"], holds: true },
     // No bends (ST-jazz-37); a guitar shakes a note held a half note or longer (SO-52).
     bend: { third: 0, rootOrFifth: 0, around: 0, elsewhere: 0 },
     // No slide: the notes give jazz none, as they give it no bend (ST-jazz-37).

@@ -379,6 +379,23 @@ export const rockSolo: SoloStyle = {
   // up (rock's space is jazz's, 0.25, SO-11). To move the default, change these two numbers.
   busier: { lift: 0.5, room: 0.4 },
 
+  // Straight eighths, doubled: sixteenths. The busy level already has bursts of sixteenths
+  // (ST-rock-22), and a pickup of them into a busy bar runs two beats, so double time is
+  // longer than that: three quarters of a bar to a bar. A flurry before the climax: only in
+  // the climb to the top note; on a rock ballad, only toward the top of the setting.
+  //
+  // None for now (Brandon, 2026-11-21): held to a fourth into a run and a fifth inside it, a
+  // run this long does not fit a phrase's register in rock's pentatonic, so none was ever
+  // played. The chance says so; the rest is what a rock run was written as, for whoever
+  // takes it up.
+  doubleTime: {
+    perPulse: 4,
+    chance: 0,
+    bars: { shortest: 0.75, longest: 1 },
+    climbOnly: true,
+    slow: { from: 0.75, longest: 1 },
+  },
+
   habits: {
     // A lick said again, as it was, 0.40 (ST-rock-24).
     riff: 0.4,
@@ -408,9 +425,10 @@ export const rockSolo: SoloStyle = {
     },
     // A lick said again a beat late is a rock guitarist's push against the backbeat, now and
     // then; early less often (0.3 where it could go either way). Its held bends reach the
-    // barline, which a beat late would cross, so few are moved. Not the opening idea brought
-    // back (`b`).
-    displace: { chance: 0.35, early: 0.3, roles: ["r", "v"] },
+    // barline, which a beat late would cross, and rock ties nothing over it (ST-rock-24), a
+    // moved lick no more than any other: so few are moved. Not the opening idea brought back
+    // (`b`).
+    displace: { chance: 0.35, early: 0.3, roles: ["r", "v"], holds: false },
     // The blue third pushed up into the third, the flat 7th into the root or the 4th into the
     // 5th (SO-53, ST-rock-24).
     bend: { third: 0.45, rootOrFifth: 0.55, around: 1, elsewhere: 0.5 },
@@ -419,7 +437,7 @@ export const rockSolo: SoloStyle = {
     // Hammer-ons and pull-offs: the notes give no figure. Clip 13 of the slide study had one of
     // each in eight bars at the working level, and that is the most any style plays: here, a
     // three-chorus solo has one of each in eleven to twenty bars, the busiest chorus the most
-    // (DECISIONS.md, "the guitar's short slide, hammer-on and pull-off").
+    // (docs/decisions/soloist.md, "the guitar's short slide, hammer-on and pull-off").
     hammerOn: 0.4,
     pullOff: 0.4,
     // A note held a dotted quarter is shaken (SO-52).

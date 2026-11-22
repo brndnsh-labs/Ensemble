@@ -10,6 +10,7 @@ import { FIGURE_STEPS, HELD } from "./figure.ts";
 import { OPEN_STRINGS, TOP_FRET } from "./guitar.ts";
 import type { Articulation, Attack, ChordStyle, RhythmBook, Voice } from "./style.ts";
 import { INSTRUMENTS, PICK_PLACES, VOICE_TONES } from "./style.ts";
+import { degreeSemitonesOf } from "./tones.ts";
 
 const TIERS: readonly Tier[] = ["low", "mid", "high"];
 const FAMILIES: readonly ChordFamily[] = [
@@ -62,8 +63,20 @@ export function validateChordStyle(chords: ChordStyle): string[] {
       );
     }),
   );
-  /** A plucked attack is a guitar's, names one or two places of the grip, and is not a scratch. */
+  /**
+   * A plucked attack is a guitar's, names one or two places of the grip, and is not a
+   * scratch. A strum across the top strings is a guitar's, crosses two or more of them,
+   * no more than the grip has, and is not also plucked.
+   */
   const plucks = (attack: Attack, where: string) => {
+    if (attack.top !== undefined) {
+      say(guitar !== null, `${where}: a strum across the top strings needs a guitar in the seat.`);
+      say(
+        Number.isInteger(attack.top) && attack.top >= 2 && attack.top <= (guitar?.strings ?? 6),
+        `${where}: a strum across the top ${attack.top} strings is not a whole number from 2 to the grip's strings.`,
+      );
+      say(attack.pluck === undefined, `${where}: a stroke is plucked or strummed, not both.`);
+    }
     if (attack.pluck === undefined) return;
     say(guitar !== null, `${where}: a plucked stroke needs a guitar in the seat.`);
     say(!attack.muted, `${where}: a stroke is plucked or deadened, not both.`);
@@ -148,6 +161,21 @@ export function validateChordStyle(chords: ChordStyle): string[] {
       for (const family of recipe.when?.family ?? []) {
         say(FAMILIES.includes(family), `${at}: "${family}" is not a chord family.`);
       }
+      const degrees = recipe.when?.degrees;
+      if (degrees !== undefined) {
+        say(degrees.length > 0, `${at}: lists no degrees, so no chord can meet it.`);
+        for (const degree of degrees) {
+          say(
+            degreeSemitonesOf(degree) !== null,
+            `${at}: "${degree}" is not a degree; write a numeral, I to VII, with b or # where it is off the major scale.`,
+          );
+        }
+      }
+      const mode = recipe.when?.mode;
+      say(
+        mode === undefined || mode === "major" || mode === "minor",
+        `${at}: "${mode}" is not a key's mode; write major or minor.`,
+      );
     });
   }
   for (const tier of TIERS) {
@@ -215,11 +243,13 @@ export function validateChordStyle(chords: ChordStyle): string[] {
   let figureSteps = FIGURE_STEPS;
   let label = "rhythm";
   /** A grid read as a bar of comping: its length, its symbols, and what it holds. */
-  const readGrid = (grid: string, articulation: Articulation, at: string) => {
+  const readGrid = (grid: string, articulation: Articulation, at: string, bars = 1) => {
     const symbols = cells(grid);
     say(
-      symbols.length === figureSteps,
-      `${at}: ${symbols.length} steps; a figure is one bar of ${figureSteps} sixteenths.`,
+      symbols.length === figureSteps * bars,
+      bars === 1
+        ? `${at}: ${symbols.length} steps; a figure is one bar of ${figureSteps} sixteenths.`
+        : `${at}: ${symbols.length} steps; a figure of two bars is ${figureSteps * bars} sixteenths.`,
     );
     // A bar of rest is written all silence; anything else that never comes down is a mistake.
     say(
@@ -339,6 +369,45 @@ export function validateChordStyle(chords: ChordStyle): string[] {
       for (const figure of vocabulary.answers) {
         say(!figure.groove, `${where}, "${figure.name}": a groove is never an answer.`);
       }
+      const across = vocabulary.twoBars;
+      if (across) {
+        const what = `${where}, the figures of two bars`;
+        say(across.figures.length > 0, `${what}: there are none.`);
+        say(
+          across.figures.some((figure) => figure.weight > 0),
+          `${what}: none has a weight above zero.`,
+        );
+        const own = across.figures.map((figure) => figure.name);
+        say(new Set(own).size === own.length, `${what}: two share a name.`);
+        for (const figure of across.figures) {
+          const at = `${where}, the figure of two bars "${figure.name}"`;
+          const articulation = figure.articulation ?? vocabulary.articulation;
+          readGrid(figure.grid, articulation, at, 2);
+          say(!names.includes(figure.name), `${at}: another figure has its name.`);
+          say(figure.groove === true, `${at}: a figure of two bars is a groove; say so.`);
+          say(
+            figure.turn === undefined && figure.alone === undefined && figure.soloing === undefined,
+            `${at}: a figure of two bars has no turn, no bar alone and none under the soloist.`,
+          );
+          for (const [symbol, attack] of Object.entries(figure.articulation ?? {})) {
+            level(attack.level, `${at}, "${symbol}"`);
+            plucks(attack, `${at}, "${symbol}"`);
+          }
+          say(figure.weight >= 0, `${at}: a weight cannot be negative.`);
+          say(
+            figure.voicing === undefined || figure.voicing in chords.kinds,
+            `${at}: there is no voicing kind "${figure.voicing}".`,
+          );
+        }
+        say(
+          across.chance > 0 && across.chance <= 1,
+          `${what}: a chance of ${across.chance} is not one a phrase could be drawn with; write more than 0, up to 1.`,
+        );
+        say(
+          Number.isInteger(across.longest) && across.longest >= 2,
+          `${what}: a run of ${across.longest} bars is not a whole number of bars from 2.`,
+        );
+      }
       say(
         vocabulary.figures.some(
           (figure) =>
@@ -401,5 +470,12 @@ export function validateChordStyle(chords: ChordStyle): string[] {
   level(ending.velocity, "ending", LOUDEST - ending.accent);
   level(ending.soft, "soft ending");
   say(ending.accent >= 0, "ending: the button's accent cannot be negative.");
+  if (ending.pullOff) {
+    say(guitar !== null, "ending: a pull-off is a guitar's; a keyboard has no string to pull off.");
+    say(
+      ending.pullOff.level > 0 && ending.pullOff.level <= 1,
+      "ending: the pulled-off note's level is a share of the strike's, more than 0 and at most 1.",
+    );
+  }
   return problems;
 }
