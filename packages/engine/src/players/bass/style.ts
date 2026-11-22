@@ -444,6 +444,17 @@ export interface LeadInPolicy {
    * place becomes the half step below.
    */
   readonly playsNextRoot?: boolean;
+  /**
+   * The line keeps its shape toward a change: a note that already lies a step
+   * from the next root, in any octave, is played where the figure put it, and
+   * no step is added from it, unless the coin asks for a lead-in. Left out (or
+   * false), such a note is moved beside the next root, or a step into it added
+   * on the last beat, whatever the coin says (BA-07): a two-beat bass's fifth
+   * under its root would go over it, and a quiet bar would gain a third note
+   * (BA-51, BA-52). A leap of more than an octave onto the arrival is still
+   * bridged.
+   */
+  readonly keepsShape?: boolean;
   /** The weight of each kind by how the bass note moves. All zero: never lead into that move (BA-11). */
   readonly kinds: Readonly<Record<RootMotion, Readonly<Record<LeadInKind, number>>>>;
 }

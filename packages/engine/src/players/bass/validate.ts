@@ -297,6 +297,8 @@ export function validateBassStyle(bass: BassStyle): string[] {
       `lead-in: "${lead.at}" is not a place before the change; write beat, eighth or sixteenth.`,
     );
   hold(lead.hold, "lead-in");
+  if (lead.keepsShape !== undefined && typeof lead.keepsShape !== "boolean")
+    problems.push("lead-in: keepsShape is true or false.");
   for (const tier of TIERS) {
     chance(lead.chance.inside[tier], `lead-in chance inside a section, ${tier}`);
     chance(lead.chance.intoSection[tier], `lead-in chance into a section, ${tier}`);
