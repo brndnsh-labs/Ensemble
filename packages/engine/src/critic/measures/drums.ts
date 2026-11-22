@@ -407,7 +407,9 @@ export const drumMeasures: readonly Measure[] = [
       bar.meter.beats === 4 &&
       bar.meter.unit === 4 &&
       Array.from({ length: 16 }, (_, step) => bar.start + step * STEP).every((tick) =>
-        notes.some((note) => note.tick === tick && note.pitch === 38),
+        notes.some(
+          (note) => note.tick === tick && (note.voice === "snare" || note.voice === "ghostSnare"),
+        ),
       ),
   ),
 ];
