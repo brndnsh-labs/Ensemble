@@ -993,7 +993,7 @@ export const bassMeasures: readonly Measure[] = [
     seat: "bass",
     idiom: true,
     lowerIsBetter: true,
-    says: "A walk's note on beat 4 fits the chord it is played over: never a half step above one of its tones (the fourth over a major chord, the flat sixth over a minor one).",
+    says: "A walk's note on beat 4 fits the chord it is played over: never a half step above one of its tones (the fourth over a major chord, the flat sixth over a minor one), unless it is a tone of the chord itself.",
     unit: "share",
     of(take) {
       const bass = notesOf(take, "bass");
@@ -1007,6 +1007,9 @@ export const bassMeasures: readonly Measure[] = [
         walks++;
         const root = pitchClass(chord.root);
         const tones = chordTones(chord.quality).map((tone) => mod12(root + tone.interval));
+        // A tone of the chord never rubs, though it sit a half step over another (over Cmaj7
+        // the root is a half step over B).
+        if (tones.includes(mod12(four.pitch))) continue;
         if (tones.includes(mod12(four.pitch - 1))) rubs++;
       }
       return share(rubs, walks);
