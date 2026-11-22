@@ -290,10 +290,12 @@ test("a take with a count-in is the same music as one without, a bar later", () 
 test("a chart with mistakes in it still plays", () => {
   for (const style of STYLES) {
     // The corpus is a parser's corpus; what a band adds is that it can play whatever
-    // parsed. On a push each style plays a third of it, a different third each.
-    const turn = styleIds().indexOf(style.id) % 3;
+    // parsed. On a push each style plays its share of it, every style's row a different one
+    // (the row's place counted round the styles), so between them they play all of it.
+    const styles = styleIds();
+    const turn = styles.indexOf(style.id);
     const broken = [
-      ...corpus.filter((_, i) => FULL || i % 3 === turn).map((row) => row.text),
+      ...corpus.filter((_, i) => FULL || i % styles.length === turn).map((row) => row.text),
       "",
       "\n\n",
       "| | |",
