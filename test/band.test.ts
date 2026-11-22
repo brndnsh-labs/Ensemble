@@ -69,9 +69,22 @@ test("the same chart, style, options, and seed give the identical performance, d
 test("a different seed is a different take", () => {
   for (const style of STYLES) {
     for (const chart of ownCharts(style)) {
-      const performances = SEEDS.map((seed) =>
-        JSON.stringify(render(chart.text, style, { mode: "jam", passes: 3, seed }).events),
-      );
+      // The library's short jams of the chart, where it is played on every seed; a chart a push
+      // plays on one seed (one in a meter other than 4/4) is played here on each.
+      const played = takes(
+        (jam) =>
+          jam.style === style &&
+          jam.chart === chart &&
+          jam.options.mode === "jam" &&
+          jam.options.passes === 2 &&
+          !jam.options.open &&
+          !jam.options.solo,
+      ).map((jam) => jam.take);
+      const performances = (
+        played.length === SEEDS.length
+          ? played
+          : SEEDS.map((seed) => render(chart.text, style, { mode: "jam", passes: 3, seed }))
+      ).map((take) => JSON.stringify(take.events));
       assert.equal(new Set(performances).size, SEEDS.length, chart.file);
     }
   }
