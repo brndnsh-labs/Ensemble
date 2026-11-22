@@ -4,7 +4,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { Plan, PlanBar, PlanOptions, StylePack, Take } from "@ensemble/engine";
+import type { Plan, PlanBar, PlanOptions, StylePack, Take, TakeOptions } from "@ensemble/engine";
 import {
   arrangedLines,
   BREATHE_MOST,
@@ -1400,6 +1400,9 @@ test("who is in: now and then a jam lays one seat out, by its style's say, for a
     const none: StylePack = { ...style, arc: steady };
     let seen = 0;
     let rendered = false;
+    let shortest:
+      | { text: string; where: string; at: PlanBar; open: boolean; options: TakeOptions }
+      | undefined;
     for (const file of ownCharts(style)) {
       const chart = parse(file.text).chart;
       const arranged = chart.arrangement?.lines != null;
@@ -1506,58 +1509,39 @@ test("who is in: now and then a jam lays one seat out, by its style's say, for a
             assert.equal(laidOut(two).size, 0, `${where}: a band of two`);
             const held = plan(chart, style, { ...options, energy: 0.5 });
             assert.equal(laidOut(held).size, 0, `${where}: a level held`);
-            // And told to finish as the app tells it, at a phrase top inside the lay-out: up to
-            // there the seat is out, from there everyone is in, and the plan says so of each bar
-            // as the notes do: a seat it marks out is silent, and one it marks in for a whole
-            // phrase plays in it wherever the band with nobody laid out does.
-            const endAfter = first.from.pass;
-            const at = music.find(
-              (bar) =>
-                bar.pass === endAfter &&
-                bar.index > first.from.index &&
-                bar.index <= first.to.index &&
-                bar.phrase.bar === 0,
-            );
-            if (at) {
-              const toldOptions = { ...options, endAfter, toldAt: at.start };
-              const take = render(file.text, style, toldOptions);
-              const base = render(file.text, none, toldOptions);
-              const toldOuts = laidOut(take.plan);
-              assert.ok(toldOuts.size > 0, `${where}: told, the lay-out before it is gone`);
-              const inBar = (t: Take, seat: string, bar: PlanBar) =>
-                notesOf(t, seat as "chords").filter(
-                  (note) => note.tick >= bar.start && note.tick < bar.start + bar.ticks,
-                ).length;
-              const phrases = Map.groupBy(
-                take.plan.bars.filter((bar) => bar.kind === "music"),
-                (bar) => `${bar.section.occurrence}:${bar.phrase.index}`,
-              );
-              for (const bars of phrases.values()) {
-                for (const seat of BAND) {
-                  for (const bar of bars) {
-                    if (toldOuts.get(bar)?.includes(seat)) {
-                      assert.equal(
-                        inBar(take, seat, bar),
-                        0,
-                        `${where}, told: ${seat} out of bar ${bar.index} plays`,
-                      );
-                      assert.ok(
-                        bar.start < at.start,
-                        `${where}, told: ${seat} out after the word, bar ${bar.index}`,
-                      );
-                    }
-                  }
-                  const marked = bars.every((bar) => bar.seats[seat] !== null);
-                  const played = (t: Take) => bars.reduce((n, bar) => n + inBar(t, seat, bar), 0);
-                  if (marked && played(base) > 0) {
-                    assert.ok(
-                      played(take) > 0,
-                      `${where}, told: ${seat} marked in and silent from bar ${bars[0]!.index}`,
-                    );
-                  }
-                }
-              }
-            }
+          }
+          // The shortest take that thins with a phrase top inside its first lay-out, to be told
+          // to finish there and played (below).
+          const at = first
+            ? music.find(
+                (bar) =>
+                  bar.pass === first.from.pass &&
+                  bar.index > first.from.index &&
+                  bar.index <= first.to.index &&
+                  bar.phrase.bar === 0,
+              )
+            : undefined;
+          // Open, so that the jam as it was is played only as far as the word (an open jam made
+          // longer plays what it played), and the shortest such, so that playing it costs little.
+          // A timed one only where no open one thins.
+          const open = kind.open === true;
+          const better =
+            shortest === undefined ||
+            (open && !shortest.open) ||
+            (open === shortest.open && at !== undefined && at.index < shortest.at.index);
+          if (first && at && better) {
+            shortest = {
+              text: file.text,
+              where,
+              at,
+              open,
+              options: {
+                ...options,
+                ...(open ? { passes: first.from.pass + 1 } : {}),
+                endAfter: first.from.pass,
+                toldAt: at.start,
+              },
+            };
           }
         }
         if (seed === 1 && data) {
@@ -1572,7 +1556,49 @@ test("who is in: now and then a jam lays one seat out, by its style's say, for a
     }
     if (data) {
       assert.ok(seen > 0, `${style.id}: nobody ever sat out`);
-      assert.ok(rendered, `${style.id}: no take that thins was played`);
+      assert.ok(shortest, `${style.id}: no take that thins was played`);
+      // Told to finish as the app tells it, at a phrase top inside the lay-out: up to there the
+      // seat is out, from there everyone is in, and the plan says so of each bar as the notes
+      // do: a seat it marks out is silent, and one it marks in for a whole phrase plays in it
+      // wherever the band with nobody laid out does.
+      const { text, where, at, options } = shortest!;
+      const take = render(text, style, options);
+      const base = render(text, none, options);
+      const toldOuts = laidOut(take.plan);
+      assert.ok(toldOuts.size > 0, `${where}: told, the lay-out before it is gone`);
+      const inBar = (t: Take, seat: string, bar: PlanBar) =>
+        notesOf(t, seat as "chords").filter(
+          (note) => note.tick >= bar.start && note.tick < bar.start + bar.ticks,
+        ).length;
+      const phrases = Map.groupBy(
+        take.plan.bars.filter((bar) => bar.kind === "music"),
+        (bar) => `${bar.section.occurrence}:${bar.phrase.index}`,
+      );
+      for (const bars of phrases.values()) {
+        for (const seat of BAND) {
+          for (const bar of bars) {
+            if (toldOuts.get(bar)?.includes(seat)) {
+              assert.equal(
+                inBar(take, seat, bar),
+                0,
+                `${where}, told: ${seat} out of bar ${bar.index} plays`,
+              );
+              assert.ok(
+                bar.start < at.start,
+                `${where}, told: ${seat} out after the word, bar ${bar.index}`,
+              );
+            }
+          }
+          const marked = bars.every((bar) => bar.seats[seat] !== null);
+          const played = (t: Take) => bars.reduce((n, bar) => n + inBar(t, seat, bar), 0);
+          if (marked && played(base) > 0) {
+            assert.ok(
+              played(take) > 0,
+              `${where}, told: ${seat} marked in and silent from bar ${bars[0]!.index}`,
+            );
+          }
+        }
+      }
     }
   }
 });
