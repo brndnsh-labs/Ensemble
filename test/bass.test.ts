@@ -164,7 +164,8 @@ const inFour = (bar: PlanBar) => bar.meter.beats === 4 && bar.meter.unit === 4;
 /**
  * Charts the library does not have, written to end every way a walk home can meet: from each
  * degree of a major and a minor key, from a chord struck on beat 3, and into a landing whose
- * low root has no fifth under it (E) and one whose does (C).
+ * low root has no fifth under it (E) and one whose does (C), and from a chord on beat 3 whose
+ * root the line has under a landing that has no octave below it (D).
  */
 const HOME_CHARTS: readonly LibraryChart[] = (
   [
@@ -191,6 +192,7 @@ const HOME_CHARTS: readonly LibraryChart[] = (
     ["Am", ["Am", "Dm", "E7", "F", "G", "F E7", "Dm G"]],
     ["E", ["E", "A", "B7", "C#m", "D", "A B7"]],
     ["G", ["G", "C", "D7", "Em", "F"]],
+    ["D", ["D Em", "G Em"]],
   ] as const
 ).flatMap(([key, befores]) =>
   befores.map((before) => ({
@@ -266,7 +268,14 @@ test("in a style whose bass walks home, every ending that is one chord struck on
         assert.equal(at(3).length, 0, `${where}: a V on beat 3 plays on into the final root`);
       walk = four ? [four.pitch] : [];
       from = at(2)[0]?.pitch ?? null;
-      if (!four) widest = motion === 7 ? 7 : 12;
+      if (!four) {
+        widest = motion === 7 ? 7 : 12;
+        // Only a drop is as wide as an octave: up onto the final root, a fifth at most.
+        assert.ok(
+          from === null || home.pitch - from <= 7,
+          `${where}: beat 3 (${from}) rises more than a fifth onto the final root (${home.pitch}) with no note on 4`,
+        );
+      }
     } else {
       assert.ok(four && at(3).length === 1, `${where}: no note on beat 4 of the walk home`);
       const down = motion === 5 && first?.pitch === home.pitch + 5 && at(1).length === 0;
