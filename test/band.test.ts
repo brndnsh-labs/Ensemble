@@ -319,7 +319,8 @@ test("a chart with mistakes in it still plays", () => {
 });
 
 test("every take is a valid MIDI file: one track per playing seat after the tempo track, drums on channel 10", () => {
-  for (const { style, chart, take } of takes()) {
+  // On a push, one take in three: the five kinds come round in turn, so every kind is written.
+  for (const { style, chart, take } of takes().filter((_, i) => FULL || i % 3 === 0)) {
     const file = readSmf(toMidi(take.plan, take.events, style));
     assert.equal(file.format, 1, chart.file);
     assert.equal(file.ppq, PPQ);
