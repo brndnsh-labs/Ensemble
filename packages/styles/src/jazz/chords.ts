@@ -489,7 +489,7 @@ const rhythmInThree: RhythmBook = {
             grid: ".... x... .... x... .... x...",
           },
         ],
-        chance: 0.28,
+        chance: 0.22,
         // Six to eight bars at a time, released at the section's end (study 2.1).
         longest: 8,
         crossesSections: false,

@@ -252,8 +252,8 @@
     "inTarget": 1
   },
   "chords.hemiola-in-three": {
-    "mean": 0.3083,
-    "p10": 0.1667,
+    "mean": 0.225,
+    "p10": 0.125,
     "p90": 0.5,
     "inTarget": 1
   },
@@ -276,15 +276,15 @@
     "inTarget": 1
   },
   "chords.strikes-per-bar-in-three": {
-    "mean": 1.7409,
+    "mean": 1.7498,
     "p10": 1.2128,
     "p90": 2.3617,
     "inTarget": 1
   },
   "chords.on-one-in-three": {
-    "mean": 0.3043,
+    "mean": 0.305,
     "p10": 0.1875,
-    "p90": 0.4762,
+    "p90": 0.4603,
     "inTarget": 1
   },
   "chords.strikes-per-bar-in-six": {

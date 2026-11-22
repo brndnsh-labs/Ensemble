@@ -380,6 +380,20 @@ export function validateChordStyle(chords: ChordStyle): string[] {
           `${what}: a run of ${across.longest} bars is not a whole number of bars from 2.`,
         );
       }
+      say(
+        vocabulary.figures.some(
+          (figure) =>
+            figure.weight > 0 &&
+            cells(figure.grid).some(
+              (symbol) => symbol in (figure.articulation ?? vocabulary.articulation),
+            ),
+        ),
+        `${where}: every figure a section could take as its own is a rest.`,
+      );
+      for (const figure of all) {
+        const rest = cells(figure.grid).every((symbol) => symbol === ".");
+        say(!(rest && figure.groove), `${where}, "${figure.name}": a bar of rest is not a groove.`);
+      }
     }
   };
   if (chords.rhythm) checkBook(chords.rhythm);
