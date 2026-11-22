@@ -6,8 +6,9 @@
 // held from 1 and the line steps into the new root on 3 and 4: "G, A-B, C"
 // (ST-country-05, BA-51 to BA-53, EN-51).
 //
-// Reading the grids: sixteen sixteenths to the bar, grouped by beat. x the next
-// tone of the line, - held, . silence.
+// Reading the grids: a sixteenth a character, grouped by beat, sixteen to a bar
+// of four and twelve to a bar of three. x the next tone of the line, - held,
+// . silence.
 
 import type { BassStyle, LeadInPolicy, Walk } from "@ensemble/engine";
 
@@ -39,7 +40,7 @@ const waltzTones: Line["tones"] = [
 ];
 const WALTZ = {
   hold: "song",
-  options: [{ name: "waltz", weight: 1, grid: "x----------- ", under: true }],
+  options: [{ name: "waltz", weight: 1, grid: "x--- ---- ----", under: true }],
 } as const;
 
 /**

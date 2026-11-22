@@ -37,7 +37,8 @@ const open: VoicingKind = {
 };
 
 // ── the right hand ──────────────────────────────────────────────────────────
-// Reading the grids: sixteen sixteenths to the bar, grouped by beat. The hand
+// Reading the grids: a sixteenth a character, grouped by beat, sixteen to a bar
+// of four and twelve to a bar of three. The hand
 // swings down on every beat and up on every "and"; the guitar idiom reads the
 // direction from the place, and an upstroke catches the top three strings.
 //
@@ -57,7 +58,8 @@ const HAND: Articulation = {
   B: { level: 92, steps: 4, pluck: ["bass"] },
   v: { level: 86, steps: 4, pluck: ["fifth"] },
   // The waltz's boom, root one bar and the alternate bass the next while the chord holds, as
-  // the bass in three plays it (BA-56): at the root's level.
+  // the bass in three plays it (BA-56). One symbol is one level: the alternate is struck at the
+  // root's 92, where four plays it at 86 (`v`); a level by place would be a new field.
   a: { level: 92, steps: 4, pluck: ["alternating"] },
 };
 

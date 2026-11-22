@@ -249,9 +249,11 @@ export function walkHome(
       });
     }
     // The run from the bar's root, played in the walk's octave: the 5th, 6th and 7th on 2, 3
-    // and 4; in three the 6th and 7th on 2 and 3, from the line's own note on 1. A root already
-    // inside the run (the bVI, the vi, the bVII) does not climb.
-    if (motion <= 7 && into(seventh)) {
+    // and 4; in three the 6th and 7th on 2 and 3, from the line's own note on 1, and only in the
+    // octave whose 5th is on the instrument, as in four, though the 5th is not played (EN-48):
+    // into G, D2, E2-F#2, G2, never a drop from D2 to E1. A root already inside the run (the
+    // bVI, the vi, the bVII) does not climb.
+    if (motion <= 7 && into(seventh) && (!waltz || inside(fifth))) {
       // The root on 1 where the line has it, or in the run's own octave: onto the run's first
       // note from it, up or down, by an octave at most (EN-48), the run itself by steps.
       const from = waltz ? own : root;
@@ -273,7 +275,9 @@ export function walkHome(
           placed: at !== from,
           run: true,
           widest: FOURTH,
-          enter: OCTAVE,
+          // In four onto the run's 5th by an octave at most; in three onto its 6th by a fourth,
+          // as every move of the walk.
+          enter: waltz ? FOURTH : OCTAVE,
         });
     }
     // Otherwise the bar keeps the line and goes in on beat 4 alone: a root inside the run from
@@ -298,14 +302,18 @@ export function walkHome(
         enter: FIFTH,
       });
     // Where the boom's fifth lies too far from every one of them, the root is held from 1 and
-    // the line steps in on 4, as it does across a third (BA-53).
-    for (const pitch of choices)
-      found.push({
-        notes: [note(0, lastBeat, waltz ? own : root, one), note(lastBeat, 1, pitch, four, true)],
-        path: [waltz ? own : root, pitch, landing],
-        placed: false,
-        widest: FOURTH,
-      });
+    // the line steps in on 4, as it does across a third (BA-53). In three, where the line's note
+    // on 1 lies too far, it is taken in another octave: there is no note on 3 to bridge it
+    // (from the bVII in A minor, G1, B1, A1 where the line had G2).
+    const holds = waltz ? [own, ...octaves(mod12(own)).filter((pitch) => pitch !== own)] : [root];
+    for (const at of holds)
+      for (const pitch of choices)
+        found.push({
+          notes: [note(0, lastBeat, at, one), note(lastBeat, 1, pitch, four, true)],
+          path: [at, pitch, landing],
+          placed: at !== holds[0],
+          widest: FOURTH,
+        });
     return found;
   };
 
