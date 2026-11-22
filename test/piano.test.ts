@@ -1811,7 +1811,7 @@ test(
   },
 );
 
-test("in a style whose guitar pulls off its final chord, the stinger is played on the final tonic of an ending that rings, and nowhere else: the 6th (the b6 over a minor chord) struck on one of the grip's top two strings and pulled off to the 5th under it on that string an eighth later, softer by the style's share; where the strike has a 6th there that its string can pull off from within the hand, without a half step over it, it always is; and no other chord note is pulled off or hammered on", {
+test("in a style whose guitar pulls off its final chord, the stinger is played on the final tonic of an ending that rings, and nowhere else: the 6th (the b6 over a minor chord) struck on the B or the high E string and pulled off to the 5th under it on that string an eighth later, softer by the style's share; where the strike has a 6th there that its string can pull off from within the hand, without a half step over it, it always is; and no other chord note is pulled off or hammered on", {
   skip: !STYLES.some((style) => style.chords.ending.pullOff),
 }, () => {
   let stung = 0;
@@ -1846,13 +1846,28 @@ test("in a style whose guitar pulls off its final chord, the stinger is played o
     );
     const step = minor ? 1 : 2;
     const sixth = minor ? 8 : 9;
+    // At most one, an eighth after the final chord lands, to its 5th: whatever is struck there.
+    assert.ok(slurs.length <= 1, `${where}: ${slurs.length} pull-offs`);
+    const [pulled] = slurs;
+    if (pulled) {
+      assert.equal(
+        pulled.tick,
+        landing + PPQ / 2,
+        `${where}: the pull-off is not an eighth after the chord`,
+      );
+      assert.equal((pulled.pitch - root + 120) % 12, 7, `${where}: the pull-off is not to the 5th`);
+    }
     const strike = strikesOf(take).find((one) => one.tick === landing);
-    if (!strike) continue;
-    const top = strike.pitches.slice(-2);
-    // Where the strike's 6th on one of its two top strings can pull off to the 5th: within the
-    // hand, and nothing a half step over it.
+    if (!strike) {
+      assert.equal(slurs.length, 0, `${where}: a pull-off with no final chord struck`);
+      continue;
+    }
+    // The guitar's top two strings, the B and the high E: a note under a silent B is not on top.
     const strings = fingering(idiom, strike.pitches);
     const frets = strings ? fretsOf(strings, strike.pitches) : [];
+    const top = strike.pitches.filter((_, k) => (strings?.[k] ?? -1) >= 4);
+    // Where the strike's 6th on one of those strings can pull off to the 5th: within the hand,
+    // and nothing a half step over it.
     const fretted = frets.filter((fret) => fret > 0);
     const can = top.some((pitch) => {
       const k = strike.pitches.indexOf(pitch);
@@ -1867,16 +1882,8 @@ test("in a style whose guitar pulls off its final chord, the stinger is played o
     });
     if (can)
       assert.equal(slurs.length, 1, `${where}: the final tonic ${strike.pitches} has no stinger`);
-    assert.ok(slurs.length <= 1, `${where}: ${slurs.length} pull-offs`);
-    const [pulled] = slurs;
     if (!pulled) continue;
     stung++;
-    assert.equal(
-      pulled.tick,
-      landing + PPQ / 2,
-      `${where}: the pull-off is not an eighth after the chord`,
-    );
-    assert.equal((pulled.pitch - root + 120) % 12, 7, `${where}: the pull-off is not to the 5th`);
     const from = notesOf(take, "chords").find(
       (note) => note.tick === landing && !note.slur && note.pitch === pulled.pitch + step,
     );

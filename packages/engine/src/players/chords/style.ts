@@ -549,11 +549,12 @@ export interface ChordStyle {
     readonly accent: number;
     /**
      * The stinger (EN-49): on a final tonic that rings, a guitar strikes the
-     * chord with its 6th (the b6 over a minor tonic) on one of the grip's top
-     * two strings and pulls it off to the 5th on the same string an eighth
-     * later, which then rings. The 6th is the grip's own where it has one there
-     * with the 5th under it on that string; otherwise the grip's 5th there is
-     * fretted up to it, where the four-fret hand reaches. Never where the 6th
+     * chord with its 6th (the b6 over a minor tonic) on the B or the high E
+     * string and pulls it off to the 5th on the same string an eighth later,
+     * which then rings. The 6th is the grip's own where it has one there with
+     * the 5th under it on that string; otherwise, where the final chord is a
+     * new chord, the grip's 5th there is fretted up to it, where the four-fret
+     * hand reaches. Never where the 6th
      * is a half step under another note of the grip; a shape with neither has
      * no stinger. `level` is the pulled-off note's share of the strike's level
      * (0.9: 10% softer). A guitar's only: a keyboard has no string to pull off.

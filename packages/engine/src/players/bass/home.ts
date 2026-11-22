@@ -20,16 +20,6 @@ type Home = NonNullable<WalkPolicy["ending"]>;
 
 const BEAT = PPQ;
 
-/**
- * Where the final root is struck when the bass walks home: the lowest one on
- * the instrument, or the octave over it where the run's first note, a fourth
- * under it, would be lower than the instrument goes (landings on E to Ab, EN-48).
- */
-export function homeRoot(pitchClass: number): number {
-  const low = lowestRoot(pitchClass);
-  return low - 5 >= LOW_E ? low : low + 12;
-}
-
 /** Whether a bar is a bar of four quarters. */
 const inFour = (piece: Piece) => piece.bar.meter.beats === 4 && piece.bar.meter.unit === 4;
 
@@ -63,10 +53,33 @@ export function walkedBar(form: readonly Piece[], i: number): readonly number[] 
 const rubs = (chord: Chord, pitch: number) =>
   isChordTone(chord, pitch - 1) && !isChordTone(chord, pitch);
 
+/** The widest move inside a walk home: a fourth. */
+const FOURTH = 5;
 /**
- * The notes of the bar before the ending, walked home to `landing`: the last
- * piece's notes, or null where nothing in the walk fits. `notes` are that
- * piece's notes as the line played them and `root` where its root sits.
+ * A V on beat 3 drops a fifth onto the final root (EN-47), and a walk of one note on beat 4 is
+ * stepped onto from the line's own note by a fifth at most, as the boom moves.
+ */
+const FIFTH = 7;
+
+/** One way to walk home into one landing: the walk's notes, and its path through them into it. */
+interface Way {
+  readonly notes: LineNote[];
+  /** The walk's pitches, then the landing. Its first is moved to from the note before the bar. */
+  readonly path: readonly number[];
+  /** Whether the path's first note is the walk's own, placed by it, not the line's. */
+  readonly placed: boolean;
+  /** The widest move along the path. */
+  readonly widest: number;
+  /** The widest move onto the walk from the line's own note, where the path starts on one. */
+  readonly enter?: number;
+}
+
+/**
+ * The notes of the bar before the ending, walked home, and where the final
+ * root lands: the lowest octave in which the walk played sits on the
+ * instrument and inside the bass's register, moving a fourth at most (EN-48).
+ * Null where no walk fits. `notes` are the piece's notes as the line played
+ * them and `root` where its root sits; `before` is the note before them.
  */
 export function walkHome(
   home: Home,
@@ -74,12 +87,13 @@ export function walkHome(
   notes: readonly LineNote[],
   root: number,
   final: Piece,
-  landing: number,
   /** The piece is the bar's second chord, struck on beat 3. */
   half: boolean,
-  /** The last pitch played before the piece, if the line was not resting. */
   before: number | null,
-): LineNote[] | null {
+  register: { readonly lowest: number; readonly highest: number },
+  /** The note before is struck within a beat of the piece: it may be leading into it. */
+  led: boolean,
+): { notes: LineNote[]; landing: number } | null {
   const chord = piece.chord!;
   const scale = final.scale!;
   // A degree of the landing's own scale, counted from its root.
@@ -100,93 +114,176 @@ export function walkHome(
     level: last ? "approach" : beat === 0 ? "arrival" : "strong",
     exact: { duration: Math.round(beats * BEAT * home.length), velocity },
   });
-  // The run, as pitches under the landing: its 5th, its 6th (the b6 where its scale has it),
-  // and its 7th, which is the chord's own tone a whole step under the landing where the chord
-  // being played has one (C7 gives Bb), and the leading tone otherwise (EN-46).
-  const fifth = landing - 5;
-  const seventhOver = (over: Chord) => (isChordTone(over, landing - 2) ? landing - 2 : landing - 1);
-  // Up through the leading tone the 6th is the major one, as the melodic minor climbs: the b6
-  // would leave a step and a half before it (docs/decisions/styles.md).
-  const sixthUnder = (seventh: number) =>
-    degree(9) || seventh === landing - 1 ? landing - 3 : landing - 4;
-  const sixth = sixthUnder(seventhOver(chord));
-  const motion = mod12(bassPitchClass(chord) - mod12(landing));
+  const pc = bassPitchClass(final.chord!);
+  const motion = mod12(bassPitchClass(chord) - pc);
+  const low = Math.max(LOW_E, register.lowest);
+  const inside = (pitch: number) => pitch >= low && pitch <= register.highest;
   // Every note of the walk belongs to the chord's scale, or passes: a step on from the note
   // before and a step on to the next, the same way, or the half step onto the landing (X-A-26).
-  // No move is wider than an octave, into the bar either (BA-21).
   const fits = (pitch: number) => inHarmony(chord, piece.scale!, pitch);
-  const runs = (from: number | null, path: readonly number[]) =>
+  const passes = (path: readonly number[]) =>
     path.every((pitch, i) => {
-      const prior = i === 0 ? from : path[i - 1]!;
-      if (prior !== null && Math.abs(pitch - prior) > OCTAVE) return false;
       if (i === 0 || i === path.length - 1 || fits(pitch)) return true;
+      const prior = path[i - 1]!;
       const next = path[i + 1]!;
       if (i === path.length - 2 && Math.abs(next - pitch) === 1) return true;
       return (
-        Math.abs(pitch - prior!) <= 2 &&
+        Math.abs(pitch - prior) <= 2 &&
         Math.abs(next - pitch) <= 2 &&
-        (pitch - prior!) * (next - pitch) > 0
+        (pitch - prior) * (next - pitch) > 0
       );
     });
-  // The note on 4 that goes in from beside the landing: the first of these that does not rub
-  // over the chord being played and is in its scale, or is the half step onto the landing.
-  const intoFour = (choices: readonly number[]) =>
-    choices.find(
-      (pitch) => !rubs(chord, pitch) && (fits(pitch) || Math.abs(pitch - landing) === 1),
-    );
-  const seventh = seventhOver(chord);
+  const stepAway = (from: number, to: number) => {
+    const byName = Math.min(mod12(from - to), mod12(to - from));
+    return (byName === 1 || byName === 2) && Math.abs(from - to) > 2;
+  };
+  const ok = (way: Way) =>
+    way.path.every(inside) &&
+    way.path.every(
+      (pitch, i) =>
+        i === 0 ||
+        Math.abs(pitch - way.path[i - 1]!) <= (i === 1 && way.enter ? way.enter : way.widest),
+    ) &&
+    // Into the bar no leap wider than an octave (BA-21), and a note within a beat before it, a
+    // step from its first by name, is a step from it in pitch: it led there (BA-05).
+    (!way.placed || before === null || Math.abs(way.path[0]! - before) <= OCTAVE) &&
+    (!way.placed || before === null || !led || !stepAway(before, way.path[0]!)) &&
+    passes(way.path);
 
-  if (half) {
-    // A chord struck on beat 3 keeps its root there and adds at most one note on 4: a V
-    // drops onto the low root from where it is; any other goes in by the 7th from below, or
-    // the 2nd from above (EN-47).
-    if (motion === 7) return runs(before, [root, landing]) ? [note(2, 2, root, three)] : null;
-    const into = intoFour([seventh, landing + 2]);
-    if (into === undefined || !runs(before, [root, into, landing])) return null;
-    return [note(2, 1, root, three), note(3, 1, into, four, true)];
+  /** A pitch class's places in the register, low to high. */
+  const octaves = (pitchClass: number) => {
+    const places: number[] = [];
+    for (let pitch = lowestRoot(pitchClass); pitch <= register.highest; pitch += 12)
+      if (inside(pitch)) places.push(pitch);
+    return places;
+  };
+  // The ways to walk into one landing, in the order they are wanted.
+  const ways = (landing: number): Way[] => {
+    // The run under the landing: its 5th, its 6th and its 7th. The 7th is the chord's own tone a
+    // whole step under the landing where the chord being played has one (C7 gives Bb), and the
+    // leading tone otherwise (EN-46). The 6th is the major one where the landing's scale has it
+    // and wherever the 7th is the leading tone, as the melodic minor goes up; the flat one where
+    // the 7th is the chord's own flat seventh (docs/decisions/styles.md).
+    const fifth = landing - 5;
+    const seventh = isChordTone(chord, landing - 2) ? landing - 2 : landing - 1;
+    const sixth = degree(9) || seventh === landing - 1 ? landing - 3 : landing - 4;
+    // A note on 4 never rubs a half step over the chord, and is in its scale, or the half step
+    // onto the landing.
+    const into = (pitch: number) =>
+      !rubs(chord, pitch) && (fits(pitch) || Math.abs(pitch - landing) === 1);
+    const found: Way[] = [];
+    if (half) {
+      // A chord struck on beat 3 keeps its root there and adds at most one note on 4: a V
+      // drops a fifth onto the final root; any other goes in by the 7th from below, or the 2nd
+      // from above, or by nothing (EN-47). The root is where the line has it, or in another
+      // octave where only that lets the walk in.
+      const roots = [root, ...octaves(bassPitchClass(chord)).filter((pitch) => pitch !== root)];
+      for (const at of roots) {
+        const placed = at !== root;
+        if (motion !== 7) {
+          for (const pitch of [seventh, landing + 2].filter(into))
+            found.push({
+              notes: [note(2, 1, at, three), note(3, 1, pitch, four, true)],
+              path: [at, pitch, landing],
+              placed,
+              widest: FOURTH,
+              enter: FIFTH,
+            });
+        }
+        found.push({
+          notes: [note(2, 2, at, three)],
+          path: [at, landing],
+          placed,
+          widest: FIFTH,
+        });
+      }
+      return found;
+    }
+    // From the IV the line walks down: its root held, then the landing's 3rd and 2nd (EN-47).
+    if (motion === 5 && into(landing + 2)) {
+      const third = landing + (degree(4) ? 4 : 3);
+      found.push({
+        notes: [
+          note(0, 2, landing + 5, one),
+          note(2, 1, third, three),
+          note(3, 1, landing + 2, four, true),
+        ],
+        path: [landing + 5, third, landing + 2, landing],
+        placed: true,
+        widest: FOURTH,
+      });
+    }
+    // Over the V the 5th is already sounding: it holds through beat 2 (EN-46).
+    if (motion === 7 && into(seventh)) {
+      found.push({
+        notes: [note(0, 2, fifth, one), note(2, 1, sixth, three), note(3, 1, seventh, four, true)],
+        path: [fifth, sixth, seventh, landing],
+        placed: true,
+        widest: FOURTH,
+      });
+    }
+    // The run from the bar's root, played in the walk's octave: the 5th, 6th and 7th on 2, 3
+    // and 4. A root already inside the run (the bVI, the vi, the bVII) does not climb.
+    if (motion <= 7 && into(seventh)) {
+      let near = root;
+      for (let pitch = lowestRoot(bassPitchClass(chord)); pitch <= register.highest; pitch += 12)
+        if (inside(pitch) && Math.abs(pitch - fifth) < Math.abs(near - fifth)) near = pitch;
+      found.push({
+        notes: [
+          note(0, 1, near, one),
+          note(1, 1, fifth, two),
+          note(2, 1, sixth, three),
+          note(3, 1, seventh, four, true),
+        ],
+        path: [near, fifth, sixth, seventh, landing],
+        placed: true,
+        widest: FOURTH,
+      });
+    }
+    // Otherwise the bar keeps the line and goes in on beat 4 alone: a root inside the run from
+    // the run's note above it, any other from the 7th, else the leading tone; where these would
+    // rub a half step over the chord, the landing's 2nd from above (EN-47; docs/decisions/styles.md).
+    const above =
+      motion > 7
+        ? [sixth, seventh, landing - 1].filter((pitch) => mod12(pitch - landing) > motion)
+        : [seventh, landing - 1];
+    const onFour = start + 3 * BEAT;
+    const kept = notes
+      .filter((line) => line.tick < onFour)
+      .map((line) => ({ ...line, space: Math.min(line.space, onFour - line.tick) }));
+    const last = kept.findLast((line) => !line.echo)?.pitch ?? before ?? root;
+    const choices = [...new Set([...above, landing + 2])].filter(into);
+    for (const pitch of choices)
+      found.push({
+        notes: [...kept, note(3, 1, pitch, four, true)],
+        path: [last, pitch, landing],
+        placed: false,
+        widest: FOURTH,
+        enter: FIFTH,
+      });
+    // Where the boom's fifth lies too far from every one of them, the root is held from 1 and
+    // the line steps in on 4, as it does across a third (BA-53).
+    for (const pitch of choices)
+      found.push({
+        notes: [note(0, 3, root, one), note(3, 1, pitch, four, true)],
+        path: [root, pitch, landing],
+        placed: false,
+        widest: FOURTH,
+      });
+    return found;
+  };
+
+  // Each way in its order, in the lowest octave it fits.
+  const landings: number[] = [];
+  for (let pitch = lowestRoot(pc); pitch <= register.highest; pitch += 12)
+    if (pitch >= low) landings.push(pitch);
+  const byOctave = landings.map(ways);
+  const count = Math.max(0, ...byOctave.map((list) => list.length));
+  for (let k = 0; k < count; k++) {
+    for (const [i, list] of byOctave.entries()) {
+      const way = list[k];
+      if (way && ok(way)) return { notes: way.notes, landing: landings[i]! };
+    }
   }
-  // From the IV the line walks down: its root held, then the landing's 3rd and 2nd (EN-47).
-  if (motion === 5) {
-    const down = [landing + 5, landing + (degree(4) ? 4 : 3), landing + 2];
-    if (intoFour([down[2]!]) !== undefined && runs(before, [...down, landing]))
-      return [
-        note(0, 2, down[0]!, one),
-        note(2, 1, down[1]!, three),
-        note(3, 1, down[2]!, four, true),
-      ];
-  }
-  // Over the V the 5th is already sounding: it holds through beat 2 (EN-46).
-  if (motion === 7) {
-    const held = [fifth, sixth, seventh];
-    if (intoFour([seventh]) !== undefined && runs(before, [...held, landing]))
-      return [note(0, 2, fifth, one), note(2, 1, sixth, three), note(3, 1, seventh, four, true)];
-  }
-  // The run from the bar's root where the line has it: the 5th, 6th and 7th on 2, 3 and 4.
-  // A root already inside the run (the bVI, the vi, the bVII) does not climb.
-  if (motion <= 7) {
-    const climb = [root, fifth, sixth, seventh];
-    if (intoFour([seventh]) !== undefined && runs(before, [...climb, landing]))
-      return [
-        note(0, 1, root, one),
-        note(1, 1, fifth, two),
-        note(2, 1, sixth, three),
-        note(3, 1, seventh, four, true),
-      ];
-  }
-  // Otherwise the bar keeps the line and goes in on beat 4 alone: a root inside the run from the
-  // run's note above it, any other from the 7th, else the leading tone; where these would rub a
-  // half step over the chord, the landing's 2nd from above (EN-47; docs/decisions/styles.md).
-  const above =
-    motion > 7
-      ? [sixth, seventh, landing - 1].filter((pitch) => mod12(pitch - landing) > motion)
-      : [seventh, landing - 1];
-  const into = intoFour([...above, landing + 2]);
-  if (into === undefined) return null;
-  const onFour = start + 3 * BEAT;
-  const kept = notes
-    .filter((line) => line.tick < onFour)
-    .map((line) => ({ ...line, space: Math.min(line.space, onFour - line.tick) }));
-  const last = kept.findLast((line) => !line.echo)?.pitch ?? before;
-  if (!runs(last, [into, landing])) return null;
-  return [...kept, note(3, 1, into, four, true)];
+  return null;
 }

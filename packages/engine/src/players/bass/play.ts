@@ -15,7 +15,7 @@ import { byBassCritic } from "./critique.ts";
 import { finalNotes, strikeBefore } from "./ending.ts";
 import type { Piece } from "./form.ts";
 import { lineAt, pieces, tierAt } from "./form.ts";
-import { homeRoot, walkedBar, walkHome } from "./home.ts";
+import { walkedBar, walkHome } from "./home.ts";
 import type { LeadIn, LeadInRequest } from "./leadin.ts";
 import { applyLeadIn, leadIn, leadInChance, OCTAVE } from "./leadin.ts";
 import type { LineNote } from "./line.ts";
@@ -233,20 +233,20 @@ export function performer(
         const home = bass.walks?.ending;
         const walked = home ? walkedBar(form, i) : null;
         if (home && walked && moving) {
-          const landing = homeRoot(bassPitchClass(piece.chord!));
-          const notes = walkHome(
+          const done = walkHome(
             home,
             moving,
             parts[i - 1] ?? [],
             state.root,
             piece,
-            landing,
             walked.length === 2,
             before,
+            bass.register,
+            leadsIn(form, parts, i - 1),
           );
-          if (notes) {
-            parts[i - 1] = notes;
-            return { state: { line: state.line, root: landing }, walked: null };
+          if (done) {
+            parts[i - 1] = done.notes;
+            return { state: { line: state.line, root: done.landing }, walked: null };
           }
         }
         const rested = leaving === undefined || leaving.chord === null;
@@ -292,6 +292,10 @@ export function performer(
         finalNotes(group, ending, state.root, bass.ending.velocity).forEach((notes, n) => {
           parts[i + n] = notes;
         });
+        // A bass that walks home strikes the final root at least as hard as the note it walked
+        // in on, as it is played (EN-46).
+        const first = parts[i]![0];
+        if (bass.walks?.ending && first) parts[i]![0] = { ...first, noSofter: true };
       } else if (piece.ending === "before" && ending) {
         // Caught at the line's own weight, and never louder than the final note.
         const weight = Math.min(lineAt(bass, piece).velocity.arrival, bass.ending.velocity);
@@ -369,6 +373,18 @@ function chromaticBefore(
   const last = parts[index - 1]?.at(-1);
   if (!piece?.chord || !piece.scale || !last) return false;
   return !inHarmony(piece.chord, piece.scale, last.pitch);
+}
+
+/** Whether the note just before a piece is struck within a beat of it: it may be leading there. */
+function leadsIn(
+  form: readonly Piece[],
+  parts: readonly (readonly LineNote[])[],
+  index: number,
+): boolean {
+  const last = parts[index - 1]?.findLast((note) => !note.echo);
+  return (
+    form[index - 1]?.chord != null && last !== undefined && form[index]!.start - last.tick <= PPQ
+  );
 }
 
 /** The pitch played just before a piece, as it will actually sound. Null after a rest. */

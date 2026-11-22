@@ -11,7 +11,6 @@ import {
   chordToString,
   contextOf,
   DEAD_VOICE,
-  energyGain,
   isCompound,
   PPQ,
   pitchClass,
@@ -145,6 +144,9 @@ test("the last bass note of a jam that ends is the lowest root on the instrument
   }
 });
 
+/** The bass's open low E. */
+const LOW_E = 28;
+
 /** A bar of four quarters. */
 const inFour = (bar: PlanBar) => bar.meter.beats === 4 && bar.meter.unit === 4;
 
@@ -187,7 +189,7 @@ const HOME_CHARTS: readonly LibraryChart[] = (
   })),
 );
 
-test("in a style whose bass walks home, every ending that is one chord struck on its downbeat, in four after a bar of four of one chord (or two, the second on beat 3), is walked into: the final root in the lowest octave whose fifth is on the instrument, and a note on beat 4 a step from it; a bar of one chord whose root is outside the run climbs on 2, 3 and 4 from the fifth under the root by steps (over the V the fifth is held from 1; from the IV the line comes down from the fourth over it); a V on beat 3 holds; and the final root is struck at least as hard as the note before it", {
+test("in a style whose bass walks home, every ending that is one chord struck on its downbeat, in four after a bar of four of one chord (or two, the second on beat 3), is walked into: a note on beat 4 a step from the final root (none after a V struck on beat 3); a bar of one chord whose root is outside the run climbs on 2, 3 and 4 from the fifth under the root by steps (over the V the fifth is held from 1; from the IV the line comes down from the fourth over it), unless no octave holds that climb or it would leave the chord's scale; the walk on the instrument and in the bass's register, moving by a fourth at most (a V on beat 3 drops a fifth), and the final root in the lowest octave where all that holds; and the final root played at least as hard as the note it is walked in on", {
   skip: !STYLES.some((style) => style.bass.walks?.ending !== undefined),
 }, () => {
   let walked = 0;
@@ -223,61 +225,129 @@ test("in a style whose bass walks home, every ending that is one chord struck on
     const home = bass.find((note) => note.tick === end.start);
     assert.ok(home, `${where}: no final root`);
     const pc = pitchClass(final.bass ?? final.root);
-    const low = 28 + ((pc - 28 + 120) % 12);
-    assert.equal(home.pitch, low - 5 >= 28 ? low : low + 12, `${where}: the final root's octave`);
+    const { lowest, highest } = style.bass.register;
+    const floor = Math.max(LOW_E, lowest);
+    const inRegister = (pitch: number) => pitch >= floor && pitch <= highest;
     const bar = bass.filter((note) => note.tick >= before.start && note.tick < end.start);
     const at = (beat: number) => bar.filter((note) => note.tick === before.start + beat * PPQ);
     const last = spans.at(-1)!.chord!;
     const motion = (pitchClass(last.bass ?? last.root) - pc + 12) % 12;
     walked++;
-    if (split && motion === 7) {
-      assert.equal(at(3).length, 0, `${where}: a V on beat 3 plays on into the final root`);
-      continue;
-    }
+    assert.equal(home.pitch % 12, pc, `${where}: the final root is not the root`);
+    // Struck at least as hard as the note it is walked in on, as played (EN-46).
+    const into = bar.at(-1)!;
+    assert.ok(
+      home.velocity >= into.velocity,
+      `${where}: the final root (${home.velocity}) is softer than the walk's last note (${into.velocity})`,
+    );
     const [four] = at(3);
-    assert.ok(four && at(3).length === 1, `${where}: no note on beat 4 of the walk home`);
-    assert.ok(
-      Math.abs(four.pitch - home.pitch) <= 2 && four.pitch !== home.pitch,
-      `${where}: beat 4 (${four.pitch}) is not a step from the final root (${home.pitch})`,
-    );
-    // Struck at least as hard: the levels as written, the two bars' energy and the hand's touch aside.
-    const gain = (b: PlanBar) => energyGain(b.seats.bass ?? b.energy);
-    const touch = (2 * 10 * style.feel.humanize) / 100 + 1;
-    assert.ok(
-      (home.velocity + touch) / gain(end) >= four.velocity / gain(before),
-      `${where}: the final root (${home.velocity}) is softer than the walk's last note (${four.velocity})`,
-    );
-    if (split || motion > 7) continue;
-    // The run itself: from the fourth over the root down (from the IV, its root held), from
-    // the fifth under it up (over the V, that fifth held), or the bar's root and the run on 2.
     const [first] = at(0);
-    const down = motion === 5 && first?.pitch === home.pitch + 5 && at(1).length === 0;
-    const held = down || (motion === 7 && first?.pitch === home.pitch - 5 && at(1).length === 0);
-    const climbs = at(1).length === 1 && at(1)[0]!.pitch === home.pitch - 5;
-    if (!held && !climbs) {
-      // In on beat 4 alone: only where the run would leave the chord's scale or leap.
-      const harmony = harmonyOf(take);
-      const over = harmony.findLast((arrival) => arrival.tick <= before.start)!;
-      const scale = chordScale(over.chord!, contextOf(harmony, over));
-      const inScale = (pitch: number) =>
-        scaleHas(scale, pitch - pitchClass(last.root)) ||
-        chordTones(last.quality).some(
-          (tone) => (((pitch - pitchClass(last.root) - tone.interval) % 12) + 12) % 12 === 0,
+    // The walk's own notes, the note the line moves to it from, and how wide it may move:
+    // a fourth inside the walk, a fifth onto it from the line's own note (the boom's move), and
+    // a fifth where a V on beat 3 drops onto the root.
+    let walk: number[];
+    let from: number | null;
+    let widest = 5;
+    let form: string;
+    if (split) {
+      form = "split";
+      if (motion === 7)
+        assert.equal(at(3).length, 0, `${where}: a V on beat 3 plays on into the final root`);
+      walk = four ? [four.pitch] : [];
+      from = at(2)[0]?.pitch ?? null;
+      if (!four) widest = 7;
+    } else {
+      assert.ok(four && at(3).length === 1, `${where}: no note on beat 4 of the walk home`);
+      const down = motion === 5 && first?.pitch === home.pitch + 5 && at(1).length === 0;
+      const held = motion === 7 && first?.pitch === home.pitch - 5 && at(1).length === 0;
+      const climbs = at(1).length === 1 && at(1)[0]!.pitch === home.pitch - 5;
+      form = down ? "down" : held ? "held" : climbs ? "climb" : "four";
+      if (form === "four") {
+        walk = [four.pitch];
+        from = bar.filter((note) => note.tick < four.tick).at(-1)?.pitch ?? null;
+      } else {
+        walk = [first!, ...(climbs ? at(1) : []), ...at(2), four].map((note) => note.pitch);
+        from = null;
+        assert.equal(walk.length, climbs ? 4 : 3, `${where}: the run is not whole`);
+        const run = [...walk.slice(climbs ? 1 : 0), home.pitch];
+        assert.ok(
+          run.slice(1).every((pitch, i) => {
+            const move = pitch - run[i]!;
+            return down ? move < 0 && move >= -2 : move > 0 && move <= 2;
+          }),
+          `${where}: the run ${run} does not walk by steps`,
         );
-      const leaps = first !== undefined && Math.abs(first.pitch - (home.pitch - 5)) > 12;
-      assert.ok(
-        leaps || !inScale(home.pitch - 5) || (!inScale(home.pitch - 3) && !inScale(home.pitch - 4)),
-        `${where}: the bar goes in on beat 4 alone where its run would fit`,
-      );
-      continue;
+      }
     }
-    const run = held ? [first!, ...at(2), four] : [...at(1), ...at(2), four];
-    assert.equal(run.length, 3, `${where}: the run is not three notes`);
-    const path = [...run.map((note) => note.pitch), home.pitch];
-    const moves = path.slice(1).map((pitch, i) => pitch - path[i]!);
+    if (four) {
+      assert.ok(
+        Math.abs(four.pitch - home.pitch) <= 2 && four.pitch !== home.pitch,
+        `${where}: beat 4 (${four.pitch}) is not a step from the final root (${home.pitch})`,
+      );
+    }
+    // On the instrument, in the register, by moves of a fourth at most, and in the lowest octave
+    // where all that holds (EN-48).
+    const sits = (shift: number) => {
+      const path = [...walk, home.pitch].map((pitch) => pitch + shift);
+      const moves = [...(from === null ? [] : [from]), ...path];
+      return (
+        path.every(inRegister) &&
+        moves.every(
+          (pitch, i) =>
+            i === 0 || Math.abs(pitch - moves[i - 1]!) <= (i === 1 && from !== null ? 7 : widest),
+        )
+      );
+    };
     assert.ok(
-      moves.every((move) => (down ? move < 0 && move >= -2 : move > 0 && move <= 2)),
-      `${where}: the run ${path} does not walk by steps`,
+      sits(0),
+      `${where}: the walk home ${walk} into ${home.pitch} (${form}) leaves the register or leaps`,
+    );
+    assert.ok(!sits(-12), `${where}: the walk home ${walk} (${form}) could land an octave lower`);
+    if (form !== "four" || motion > 7) continue;
+    // In on beat 4 alone where the bar's root is outside the run: only where no octave holds the
+    // climb, or its run would leave the chord's scale.
+    const harmony = harmonyOf(take);
+    const over = harmony.findLast((arrival) => arrival.tick <= before.start)!;
+    const scale = chordScale(over.chord!, contextOf(harmony, over));
+    const inScale = (pitch: number) =>
+      scaleHas(scale, pitch - pitchClass(last.root)) ||
+      chordTones(last.quality).some(
+        (tone) => (((pitch - pitchClass(last.root) - tone.interval) % 12) + 12) % 12 === 0,
+      );
+    // A note struck within a beat before the bar, a step by name from its root, led there: the
+    // bar's root stays a step from it in pitch (BA-05), and into the bar no leap over an octave.
+    const prior = bass.findLast((note) => note.tick < before.start);
+    const climbable = [-24, -12, 0, 12, 24].some((shift) => {
+      const landing = home.pitch + shift;
+      if (!inRegister(landing) || !inRegister(landing - 5)) return false;
+      const roots = [0, 12, 24, 36, 48]
+        .map(
+          (o) =>
+            LOW_E +
+            (((((last.bass ? pitchClass(last.bass) : pitchClass(last.root)) - LOW_E) % 12) + 12) %
+              12) +
+            o,
+        )
+        .filter(inRegister);
+      const root = roots.reduce((a, b) =>
+        Math.abs(b - (landing - 5)) < Math.abs(a - (landing - 5)) ? b : a,
+      );
+      const byName = prior
+        ? Math.min((((prior.pitch - root) % 12) + 12) % 12, (((root - prior.pitch) % 12) + 12) % 12)
+        : 0;
+      const led =
+        prior !== undefined &&
+        before.start - prior.tick <= PPQ &&
+        (byName === 1 || byName === 2) &&
+        Math.abs(prior.pitch - root) > 2;
+      const leaps = prior !== undefined && Math.abs(prior.pitch - root) > 12;
+      return Math.abs(root - (landing - 5)) <= 5 && !led && !leaps;
+    });
+    assert.ok(
+      !climbable ||
+        !inScale(home.pitch - 5) ||
+        (!inScale(home.pitch - 3) && !inScale(home.pitch - 4)),
+      `${where}: the bar goes in on beat 4 alone where its run would fit`,
     );
   }
   assert.ok(walked > enough(400), `only ${walked} endings walked home`);

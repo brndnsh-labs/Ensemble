@@ -292,8 +292,8 @@ interface Stinger {
 
 /**
  * Where a grip has a stinger over its chord: the 6th (the b6 over a minor
- * chord) on one of its top two strings, pulled off to the 5th a step under it
- * on the same string. The grip's own 6th there is taken first, top string
+ * chord) on one of the guitar's top two strings, the B or the high E, pulled
+ * off to the 5th a step under it on the same string. The grip's own 6th there is taken first, top string
  * first, where the 5th is on that string under it; then its 5th there, fretted
  * up to the 6th. The hand holds both frets inside its four and with its
  * fingers, the 6th keeps the strings' pitch rising, and it is never a half
@@ -320,7 +320,10 @@ export function stingerOf(voicing: Voicing, chord: Chord, frets: boolean): Sting
   };
   const rubs = (pitch: number, at: number) =>
     pitches.some((other, k) => k !== at && mod12(other - pitch) === 1);
-  const top = [pitches.length - 1, pitches.length - 2].filter((at) => at >= 0);
+  // The B and the high E strings: a 6th on a lower string, or under a silent B, is not on top.
+  const top = [pitches.length - 1, pitches.length - 2].filter(
+    (at) => at >= 0 && strings[at]! >= OPEN_STRINGS.length - 2,
+  );
   const found = (at: number, struck: number, pulled: number, fret: number): Stinger | null =>
     fret >= 0 && holds(at, fret) && !rubs(struck, at) && (pitches[at + 1] ?? Infinity) > struck
       ? { at, struck, pulled }
