@@ -139,6 +139,8 @@ export function soloPart(
   /** What the solo played: its first chorus's notes and beats, and the phrase before's. */
   let firstChorus = { notes: 0, beats: 0 };
   let lastPhrase: PlayedPhrase | null = null;
+  /** Each idea remembered, its notes as they were played: a horn's air and the chords cut them. */
+  const heardAs = new WeakMap<Phrase, readonly SoloNote[]>();
   /** A pickup into the top of a pass, made from the pass before (`passPickup`). */
   const intoPass = (bar: PlanBar, previous: Slot | undefined): PassPickup | null => {
     if (!opensPass(plan, bar)) return null;
@@ -181,6 +183,22 @@ export function soloPart(
     // Where the pass before's pickup into this phrase starts, if it leads in: a phrase's
     // first breath is taken from there.
     const from = lead ? realiseLead(world, lead, first)[0]?.tick : undefined;
+    // An idea said again, where it was, as it sounded: the notes it was heard at, where they
+    // are the same notes the same distances apart (SO-33). Otherwise as it sounds laid in this
+    // slot, with its own lengths, not stopped at a change of this slot's it is not a tone of (a
+    // moved note is checked against the chords it is moved onto).
+    const asHeard = (inPlace: Phrase, idea: Phrase | undefined): SoloNote[] => {
+      const heard = idea && heardAs.get(idea);
+      const [now, was] = [inPlace.line, idea?.line ?? []];
+      const by = (now[0]?.spot.tick ?? 0) - (was[0]?.spot.tick ?? 0);
+      const notes = was.map((note) => heard?.find((one) => one.tick === note.spot.tick));
+      const same =
+        now.length === was.length &&
+        now.every((note, k) => note.spot.tick - was[k]!.spot.tick === by);
+      return same && notes.every((note) => note !== undefined)
+        ? (notes as SoloNote[])
+        : realise(world, inPlace, accent, from, true).filter((note) => !note.lead);
+    };
     const offered = phrasesFor(
       world,
       slot,
@@ -195,13 +213,11 @@ export function soloPart(
         drawn: () => {
           drawn = true;
         },
-        // The idea where it was, as it sounds: its own lengths, not stopped at a change of
-        // this slot's it is not a tone of (a moved note is checked against the chords it
-        // is moved onto).
-        sounds: (phrase) =>
-          realise(world, phrase, accent, from, true)
-            .filter((note) => !note.lead)
-            .map((note) => ({ duration: note.duration, value: note.lasts ?? note.value })),
+        sounds: (phrase, idea) =>
+          asHeard(phrase, idea).map((note) => ({
+            duration: note.duration,
+            value: note.lasts ?? note.value,
+          })),
       },
     );
     // The pass before's pickup into this phrase is played as it was made, whichever is chosen.
@@ -221,8 +237,7 @@ export function soloPart(
         return kept;
       }
       return (
-        !mainKept.has(inPlace) &&
-        keepsLengths(realise(world, inPlace, accent, from, true), realised[i]!)
+        !mainKept.has(inPlace) && keepsLengths(asHeard(inPlace, phrase.remembered), realised[i]!)
       );
     });
     const phrases = offered.filter((_, i) => keeps[i]);
@@ -299,6 +314,10 @@ export function soloPart(
     const stated = memory.motif === null || phrase.fresh || "svcb".includes(role);
     // A phrase with a run in double time is remembered as the line it doubles.
     const kept = phrase.plain ?? phrase;
+    // How it was heard, what an idea said again a beat away is held to: not a run in double
+    // time, which is remembered as the line it doubles.
+    const heard = played.filter((note) => !note.lead);
+    if (!phrase.burst) heardAs.set(kept, heard);
     earlier = [...earlier, candidates[at]!];
     memory = {
       // The climb to the top note is a use of the idea, not a new one. An idea said a beat
