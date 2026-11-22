@@ -12,7 +12,6 @@ import {
   parse,
   plan,
   pulseStarts,
-  render,
   STEP,
   strongPulses,
   TIER_MID,
@@ -29,6 +28,7 @@ import {
   ownCharts,
   STYLES,
   soloistTakes,
+  takeOf,
   takes,
   WRITTEN,
   written,
@@ -723,9 +723,16 @@ const anyCompound = LIBRARY.some((chart) => compound({ chart }));
 
 /**
  * The bars of dotted pulses a style plays time in: every take of the library's in six-eight
- * or twelve-eight that it is handed, and each such chart held quiet and held loud.
+ * or twelve-eight that it is handed, and each such chart held quiet and held loud. Read once,
+ * for both the properties of six and twelve below.
  */
-function compoundBars(): { where: string; bar: PlanBar; kit: Kit; held: number | undefined }[] {
+type CompoundBar = { where: string; bar: PlanBar; kit: Kit; held: number | undefined };
+let compoundRead: CompoundBar[] | undefined;
+function compoundBars(): CompoundBar[] {
+  compoundRead ??= readCompound();
+  return compoundRead;
+}
+function readCompound(): CompoundBar[] {
   const played = [
     ...takes(compound).map(({ style, chart, options, take }) => ({
       where: `${style.id} ${chart.file} seed ${options.seed}`,
@@ -736,7 +743,8 @@ function compoundBars(): { where: string; bar: PlanBar; kit: Kit; held: number |
       LIBRARY.filter((chart) => compound({ chart })).flatMap((chart) =>
         [0.3, 0.85].map((held) => ({
           where: `${style.id} ${chart.file} at ${held}`,
-          take: render(chart.text, style, { mode: "jam", passes: 2, energy: held, seed: 1 }),
+          take: takeOf({ style, chart, options: { mode: "jam", passes: 2, energy: held, seed: 1 } })
+            .take,
           held,
         })),
       ),
