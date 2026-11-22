@@ -211,6 +211,13 @@ export interface PlainRhythm {
    * struck where it arrives.
    */
   readonly pulse?: boolean | "offbeats";
+  /**
+   * While a bassist plays, every strike crosses only the grip's top this many
+   * strings, as a figure's stroke written so does (`Attack.top`): a chick that
+   * leaves the low strings to the bass in any meter (ST-country-07). In a bar
+   * with no bassist the whole grip is struck (CH-26). Left out, the whole grip.
+   */
+  readonly top?: number;
   readonly velocity: {
     /** A chord arriving on a beat. */
     readonly beat: number;

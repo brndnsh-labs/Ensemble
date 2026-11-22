@@ -221,6 +221,16 @@ export function validateChordStyle(chords: ChordStyle): string[] {
   level(plain.velocity.beat, "plain rhythm, on the beat");
   level(plain.velocity.offbeat, "plain rhythm, off the beat");
   level(plain.velocity.restrike, "plain rhythm, struck again");
+  if (plain.top !== undefined) {
+    say(
+      guitar !== null,
+      "plain rhythm: a strum across the top strings needs a guitar in the seat.",
+    );
+    say(
+      Number.isInteger(plain.top) && plain.top >= 2 && plain.top <= (guitar?.strings ?? 6),
+      `plain rhythm: a strum across the top ${plain.top} strings is not a whole number from 2 to the grip's strings.`,
+    );
+  }
 
   const { barline, midBar, stroke } = chords.anticipation;
   for (const tier of TIERS) {

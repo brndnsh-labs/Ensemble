@@ -2,7 +2,9 @@
 // final root, every time and at any level, for a style whose bassist does
 // (`WalkPolicy.ending`, EN-45 to EN-48). The run is counted from where it lands:
 // the 5th, 6th and 7th of the landing's own scale on beats 2, 3 and 4, into
-// its root, in the lowest octave whose 5th is on the instrument.
+// its root, in the lowest octave whose 5th is on the instrument. In a bar of
+// three the run is its last two notes, the 6th and 7th on 2 and 3, after the
+// line's own note on 1.
 
 import { PPQ } from "../../chart/types.ts";
 import { sameChord } from "../../perform/harmony.ts";
@@ -22,18 +24,21 @@ const BEAT = PPQ;
 
 /** Whether a bar is a bar of four quarters. */
 const inFour = (piece: Piece) => piece.bar.meter.beats === 4 && piece.bar.meter.unit === 4;
+/** Whether a bar is a bar of three quarters: a waltz's. */
+const inThree = (piece: Piece) => piece.bar.meter.beats === 3 && piece.bar.meter.unit === 4;
+/** Whether two pieces' bars are both of four quarters, or both of three. */
+const walkable = (a: Piece, b: Piece) => (inFour(a) && inFour(b)) || (inThree(a) && inThree(b));
 
 /**
  * The pieces of the bar before the final chord the walk replaces the notes of,
  * or null where there is no walk home: the ending must be one chord struck on
- * its downbeat, both bars in 4/4, and the bar before one chord the bass plays,
- * or two with the second struck on beat 3.
+ * its downbeat, both bars in 4/4 or both in 3/4, and the bar before one chord
+ * the bass plays, or in four two with the second struck on beat 3.
  */
 export function walkedBar(form: readonly Piece[], i: number): readonly number[] | null {
   const final = form[i]!;
   const bar = final.bar;
-  if (final.ending !== "final" || final.start !== bar.start || !final.chord || !inFour(final))
-    return null;
+  if (final.ending !== "final" || final.start !== bar.start || !final.chord) return null;
   if (
     form.some((piece) => piece.bar === bar && piece.chord && !sameChord(piece.chord, final.chord))
   )
@@ -43,8 +48,9 @@ export function walkedBar(form: readonly Piece[], i: number): readonly number[] 
   const pieces = before.map((j) => form[j]!);
   if (pieces.length === 0 || pieces.some((piece) => !piece.chord || !piece.scale)) return null;
   const first = pieces[0]!;
-  if (!inFour(first) || first.start !== first.bar.start || first.lookahead) return null;
+  if (!walkable(first, final) || first.start !== first.bar.start || first.lookahead) return null;
   if (pieces.length === 1) return before;
+  if (inThree(first)) return null;
   if (pieces.length === 2 && pieces[1]!.start - first.bar.start === 2 * BEAT) return before;
   return null;
 }
@@ -102,6 +108,11 @@ export function walkHome(
   const degree = (interval: number) => scaleHas(scale, interval);
   const start = piece.bar.start;
   const [one, two, three, four] = home.velocity;
+  // In three the run is its last two notes on 2 and 3, played at the levels of 3 and 4, after
+  // the line's own note on 1: the root, or a waltz's fifth on a chord carried into the bar.
+  const waltz = inThree(piece);
+  const lastBeat = waltz ? 2 : 3;
+  const own = notes.find((line) => line.tick === start && !line.echo)?.pitch ?? root;
   const note = (
     beat: number,
     beats: number,
@@ -208,11 +219,17 @@ export function walkHome(
     if (motion === 5 && into(landing + 2)) {
       const third = landing + (degree(4) ? 4 : 3);
       found.push({
-        notes: [
-          note(0, 2, landing + 5, one),
-          note(2, 1, third, three),
-          note(3, 1, landing + 2, four, true),
-        ],
+        notes: waltz
+          ? [
+              note(0, 1, landing + 5, one),
+              note(1, 1, third, three),
+              note(2, 1, landing + 2, four, true),
+            ]
+          : [
+              note(0, 2, landing + 5, one),
+              note(2, 1, third, three),
+              note(3, 1, landing + 2, four, true),
+            ],
         path: [landing + 5, third, landing + 2, landing],
         placed: true,
         run: true,
@@ -222,7 +239,9 @@ export function walkHome(
     // Over the V the 5th is already sounding: it holds through beat 2 (EN-46).
     if (motion === 7 && into(seventh)) {
       found.push({
-        notes: [note(0, 2, fifth, one), note(2, 1, sixth, three), note(3, 1, seventh, four, true)],
+        notes: waltz
+          ? [note(0, 1, fifth, one), note(1, 1, sixth, three), note(2, 1, seventh, four, true)]
+          : [note(0, 2, fifth, one), note(2, 1, sixth, three), note(3, 1, seventh, four, true)],
         path: [fifth, sixth, seventh, landing],
         placed: true,
         run: true,
@@ -230,23 +249,28 @@ export function walkHome(
       });
     }
     // The run from the bar's root, played in the walk's octave: the 5th, 6th and 7th on 2, 3
-    // and 4. A root already inside the run (the bVI, the vi, the bVII) does not climb.
+    // and 4; in three the 6th and 7th on 2 and 3, from the line's own note on 1. A root already
+    // inside the run (the bVI, the vi, the bVII) does not climb.
     if (motion <= 7 && into(seventh)) {
-      // The root on 1 where the line has it, or in the run's own octave: onto the run's 5th
-      // from it, up or down, by an octave at most (EN-48), the run itself by steps.
-      let near = root;
-      for (let pitch = lowestRoot(bassPitchClass(chord)); pitch <= register.highest; pitch += 12)
-        if (inside(pitch) && Math.abs(pitch - fifth) < Math.abs(near - fifth)) near = pitch;
-      for (const at of [near, root])
+      // The root on 1 where the line has it, or in the run's own octave: onto the run's first
+      // note from it, up or down, by an octave at most (EN-48), the run itself by steps.
+      const from = waltz ? own : root;
+      const runFrom = waltz ? sixth : fifth;
+      let near = from;
+      for (let pitch = lowestRoot(mod12(from)); pitch <= register.highest; pitch += 12)
+        if (inside(pitch) && Math.abs(pitch - runFrom) < Math.abs(near - runFrom)) near = pitch;
+      for (const at of [near, from])
         found.push({
-          notes: [
-            note(0, 1, at, one),
-            note(1, 1, fifth, two),
-            note(2, 1, sixth, three),
-            note(3, 1, seventh, four, true),
-          ],
-          path: [at, fifth, sixth, seventh, landing],
-          placed: at !== root,
+          notes: waltz
+            ? [note(0, 1, at, one), note(1, 1, sixth, three), note(2, 1, seventh, four, true)]
+            : [
+                note(0, 1, at, one),
+                note(1, 1, fifth, two),
+                note(2, 1, sixth, three),
+                note(3, 1, seventh, four, true),
+              ],
+          path: waltz ? [at, sixth, seventh, landing] : [at, fifth, sixth, seventh, landing],
+          placed: at !== from,
           run: true,
           widest: FOURTH,
           enter: OCTAVE,
@@ -259,7 +283,7 @@ export function walkHome(
       motion > 7
         ? [sixth, seventh, landing - 1].filter((pitch) => mod12(pitch - landing) > motion)
         : [seventh, landing - 1];
-    const onFour = start + 3 * BEAT;
+    const onFour = start + lastBeat * BEAT;
     const kept = notes
       .filter((line) => line.tick < onFour)
       .map((line) => ({ ...line, space: Math.min(line.space, onFour - line.tick) }));
@@ -267,7 +291,7 @@ export function walkHome(
     const choices = [...new Set([...above, landing + 2])].filter(into);
     for (const pitch of choices)
       found.push({
-        notes: [...kept, note(3, 1, pitch, four, true)],
+        notes: [...kept, note(lastBeat, 1, pitch, four, true)],
         path: [last, pitch, landing],
         placed: false,
         widest: FOURTH,
@@ -277,8 +301,8 @@ export function walkHome(
     // the line steps in on 4, as it does across a third (BA-53).
     for (const pitch of choices)
       found.push({
-        notes: [note(0, 3, root, one), note(3, 1, pitch, four, true)],
-        path: [root, pitch, landing],
+        notes: [note(0, lastBeat, waltz ? own : root, one), note(lastBeat, 1, pitch, four, true)],
+        path: [waltz ? own : root, pitch, landing],
         placed: false,
         widest: FOURTH,
       });
