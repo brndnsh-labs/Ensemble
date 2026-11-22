@@ -465,14 +465,32 @@ export interface Walk {
    * being left (X-A-26). It obeys every rule a lead-in obeys.
    */
   readonly last: "half" | "whole";
+  /**
+   * The walk's own rhythm, one bar of the grid a figure is written in (`x` a
+   * note, `-` held, `.` silence), striking one more note than `tones` has:
+   * `x------- x--- x---` is the root held from 1 and two steps on 3 and 4
+   * (BA-53). It replaces the bar's figure where the walk is played, so a line
+   * whose figure strikes fewer notes than the walk needs (a two-beat bass) can
+   * still walk. A bar of another length than the grid is never walked this
+   * way. Left out, the walk is played on the bar's own figure's strokes.
+   */
+  readonly grid?: string;
 }
 
 export interface WalkPolicy {
   /**
    * How likely a plan the bassist weighs is to walk into the next line, and
    * into a change inside one. The critic decides which plan is played.
+   *
+   * `intoSection`: into the first bar of a section or of a new time through it
+   * (EN-51: a country bass walks up into a new section far more often than
+   * inside one). Left out, as `end`. The final chord is always `end`'s.
    */
-  readonly offer: { readonly end: PerTier<number>; readonly inside: PerTier<number> };
+  readonly offer: {
+    readonly end: PerTier<number>;
+    readonly inside: PerTier<number>;
+    readonly intoSection?: PerTier<number>;
+  };
   /** The walks for each way the bass note can move. A move with none is never walked. */
   readonly kinds: Readonly<Partial<Record<RootMotion, readonly Walk[]>>>;
 }

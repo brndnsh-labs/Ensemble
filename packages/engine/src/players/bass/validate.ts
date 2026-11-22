@@ -322,6 +322,8 @@ export function validateBassStyle(bass: BassStyle): string[] {
     for (const tier of TIERS) {
       chance(walks.offer.end[tier], `walks offered at the end of a line, ${tier}`);
       chance(walks.offer.inside[tier], `walks offered inside a line, ${tier}`);
+      if (walks.offer.intoSection)
+        chance(walks.offer.intoSection[tier], `walks offered into a section, ${tier}`);
     }
     for (const [motion, list] of Object.entries(walks.kinds)) {
       if (!ROOT_MOTIONS.includes(motion as RootMotion))
@@ -339,6 +341,20 @@ export function validateBassStyle(bass: BassStyle): string[] {
           problems.push(
             `${at}: a walk starts on the chord's root (R), where it still states the chord.`,
           );
+        if (walk.grid !== undefined) {
+          const grid = cells(walk.grid);
+          if (grid.some((symbol) => symbol !== "x" && symbol !== "-" && symbol !== "."))
+            problems.push(`${at}: its grid is written in x, - and . only.`);
+          if (grid[0] !== "x")
+            problems.push(
+              `${at}: its grid strikes the root on the downbeat, where it states the chord.`,
+            );
+          const strokes = grid.filter((symbol) => symbol === "x").length;
+          if (strokes !== walk.tones.length + 1)
+            problems.push(
+              `${at}: its grid strikes ${strokes} notes; a walk of ${walk.tones.length + 1} notes needs as many.`,
+            );
+        }
       });
     }
   }

@@ -143,7 +143,7 @@ function onsetsOf(line: BassLine, tier: Tier, bar: PlanBar, rng: Rng): Onsets {
 }
 
 /** The bar's first pulse and, in a bar that divides in two, its middle one. */
-function isStrong(bar: PlanBar, tickInBar: number): boolean {
+export function isStrong(bar: PlanBar, tickInBar: number): boolean {
   if (tickInBar === 0) return true;
   const beats = pulses(bar);
   if (beats.length < 4 || beats.length % 2 === 1) return false;
