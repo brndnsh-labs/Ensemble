@@ -193,12 +193,13 @@ export function walkHome(
             });
         }
         // With no note on 4 the root drops onto the final one: a V by a fifth, any other chord
-        // by no more than an octave (BA-21), where no note on 4 goes in to the low root.
+        // by no more than an octave (BA-21), where no note on 4 goes in to the low root. Only a
+        // drop is that wide: a root under the landing rises onto it by a fifth at most.
         found.push({
           notes: [note(2, 2, at, three)],
           path: [at, landing],
           placed,
-          widest: motion === 7 ? FIFTH : OCTAVE,
+          widest: motion !== 7 && at > landing ? OCTAVE : FIFTH,
         });
       }
       return found;
