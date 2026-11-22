@@ -6,6 +6,7 @@
 // and a scratch is the same stroke with the fretting hand let go (CH-28).
 
 import { PPQ } from "../../chart/types.ts";
+import { heldCount } from "../../perform/harmony.ts";
 import { isCompound, onAnd } from "../../perform/meter.ts";
 import type { WrittenNote } from "../../perform/notes.ts";
 import type { Plan } from "../../plan/types.ts";
@@ -433,7 +434,7 @@ function placeIn(voicing: Voicing, chord: Chord | null, place: PickPlace): Pluck
   const at = (k: number): Plucked => ({ string: strings[k]!, pitch: voicing.pitches[k]! });
   // A finger's string is counted from the top of the grip, as a guitarist numbers them.
   if (typeof place === "number") return at(Math.max(0, strings.length - place));
-  if (place === "bass") return at(0);
+  if (place === "bass" || place === "alternating") return at(0);
   if (place === "fifth") return boomFifth(voicing, chord);
   const other = alternate(voicing, chord);
   if (place === "alternate") return other;
@@ -443,14 +444,38 @@ function placeIn(voicing: Voicing, chord: Chord | null, place: PickPlace): Pluck
 }
 
 /**
+ * For each bar the chord seat plays, the bars its chord at the barline has held before it
+ * (`heldCount`, as the bass counts them), and the tick its next chord arrives at, if inside
+ * the bar.
+ */
+function heldBars(plan: Plan): Map<number, { readonly cycle: number; readonly until: number }> {
+  const count = heldCount();
+  const result = new Map<number, { cycle: number; until: number }>();
+  for (const bar of plan.bars) {
+    if (bar.kind !== "music") continue;
+    for (const span of bar.spans) {
+      const { merged, cycle } = count(bar, span, bar.seats.chords === null ? null : span.chord);
+      if (merged) continue;
+      const entry = result.get(bar.index);
+      if (span.start === 0) result.set(bar.index, { cycle, until: bar.start + bar.ticks });
+      else if (entry && entry.until === bar.start + bar.ticks) entry.until = bar.start + span.start;
+    }
+  }
+  return result;
+}
+
+/**
  * What each stroke of a part plucks, or null for a stroke that is strummed.
  * Under a new grip the thumb's first note is its bass, whichever of its
  * places the pattern writes there: a chord that arrives where the thumb would
  * alternate is still stated by its bass (CH-32).
  */
-function plucked(part: readonly VoicedStrike[]): (readonly Plucked[] | null)[] {
+function plucked(part: readonly VoicedStrike[], plan: Plan): (readonly Plucked[] | null)[] {
   let holding: Voicing | null = null;
   let stated = false;
+  const held = part.some(({ strike }) => strike.pluck?.includes("alternating"))
+    ? heldBars(plan)
+    : null;
   return part.map(({ strike, voicing }) => {
     if (!holding || !sameGrip(holding, voicing)) stated = false;
     holding = voicing;
@@ -460,7 +485,16 @@ function plucked(part: readonly VoicedStrike[]): (readonly Plucked[] | null)[] {
       return null;
     }
     const thumbs = (place: PickPlace) => typeof place !== "number";
-    const places = strike.pluck.map((place) => (!stated && thumbs(place) ? "bass" : place));
+    // The boom bar by bar: the bass in the bar its chord is struck in and every second bar
+    // after, the alternate bass between (BA-56).
+    const alternating = (): PickPlace => {
+      const bar = held?.get(strike.bar);
+      const odd = bar !== undefined && strike.tick < bar.until && bar.cycle % 2 === 1;
+      return odd ? "fifth" : "bass";
+    };
+    const places = strike.pluck
+      .map((place) => (place === "alternating" ? alternating() : place))
+      .map((place) => (!stated && thumbs(place) ? "bass" : place));
     if (places.includes("bass")) stated = true;
     const sounded: Plucked[] = [];
     for (const place of places) {
@@ -568,7 +602,7 @@ export function guitar(style: Guitar): InstrumentIdiom {
       const pair = grid === "eighth" ? PPQ : PPQ / 2;
       // The roll is a time, not a share of the beat: the same at every tempo (CH-29).
       const ticksPerMs = (plan.quarters * PPQ) / 60_000;
-      const plucks = plucked(part);
+      const plucks = plucked(part, plan);
       part.forEach(({ strike, voicing }, i) => {
         // A plucked stroke: each string sounds by itself, and rings on under the hand.
         const picked = plucks[i];

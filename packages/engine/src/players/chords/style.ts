@@ -248,14 +248,28 @@ export interface PlainRhythm {
  *   low string, at the fourth fret or under); else the grip's own fifth on the
  *   two strings over the bass; else the fifth over the bass on the next string
  *   up, fretted with the grip. Only with no fifth anywhere there, the bass.
+ * - `alternating`: the boom bar by bar, as a bass in one alternates (BA-56):
+ *   the bass in the bar its chord is struck in and every second bar the chord
+ *   holds after, `fifth` in the bars between. The bars are counted as the bass
+ *   counts them (`heldCount`): a new chord, the top of a section, the first
+ *   chord after the seat's rest, or a chord inside the bar, is struck there.
  *
  * and each finger one: `1`, `2`, `3` are the grip's strings counted from the
  * top, as a guitarist numbers them. On a grip with fewer strings than a place
  * asks for, the place is the nearest string the grip has. Under a new chord
  * the thumb's first note is its bass, whichever of its places is written.
  */
-export type PickPlace = "bass" | "alternate" | "fifth" | "upper" | 1 | 2 | 3;
-export const PICK_PLACES: readonly PickPlace[] = ["bass", "alternate", "fifth", "upper", 1, 2, 3];
+export type PickPlace = "bass" | "alternate" | "fifth" | "alternating" | "upper" | 1 | 2 | 3;
+export const PICK_PLACES: readonly PickPlace[] = [
+  "bass",
+  "alternate",
+  "fifth",
+  "alternating",
+  "upper",
+  1,
+  2,
+  3,
+];
 
 /**
  * How the hand plays one written symbol of a figure: how hard, and for how

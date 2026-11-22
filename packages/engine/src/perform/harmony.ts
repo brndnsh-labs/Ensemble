@@ -1,8 +1,8 @@
 // The chart's harmony as the rhythm section meets it: a line of arrivals, each
 // a chord being struck somewhere, with what comes before and after.
 
-import type { ChartChord } from "../chart/types.ts";
-import type { Plan } from "../plan/types.ts";
+import type { ChartChord, ChordSpan } from "../chart/types.ts";
+import type { Plan, PlanBar } from "../plan/types.ts";
 import { sameQuality } from "../theory/chord.ts";
 import type { Key } from "../theory/pitch.ts";
 import { sameNote } from "../theory/pitch.ts";
@@ -98,4 +98,53 @@ export function contextOf(list: readonly Arrival[], arrival: Arrival): HarmonicC
     }
   }
   return { key: arrival.key, next: nextChange(list, arrival)?.chord ?? null, previous };
+}
+
+/** Where a seat is in a chord, at one stretch of a bar under one chord. */
+export interface Held {
+  /**
+   * The stretch only carries on the piece before it: the same chord written again in the same
+   * bar, outside the ending bar. It is one with that piece, and nothing below is counted.
+   */
+  readonly merged: boolean;
+  /**
+   * The chord is stated here: a new chord, the top of a section, the first chord after the
+   * seat's rest, or any chord of the ending bar. Where the chart only carries the same chord on
+   * into the next bar, a line continues instead (X-A-22).
+   */
+  readonly struck: boolean;
+  /**
+   * Whole bars the chart has already spent on this chord before this bar, counted from where
+   * it was struck (BA-97): 0 in the bar it is struck in, 1 the next, and so on. A chord that
+   * arrives partway through a bar starts counting at the next barline; a stretch that starts
+   * inside the bar reads 0.
+   */
+  readonly cycle: number;
+}
+
+/**
+ * The count of bars a chord has held, as one seat reads the plan: one call for each stretch
+ * of each bar the seat plays through, in order, with the chord the seat hears there (null
+ * where it rests). It is the one count every reader of "the bar the chord was struck in, and
+ * the bars it holds after" shares: the bass's line going up and coming down (BA-97), a
+ * waltz's root and fifth bar by bar (BA-56), and a picking thumb's alternate bass.
+ */
+export function heldCount(): (bar: PlanBar, span: ChordSpan, chord: ChartChord | null) => Held {
+  let previous: { readonly chord: ChartChord | null; readonly bar: PlanBar } | undefined;
+  let bars = 0;
+  return (bar, span, chord) => {
+    const carried = previous !== undefined && sameChord(previous.chord, chord);
+    // One chord written twice in a bar is one piece: the line continues through it. The ending
+    // bar is kept as written, because the band strikes each of its chords.
+    if (carried && previous!.bar === bar && !bar.ending)
+      return { merged: true, struck: false, cycle: 0 };
+    const atBarline = span.start === 0;
+    const top = atBarline && bar.barInSection === 0;
+    const struck = chord !== null && (!carried || top || bar.ending !== null);
+    if (struck) bars = 0;
+    const cycle = atBarline ? bars : 0;
+    if (atBarline && chord !== null) bars++;
+    previous = { chord, bar };
+    return { merged: false, struck, cycle };
+  };
 }
