@@ -33,6 +33,7 @@ import {
   type Strike,
   strikesOf,
 } from "./reading.ts";
+import type { LibraryChart } from "./takes.ts";
 import {
   COUNTRY_WALTZ,
   enough,
@@ -1943,13 +1944,20 @@ test(
 );
 
 test(
-  "country: in three with no bassist the guitar's pick takes the boom on 1 of every bar it plays that is not a rest or the final chord: one plucked note, the lowest the guitar sounds in the bar, the chord's bass in the bar it is struck in and every second bar it holds after, its alternate bass (the fifth; over a chord standing on another note, its own root) in the bars between, as the waltz bass alternates (ST-country-07, CH-26, BA-56)",
+  "country: in three with no bassist the guitar's pick takes the boom on 1 of every bar it plays that is not a rest or the final chord: one plucked note, the lowest the guitar sounds in the bar, the grip's bass in the bar its chord is struck in and every second bar it holds after, the grip's alternate bass (its fifth) in the bars between, counted as the waltz bass counts (ST-country-07, CH-26, BA-56). The grip stands on the chord's own root: over a slash chord the boom is that root and its fifth, the slash note left to a bassist, as in four",
   only("country"),
   () => {
     const country = STYLES.find((style) => style.id === "country")!;
     let booms = 0;
+    // Slash chords held and changed: the boom is the grip's (C3, G2, C3 over C/G), not the slash.
+    const slashes: LibraryChart = {
+      file: "slash-waltz",
+      text: "title: Slash waltz\nkey: C\nmeter: 3/4\n\n[A]\n| C/G | C/G | C/G | F |\n| G/B | G/B | D/F# | D/F# |\n",
+      meter: "3/4",
+    };
     for (const chart of [
       COUNTRY_WALTZ,
+      slashes,
       ...LIBRARY.filter((candidate) => candidate.meter === "3/4"),
     ]) {
       for (const energy of [0.3, 0.6, 0.85]) {
@@ -1968,12 +1976,11 @@ test(
             const boom = plucked.filter((note) => note.tick === bar.start);
             assert.equal(boom.length, 1, `${where}: ${boom.length} plucked notes on 1`);
             const pitch = boom[0]!.pitches[0]!;
-            const standsOn = pitchClass(first.bass ?? first.root);
-            const fifth =
-              (pitchClass(first.root) +
+            const standsOn = pitchClass(first.root);
+            const other =
+              (standsOn +
                 (chordTones(first.quality).find((tone) => tone.role === "fifth")?.interval ?? 7)) %
               12;
-            const other = standsOn !== pitchClass(first.root) ? pitchClass(first.root) : fifth;
             const odd = cycle % 2 === 1;
             assert.equal(
               pitch % 12,
