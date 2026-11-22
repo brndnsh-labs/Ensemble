@@ -189,7 +189,7 @@ const HOME_CHARTS: readonly LibraryChart[] = (
   })),
 );
 
-test("in a style whose bass walks home, every ending that is one chord struck on its downbeat, in four after a bar of four of one chord (or two, the second on beat 3), is walked into: a note on beat 4 a step from the final root (none after a V struck on beat 3); a bar of one chord whose root is outside the run climbs on 2, 3 and 4 from the fifth under the root by steps (over the V the fifth is held from 1; from the IV the line comes down from the fourth over it), unless no octave holds that climb or it would leave the chord's scale; the walk on the instrument and in the bass's register, moving by a fourth at most (a V on beat 3 drops a fifth), and the final root in the lowest octave where all that holds; and the final root played at least as hard as the note it is walked in on", {
+test("in a style whose bass walks home, every ending that is one chord struck on its downbeat, in four after a bar of four of one chord (or two, the second on beat 3), is walked into: a note on beat 4 a step from the final root (none after a V struck on beat 3); a bar of one chord whose root is outside the run climbs on 2, 3 and 4 from the fifth under the root by steps (over the V the fifth is held from 1; from the IV the line comes down from the fourth over it), unless no octave holds that climb or it would leave the chord's scale; the walk on the instrument and in the bass's register, moving by a fourth at most (a V on beat 3 drops a fifth onto it, any other chord on 3 no more than an octave), and the final root in the lowest octave where all that holds; and the final root played at least as hard as the note it is walked in on", {
   skip: !STYLES.some((style) => style.bass.walks?.ending !== undefined),
 }, () => {
   let walked = 0;
@@ -243,8 +243,8 @@ test("in a style whose bass walks home, every ending that is one chord struck on
     const [four] = at(3);
     const [first] = at(0);
     // The walk's own notes, the note the line moves to it from, and how wide it may move:
-    // a fourth inside the walk, a fifth onto it from the line's own note (the boom's move), and
-    // a fifth where a V on beat 3 drops onto the root.
+    // a fourth inside the walk, a fifth onto it from the line's own note (the boom's move), a
+    // fifth where a V on beat 3 drops onto the root, and an octave where another chord on 3 does.
     let walk: number[];
     let from: number | null;
     let widest = 5;
@@ -255,7 +255,7 @@ test("in a style whose bass walks home, every ending that is one chord struck on
         assert.equal(at(3).length, 0, `${where}: a V on beat 3 plays on into the final root`);
       walk = four ? [four.pitch] : [];
       from = at(2)[0]?.pitch ?? null;
-      if (!four) widest = 7;
+      if (!four) widest = motion === 7 ? 7 : 12;
     } else {
       assert.ok(four && at(3).length === 1, `${where}: no note on beat 4 of the walk home`);
       const down = motion === 5 && first?.pitch === home.pitch + 5 && at(1).length === 0;
@@ -294,7 +294,9 @@ test("in a style whose bass walks home, every ending that is one chord struck on
         path.every(inRegister) &&
         moves.every(
           (pitch, i) =>
-            i === 0 || Math.abs(pitch - moves[i - 1]!) <= (i === 1 && from !== null ? 7 : widest),
+            i === 0 ||
+            Math.abs(pitch - moves[i - 1]!) <=
+              (i === 1 && from !== null && walk.length > 0 ? 7 : widest),
         )
       );
     };

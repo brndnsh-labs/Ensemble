@@ -190,11 +190,13 @@ export function walkHome(
               enter: FIFTH,
             });
         }
+        // With no note on 4 the root drops onto the final one: a V by a fifth, any other chord
+        // by no more than an octave (BA-21), where no note on 4 goes in to the low root.
         found.push({
           notes: [note(2, 2, at, three)],
           path: [at, landing],
           placed,
-          widest: FIFTH,
+          widest: motion === 7 ? FIFTH : OCTAVE,
         });
       }
       return found;
