@@ -1,0 +1,91 @@
+# Release one commit's image to one of the two sites: join the tailnet, speak to the one
+# scoped account on the Docker host, and wait until the public site says it serves the
+# commit. The job that uses this runs nothing else: no install, no code of the app's.
+name: release
+description: Release a commit's image to the test site or to production, and confirm the site serves it
+inputs:
+  site:
+    description: ensembletest or ensemble
+    required: true
+  sha:
+    description: The commit whose image is released, all 40 characters
+    required: true
+  host:
+    description: The Docker host, as the tailnet names it
+    required: true
+  ts-oauth-client-id:
+    description: The tailnet's OAuth client for a tag:ci node
+    required: true
+  ts-oauth-secret:
+    description: Its secret
+    required: true
+  release-key:
+    description: The key of the account that can run `release <stack> <service> sha-<commit>` and nothing else
+    required: true
+  only-the-tip:
+    description: "true for a merge's release: release nothing if main has moved on from the commit"
+    required: true
+  token:
+    description: A token that can read the repository, to ask where main is
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Check the release target is named
+      shell: bash
+      env:
+        DEPLOY_HOST: ${{ inputs.host }}
+      run: |
+        [[ "$DEPLOY_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]] \
+          || { echo '::error::Missing or invalid PROD_DEPLOY_DOCKER_HOST variable'; exit 1; }
+
+    - name: Join the tailnet
+      uses: tailscale/github-action@v4
+      with:
+        oauth-client-id: ${{ inputs.ts-oauth-client-id }}
+        oauth-secret: ${{ inputs.ts-oauth-secret }}
+        tags: tag:ci
+        use-cache: "true"
+
+    # Linux does not accept subnet routes unless told to, and without them the runner
+    # cannot reach the LAN. DNS stays GitHub's, so the check at the end reaches the site
+    # by the public path a visitor takes.
+    - name: Accept subnet routes, keep GitHub's DNS
+      shell: bash
+      run: sudo tailscale set --accept-routes --accept-dns=false
+
+    - name: Check the release target is reachable
+      shell: bash
+      env:
+        DEPLOY_HOST: ${{ inputs.host }}
+      run: |
+        timeout 20 bash -c "until </dev/tcp/$DEPLOY_HOST/22; do sleep 1; done" \
+          || { echo "::error::Cannot reach $DEPLOY_HOST:22 over the tailnet."; exit 1; }
+
+    - name: Install the release key
+      shell: bash
+      env:
+        DEPLOY_HOST: ${{ inputs.host }}
+        RELEASE_KEY: ${{ inputs.release-key }}
+      run: |
+        [[ -n "$RELEASE_KEY" ]] || { echo '::error::Missing API_RELEASE_SSH_KEY secret'; exit 1; }
+        mkdir -p ~/.ssh && chmod 700 ~/.ssh
+        printf '%s\n' "$RELEASE_KEY" > ~/.ssh/release_key
+        chmod 600 ~/.ssh/release_key
+        {
+          echo "Host ensemble-release"
+          echo "  HostName $DEPLOY_HOST"
+          echo "  User ensemble-release"
+          echo "  IdentityFile ~/.ssh/release_key"
+          echo "  IdentitiesOnly yes"
+          echo "  StrictHostKeyChecking accept-new"
+        } >> ~/.ssh/config
+
+    - name: Release, and wait for the site to serve it
+      shell: bash
+      env:
+        SITE: ${{ inputs.site }}
+        SHA: ${{ inputs.sha }}
+        ONLY_THE_TIP: ${{ inputs.only-the-tip }}
+        GH_TOKEN: ${{ inputs.token }}
+      run: bash "$GITHUB_ACTION_PATH/release.sh" "$SITE"

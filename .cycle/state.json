@@ -1,15 +1,15 @@
 {
   "upstream": "667639e",
   "files": {
-    ".claude/skills/DOCTRINE.md": "b6783796c70c",
+    ".claude/skills/DOCTRINE.md": "3789e3e5a941",
     ".claude/skills/cycle/SKILL.md": "4c40a1ba60a7",
-    ".claude/skills/intake/SKILL.md": "b61e3ca2dd66",
-    ".claude/skills/review/SKILL.md": "82ee85f6d2bf",
+    ".claude/skills/intake/SKILL.md": "e4a8d857e5dd",
+    ".claude/skills/review/SKILL.md": "57770e3c4e77",
     ".claude/skills/next/SKILL.md": "ba5a0dcd8d9b",
     ".claude/skills/scout/SKILL.md": "bb988322b450",
     ".claude/skills/wrap-up/SKILL.md": "ca11b2eeab49",
     ".claude/skills/dep-update/SKILL.md": "f6b2f5dce742",
-    ".claude/skills/deploy-prod/SKILL.md": "16f63399dce9",
+    ".claude/skills/deploy-prod/SKILL.md": "20f0392451fd",
     ".claude/skills/unblock/SKILL.md": "810529fb83a8"
   }
 }
