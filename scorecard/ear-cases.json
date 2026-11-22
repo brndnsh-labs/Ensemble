@@ -752,6 +752,19 @@
       "seat": "band",
       "styles": ["jazz", "blues", "rock", "acoustic"],
       "heard": "out/tempo-breathes/: jazz (Autumn Leaves at 132), the blues, rock and acoustic, one chart each on one seed, steady and with the option on; jazz and rock also at double the amount; disco, which does not breathe, beside main. Rendered from the branch that merged as e7091a41."
+    },
+    {
+      "id": "who-plays-sounds-good",
+      "date": "2026-11-21",
+      "words": "listening page sounds good, thanks for posting that",
+      "source": "docs/decisions/critic.md: his ear on who plays (2026-11-21, #2240)",
+      "kind": "passed",
+      "medium": "notes",
+      "recorded": "d33df056",
+      "doubt": "One sentence for the whole page. He did not say which clips he played, nor answer the questions put (does the drop read as the band's choice, does the comp come back in the right place, is a chorus without the piano too bare under the soloist, could he play along through it) one by one. The page's clips were chosen as takes where a seat sits out; how often that happens was given to him in numbers, not heard. Not tried on his phone.",
+      "seat": "band",
+      "styles": ["jazz", "blues", "funk", "disco", "reggae"],
+      "heard": "out/who-plays/: jazz and the blues with the alto, funk, disco and reggae, each a jam of eight passes and an open jam told to finish inside its lay-out, main beside the build on the same seed; rock, where nobody sits out. Rendered from the branch that merged as 060a260f."
     }
   ],
   "leftOut": [
