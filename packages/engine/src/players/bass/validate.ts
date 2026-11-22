@@ -343,6 +343,7 @@ export function validateBassStyle(bass: BassStyle): string[] {
           problems.push(
             `${at}: a walk starts on the chord's root (R), where it still states the chord.`,
           );
+        if (walk.length !== undefined) share(walk.length, `${at}, its notes' length`);
         if (walk.grid !== undefined) {
           const grid = cells(walk.grid);
           const named = (symbol: string) => symbol in RIFF_TONES;

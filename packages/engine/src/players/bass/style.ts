@@ -516,6 +516,12 @@ export interface Walk {
    * walk is played on the bar's own figure's strokes.
    */
   readonly grid?: string;
+  /**
+   * How much of its space each note of the walk sounds, the gap a line's notes
+   * keep (`length.gap`) aside: a walk connects, where the line's own notes may
+   * be short (BA-52: walking notes at 92%). Left out, as the line's notes.
+   */
+  readonly length?: number;
 }
 
 export interface WalkPolicy {

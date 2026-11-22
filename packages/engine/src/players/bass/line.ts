@@ -47,6 +47,8 @@ export interface LineNote {
   walked?: boolean;
   /** A walked note that is not a tone of its chord: it passes. */
   passing?: boolean;
+  /** How much of its space it sounds, the line's gap aside: a walk's note (`Walk.length`). */
+  connects?: number;
 }
 
 interface Onset {
@@ -317,13 +319,17 @@ export function write(notes: readonly LineNote[], piece: Piece, line: BassLine):
   const written: WrittenNote[] = [];
   notes.forEach((note, i) => {
     if (note.space < SHORTEST && !note.exact) return;
-    const share = note.echo
-      ? line.length.short
-      : notes[i + 1]?.echo
-        ? line.length.long
-        : line.length.note;
-    // A gap is as much of the space as counts toward the note's length (ST-funk-18).
-    const gap = line.length.gap;
+    const share =
+      note.connects !== undefined
+        ? note.connects
+        : note.echo
+          ? line.length.short
+          : notes[i + 1]?.echo
+            ? line.length.long
+            : line.length.note;
+    // A gap is as much of the space as counts toward the note's length (ST-funk-18); a walk's
+    // note that connects keeps its whole space.
+    const gap = note.connects === undefined ? line.length.gap : undefined;
     const room = gap === undefined ? note.space : Math.min(note.space, gap * STEP);
     // One voice: a note never rings into the next. A dead note is as short as a note gets.
     const duration =

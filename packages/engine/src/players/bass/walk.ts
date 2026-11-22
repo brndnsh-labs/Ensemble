@@ -100,7 +100,12 @@ export function walkInto(
     }
     if (!note.echo) n++;
     const last = n === pitches.length - 1;
-    return { ...note, pitch: pitches[n]!, level: last && !note.echo ? "approach" : note.level };
+    return {
+      ...note,
+      pitch: pitches[n]!,
+      level: last && !note.echo ? "approach" : note.level,
+      ...(walk.length !== undefined ? { connects: walk.length } : {}),
+    };
   });
   return { notes: walked, walk };
 }
