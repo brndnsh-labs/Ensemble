@@ -32,7 +32,7 @@ import {
 import { styleIds } from "@ensemble/styles";
 import { corpus } from "./corpus.ts";
 import { bluesWritten, POCKET } from "./reading.ts";
-import type { Jam } from "./takes.ts";
+import type { Jam, LibraryChart } from "./takes.ts";
 import {
   enough,
   FULL,
@@ -43,6 +43,7 @@ import {
   ownCharts,
   readSmf,
   SEEDS,
+  SOLO_SECTION,
   STYLES,
   soloistTakes,
   takes,
@@ -218,6 +219,48 @@ test("making an open jam one pass longer changes nothing that was already played
 
 test("a jam told to finish plays everything before its last pass as it would have, and that pass is a last pass like any other: marked, and landed", () => {
   for (const style of STYLES) {
+    const check = (
+      chart: LibraryChart,
+      options: PlanOptions,
+      endAfter: number,
+      seed: number,
+      solo: boolean,
+      breathe: boolean,
+    ) => {
+      const asPlanned = render(chart.text, style, { ...options, seed, solo, breathe });
+      const told = render(chart.text, style, { ...options, seed, solo, breathe, endAfter });
+      const where = `${chart.file} seed ${seed}, told on pass ${endAfter}`;
+
+      const top = told.plan.bars.find((bar) => bar.kind === "music" && bar.pass === endAfter)!;
+      // The pass markers say "1/2" once the band knows how many there are; nothing else may differ.
+      const before = (take: Take) =>
+        take.events.filter(
+          (event) =>
+            event.tick < top.start && !(event.kind === "marker" && event.marker === "pass"),
+        );
+      assert.deepEqual(before(told), before(asPlanned), where);
+      // And the soloist was playing the solos the jam set out with: as long, and as far through.
+      const solos = (take: Take) =>
+        take.plan.bars.filter((bar) => bar.start < top.start).map((bar) => bar.solo);
+      assert.deepEqual(solos(told), solos(asPlanned), `${where}: the solos before it`);
+      // The band may be told at any phrase top of the pass it turns on (the app tells it where
+      // it can), so the whole of that pass keeps the time it was going to be played in.
+      const turned = told.plan.bars.filter(
+        (bar) => bar.kind === "music" && bar.pass <= endAfter && bar.section.role === "body",
+      );
+      assert.deepEqual(
+        turned.map((bar) => bar.quarters),
+        turned.map((bar) => asPlanned.plan.bars[bar.index]!.quarters),
+        `${where}: the time of the pass it turns on`,
+      );
+
+      assert.equal(told.plan.open, false, where);
+      assert.equal(told.plan.passes, endAfter + 1, where);
+      const music = told.plan.bars.filter((bar) => bar.kind === "music");
+      for (const bar of music) assert.equal(bar.lastPass, bar.pass === endAfter, where);
+      const last = music.at(-1)!;
+      assert.ok(last.ending !== null || last.spans.every((s) => s.chord === null), where);
+    };
     for (const [c, chart] of ownCharts(style).entries()) {
       for (const seed of SEEDS.slice(0, 4).filter((s) => FULL || (s + c) % 2 === 0)) {
         // An open jam and a timed one, each told to finish on one pass or another.
@@ -235,38 +278,13 @@ test("a jam told to finish plays everything before its last pass as it would hav
           const solo = (seed + c) % 4 < 2;
           // Half the charts with the tempo breathing: the band keeps the time of what was played.
           const breathe = c % 2 === 0;
-          const asPlanned = render(chart.text, style, { ...options, seed, solo, breathe });
-          const told = render(chart.text, style, { ...options, seed, solo, breathe, endAfter });
-          const where = `${chart.file} seed ${seed}, told on pass ${endAfter}`;
-
-          const top = told.plan.bars.find((bar) => bar.kind === "music" && bar.pass === endAfter)!;
-          // The pass markers say "1/2" once the band knows how many there are; nothing else may differ.
-          const before = (take: Take) =>
-            take.events.filter(
-              (event) =>
-                event.tick < top.start && !(event.kind === "marker" && event.marker === "pass"),
-            );
-          assert.deepEqual(before(told), before(asPlanned), where);
-          // The band may be told at any phrase top of the pass it turns on (the app tells it where
-          // it can), so the whole of that pass keeps the time it was going to be played in.
-          const turned = told.plan.bars.filter(
-            (bar) => bar.kind === "music" && bar.pass <= endAfter && bar.section.role === "body",
-          );
-          assert.deepEqual(
-            turned.map((bar) => bar.quarters),
-            turned.map((bar) => asPlanned.plan.bars[bar.index]!.quarters),
-            `${where}: the time of the pass it turns on`,
-          );
-
-          assert.equal(told.plan.open, false, where);
-          assert.equal(told.plan.passes, endAfter + 1, where);
-          const music = told.plan.bars.filter((bar) => bar.kind === "music");
-          for (const bar of music) assert.equal(bar.lastPass, bar.pass === endAfter, where);
-          const last = music.at(-1)!;
-          assert.ok(last.ending !== null || last.spans.every((s) => s.chord === null), where);
+          check(chart, options, endAfter, seed, solo, breathe);
         }
       }
     }
+    // A chart with a Solo section, the soloist asked for: each solo is the arc the jam set out with.
+    check(SOLO_SECTION, { mode: "jam", passes: 6 }, 4, 1, true, false);
+    check(SOLO_SECTION, { mode: "jam", open: true, passes: 3 }, 2, 1, true, false);
   }
 });
 

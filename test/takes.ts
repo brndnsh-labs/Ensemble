@@ -286,17 +286,29 @@ const STRESS_KINDS: readonly Omit<TakeOptions, "seed">[] = [
   { mode: "jam", passes: 3, solo: true },
 ];
 
-const STRESS_SPECS: readonly JamSpec[] = STYLES.flatMap((style) =>
-  STRESS.flatMap((chart) =>
+/**
+ * A chart with a section labelled Solo, where a jam's soloist has the lead every time round
+ * and nowhere else. No tune in the library has one; it is played as a jam of three passes with
+ * the soloist and without, on one seed, in every style.
+ */
+export const SOLO_SECTION: LibraryChart = testChart("solo-section.chart");
+
+const STRESS_SPECS: readonly JamSpec[] = STYLES.flatMap((style) => [
+  ...STRESS.flatMap((chart) =>
     SEEDS.slice(0, 4).flatMap((seed) =>
       STRESS_KINDS.map((kind) => ({ style, chart, options: { ...kind, seed } })),
     ),
   ),
-);
+  ...[{ solo: false }, { solo: true }].map(({ solo }) => ({
+    style,
+    chart: SOLO_SECTION,
+    options: { mode: "jam" as const, passes: 3, seed: 1, ...(solo ? { solo } : {}) },
+  })),
+]);
 
 /**
  * The stress charts at each level and as a jam with an arc and an ending, over a few seeds,
- * those that pass `only`.
+ * and the chart with a Solo section, those that pass `only`.
  */
 export function stressTakes(only: (spec: JamSpec) => boolean = () => true): Jam[] {
   return renderOnly(STRESS_SPECS, only);
