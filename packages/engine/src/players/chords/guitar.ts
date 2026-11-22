@@ -6,6 +6,7 @@
 // and a scratch is the same stroke with the fretting hand let go (CH-28).
 
 import { PPQ } from "../../chart/types.ts";
+import { heldCount } from "../../perform/harmony.ts";
 import { isCompound, onAnd } from "../../perform/meter.ts";
 import type { WrittenNote } from "../../perform/notes.ts";
 import type { Plan } from "../../plan/types.ts";
@@ -13,7 +14,7 @@ import type { Chord } from "../../theory/chord.ts";
 import { chordFamily, toneInterval } from "../../theory/chord.ts";
 import { mod12, pitchClass } from "../../theory/pitch.ts";
 import type { InstrumentIdiom } from "./idiom.ts";
-import type { VoicedStrike, Voicing } from "./strike.ts";
+import type { Strike, VoicedStrike, Voicing } from "./strike.ts";
 import { LOW_LIMITS, MUTED, PICKED } from "./strike.ts";
 import type { Guitar, PickPlace } from "./style.ts";
 import type { FittedTone } from "./tones.ts";
@@ -433,7 +434,7 @@ function placeIn(voicing: Voicing, chord: Chord | null, place: PickPlace): Pluck
   const at = (k: number): Plucked => ({ string: strings[k]!, pitch: voicing.pitches[k]! });
   // A finger's string is counted from the top of the grip, as a guitarist numbers them.
   if (typeof place === "number") return at(Math.max(0, strings.length - place));
-  if (place === "bass") return at(0);
+  if (place === "bass" || place === "alternating") return at(0);
   if (place === "fifth") return boomFifth(voicing, chord);
   const other = alternate(voicing, chord);
   if (place === "alternate") return other;
@@ -443,14 +444,74 @@ function placeIn(voicing: Voicing, chord: Chord | null, place: PickPlace): Pluck
 }
 
 /**
+ * The lowest note of the grip a stroke sounds, as an index into its pitches. An upstroke
+ * (`up`: the strings it catches) catches only the top strings of the grip, and as many more
+ * under them as it takes to sound every tone the chord is heard by (X-B-13), and to leave no
+ * growl on the bottom of what it sounds: a grip with the 13th under the 7th is clean from its
+ * root, and its top three strings are not (Q-03). A stroke written across only the top N
+ * strings sounds the grip's notes on those strings and nothing under them: a string the grip
+ * leaves silent is one of the N.
+ */
+function soundsFrom(voicing: Voicing, strike: Strike, up: number | null): number {
+  const strings = voicing.strings ?? voicing.pitches.map((_, string) => string);
+  const floor =
+    strike.top === undefined
+      ? 0
+      : Math.max(
+          0,
+          strings.findIndex((s) => s >= OPEN_STRINGS.length - strike.top!),
+        );
+  let from = Math.max(floor, up !== null ? Math.max(0, voicing.pitches.length - up) : 0);
+  if (from > 0) {
+    const needed = heardBy(voicing, strike.arrival.chord);
+    const family = strike.arrival.chord ? chordFamily(strike.arrival.chord.quality) : null;
+    const caught = (pitch: number) =>
+      voicing.pitches.slice(from).some((other) => mod12(other - pitch) === 0);
+    const growl = () =>
+      family !== null &&
+      !growls(voicing, family) &&
+      growls({ pitches: voicing.pitches.slice(from) }, family);
+    // An upstroke reaches down to the top strings' floor for a growl-free sound, and any
+    // stroke below it only for a tone the chord is heard by that the top strings lack.
+    while (from > floor && (needed.some((pitch) => !caught(pitch)) || growl())) from--;
+    while (from > 0 && needed.some((pitch) => !caught(pitch))) from--;
+  }
+  return from;
+}
+
+/**
+ * For each bar the chord seat plays, the bars its chord at the barline has held before it
+ * (`heldCount`, as the bass counts them), and the tick its next chord arrives at, if inside
+ * the bar.
+ */
+function heldBars(plan: Plan): Map<number, { readonly cycle: number; readonly until: number }> {
+  const count = heldCount();
+  const result = new Map<number, { cycle: number; until: number }>();
+  for (const bar of plan.bars) {
+    if (bar.kind !== "music") continue;
+    for (const span of bar.spans) {
+      const { merged, cycle } = count(bar, span, bar.seats.chords === null ? null : span.chord);
+      if (merged) continue;
+      const entry = result.get(bar.index);
+      if (span.start === 0) result.set(bar.index, { cycle, until: bar.start + bar.ticks });
+      else if (entry && entry.until === bar.start + bar.ticks) entry.until = bar.start + span.start;
+    }
+  }
+  return result;
+}
+
+/**
  * What each stroke of a part plucks, or null for a stroke that is strummed.
  * Under a new grip the thumb's first note is its bass, whichever of its
  * places the pattern writes there: a chord that arrives where the thumb would
  * alternate is still stated by its bass (CH-32).
  */
-function plucked(part: readonly VoicedStrike[]): (readonly Plucked[] | null)[] {
+function plucked(part: readonly VoicedStrike[], plan: Plan): (readonly Plucked[] | null)[] {
   let holding: Voicing | null = null;
   let stated = false;
+  const held = part.some(({ strike }) => strike.pluck?.includes("alternating"))
+    ? heldBars(plan)
+    : null;
   return part.map(({ strike, voicing }) => {
     if (!holding || !sameGrip(holding, voicing)) stated = false;
     holding = voicing;
@@ -460,7 +521,16 @@ function plucked(part: readonly VoicedStrike[]): (readonly Plucked[] | null)[] {
       return null;
     }
     const thumbs = (place: PickPlace) => typeof place !== "number";
-    const places = strike.pluck.map((place) => (!stated && thumbs(place) ? "bass" : place));
+    // The boom bar by bar: the bass in the bar its chord is struck in and every second bar
+    // after, the alternate bass between (BA-56).
+    const alternating = (): PickPlace => {
+      const bar = held?.get(strike.bar);
+      const odd = bar !== undefined && strike.tick < bar.until && bar.cycle % 2 === 1;
+      return odd ? "fifth" : "bass";
+    };
+    const places = strike.pluck
+      .map((place) => (place === "alternating" ? alternating() : place))
+      .map((place) => (!stated && thumbs(place) ? "bass" : place));
     if (places.includes("bass")) stated = true;
     const sounded: Plucked[] = [];
     for (const place of places) {
@@ -515,6 +585,10 @@ export function guitar(style: Guitar): InstrumentIdiom {
     // A guitarist holds a grip until the chord changes and moves only then (CH-31).
     holds: true,
 
+    sounds(voicing, strike) {
+      return voicing.pitches.slice(soundsFrom(voicing, strike, null));
+    },
+
     /**
      * Every grip of the tones in the style's window, the tightest first. A chord
      * with more tones than the style has strings takes a string for each
@@ -568,7 +642,7 @@ export function guitar(style: Guitar): InstrumentIdiom {
       const pair = grid === "eighth" ? PPQ : PPQ / 2;
       // The roll is a time, not a share of the beat: the same at every tempo (CH-29).
       const ticksPerMs = (plan.quarters * PPQ) / 60_000;
-      const plucks = plucked(part);
+      const plucks = plucked(part, plan);
       part.forEach(({ strike, voicing }, i) => {
         // A plucked stroke: each string sounds by itself, and rings on under the hand.
         const picked = plucks[i];
@@ -599,34 +673,7 @@ export function guitar(style: Guitar): InstrumentIdiom {
         const upstroke =
           !strike.down && (dotted ? onAnd(bar.meter, inBar) : inBar % pair >= pair / 2);
         const strings = voicing.strings ?? voicing.pitches.map((_, string) => string);
-        // An upstroke catches only the top strings of the grip, and as many more under them
-        // as it takes to sound every tone the chord is heard by (X-B-13), and to leave no
-        // growl on the bottom of what it sounds: a grip with the 13th under the 7th is clean
-        // from its root, and its top three strings are not (Q-03).
-        // A stroke written across only the top N strings sounds the grip's notes on those
-        // strings and nothing under them: a string the grip leaves silent is one of the N.
-        const floor =
-          strike.top === undefined
-            ? 0
-            : Math.max(
-                0,
-                strings.findIndex((s) => s >= OPEN_STRINGS.length - strike.top!),
-              );
-        let from = Math.max(floor, upstroke ? Math.max(0, voicing.pitches.length - up) : 0);
-        if (from > 0) {
-          const needed = heardBy(voicing, strike.arrival.chord);
-          const family = strike.arrival.chord ? chordFamily(strike.arrival.chord.quality) : null;
-          const caught = (pitch: number) =>
-            voicing.pitches.slice(from).some((other) => mod12(other - pitch) === 0);
-          const growl = () =>
-            family !== null &&
-            !growls(voicing, family) &&
-            growls({ pitches: voicing.pitches.slice(from) }, family);
-          // An upstroke reaches down to the top strings' floor for a growl-free sound, and any
-          // stroke below it only for a tone the chord is heard by that the top strings lack.
-          while (from > floor && (needed.some((pitch) => !caught(pitch)) || growl())) from--;
-          while (from > 0 && needed.some((pitch) => !caught(pitch))) from--;
-        }
+        const from = soundsFrom(voicing, strike, upstroke ? up : null);
         const [lowest, highest] = [strings[from]!, strings.at(-1)!];
         const across = (highest - lowest) * roll;
         // The stinger: the 6th struck with the chord and pulled off to the 5th an eighth later,
