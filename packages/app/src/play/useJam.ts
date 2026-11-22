@@ -85,7 +85,10 @@ interface Running {
 }
 
 /** Count a run's end, unless it has been counted already. */
-function countEnd(run: Running, how: "finished" | "ran-out" | "stopped" | "closed"): void {
+function countEnd(
+  run: Running,
+  how: "finished" | "ran-out" | "stopped" | "interrupted" | "closed",
+): void {
   if (run.ended) return;
   run.ended = true;
   count("play_ended", { how, length: lengthOf((performance.now() - run.startedAt) / 1000) });
@@ -147,9 +150,12 @@ export function useJam(
     }
   }, [rig, packs]);
 
-  /** Silence. `ended` is why: the take came to its end, or anything else stopped it. */
+  /**
+   * Silence. `ended` is why: the take came to its end, the phone cut the sound off, or
+   * anything else stopped it.
+   */
   const stop = useCallback(
-    (ended: "ran-out" | "stopped" = "stopped") => {
+    (ended: "ran-out" | "interrupted" | "stopped" = "stopped") => {
       presses.current++;
       const run = running.current;
       if (run) countEnd(run, ended === "ran-out" && run.toldAt !== undefined ? "finished" : ended);
@@ -340,6 +346,9 @@ export function useJam(
 
   // Leaving the screen stops the band.
   useEffect(() => () => stop(), [stop]);
+
+  // So does the phone cutting the sound off: the screen must not show a band that is not heard.
+  useEffect(() => rig.whenCutOff(() => stop("interrupted")), [rig, stop]);
 
   // The page closed while the band plays: that is its end. A page kept by the browser and come
   // back to plays on, and its end has been counted. Hidden is not closed: a phone puts a page
