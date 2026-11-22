@@ -5,6 +5,7 @@ import { STEP } from "../../perform/grid.ts";
 import { pulseTicks, strongPulses } from "../../perform/meter.ts";
 import type { NoteEvent } from "../../perform/notes.ts";
 import type { PlanBar } from "../../plan/types.ts";
+import { LOW_E } from "../../players/bass/tones.ts";
 import { tierOf } from "../../style/types.ts";
 import type { Take } from "../../take.ts";
 import { chordFamily, chordTones } from "../../theory/chord.ts";
@@ -921,4 +922,167 @@ export const bassMeasures: readonly Measure[] = [
     },
   },
   ...idiomMeasures,
+  {
+    id: "bass.boom-chick",
+    seat: "bass",
+    idiom: true,
+    says: "The two-beat bass: in a bar of four on one chord, its root on 1 and on 3 its fifth (over a chord standing on its fifth, the chord's own root), or the first note of a walk into the next chord: the root held and a step on 4, a step on 3 before it or not. 2 and 4 are left to the chick.",
+    unit: "share",
+    of(take) {
+      const bass = notesOf(take, "bass");
+      let bars = 0;
+      let boom = 0;
+      for (const bar of fourOnOneChord(take)) {
+        const chord = bar.spans[0]!.chord!;
+        const notes = notesIn(bass, bar);
+        const on = (beat: number) => notes.find((note) => note.tick === bar.start + beat * PPQ);
+        const [one, three, four] = [on(0), on(2), on(3)];
+        bars++;
+        const root = pitchClass(chord.root);
+        const standsOn = pitchClass(chord.bass ?? chord.root);
+        const fifth =
+          chordTones(chord.quality).find((tone) => tone.role === "fifth")?.interval ?? 7;
+        const other = standsOn !== root ? root : mod12(root + fifth);
+        if (!one || mod12(one.pitch) !== standsOn) continue;
+        if (three && mod12(three.pitch) === other) {
+          boom++;
+          continue;
+        }
+        // A walk (BA-53): the note on 4 a step from the next bar's first, the one on 3 (if any)
+        // a step from it, and nothing else in the bar but the root.
+        const landing = bass.find((note) => note.tick === bar.start + bar.ticks);
+        const step = (a: number, b: number) => a !== b && Math.abs(a - b) <= 2;
+        const walks =
+          four !== undefined &&
+          landing !== undefined &&
+          step(four.pitch, landing.pitch) &&
+          (three === undefined || step(three.pitch, four.pitch)) &&
+          notes.length === (three ? 3 : 2);
+        if (walks) boom++;
+      }
+      return share(boom, bars);
+    },
+  },
+  {
+    id: "bass.fifth-under",
+    seat: "bass",
+    idiom: true,
+    says: "A two-beat bass takes its fifth under the root wherever the instrument has the note there: of the bars with the root on 1 and its fifth on 3, the share with the fifth below where it fits.",
+    unit: "share",
+    of(take) {
+      const bass = notesOf(take, "bass");
+      let fits = 0;
+      let under = 0;
+      for (const bar of fourOnOneChord(take)) {
+        const chord = bar.spans[0]!.chord!;
+        const { one, three } = beatsOf(bass, bar);
+        if (!one || !three || (chord.bass && pitchClass(chord.bass) !== pitchClass(chord.root)))
+          continue;
+        const fifth =
+          chordTones(chord.quality).find((tone) => tone.role === "fifth")?.interval ?? 7;
+        if (mod12(three.pitch - one.pitch) !== mod12(fifth)) continue;
+        if (one.pitch - 12 + fifth < LOW_E) continue;
+        fits++;
+        if (three.pitch < one.pitch) under++;
+      }
+      return share(under, fits);
+    },
+  },
+  {
+    id: "bass.walks-that-rub",
+    seat: "bass",
+    idiom: true,
+    lowerIsBetter: true,
+    says: "A walk's note on beat 4 fits the chord it is played over: never a half step above one of its tones (the fourth over a major chord, the flat sixth over a minor one), unless it is a tone of the chord itself.",
+    unit: "share",
+    of(take) {
+      const bass = notesOf(take, "bass");
+      let walks = 0;
+      let rubs = 0;
+      for (const bar of fourOnOneChord(take)) {
+        const chord = bar.spans[0]!.chord!;
+        const { four, landing } = beatsOf(bass, bar);
+        if (!four || !landing || four.pitch === landing.pitch) continue;
+        if (Math.abs(four.pitch - landing.pitch) > 2) continue;
+        walks++;
+        const root = pitchClass(chord.root);
+        const tones = chordTones(chord.quality).map((tone) => mod12(root + tone.interval));
+        // A tone of the chord never rubs, though it sit a half step over another (over Cmaj7
+        // the root is a half step over B).
+        if (tones.includes(mod12(four.pitch))) continue;
+        if (tones.includes(mod12(four.pitch - 1))) rubs++;
+      }
+      return share(rubs, walks);
+    },
+  },
+  {
+    id: "bass.notes-per-beat",
+    seat: "bass",
+    idiom: true,
+    says: "How busy the line is, in notes a beat over its bars of four: two a bar is a two-beat bass, a walk adds one or two.",
+    unit: "per beat",
+    of(take) {
+      const bass = notesOf(take, "bass");
+      let beats = 0;
+      let notes = 0;
+      for (const bar of musicBars(take)) {
+        if (bar.ending || bar.seats.bass === null || bar.meter.beats !== 4 || bar.meter.unit !== 4)
+          continue;
+        beats += 4;
+        notes += notesIn(bass, bar).length;
+      }
+      return beats === 0 ? null : { value: notes / beats, cases: beats };
+    },
+  },
+  {
+    id: "bass.changes-walked",
+    seat: "bass",
+    idiom: true,
+    says: "Above the quiet level, some changes of bass note at a barline are walked into from the bar before: the root held, and a step on 4 (and on 3) into the new root; most are not.",
+    unit: "share",
+    of(take) {
+      const bass = notesOf(take, "bass");
+      let cases = 0;
+      let walked = 0;
+      for (const change of bassChanges(take)) {
+        if (change.tick !== change.bar.start || change.bar.ending) continue;
+        const before = take.plan.bars[change.bar.index - 1];
+        if (before?.kind !== "music" || before.meter.beats !== 4) continue;
+        const tier = bassTier(before);
+        if (tier === null || tier === "low" || before.spans.length !== 1) continue;
+        const landing = bass.find((note) => note.tick === change.tick);
+        if (!landing) continue;
+        cases++;
+        const notes = notesIn(bass, before);
+        const on = (beat: number) => notes.find((note) => note.tick === before.start + beat * PPQ);
+        const [three, four] = [on(2), on(3)];
+        const step = (a: number, b: number) => a !== b && Math.abs(a - b) <= 2;
+        if (four && step(four.pitch, landing.pitch) && (!three || step(three.pitch, four.pitch)))
+          walked++;
+      }
+      return share(walked, cases);
+    },
+  },
 ];
+
+/** The notes on beats 1, 3 and 4 of a bar of four, and the next bar's first. */
+function beatsOf(bass: readonly NoteEvent[], bar: PlanBar) {
+  const notes = notesIn(bass, bar);
+  const on = (beat: number) => notes.find((note) => note.tick === bar.start + beat * PPQ);
+  const landing = bass.find((note) => note.tick === bar.start + bar.ticks);
+  return { notes, one: on(0), three: on(2), four: on(3), landing };
+}
+
+/** Bars of four on one chord, struck on the downbeat, with the bass in and short of the ending. */
+function fourOnOneChord(take: Take): PlanBar[] {
+  return musicBars(take).filter(
+    (bar) =>
+      !bar.ending &&
+      bar.seats.bass !== null &&
+      bar.meter.beats === 4 &&
+      bar.meter.unit === 4 &&
+      bar.spans.length === 1 &&
+      bar.spans[0]!.chord !== null &&
+      bar.spans[0]!.start === 0,
+  );
+}

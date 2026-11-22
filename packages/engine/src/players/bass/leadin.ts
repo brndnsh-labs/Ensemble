@@ -208,6 +208,9 @@ function leadInTo(request: LeadInRequest): LeadIn | null {
       else if (policy.playsNextRoot) kind = coin() ? (draw() ?? "below") : null;
       else if (request.third === null || coin()) kind = draw() ?? "below";
       else return { how: "replace", index, pitch: request.third, chosen: false };
+    } else if (apart <= 2 && policy.keepsShape) {
+      // The figure stays as written: only the coin leads in from here.
+      if (coin()) kind = draw();
     } else if (apart <= 2) {
       // The line already leads in by step. Keep the note, beside the root it leads to
       // (BA-07). The open E under an F is a step on the instrument, so it stays too.

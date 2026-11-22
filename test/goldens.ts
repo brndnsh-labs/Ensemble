@@ -140,6 +140,23 @@ export const GOLDENS: readonly Golden[] = [
     style: "acoustic",
     options: { mode: "song", seed: 2 },
   },
+  // Country: the two in front of the five, a jam with the lead guitar (the boom-chick and its
+  // walks, the two-step turning into the train, the chick on the top four strings, the 6th on
+  // the I and the IV, the curl and the steel's bend).
+  {
+    file: "country-two-seven-a-solo.mid",
+    chart: "country-two-seven-a.chart",
+    style: "country",
+    options: { mode: "jam", passes: 4, seed: 1, solo: true },
+  },
+  // Country: the arranged song, in song mode (an intro and a first verse for the guitar alone,
+  // the pick playing the boom; the band, the lead over the third verse, the held ending).
+  {
+    file: "country-song-g.mid",
+    chart: "country-song-g.chart",
+    style: "country",
+    options: { mode: "song", seed: 2 },
+  },
 ];
 
 export const goldenUrl = (golden: Golden): URL =>

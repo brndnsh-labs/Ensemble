@@ -10,7 +10,7 @@ import type { Arrival } from "../../perform/harmony.ts";
 import { contextOf } from "../../perform/harmony.ts";
 import type { ChordFamily } from "../../theory/chord.ts";
 import { chordFamily } from "../../theory/chord.ts";
-import { mod12, pitchClass } from "../../theory/pitch.ts";
+import { keyToString, mod12, pitchClass } from "../../theory/pitch.ts";
 import { chordScale } from "../../theory/scale.ts";
 import { fretsOf, OPEN_STRINGS } from "./guitar.ts";
 import type { InstrumentIdiom } from "./idiom.ts";
@@ -18,7 +18,7 @@ import type { StrikeLine } from "./line.ts";
 import type { Strike, VoicedStrike, Voicing } from "./strike.ts";
 import { LOW_LIMITS } from "./strike.ts";
 import type { ChordRegister, ChordStyle } from "./style.ts";
-import { fitRecipe, identity, recipeFor } from "./tones.ts";
+import { fitRecipe, identity, readsTheKey, recipeFor } from "./tones.ts";
 
 export { LOW_LIMITS };
 
@@ -312,14 +312,17 @@ export function voiceStrikes(
     const at = `${strike.kind} ${strike.arrival.index}`;
     let way = wayAt.get(at);
     if (!way) {
-      const scale = chordScale(chord, contextOf(harmony, strike.arrival));
+      const context = contextOf(harmony, strike.arrival);
+      const scale = chordScale(chord, context);
       const root = pitchClass(chord.root);
       const colour = `${JSON.stringify(chord.quality)} ${scale.name} ${scale.intervals.join(" ")}`;
-      const name = `${strike.kind} ${root} ${colour}`;
+      // A kind whose recipes read the chord's place in the key voices it again in another key.
+      const inKey = readsTheKey(kind) ? ` ${keyToString(context.key)}` : "";
+      const name = `${strike.kind} ${root} ${colour}${inKey}`;
       way = ways.get(name);
       if (!way) {
         // A spread offers each of its recipe's stackings; close position has the one.
-        const recipe = recipeFor(kind, chord, scale);
+        const recipe = recipeFor(kind, chord, scale, context.key);
         const stacks =
           kind.position === "spread" ? [recipe.voices, ...(recipe.also ?? [])] : [recipe.voices];
         const family = chordFamily(chord.quality);

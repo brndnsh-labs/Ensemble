@@ -4,7 +4,7 @@
 import type { Meter } from "../../chart/types.ts";
 import { cells, LEVELS, STEP } from "../../perform/grid.ts";
 import { arrivals } from "../../perform/harmony.ts";
-import { barSteps, pulseTicks, writtenFor } from "../../perform/meter.ts";
+import { barSteps, meterName, pulseTicks, writtenFor } from "../../perform/meter.ts";
 import type { PlayerContext } from "../../perform/notes.ts";
 import { heldRng } from "../../perform/notes.ts";
 import type { Plan, PlanBar } from "../../plan/types.ts";
@@ -209,6 +209,7 @@ function applies(
   if (when.fill !== undefined && when.fill !== reading.filled) return false;
   if (when.changeInBar !== undefined && when.changeInBar !== reading.changeInBar) return false;
   if (when.changeAhead !== undefined && when.changeAhead !== reading.changeAhead) return false;
+  if (when.meters && !when.meters.includes(meterName(bar.meter))) return false;
   return true;
 }
 

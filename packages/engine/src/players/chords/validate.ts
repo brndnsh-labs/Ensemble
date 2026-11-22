@@ -10,6 +10,7 @@ import { FIGURE_STEPS, HELD } from "./figure.ts";
 import { OPEN_STRINGS, TOP_FRET } from "./guitar.ts";
 import type { Articulation, Attack, ChordStyle, RhythmBook, Voice } from "./style.ts";
 import { INSTRUMENTS, PICK_PLACES, VOICE_TONES } from "./style.ts";
+import { degreeSemitonesOf } from "./tones.ts";
 
 const TIERS: readonly Tier[] = ["low", "mid", "high"];
 const FAMILIES: readonly ChordFamily[] = [
@@ -62,8 +63,20 @@ export function validateChordStyle(chords: ChordStyle): string[] {
       );
     }),
   );
-  /** A plucked attack is a guitar's, names one or two places of the grip, and is not a scratch. */
+  /**
+   * A plucked attack is a guitar's, names one or two places of the grip, and is not a
+   * scratch. A strum across the top strings is a guitar's, crosses two or more of them,
+   * no more than the grip has, and is not also plucked.
+   */
   const plucks = (attack: Attack, where: string) => {
+    if (attack.top !== undefined) {
+      say(guitar !== null, `${where}: a strum across the top strings needs a guitar in the seat.`);
+      say(
+        Number.isInteger(attack.top) && attack.top >= 2 && attack.top <= (guitar?.strings ?? 6),
+        `${where}: a strum across the top ${attack.top} strings is not a whole number from 2 to the grip's strings.`,
+      );
+      say(attack.pluck === undefined, `${where}: a stroke is plucked or strummed, not both.`);
+    }
     if (attack.pluck === undefined) return;
     say(guitar !== null, `${where}: a plucked stroke needs a guitar in the seat.`);
     say(!attack.muted, `${where}: a stroke is plucked or deadened, not both.`);
@@ -148,6 +161,21 @@ export function validateChordStyle(chords: ChordStyle): string[] {
       for (const family of recipe.when?.family ?? []) {
         say(FAMILIES.includes(family), `${at}: "${family}" is not a chord family.`);
       }
+      const degrees = recipe.when?.degrees;
+      if (degrees !== undefined) {
+        say(degrees.length > 0, `${at}: lists no degrees, so no chord can meet it.`);
+        for (const degree of degrees) {
+          say(
+            degreeSemitonesOf(degree) !== null,
+            `${at}: "${degree}" is not a degree; write a numeral, I to VII, with b or # where it is off the major scale.`,
+          );
+        }
+      }
+      const mode = recipe.when?.mode;
+      say(
+        mode === undefined || mode === "major" || mode === "minor",
+        `${at}: "${mode}" is not a key's mode; write major or minor.`,
+      );
     });
   }
   for (const tier of TIERS) {

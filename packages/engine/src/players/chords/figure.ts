@@ -22,6 +22,8 @@ export interface FigureStroke {
   readonly muted?: true;
   /** A plucked stroke: the places of the grip that sound. */
   readonly pluck?: readonly PickPlace[];
+  /** A strum across only the grip's top strings: how many. */
+  readonly top?: number;
 }
 
 export function strokesOf(figure: CompFigure, tier: RhythmTier, book: RhythmBook): FigureStroke[] {
@@ -40,6 +42,7 @@ export function strokesOf(figure: CompFigure, tier: RhythmTier, book: RhythmBook
       length: Math.round(steps * STEP),
       ...(stroke.muted ? { muted: true as const } : {}),
       ...(stroke.pluck ? { pluck: stroke.pluck } : {}),
+      ...(stroke.top !== undefined ? { top: stroke.top } : {}),
     });
   });
   return strokes;

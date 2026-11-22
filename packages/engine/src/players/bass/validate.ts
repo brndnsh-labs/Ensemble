@@ -297,6 +297,8 @@ export function validateBassStyle(bass: BassStyle): string[] {
       `lead-in: "${lead.at}" is not a place before the change; write beat, eighth or sixteenth.`,
     );
   hold(lead.hold, "lead-in");
+  if (lead.keepsShape !== undefined && typeof lead.keepsShape !== "boolean")
+    problems.push("lead-in: keepsShape is true or false.");
   for (const tier of TIERS) {
     chance(lead.chance.inside[tier], `lead-in chance inside a section, ${tier}`);
     chance(lead.chance.intoSection[tier], `lead-in chance into a section, ${tier}`);
@@ -322,6 +324,8 @@ export function validateBassStyle(bass: BassStyle): string[] {
     for (const tier of TIERS) {
       chance(walks.offer.end[tier], `walks offered at the end of a line, ${tier}`);
       chance(walks.offer.inside[tier], `walks offered inside a line, ${tier}`);
+      if (walks.offer.intoSection)
+        chance(walks.offer.intoSection[tier], `walks offered into a section, ${tier}`);
     }
     for (const [motion, list] of Object.entries(walks.kinds)) {
       if (!ROOT_MOTIONS.includes(motion as RootMotion))
@@ -339,6 +343,34 @@ export function validateBassStyle(bass: BassStyle): string[] {
           problems.push(
             `${at}: a walk starts on the chord's root (R), where it still states the chord.`,
           );
+        if (walk.length !== undefined) share(walk.length, `${at}, its notes' length`);
+        if (walk.grid !== undefined) {
+          const grid = cells(walk.grid);
+          const named = (symbol: string) => symbol in RIFF_TONES;
+          if (grid.some((symbol) => !["x", "-", "."].includes(symbol) && !named(symbol)))
+            problems.push(`${at}: its grid is written in x, -, . and the tones a riff names.`);
+          if (grid[0] !== "x")
+            problems.push(
+              `${at}: its grid strikes the root on the downbeat, where it states the chord.`,
+            );
+          const strokes = grid.filter((symbol) => symbol === "x").length;
+          if (strokes !== walk.tones.length + 1)
+            problems.push(
+              `${at}: its grid strikes ${strokes} notes; a walk of ${walk.tones.length + 1} notes needs as many.`,
+            );
+          // A bar of four, or of a meter the line is written for: any other grid never walks.
+          const bars = [
+            FIGURE_STEPS,
+            ...Object.keys(bass.meters ?? {}).flatMap((name) => {
+              const meter = readMeter(name);
+              return meter ? [barSteps(meter)] : [];
+            }),
+          ];
+          if (!bars.includes(grid.length))
+            problems.push(
+              `${at}: its grid is ${grid.length} sixteenths, which is no bar the line is written for (${bars.join(", ")}).`,
+            );
+        }
       });
     }
   }

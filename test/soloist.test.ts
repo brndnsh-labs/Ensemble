@@ -375,6 +375,9 @@ const PLAYS: Readonly<Record<string, { readonly perSecond: number; readonly soun
   neosoul: { perSecond: 1.14, sounding: 0.58 },
   reggae: { perSecond: 0.9, sounding: 0.557 },
   acoustic: { perSecond: 1.27, sounding: 0.648 },
+  // Set when it was written, a margin under what it plays: 2.04 notes a second and 0.756 sounding
+  // on the full run (2.09 and 0.770 on a push).
+  country: { perSecond: 1.9, sounding: 0.7 },
 };
 
 test("the soloist is not sparse: over a style's own charts at their own tempo, with the band's own arc, it plays at least the style's notes a second while it has the lead, and some note of it sounds through at least the style's share of the lead", () => {
@@ -768,6 +771,8 @@ const LED_IN: Readonly<Record<string, number>> = {
   // A reggae line starts after the One (ST-reggae-25): it leads in, but seldom.
   reggae: 0,
   acoustic: 0.08,
+  // 14.8% of its phrases on the full run, 13.0% on a push: rock's guitarist's pickups.
+  country: 0.1,
 };
 
 test("the soloist leads phrases in: of the phrases it starts after a breath, at least the style's share start before their barline, from the end of the bar before", () => {

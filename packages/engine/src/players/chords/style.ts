@@ -47,6 +47,18 @@ export interface VoicingCondition {
   readonly has?: readonly VoiceTone[];
   /** Tones the chord must be unable to give. */
   readonly lacks?: readonly VoiceTone[];
+  /**
+   * What the chord's root is in the key: a numeral of the major scale counted
+   * from the tonic, in major and minor keys alike, with a flat or sharp where it
+   * is off that scale (`I`, `IV`, `bVII`). Read by pitch, so A# and Bb in C are
+   * both `bVII`. Every chord is measured against the key its bar is in; a
+   * secondary dominant's root is where it sounds (V7/ii in C is `VI`). The
+   * pedal steel's 6th on a plain I or IV, never on V (ST-country-06), and the
+   * add9 by the chord's job in the key (ST-acoustic-21) are conditions on this.
+   */
+  readonly degrees?: readonly string[];
+  /** Only in a key of this mode. */
+  readonly mode?: "major" | "minor";
 }
 
 export interface Recipe {
@@ -223,14 +235,20 @@ export interface PlainRhythm {
  *   fifth on one of the two strings over the bass (E2 with B2); and with no
  *   fifth there, the bass again
  * - `upper`: the next string of the grip above those two
+ * - `fifth`: the boom-chick's alternate bass (ST-country-07): the chord's
+ *   fifth on the low strings, never the bass again. Under the bass on the
+ *   string below where the hand has it (the thumb over the neck may fret the
+ *   low string, at the fourth fret or under); else the grip's own fifth on the
+ *   two strings over the bass; else the fifth over the bass on the next string
+ *   up, fretted with the grip. Only with no fifth anywhere there, the bass.
  *
  * and each finger one: `1`, `2`, `3` are the grip's strings counted from the
  * top, as a guitarist numbers them. On a grip with fewer strings than a place
  * asks for, the place is the nearest string the grip has. Under a new chord
  * the thumb's first note is its bass, whichever of its places is written.
  */
-export type PickPlace = "bass" | "alternate" | "upper" | 1 | 2 | 3;
-export const PICK_PLACES: readonly PickPlace[] = ["bass", "alternate", "upper", 1, 2, 3];
+export type PickPlace = "bass" | "alternate" | "fifth" | "upper" | 1 | 2 | 3;
+export const PICK_PLACES: readonly PickPlace[] = ["bass", "alternate", "fifth", "upper", 1, 2, 3];
 
 /**
  * How the hand plays one written symbol of a figure: how hard, and for how
@@ -261,6 +279,16 @@ export interface Attack {
    * single string cannot state a chord (ST-acoustic-30).
    */
   readonly pluck?: readonly PickPlace[];
+  /**
+   * The stroke crosses only the guitar's top this many strings: it sounds the
+   * grip's notes on those strings and nothing under them, a string the grip
+   * leaves silent counting as one of them. On a guitar only. A boom-chick
+   * guitar's chick on the top four strings, over the low strings the thumb
+   * plays as the boom (ST-country-07). An upstroke among them catches the
+   * style's `strum.up` of their top notes, as any upstroke does. Left out, a
+   * downstroke crosses the whole grip.
+   */
+  readonly top?: number;
 }
 
 /** The symbols a figure may be written in, and how each is played. */

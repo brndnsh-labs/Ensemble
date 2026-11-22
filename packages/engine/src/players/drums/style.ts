@@ -54,6 +54,15 @@ export interface When {
   readonly changeInBar?: boolean;
   /** Only where the next bar brings a new chord on its downbeat (true), or does not (false). */
   readonly changeAhead?: boolean;
+  /**
+   * Only in bars of these meters, by name as a chart writes them (`"4/4"`). A
+   * part written for 4/4 is also what a bar of any meter it has not been
+   * written for is fitted from, a beat to a pulse; a figure that is four's own
+   * (a train's eighths on the snare, two to every beat, are every eighth of a
+   * bar of twelve) names four, and a fitted bar plays the layers that name no
+   * meter (DR-10, DR-59).
+   */
+  readonly meters?: readonly MeterName[];
 }
 
 export interface GrooveOption {

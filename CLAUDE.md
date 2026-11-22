@@ -35,11 +35,11 @@ A browser-based generative backing band. Read these before doing anything:
 
 ```sh
 pnpm install            # once
-pnpm check              # typecheck, lint, tests (budget, in CPU seconds: 4, and 24 more for each style: 196 now; about 26 seconds on the clock)
+pnpm check              # typecheck, lint, tests (budget, in CPU seconds: 4, and 24 more for each style: 220 now; about 27 seconds on the clock)
 pnpm typecheck          # tsc --build across packages
 pnpm lint               # biome check; `pnpm format` to fix
 pnpm test               # engine suite under the budget: every property, two seeds
-pnpm test:full          # the same on six seeds (three times the push budget: 588 CPU seconds, about 76 on the clock); run before a gate
+pnpm test:full          # the same on six seeds (three times the push budget: 660 CPU seconds, about 85 on the clock); run before a gate
 pnpm score              # every style's scorecard against its accepted baseline (budget: 150 CPU seconds, about 68 on the clock)
                         # on a branch it also sorts the change against what Brandon has passed by ear: inside, or the measures outside
 pnpm ears               # Brandon's verdicts by ear (scorecard/ear-cases.json) beside the scorecards as they stood in git: which

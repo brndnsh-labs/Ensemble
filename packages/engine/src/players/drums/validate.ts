@@ -17,12 +17,22 @@ const FOUR_FOUR = { beats: 4, unit: 4 } as const;
 export function validateDrumStyle(drums: DrumStyle): string[] {
   const problems: string[] = [];
   for (const name of drums.timekeepers) voiceOf(name, "timekeepers", problems);
-  problems.push(...validateTime(drums, FOUR_FOUR));
+  // The part for four plays in 4/4 and in every meter no part is written for (fitted).
+  const written = new Set(Object.keys(drums.meters ?? {}));
+  problems.push(
+    ...validateTime(drums, FOUR_FOUR, (names) =>
+      names.some((name) => name === "4/4" || !written.has(name)),
+    ),
+  );
   for (const [name, time] of Object.entries(drums.meters ?? {})) {
     const meter = readMeter(name);
     if (!meter) problems.push(`meters: "${name}" is not a meter a chart can write, or is 4/4.`);
     else if (time)
-      problems.push(...validateTime(time, meter).map((problem) => `in ${name}, ${problem}`));
+      problems.push(
+        ...validateTime(time, meter, (names) => names.includes(name)).map(
+          (problem) => `in ${name}, ${problem}`,
+        ),
+      );
   }
   const strike = (written: Strike, where: string): void => {
     for (const [name, symbol] of Object.entries(written)) {
@@ -41,7 +51,12 @@ function voiceOf(name: string, where: string, problems: string[]): void {
 }
 
 /** The problems in what is written as a bar: the grooves, the touches, the fills, for a bar of one meter. */
-function validateTime(drums: DrumTime, meter: { beats: number; unit: 2 | 4 | 8 }): string[] {
+function validateTime(
+  drums: DrumTime,
+  meter: { beats: number; unit: 2 | 4 | 8 },
+  /** Whether a layer naming these meters could ever play in a bar this part is played in. */
+  playsIn: (names: readonly string[]) => boolean,
+): string[] {
   const problems: string[] = [];
   /** A groove line is one bar of the meter. */
   const GROOVE_STEPS = barSteps(meter);
@@ -96,6 +111,17 @@ function validateTime(drums: DrumTime, meter: { beats: number; unit: 2 | 4 | 8 }
       if (when?.playing) voice(when.playing, `${where}, "playing"`);
       if (when?.phraseBars?.some((bar) => !Number.isInteger(bar) || bar < 1))
         problems.push(`${where}: phrase bars are counted from 1.`);
+      for (const name of when?.meters ?? []) {
+        // 4/4 is the style itself, and a meter like any other here.
+        if (name !== "4/4" && readMeter(name) === null)
+          problems.push(`${where}: "${name}" is not a meter.`);
+      }
+      if (when?.meters?.length === 0)
+        problems.push(`${where}: names no meter, so it is never played.`);
+      else if (when?.meters && !playsIn(when.meters))
+        problems.push(
+          `${where}: names only meters this part is never played in (${when.meters.join(", ")}), so it is never played.`,
+        );
       for (const energy of [when?.energyFrom, when?.energyBelow]) {
         if (energy !== undefined && !(energy >= 0 && energy <= 1))
           problems.push(`${where}: an energy is between 0 and 1, not ${energy}.`);

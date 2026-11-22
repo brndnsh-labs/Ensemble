@@ -1,0 +1,12 @@
+title: Sixteen Bars in C
+key: C
+tempo: 104
+style: country
+
+// Sixteen bars: four on the I, the IV and back, the V, and a turn on the V
+// that walks home to the I.
+[A]
+| C | C | F | F |
+| C | C | G | G |
+| C | C | F | F |
+| C | G | C | C |

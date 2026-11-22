@@ -741,9 +741,11 @@ function readCompound(): CompoundBar[] {
       held: undefined,
     })),
     // On a push only the style's own charts are held (it is handed the rest among the
-    // library's takes above); the full run holds every one.
+    // library's takes above); the full run holds every one. A style with none of its own in
+    // six or twelve holds the library's on a push too: it is still handed them, and both
+    // levels have to be heard from it.
     ...STYLES.flatMap((style) =>
-      (FULL ? LIBRARY : ownCharts(style))
+      (FULL || !ownCharts(style).some((chart) => compound({ chart })) ? LIBRARY : ownCharts(style))
         .filter((chart) => compound({ chart }))
         .flatMap((chart) =>
           [0.3, 0.85].map((held) => ({

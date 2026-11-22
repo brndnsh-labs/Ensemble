@@ -39,6 +39,7 @@ const SAYS: Readonly<Record<string, string>> = {
   neosoul: "A soft loop, the bass and the Rhodes far behind it.",
   reggae: "Roots reggae: the one drop, and nothing on the One.",
   acoustic: "The singer-songwriter’s band, restraint around a guitar.",
+  country: "The boom-chick two-step, turning into a train beat.",
 };
 
 export const saysOf = (style: StylePack): string | undefined => SAYS[style.id];

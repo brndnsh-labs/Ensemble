@@ -1,13 +1,13 @@
 # Ensemble
 
-A backing band in a browser. Type or pick a chord chart, press Play, and a generated band (drums, bass, a chord instrument and, if you want one, a soloist) plays it in one of eight styles while you practise over it. It runs entirely in the browser, installs as an app, and works offline.
+A backing band in a browser. Type or pick a chord chart, press Play, and a generated band (drums, bass, a chord instrument and, if you want one, a soloist) plays it in one of nine styles while you practise over it. It runs entirely in the browser, installs as an app, and works offline.
 
 **https://ensemble.brndn.zip**
 
 ## How it is put together
 
 - `packages/engine`: the band. Pure: a chart, a style, options and a seed go in, events come out, the same every time.
-- `packages/styles`: the eight styles, as data.
+- `packages/styles`: the nine styles, as data.
 - `packages/audio`: a sampler and a scheduler. It knows nothing about music.
 - `packages/app`: the app (React, Vite, a service worker).
 - `library/`: the built-in charts. `docs/CHART_FORMAT.md` is the format.

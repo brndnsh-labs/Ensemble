@@ -140,6 +140,23 @@ test("the last bass note of a jam that ends is the lowest root on the instrument
   }
 });
 
+/**
+ * A bass that leads into a change by a half step: its line steps in from the half step under or
+ * over the new root at some level. Its outside notes are common, so the rule below must see
+ * enough of them; a bass whose line stays in the scale (country's, BA-51, BA-53) is held to the
+ * rule on every note it plays, and to no count of them.
+ */
+const leadsInByHalfSteps = (style: (typeof STYLES)[number]): boolean => {
+  const { chance, kinds } = style.bass.leadIn;
+  const leads = [
+    ...Object.values(chance.inside),
+    ...Object.values(chance.intoSection),
+    ...Object.values(chance.intoPhrase ?? {}),
+    chance.intoEnding,
+  ].some((value) => value > 0);
+  return leads && Object.values(kinds).some((kind) => kind.below > 0 || kind.above > 0);
+};
+
 test("a bass note outside its chord's scale only passes: it is stepped into and out of the same way, or it is the half step onto the note that states the next change", () => {
   let outside = 0;
   for (const { chart, options, take } of takes(written)) {
@@ -189,7 +206,8 @@ test("a bass note outside its chord's scale only passes: it is stepped into and 
       );
     });
   }
-  assert.ok(outside > enough(100), `only ${outside} notes outside their chord's scale`);
+  if (STYLES.some(leadsInByHalfSteps))
+    assert.ok(outside > enough(100), `only ${outside} notes outside their chord's scale`);
 });
 
 test(

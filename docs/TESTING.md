@@ -86,8 +86,8 @@ Musical quality is statistical. "Is the soloist aimless" is a distribution over 
 
 | Suite | Limit | When it runs |
 |---|---|---|
-| Engine (corpus, properties, goldens) | 4 CPU seconds, and 24 more for each style (196 at eight styles) | every push |
-| Engine, six seeds | three times the push budget (588) | before a gate |
+| Engine (corpus, properties, goldens) | 4 CPU seconds, and 24 more for each style (220 at nine styles) | every push |
+| Engine, six seeds | three times the push budget (660) | before a gate |
 | Scorecard | 150 CPU seconds | every push, report only except for tolerance failures |
 | Browser smoke | 60 seconds on the clock | merge to main |
 
