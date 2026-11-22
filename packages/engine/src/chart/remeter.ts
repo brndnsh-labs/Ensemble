@@ -41,12 +41,15 @@ const starts = (slot: Slot): boolean => slot.kind === "chord" || slot.kind === "
 const NUMBERS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight"];
 const count = (n: number): string => NUMBERS[n] ?? String(n);
 
+/** Why a bar does not read in a meter: a change written off the beat, or chords that do not go into its beats. */
+type Refusal = { readonly offBeat: true } | { readonly chords: number; readonly pulses: number };
+
 /**
  * How a bar reads in the new meter: its tokens as they are, tokens written
- * again, or null when it does not fit. Every case is a rule a player reading
- * the chart would follow; see `fits`.
+ * again, or why it does not fit. Every case is a rule a player reading the
+ * chart would follow; see `fits`.
  */
-function readBar(bar: Bar, from: Meter, to: Meter): readonly BarToken[] | "same" | null {
+function readBar(bar: Bar, from: Meter, to: Meter): readonly BarToken[] | "same" | Refusal {
   const slots = slotsOf(bar);
   const n = slots.length;
   // `%` and a bar with no slot are the same in any meter (an error in either, if one).
@@ -61,6 +64,13 @@ function readBar(bar: Bar, from: Meter, to: Meter): readonly BarToken[] | "same"
   const toTicks = barTicks(to);
   // (a) One chord, or one held from the bar before: any meter holds it.
   if (changes.length === 0) return [slots[0]!];
+  // A change is read only where it was written on a pulse: composed syncopation (an eighth
+  // before the bar line) is the song's, and is neither moved nor read onto a pulse of another meter.
+  const onItsPulse = changes.every((at) => {
+    const tick = (at * fromTicks) / n;
+    return Number.isInteger(tick) && onPulse(from, tick);
+  });
+  if (!onItsPulse) return { offBeat: true };
   // (b) As written, where the count is one the new meter takes and every change is on its pulse.
   if (
     validSlotCount(n, to) &&
@@ -70,13 +80,6 @@ function readBar(bar: Bar, from: Meter, to: Meter): readonly BarToken[] | "same"
     })
   )
     return "same";
-  // Past here a change only moves if it was on a pulse where it was written: composed
-  // syncopation (an eighth before the bar line) is the song's, and is not moved.
-  const onItsPulse = changes.every((at) => {
-    const tick = (at * fromTicks) / n;
-    return Number.isInteger(tick) && onPulse(from, tick);
-  });
-  if (!onItsPulse) return null;
   const pulses = pulseStarts(to).length;
   const keep = bar.tokens.filter((token) => token.kind === "annotation");
   const hold = (): BarToken => ({ kind: "hold", range: bar.range });
@@ -97,12 +100,21 @@ function readBar(bar: Bar, from: Meter, to: Meter): readonly BarToken[] | "same"
   // (c2) As many chords as the new meter has pulses: a chord a pulse.
   if (parts.length === pulses) return [...keep, ...parts];
   // (d) It does not fit.
-  return null;
+  return { chords: parts.length, pulses };
 }
 
 /** The section of a chart whose meter is not the chart's, if any: such a chart keeps its meters. */
 const ownMeter = (chart: Chart): Section | undefined =>
   chart.sections.find((section) => !sameMeter(section.meter, chart.meter));
+
+/**
+ * Every bar a chart plays, as typed, repeats and endings included: the bars of each section
+ * that holds its own. A reference plays an earlier section's, and a label defined a second time
+ * plays its first definition (`Section.barsFrom`), so the bars under the second are never
+ * played, and are left as they are.
+ */
+const playedSections = (chart: Chart): Section[] =>
+  chart.sections.filter((section, index) => section.barsFrom === index);
 
 /** Every bar of a section as typed, repeats and endings included. */
 function barsOf(section: Section): Bar[] {
@@ -164,15 +176,20 @@ export function fits(chart: Chart, meter: Meter): Fit {
       reason: `The section ${own.label ? `[${own.label}] ` : ""}is in ${meterToString(own.meter)} of its own, so the chart keeps its meters.`,
       range: own.range,
     };
-  for (const section of chart.sections) {
+  const name = meterToString(meter);
+  for (const section of playedSections(chart)) {
     for (const bar of barsOf(section)) {
-      if (readBar(bar, chart.meter, meter) !== null) continue;
-      const chords = slotsOf(bar).filter(starts).length;
-      return {
-        ok: false,
-        reason: `The bar "${typed(bar)}" (line ${bar.range.line}) has ${count(chords)} chords, and a bar of ${meterToString(meter)} cannot put them on its beats.`,
-        range: bar.range,
-      };
+      const read = readBar(bar, chart.meter, meter);
+      if (read === "same" || Array.isArray(read)) continue;
+      const which = `The bar "${typed(bar)}" (line ${bar.range.line})`;
+      const refusal = read as Refusal;
+      const reason =
+        "offBeat" in refusal
+          ? `${which} has a chord written off the beat, which is the song's and is not moved, so it cannot be read in ${name}.`
+          : refusal.chords > refusal.pulses
+            ? `${which} has ${count(refusal.chords)} chords, more than the ${count(refusal.pulses)} beats of a bar of ${name}.`
+            : `${which} has ${count(refusal.chords)} chords: a bar of ${name} splits in two or takes a chord on each of its ${count(refusal.pulses)} beats, and ${count(refusal.chords)} is neither.`;
+      return { ok: false, reason, range: bar.range };
     }
   }
   return { ok: true };
@@ -200,23 +217,30 @@ export function remeter(chart: Chart, meter: Meter): Chart {
   const from = chart.meter;
   const bar = (item: Bar): Bar => {
     const read = readBar(item, from, meter);
-    return read === "same" || read === null ? item : { ...item, tokens: read };
+    return Array.isArray(read) ? { ...item, tokens: read } : item;
   };
   const each = <T extends RepeatItem | UnreadLine>(item: T): T | Bar =>
     item.kind === "bar" ? bar(item) : item;
   const sections = chart.sections.map(
-    (section): Section => ({
+    (section, index): Section => ({
       ...section,
       meter,
-      items: section.items.map((item) =>
-        item.kind !== "repeat"
-          ? each(item)
-          : {
-              ...item,
-              body: item.body.map(each),
-              endings: item.endings.map((ending) => ({ ...ending, items: ending.items.map(each) })),
-            },
-      ),
+      // Bars that are never played (under a label defined a second time) are left as typed.
+      items:
+        section.barsFrom !== index
+          ? section.items
+          : section.items.map((item) =>
+              item.kind !== "repeat"
+                ? each(item)
+                : {
+                    ...item,
+                    body: item.body.map(each),
+                    endings: item.endings.map((ending) => ({
+                      ...ending,
+                      items: ending.items.map(each),
+                    })),
+                  },
+            ),
     }),
   );
   return {
