@@ -828,7 +828,10 @@ export function PlayView(props: Props) {
         />
         <div className="tempo-ends">
           <span>{range.min}</span>
-          {choices.tempo !== undefined && inLimits(choices.tempo) !== Math.round(usual) ? (
+          {/* Offered only where it moves the tempo: the figure played without a tempo set is the
+              usual one held in the style's limits for the meter played (6/8's 79 plays at 100). */}
+          {choices.tempo !== undefined &&
+          inLimits(choices.tempo) !== Math.round(inLimits(usual)) ? (
             <button
               type="button"
               className="tempo-back"
@@ -838,9 +841,12 @@ export function PlayView(props: Props) {
               }}
             >
               Back to {Math.round(inLimits(usual))},{" "}
-              {unset === null && written !== null
-                ? "as written"
-                : `${style.name.toLowerCase()}'s usual`}
+              {/* Held at a limit, the figure is the limit's, not the chart's or the style's. */}
+              {Math.round(inLimits(usual)) !== Math.round(usual)
+                ? `${style.name.toLowerCase()}'s ${usual < range.min ? "slowest" : "fastest"}`
+                : unset === null && written !== null
+                  ? "as written"
+                  : `${style.name.toLowerCase()}'s usual`}
             </button>
           ) : choices.tempo === undefined &&
             unset !== null &&
