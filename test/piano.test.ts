@@ -1097,16 +1097,25 @@ test("a guitar's chords can be held: every stroke is three notes or more and no 
       if (!bar || bar.ending || bar.meter.beats !== 4 || bar.meter.unit !== 4) continue;
       topped++;
       const lowest = OPEN[OPEN.length - top]!;
-      // Under them only a tone the chord is heard by (its third, seventh or sixth, a written
-      // alteration) that the top strings lack, reached for as an upstroke reaches (X-B-13).
+      // Under them only a tone the chord is heard by (its third or suspension, its seventh or
+      // sixth, a written alteration) that the top strings lack, reached for as an upstroke
+      // reaches (X-B-13): the guitar's own rule.
       const chord = chordAt(take, stroke.tick);
+      const altered = { b5: 6, "#5": 8, b9: 1, "#9": 3, "#11": 6, b13: 8 } as const;
       const heard = (pitch: number) =>
         chord !== null &&
-        chordTones(chord.quality).some(
-          (tone) =>
-            ["third", "sus", "seventh", "sixth"].includes(tone.role) &&
-            (pitchClass(chord.root) + tone.interval) % 12 === pitch % 12,
-        );
+        [
+          ...chordTones(chord.quality)
+            .filter(
+              (tone, _, all) =>
+                ["third", "sus", "seventh", "sixth"].includes(tone.role) ||
+                // An eleventh chord's eleventh stands where the third would (the voicing's 3).
+                (tone.role === "eleventh" &&
+                  !all.some((other) => other.role === "third" || other.role === "sus")),
+            )
+            .map((tone) => tone.interval),
+          ...chord.quality.alterations.map((alteration) => altered[alteration]),
+        ].some((interval) => (pitchClass(chord.root) + interval) % 12 === pitch % 12);
       const over = stroke.pitches.filter((pitch) => pitch >= lowest);
       for (const pitch of stroke.pitches.filter((pitch) => pitch < lowest)) {
         assert.ok(
