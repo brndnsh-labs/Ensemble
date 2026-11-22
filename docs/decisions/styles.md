@@ -479,7 +479,7 @@ Built from `prompts/style-country.md`: `packages/styles/src/country/`, six chart
 
 **The soloist's rows** (`PLAYS`, `LED_IN` in `test/soloist.test.ts`), so those two properties hold country and do not skip it. The others' were set when each was written, a margin under what the style played (the notes a second and the share sounding between the starting commit and the branch, `scripts/solo-density.ts`; the share led in about three quarters of what the branch measured: rock 13.3% to 0.1, acoustic 13.3% to 0.08). Country plays 2.04 notes a second and sounds through 0.756 of its lead on the full run (2.09 and 0.770 on a push), and leads in 14.8% of its phrases (13.0% on a push): its rows are 1.9, 0.7 and 0.1.
 
-**Suite** (each run alone, the machine shared, load 6 to 10): `pnpm test` 28.6 s of 30 on the clock, 203 CPU seconds; country's process alone 11.6 s, 21 CPU seconds. `pnpm test:full` 85.9 s of 90, 603 CPU seconds. `pnpm score` 79.6 s of 120. `pnpm smoke` 10.8 s of 60 (against the built app served on port 8770). `pnpm ears --check` passes.
+**Suite** (each run alone, the machine shared, load 6 to 10): `pnpm test` 28.6 to 29.9 s of 30 on the clock, 203 to 212 CPU seconds (the last with the soloist's rows and the widened thumb rule, load 8); country's process alone 11.6 to 12.1 s, 21 to 22 CPU seconds, and on six seeds 33.6 s, 49 CPU seconds. `pnpm test:full` 85.9 s of 90, 603 CPU seconds. `pnpm score` 79.6 s of 120. `pnpm smoke` 10.8 s of 60 (against the built app served on port 8770). `pnpm ears --check` passes.
 
 **Found, not fixed:**
 
