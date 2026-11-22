@@ -173,27 +173,30 @@ export const jazzCritic: CriticStyle = {
     "chords.on-one-in-three-under-the-solo": { max: 0.5, kind: "intent", minCases: 12 },
     // Every eighth struck in some bars and none in most: Kelly's 16 bars under Davis strike 1 in
     // 38%, the "and" of 1 in 38%, 2 in 31%, the "and" of 2 in 38%, 3 in 31%, the "and" of 3 in
-    // 44% (study 1.1: proportions, not rates), so each is held between 15% and 55%.
-    "chords.under-the-solo-in-three-on-1": { min: 0.15, max: 0.55, kind: "intent", minCases: 12 },
+    // 44% (study 1.1: proportions, not rates), so each is held between 15% and 55%. A section
+    // keeps its figure, so a take of a one-section tune is one figure's eighths: the spread is
+    // read over many takes or not at all (400 bars; this card's two waltz takes with the alto are
+    // 143, and the full run's property pools 906).
+    "chords.under-the-solo-in-three-on-1": { min: 0.15, max: 0.55, kind: "intent", minCases: 400 },
     "chords.under-the-solo-in-three-on-and-of-1": {
       min: 0.15,
       max: 0.55,
       kind: "intent",
-      minCases: 12,
+      minCases: 400,
     },
-    "chords.under-the-solo-in-three-on-2": { min: 0.15, max: 0.55, kind: "intent", minCases: 12 },
+    "chords.under-the-solo-in-three-on-2": { min: 0.15, max: 0.55, kind: "intent", minCases: 400 },
     "chords.under-the-solo-in-three-on-and-of-2": {
       min: 0.15,
       max: 0.55,
       kind: "intent",
-      minCases: 12,
+      minCases: 400,
     },
-    "chords.under-the-solo-in-three-on-3": { min: 0.15, max: 0.55, kind: "intent", minCases: 12 },
+    "chords.under-the-solo-in-three-on-3": { min: 0.15, max: 0.55, kind: "intent", minCases: 400 },
     "chords.under-the-solo-in-three-on-and-of-3": {
       min: 0.15,
       max: 0.55,
       kind: "intent",
-      minCases: 12,
+      minCases: 400,
     },
     // With the band to itself, at every level: one to four a bar (AU-94), and not every bar
     // on 1, which is the pad (the quiet level's "and" of 1 and beat 2 held, F5 and F7). The

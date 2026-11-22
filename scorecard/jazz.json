@@ -275,42 +275,6 @@
     "p90": 0.4681,
     "inTarget": 1
   },
-  "chords.under-the-solo-in-three-on-1": {
-    "mean": 0.2587,
-    "p10": 0.2587,
-    "p90": 0.2587,
-    "inTarget": 1
-  },
-  "chords.under-the-solo-in-three-on-and-of-1": {
-    "mean": 0.4196,
-    "p10": 0.4196,
-    "p90": 0.4196,
-    "inTarget": 1
-  },
-  "chords.under-the-solo-in-three-on-2": {
-    "mean": 0.0629,
-    "p10": 0.0629,
-    "p90": 0.0629,
-    "inTarget": 0
-  },
-  "chords.under-the-solo-in-three-on-and-of-2": {
-    "mean": 0.5664,
-    "p10": 0.5664,
-    "p90": 0.5664,
-    "inTarget": 0
-  },
-  "chords.under-the-solo-in-three-on-3": {
-    "mean": 0.2168,
-    "p10": 0.2168,
-    "p90": 0.2168,
-    "inTarget": 1
-  },
-  "chords.under-the-solo-in-three-on-and-of-3": {
-    "mean": 0.3706,
-    "p10": 0.3706,
-    "p90": 0.3706,
-    "inTarget": 1
-  },
   "chords.strikes-per-bar-in-three": {
     "mean": 1.7409,
     "p10": 1.2128,
