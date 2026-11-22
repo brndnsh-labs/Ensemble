@@ -38,7 +38,19 @@ export const disco: StylePack = {
     breathe: 0,
   },
   // The full default arc (ST-disco-32).
-  arc: DEFAULT_ARC,
+  arc: {
+    ...DEFAULT_ARC,
+    // Now and then a breakdown to the kick and the bass: the comp out of a section where the band
+    // plays alone (docs/decisions/styles.md, who is in).
+    layOut: {
+      seats: ["chords"],
+      under: "band",
+      span: "section",
+      below: 0.75,
+      chance: 0.12,
+      openChance: 0.1,
+    },
+  },
   ending: {
     // A major 7th in major, a minor 7th in minor, the I9 on a dominant tonic (ST-disco-30).
     finalChord: { major: "maj7", minor: "m7", dominant: "9" },

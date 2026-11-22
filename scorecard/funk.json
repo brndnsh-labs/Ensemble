@@ -156,13 +156,13 @@
     "inTarget": 1
   },
   "chords.top-holds": {
-    "mean": 0.3725,
+    "mean": 0.373,
     "p10": 0.0833,
     "p90": 0.9841,
     "inTarget": null
   },
   "chords.top-steps": {
-    "mean": 0.4322,
+    "mean": 0.4317,
     "p10": 0.0159,
     "p90": 0.6939,
     "inTarget": null
@@ -180,7 +180,7 @@
     "inTarget": 1
   },
   "chords.top-movement": {
-    "mean": 1.2946,
+    "mean": 1.2942,
     "p10": 0.0159,
     "p90": 3.1667,
     "inTarget": 1
@@ -204,19 +204,19 @@
     "inTarget": 1
   },
   "chords.lowest-note": {
-    "mean": 57.5557,
+    "mean": 57.5545,
     "p10": 56,
     "p90": 59.6364,
     "inTarget": 1
   },
   "chords.colour": {
-    "mean": 0.8453,
-    "p10": 0.4465,
+    "mean": 0.8454,
+    "p10": 0.4473,
     "p90": 1,
     "inTarget": 1
   },
   "chords.written-tensions": {
-    "mean": 0.9714,
+    "mean": 0.9713,
     "p10": 0.8647,
     "p90": 1,
     "inTarget": 1
@@ -246,7 +246,7 @@
     "inTarget": 1
   },
   "chords.with-the-drums": {
-    "mean": 0.4155,
+    "mean": 0.4156,
     "p10": 0.2218,
     "p90": 0.5526,
     "inTarget": null
@@ -270,13 +270,13 @@
     "inTarget": 1
   },
   "chords.changes-anticipated": {
-    "mean": 0.1122,
+    "mean": 0.1123,
     "p10": 0,
     "p90": 0.1875,
     "inTarget": 1
   },
   "chords.strokes-per-bar": {
-    "mean": 12.8582,
+    "mean": 12.8701,
     "p10": 11.1746,
     "p90": 15.6129,
     "inTarget": 1
@@ -294,7 +294,7 @@
     "inTarget": 1
   },
   "chords.scratches": {
-    "mean": 0.5186,
+    "mean": 0.519,
     "p10": 0.4444,
     "p90": 0.6049,
     "inTarget": 1
@@ -586,6 +586,30 @@
     "p10": 2.8523,
     "p90": 4.1658,
     "inTarget": null
+  },
+  "drums.laid-out": {
+    "mean": 0,
+    "p10": 0,
+    "p90": 0,
+    "inTarget": null
+  },
+  "bass.laid-out": {
+    "mean": 0,
+    "p10": 0,
+    "p90": 0,
+    "inTarget": null
+  },
+  "chords.laid-out": {
+    "mean": 0.0065,
+    "p10": 0,
+    "p90": 0,
+    "inTarget": null
+  },
+  "band.takes-thinned": {
+    "mean": 0.0847,
+    "p10": 0.0847,
+    "p90": 0.0847,
+    "inTarget": 1
   },
   "band.new-grooves": {
     "mean": 0.92,

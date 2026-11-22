@@ -6,6 +6,9 @@ import type { CriticStyle } from "@ensemble/engine";
 
 export const funkCritic: CriticStyle = {
   targets: {
+    // How many jams thin at all, of those that could, on this scorecard's jams, which are mostly
+    // short: a jam of eight passes thins about half the time (docs/decisions/styles.md, who is in).
+    "band.takes-thinned": { min: 0.03, max: 0.18, kind: "measured" },
     // ── drums ──
     // The One and the backbeat in every bar of time (ST-funk-14: 95% and 90%).
     "drums.kick-on-one": { min: 0.95, kind: "intent" },

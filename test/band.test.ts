@@ -4,7 +4,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { Plan, PlanBar, PlanOptions, StylePack, Take } from "@ensemble/engine";
+import type { Plan, PlanBar, PlanOptions, StylePack, Take, TakeOptions } from "@ensemble/engine";
 import {
   arrangedLines,
   BREATHE_MOST,
@@ -1318,5 +1318,369 @@ test("asked to breathe, the band plays the same notes; a style that does not bre
       );
     }
     if (style.feel.breathe > 0) assert.ok(said.length > 1, `${where}: one tempo only`);
+  }
+});
+
+// ── who is in ───────────────────────────────────────────────────────────────
+
+/** The seats of the band, the soloist apart: the planner may lay one of them out of a jam. */
+const BAND = ["drums", "bass", "chords"] as const;
+
+/**
+ * The band seats a bar of a jam is without while the band plays on: each null in it that plays
+ * in some other bar (a seat the player left out plays in none), in a bar some of the band plays.
+ */
+function laidOut(roadmap: Plan): Map<PlanBar, string[]> {
+  const music = [...roadmap.bars, ...roadmap.lookahead].filter((bar) => bar.kind === "music");
+  const present = BAND.filter((seat) => music.some((bar) => bar.seats[seat] !== null));
+  const outs = new Map<PlanBar, string[]>();
+  for (const bar of music) {
+    const out = present.filter((seat) => bar.seats[seat] === null);
+    if (out.length > 0 && out.length < present.length) outs.set(bar, out);
+  }
+  return outs;
+}
+
+/** The kinds of jam who is in is held in: planned only, so many seeds cost little. */
+const WHO_KINDS: readonly PlanOptions[] = [
+  { mode: "jam", passes: 3 },
+  { mode: "jam", passes: 4 },
+  { mode: "jam", passes: 8 },
+  { mode: "jam", passes: 8, solo: true },
+  { mode: "jam", open: true, passes: 9 },
+  { mode: "jam", open: true, passes: 16, solo: true },
+  // The full run: long jams, solos after the peak and solos into the ending.
+  ...(FULL
+    ? ([
+        { mode: "jam", passes: 12, solo: true },
+        { mode: "jam", minutes: 6 },
+        { mode: "jam", open: true, passes: 24 },
+      ] as const)
+    : []),
+];
+const WHO_SEEDS = Array.from({ length: FULL ? 24 : 4 }, (_, i) => i + 1);
+
+/**
+ * The kinds a push plans for a style: a jam too short to thin, one of eight passes and an open
+ * one, each with the soloist where the style thins under one and without where it thins alone,
+ * so that every clause meets a take that thins. The full run plans every kind for every style.
+ */
+const whoKinds = (style: StylePack): readonly PlanOptions[] => {
+  if (FULL) return WHO_KINDS;
+  const solo = style.arc.layOut?.under === "solo";
+  return WHO_KINDS.filter(
+    (kind) =>
+      kind.passes === 3 ||
+      (kind.passes === 8 && (kind.solo === true) === solo) ||
+      (kind.open === true && (kind.solo === true) === solo),
+  );
+};
+
+/** A take's lay-outs, in order: the seat, and the first and last bar out, counted in bars of music. */
+function stretchesOf(
+  roadmap: Plan,
+): { seat: string; from: PlanBar; to: PlanBar; at: number; end: number }[] {
+  const music = [...roadmap.bars, ...roadmap.lookahead].filter((bar) => bar.kind === "music");
+  const outs = laidOut(roadmap);
+  const found: { seat: string; from: PlanBar; to: PlanBar; at: number; end: number }[] = [];
+  music.forEach((bar, at) => {
+    for (const seat of outs.get(bar) ?? []) {
+      const open = found.findLast((s) => s.seat === seat && s.end === at - 1);
+      if (open) {
+        open.to = bar;
+        open.end = at;
+      } else found.push({ seat, from: bar, to: bar, at, end: at });
+    }
+  });
+  return found;
+}
+
+test("who is in: now and then a jam lays one seat out, by its style's say, for a whole section or pass and never mid-phrase; never the drums or the bass, never two seats at once, never in the first two passes or the first 16 bars, the last pass, the peak, or the last chorus of a solo; after one, everyone in for three whole passes and 64 bars at least; never in a jam planned shorter than four passes; a style with no say, a band of two, a level the player holds, a song and a chart with an arrangement of its own keep everyone in; a jam made longer keeps every lay-out it had, and one told to finish too, with everyone in from where it was told: its plan says who played each bar as its notes do", () => {
+  for (const style of STYLES) {
+    const data = style.arc.layOut;
+    const { layOut: _, ...steady } = style.arc;
+    const none: StylePack = { ...style, arc: steady };
+    let seen = 0;
+    let rendered = false;
+    let shortest:
+      | {
+          text: string;
+          where: string;
+          at: PlanBar;
+          open: boolean;
+          seconds: number;
+          options: TakeOptions;
+        }
+      | undefined;
+    for (const file of ownCharts(style)) {
+      const chart = parse(file.text).chart;
+      const arranged = chart.arrangement?.lines != null;
+      for (const seed of WHO_SEEDS) {
+        for (const kind of whoKinds(style)) {
+          const options = { ...kind, seed };
+          const where = `${file.file} seed ${seed} ${JSON.stringify(kind)}`;
+          if (!data) {
+            // A style with no say lays nobody out of any jam.
+            if (seed === 1) assert.equal(laidOut(plan(chart, style, options)).size, 0, where);
+            continue;
+          }
+          if (arranged) {
+            // Nobody is laid out by the band itself: the plan the band had before it could be.
+            if (seed > 1) continue;
+            const asBefore = plan(chart, none, options);
+            assert.deepEqual(plan(chart, style, options), asBefore, `${where}: as arranged`);
+            continue;
+          }
+          const roadmap = plan(chart, style, options);
+          const outs = laidOut(roadmap);
+          seen += outs.size;
+          const music = [...roadmap.bars, ...roadmap.lookahead].filter(
+            (bar) => bar.kind === "music",
+          );
+          const body = music.filter((bar) => bar.section.role === "body");
+          const mean = (pass: number) => {
+            const bars = body.filter((bar) => bar.pass === pass);
+            return bars.reduce((sum, bar) => sum + bar.energy, 0) / bars.length;
+          };
+          const passes = [...new Set(body.map((bar) => bar.pass))];
+          const peak = Math.max(...passes.map(mean));
+          for (const [bar, out] of outs) {
+            assert.equal(out.length, 1, `${where} bar ${bar.index}: two seats out`);
+            assert.ok(
+              data.seats.includes(out[0] as never),
+              `${where}: ${out[0]} is not the style's to lay out`,
+            );
+            assert.ok(bar.pass >= 2 && !bar.lastPass, `${where}: out on pass ${bar.pass}`);
+            if (!roadmap.open) assert.ok(mean(bar.pass) < peak, `${where}: out at the peak`);
+            const soloing = bar.solo !== null;
+            assert.equal(soloing, data.under === "solo", `${where}: under the soloist or not`);
+            if (bar.solo) {
+              assert.ok(
+                bar.solo.chorus < bar.solo.of - 1,
+                `${where} bar ${bar.index}: out under the last chorus of a solo`,
+              );
+            }
+          }
+          // Out and back in at the top of a section, never inside one.
+          for (const [i, bar] of music.entries()) {
+            const before = music[i - 1];
+            if (!before || before.index !== bar.index - 1) continue;
+            const was = (outs.get(before) ?? []).join();
+            if (was !== (outs.get(bar) ?? []).join()) {
+              assert.equal(bar.barInSection, 0, `${where} bar ${bar.index}: in or out mid-section`);
+            }
+          }
+          // Spaced by the music, not by passes alone: a pass is four bars of one chart and
+          // thirty-two of another.
+          const stretches = stretchesOf(roadmap);
+          if (stretches[0]) assert.ok(stretches[0].at >= 16, `${where}: out in the first 16 bars`);
+          for (const [i, next] of stretches.entries()) {
+            const last = stretches[i - 1];
+            if (!last) continue;
+            assert.ok(
+              next.at - last.end - 1 >= 64 && next.from.pass - last.to.pass - 1 >= 3,
+              `${where}: in for ${next.at - last.end - 1} bars between bars ${last.to.index} and ${next.from.index}`,
+            );
+          }
+          if (!roadmap.open && roadmap.passes < 4)
+            assert.equal(outs.size, 0, `${where}: too short`);
+          if (kind.open && (FULL || seed === 1)) {
+            // One pass more changes nobody's place in what was planned.
+            const longer = plan(chart, style, { ...options, passes: kind.passes! + 1 });
+            const known = [...roadmap.bars, ...roadmap.lookahead].map((bar) => bar.seats);
+            const again = [...longer.bars, ...longer.lookahead].slice(0, known.length);
+            assert.deepEqual(
+              again.map((bar) => bar.seats),
+              known,
+              `${where}: made longer`,
+            );
+          }
+          const first = stretches[0];
+          if (first) {
+            // Told to finish on a pass a seat sits out of: everything before it as it was, and
+            // that pass, the last, with everyone in.
+            const endAfter = first.from.pass;
+            const told = plan(chart, style, { ...options, endAfter });
+            const kept = (p: Plan) =>
+              p.bars
+                .filter((bar) => bar.kind === "music" && bar.pass < endAfter)
+                .map((bar) => bar.seats);
+            assert.deepEqual(kept(told), kept(roadmap), `${where}: told on ${endAfter}`);
+            for (const [bar] of laidOut(told)) {
+              assert.ok(bar.pass < endAfter, `${where}: out of the last pass at bar ${bar.index}`);
+            }
+          }
+          if (first && !rendered) {
+            rendered = true;
+            // The first take that thins: a band of two keeps both, and a level the player holds
+            // has no low point to thin at.
+            const two = plan(chart, style, { ...options, without: ["bass"] });
+            assert.equal(laidOut(two).size, 0, `${where}: a band of two`);
+            const held = plan(chart, style, { ...options, energy: 0.5 });
+            assert.equal(laidOut(held).size, 0, `${where}: a level held`);
+          }
+          // The shortest take that thins with a phrase top inside its first lay-out, to be told
+          // to finish there and played (below).
+          const at = first
+            ? music.find(
+                (bar) =>
+                  bar.pass === first.from.pass &&
+                  bar.index > first.from.index &&
+                  bar.index <= first.to.index &&
+                  bar.phrase.bar === 0,
+              )
+            : undefined;
+          // Open, so that the jam as it was is played only as far as the word (an open jam made
+          // longer plays what it played), and the shortest such, so that playing it costs little.
+          // A timed one only where no open one thins.
+          const open = kind.open === true;
+          const better =
+            shortest === undefined ||
+            (open && !shortest.open) ||
+            (open === shortest.open &&
+              at !== undefined &&
+              secondsAt(roadmap, at.start) < shortest.seconds);
+          if (first && at && better) {
+            shortest = {
+              text: file.text,
+              where,
+              at,
+              open,
+              seconds: secondsAt(roadmap, at.start),
+              options: {
+                ...options,
+                ...(open ? { passes: first.from.pass + 1 } : {}),
+                endAfter: first.from.pass,
+                toldAt: at.start,
+              },
+            };
+          }
+        }
+        if (seed === 1 && data) {
+          const song = { mode: "song" as const, solo: true, seed };
+          assert.deepEqual(
+            plan(chart, style, song),
+            plan(chart, none, song),
+            `${file.file}: a song`,
+          );
+        }
+      }
+    }
+    if (data) {
+      // The quickest open jam, over more seeds, planned only, to tell to finish and play.
+      const opens = WHO_KINDS.filter(
+        (kind) => kind.open === true && (kind.solo === true) === (data.under === "solo"),
+      );
+      for (const file of ownCharts(style)) {
+        const chart = parse(file.text).chart;
+        if (chart.arrangement?.lines != null) continue;
+        for (let seed = 1; seed <= (FULL ? 12 : 6); seed++) {
+          for (const kind of opens) {
+            const roadmap = plan(chart, style, { ...kind, seed });
+            const first = stretchesOf(roadmap)[0];
+            if (!first) continue;
+            const at = [...roadmap.bars, ...roadmap.lookahead].find(
+              (bar) =>
+                bar.kind === "music" &&
+                bar.index > first.from.index &&
+                bar.index <= first.to.index &&
+                bar.phrase.bar === 0,
+            );
+            if (!at) continue;
+            const seconds = secondsAt(roadmap, at.start);
+            if (shortest?.open && shortest.seconds <= seconds) continue;
+            shortest = {
+              text: file.text,
+              where: `${file.file} seed ${seed} ${JSON.stringify(kind)}`,
+              at,
+              open: true,
+              seconds,
+              options: {
+                ...kind,
+                seed,
+                passes: first.from.pass + 1,
+                endAfter: first.from.pass,
+                toldAt: at.start,
+              },
+            };
+          }
+        }
+      }
+      assert.ok(seen > 0, `${style.id}: nobody ever sat out`);
+      assert.ok(shortest, `${style.id}: no take that thins was played`);
+      // Told to finish as the app tells it, at a phrase top inside the lay-out: up to there the
+      // seat is out, from there everyone is in, and the plan says so of each bar as the notes
+      // do: up to the word its seats are the jam's as it was going to be, a seat it marks out is
+      // silent, and one it marks in for a whole phrase plays in it.
+      const { text, where, at, options } = shortest!;
+      const take = render(text, style, options);
+      // Up to the word, who is in is the jam's as it was going to be.
+      const { toldAt: _word, endAfter: _last, ...going } = options;
+      const was = plan(parse(text).chart, style, going);
+      for (const bar of take.plan.bars) {
+        if (bar.start >= at.start) break;
+        assert.deepEqual(bar.seats, was.bars[bar.index]!.seats, `${where}, told: bar ${bar.index}`);
+      }
+      const toldOuts = laidOut(take.plan);
+      assert.ok(toldOuts.size > 0, `${where}: told, the lay-out before it is gone`);
+      const inBar = (t: Take, seat: string, bar: PlanBar) =>
+        notesOf(t, seat as "chords").filter(
+          (note) => note.tick >= bar.start && note.tick < bar.start + bar.ticks,
+        ).length;
+      const phrases = Map.groupBy(
+        take.plan.bars.filter((bar) => bar.kind === "music"),
+        (bar) => `${bar.section.occurrence}:${bar.phrase.index}`,
+      );
+      for (const bars of phrases.values()) {
+        for (const seat of BAND) {
+          for (const bar of bars) {
+            if (toldOuts.get(bar)?.includes(seat)) {
+              assert.equal(
+                inBar(take, seat, bar),
+                0,
+                `${where}, told: ${seat} out of bar ${bar.index} plays`,
+              );
+              assert.ok(
+                bar.start < at.start,
+                `${where}, told: ${seat} out after the word, bar ${bar.index}`,
+              );
+            }
+          }
+          const marked = bars.every((bar) => bar.seats[seat] !== null);
+          const played = (t: Take) => bars.reduce((n, bar) => n + inBar(t, seat, bar), 0);
+          if (marked) {
+            assert.ok(
+              played(take) > 0,
+              `${where}, told: ${seat} marked in and silent from bar ${bars[0]!.index}`,
+            );
+          }
+        }
+      }
+    }
+  }
+});
+
+test("a seat laid out of a jam is silent: none of its notes starts in a bar it sits out, and none rings into one from the bar before", () => {
+  for (const { chart, options, take } of takes((jam) => jam.options.mode === "jam")) {
+    // Each seat's time out, as stretches of ticks: a section or a pass at a time.
+    const away = new Map<string, [number, number][]>();
+    for (const [bar, out] of laidOut(take.plan)) {
+      for (const seat of out) {
+        const stretches = away.get(seat) ?? [];
+        const last = stretches.at(-1);
+        if (last && last[1] === bar.start) last[1] += bar.ticks;
+        else stretches.push([bar.start, bar.start + bar.ticks]);
+        away.set(seat, stretches);
+      }
+    }
+    for (const [seat, stretches] of away) {
+      for (const note of notesOf(take, seat as "chords")) {
+        const end = note.tick + note.offset + note.duration;
+        for (const [from, to] of stretches) {
+          const sounds = note.tick < to && (note.tick >= from || end > from);
+          assert.ok(!sounds, `${chart.file} seed ${options.seed}: ${seat} at ${note.tick}`);
+        }
+      }
+    }
   }
 });

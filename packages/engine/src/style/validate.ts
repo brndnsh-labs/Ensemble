@@ -49,6 +49,21 @@ export function validateStyle(style: StylePack): string[] {
   }
   check(arc.defaultLevel >= 0 && arc.defaultLevel <= 1, "arc: default level must be 0 to 1");
   check(arc.depth >= 0, "arc: depth cannot be negative");
+  if (arc.layOut) {
+    const { seats, under, span, below, chance, openChance } = arc.layOut;
+    check(seats.length > 0, "arc: a lay-out names at least one seat that may sit out");
+    for (const seat of seats as readonly string[]) {
+      check(
+        seat === "drums" || seat === "bass" || seat === "chords",
+        `arc: "${seat}" is not a band seat a lay-out may take (never the soloist)`,
+      );
+    }
+    check(under === "solo" || under === "band", `arc: a lay-out is under "solo" or "band"`);
+    check(span === "pass" || span === "section", `arc: a lay-out spans a "pass" or a "section"`);
+    check(below >= 0 && below <= 1, "arc: a lay-out's below is 0 to 1");
+    check(chance >= 0 && chance <= 1, "arc: a lay-out's chance is 0 to 1");
+    check(openChance >= 0 && openChance <= 1, "arc: a lay-out's open-jam chance is 0 to 1");
+  }
   for (const [family, quality] of Object.entries(ending.finalChord)) {
     check(
       (BASE_QUALITIES as readonly string[]).includes(quality),

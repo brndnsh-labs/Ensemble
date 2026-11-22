@@ -27,7 +27,18 @@ export const blues: StylePack = {
     // A percent either way (docs/decisions/engine.md, the tempo breathes): a shuffle band leaning into its last choruses.
     breathe: 0.01,
   },
-  arc: DEFAULT_ARC,
+  arc: {
+    ...DEFAULT_ARC,
+    // Now and then the comp sits out a chorus under the soloist (docs/decisions/styles.md, who is in).
+    layOut: {
+      seats: ["chords"],
+      under: "solo",
+      span: "pass",
+      below: 0.75,
+      chance: 0.1,
+      openChance: 0.05,
+    },
+  },
   ending: {
     // A blues band ends even a major tune on its I9.
     finalChord: { major: "9", minor: "m9", dominant: "9" },

@@ -87,7 +87,58 @@ export function grooveOf(take: Take): string | null {
   return best;
 }
 
+/**
+ * The share of a jam's bars where a seat is laid out while the band plays on (#2240): the
+ * bars of music with any of the band in them, and of those the ones without this seat. A
+ * song is played as arranged and is not measured; a seat that plays in no bar of the take
+ * was left out by the player, not laid out, and is not measured either.
+ */
+const laidOut = (seat: "drums" | "bass" | "chords"): Measure => ({
+  id: `${seat}.laid-out`,
+  seat,
+  says: `How much of a jam ${seat === "chords" ? "the comp sits" : `the ${seat} sit${seat === "bass" ? "s" : ""}`} out while the rest of the band plays: rarely, for a section or a pass at a low point of the arc, and never at all in a style that keeps everyone in.`,
+  unit: "share",
+  of(take) {
+    if (take.plan.mode !== "jam") return null;
+    const band = musicBars(take).filter(
+      (bar) => bar.seats.drums !== null || bar.seats.bass !== null || bar.seats.chords !== null,
+    );
+    if (!band.some((bar) => bar.seats[seat] !== null)) return null;
+    return share(band.filter((bar) => bar.seats[seat] === null).length, band.length);
+  },
+});
+
+/** Whether a take lays a band seat out anywhere while the rest of the band plays on. */
+function thins(take: Take): boolean {
+  const band = musicBars(take).filter(
+    (bar) => bar.seats.drums !== null || bar.seats.bass !== null || bar.seats.chords !== null,
+  );
+  return (["drums", "bass", "chords"] as const).some(
+    (seat) =>
+      band.some((bar) => bar.seats[seat] !== null) && band.some((bar) => bar.seats[seat] === null),
+  );
+}
+
 export const bandMeasures: readonly Measure[] = [
+  laidOut("drums"),
+  laidOut("bass"),
+  laidOut("chords"),
+  {
+    id: "band.takes-thinned",
+    seat: "band",
+    says: "How many jams a seat sits out of at all, for a while, of those that could: now and then, not every time, and never in a style that keeps everyone in. A jam that could is one of four passes or more (or open), and, where the style thins only under the soloist, one with the soloist.",
+    unit: "share",
+    of: () => null,
+    across(takes, style) {
+      const could = takes.filter(
+        (take) =>
+          take.plan.mode === "jam" &&
+          (take.plan.open || take.plan.passes >= 4) &&
+          (style.arc.layOut?.under !== "solo" || take.plan.bars.some((bar) => bar.solo !== null)),
+      );
+      return share(could.filter(thins).length, could.length);
+    },
+  },
   {
     id: "band.new-grooves",
     idiom: true,

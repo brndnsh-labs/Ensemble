@@ -64,6 +64,11 @@ export interface PlanOptions {
   readonly countIn?: boolean;
   /** Seats to leave out entirely. Default: none. */
   readonly without?: readonly Seat[];
+  /**
+   * The take's seed: a jam draws from it where a seat sits out for a while
+   * (`ArcStyle.layOut`), keyed by the pass. Left out, everyone stays in.
+   */
+  readonly seed?: number | string;
 }
 
 /** A fill the drummer owes at the end of a bar, and how big a boundary it marks. */
@@ -174,6 +179,13 @@ export interface PlanBar {
 
   /** Where this bar was typed, for linking the playhead to the text. */
   readonly source: SourceRange | null;
+  /**
+   * Seats that come in on this bar though the bar before was theirs to play: a jam told to
+   * finish on a pass a seat was going to sit out from its top. Nobody leans into it from the bar
+   * before, and its first chord is struck afresh, as by a seat coming back from a lay-out. Left
+   * out: none.
+   */
+  readonly enters?: readonly Seat[];
 }
 
 export interface Plan {
