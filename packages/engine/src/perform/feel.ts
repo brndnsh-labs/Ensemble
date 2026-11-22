@@ -74,6 +74,8 @@ export function applyFeel(
   const ticksPerMs = (plan.quarters * PPQ) / 60_000;
   const human = Math.min(100, Math.max(0, style.feel.humanize)) / 100;
 
+  // Each seat's last note as played, for a note that is no softer than it.
+  const played = new Map<string, { tick: number; velocity: number }>();
   return notes.map((note) => {
     const bar = plan.bars[note.bar]!;
     const tickInBar = note.tick - bar.start;
@@ -97,7 +99,7 @@ export function applyFeel(
     const offset = Math.round(start - tickInBar + lean + placement + (note.nudge ?? 0));
     // Nothing rings past the end of a performance that ends, however the pocket moved the note.
     const room = plan.open ? Number.POSITIVE_INFINITY : plan.ticks - (note.tick + offset);
-    const event: NoteEvent = {
+    let event: NoteEvent = {
       kind: "note",
       seat: note.seat,
       tick: note.tick,
@@ -106,6 +108,11 @@ export function applyFeel(
       pitch: note.pitch,
       velocity: clampVelocity(note.velocity * energyGain(energy) + velocityShift),
     };
+    const prior = played.get(note.seat);
+    if (note.noSofter && prior && prior.tick < note.tick && prior.velocity > event.velocity)
+      event = { ...event, velocity: prior.velocity };
+    if (!prior || prior.tick <= note.tick)
+      played.set(note.seat, { tick: note.tick, velocity: event.velocity });
     return {
       ...event,
       ...(note.voice === undefined ? {} : { voice: note.voice }),

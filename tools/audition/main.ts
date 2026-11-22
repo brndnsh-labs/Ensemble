@@ -74,7 +74,8 @@ async function perform(): Promise<Performance> {
   const text = await (await fetch(params.get("chartAt") ?? `/library/${chartSelect.value}`)).text();
   const soloInstrument = $<HTMLSelectElement>("solo").value;
   const take = render(text, style, {
-    mode: "jam",
+    // `song=1` plays the chart once as written, as the CLI's --song does.
+    mode: params.get("song") === "1" ? "song" : "jam",
     seed: Number($<HTMLInputElement>("seed").value),
     passes: Number($<HTMLInputElement>("passes").value),
     ...(soloInstrument ? { solo: true, soloInstrument } : {}),
@@ -91,6 +92,8 @@ async function perform(): Promise<Performance> {
     ...(params.get("open") === "1" ? { open: true } : {}),
     ...(params.has("endafter") ? { endAfter: Number(params.get("endafter")) } : {}),
     ...(params.has("toldat") ? { toldAt: Number(params.get("toldat")) } : {}),
+    // `without=bass` leaves seats out of the band, as the CLI's --without does.
+    ...(params.has("without") ? { without: params.get("without")!.split(",") as Seat[] } : {}),
   });
   const only = params.get("only")?.split(",");
   // `packs=chords:electric-piano` puts another instrument in a seat: for hearing a pack

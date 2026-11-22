@@ -282,6 +282,69 @@ function heardBy(voicing: Voicing, chord: Chord | null): number[] {
   );
 }
 
+/** The note a stinger strikes on one string of the grip and the one it pulls off to (EN-49). */
+interface Stinger {
+  /** Which note of the grip, low to high. */
+  readonly at: number;
+  readonly struck: number;
+  readonly pulled: number;
+}
+
+/**
+ * Where a grip has a stinger over its chord: the 6th (the b6 over a minor
+ * chord) on one of the guitar's top two strings, the B or the high E, pulled
+ * off to the 5th a step under it on the same string. The grip's own 6th there is taken first, top string
+ * first, where the 5th is on that string under it; then its 5th there, fretted
+ * up to the 6th. The hand holds both frets inside its four and with its
+ * fingers, the 6th keeps the strings' pitch rising, and it is never a half
+ * step under another note of the grip. Null where there is none: an open
+ * shape whose 6th is an open string, or whose 5th lies lower in the grip.
+ * `frets`: the 5th may be fretted up to the 6th. Not where the chord carries
+ * on from the bar before: the hand holding its grip moves only where the chord
+ * does, so there only a 6th the grip already holds is pulled off.
+ */
+export function stingerOf(voicing: Voicing, chord: Chord, frets: boolean): Stinger | null {
+  const strings = voicing.strings;
+  const fifth = toneInterval(chord.quality, "fifth");
+  if (!strings || fifth !== 7) return null;
+  const third = toneInterval(chord.quality, "third");
+  const sixth = third === 3 ? 8 : 9;
+  const root = pitchClass(chord.root);
+  const { pitches } = voicing;
+  const held = fretsOf(strings, pitches);
+  const holds = (at: number, extra: number) => {
+    const all = [...held.slice(0, at), extra, ...held.slice(at)];
+    const fretted = all.filter((fret) => fret > 0);
+    if (fretted.length > 0 && Math.max(...fretted) - Math.min(...fretted) > HAND_SPAN) return false;
+    return Math.max(...all) <= TOP_FRET && fingered(all);
+  };
+  const rubs = (pitch: number, at: number) =>
+    pitches.some((other, k) => k !== at && mod12(other - pitch) === 1);
+  // The B and the high E strings: a 6th on a lower string, or under a silent B, is not on top.
+  const top = [pitches.length - 1, pitches.length - 2].filter(
+    (at) => at >= 0 && strings[at]! >= OPEN_STRINGS.length - 2,
+  );
+  const found = (at: number, struck: number, pulled: number, fret: number): Stinger | null =>
+    fret >= 0 && holds(at, fret) && !rubs(struck, at) && (pitches[at + 1] ?? Infinity) > struck
+      ? { at, struck, pulled }
+      : null;
+  for (const at of top) {
+    const pitch = pitches[at]!;
+    if (mod12(pitch - root) !== sixth) continue;
+    const pulled = pitch - (sixth - fifth);
+    const stinger = found(at, pitch, pulled, held[at]! - (sixth - fifth));
+    if (stinger) return stinger;
+  }
+  for (const at of frets ? top : []) {
+    const pitch = pitches[at]!;
+    if (mod12(pitch - root) !== fifth) continue;
+    const struck = pitch + (sixth - fifth);
+    const stinger = found(at, struck, pitch, held[at]! + (sixth - fifth));
+    if (stinger) return stinger;
+  }
+  return null;
+}
+
 /** One string sounding one note. */
 interface Plucked {
   readonly string: number;
@@ -566,21 +629,48 @@ export function guitar(style: Guitar): InstrumentIdiom {
         }
         const [lowest, highest] = [strings[from]!, strings.at(-1)!];
         const across = (highest - lowest) * roll;
+        // The stinger: the 6th struck with the chord and pulled off to the 5th an eighth later,
+        // which rings on to the chord's end (EN-49).
+        const stinger =
+          strike.pullOff !== undefined &&
+          !strike.muted &&
+          strike.arrival.chord &&
+          duration > PPQ / 2 + SHORTEST
+            ? stingerOf(
+                voicing,
+                strike.arrival.chord,
+                strike.arrival.changed || strike.arrival.index === 0,
+              )
+            : null;
         for (let k = from; k < voicing.pitches.length; k++) {
           // Low string first going down, high string first coming up (CH-29), the whole
           // stroke centred on its place in the grid. Feel adds the nudge to the pocket.
           const reached = (upstroke ? highest - strings[k]! : strings[k]! - lowest) * roll;
           const nudge = (reached - across / 2) * ticksPerMs;
+          const velocity = Math.max(1, strike.velocity - (upstroke ? lighter : 0));
+          const stung = stinger?.at === k;
           notes.push({
             seat: "chords",
             bar: strike.bar,
             tick: strike.tick,
-            duration,
-            pitch: voicing.pitches[k]!,
-            velocity: Math.max(1, strike.velocity - (upstroke ? lighter : 0)),
+            duration: stung ? PPQ / 2 : duration,
+            pitch: stung ? stinger.struck : voicing.pitches[k]!,
+            velocity,
             ...(strike.muted ? { voice: MUTED } : {}),
             ...(nudge === 0 ? {} : { nudge }),
           });
+          if (stung) {
+            notes.push({
+              seat: "chords",
+              bar: strike.bar,
+              tick: strike.tick + PPQ / 2,
+              duration: duration - PPQ / 2,
+              pitch: stinger.pulled,
+              velocity: Math.max(1, Math.round(velocity * strike.pullOff!)),
+              slur: true,
+              ...(nudge === 0 ? {} : { nudge }),
+            });
+          }
         }
       });
       return notes;

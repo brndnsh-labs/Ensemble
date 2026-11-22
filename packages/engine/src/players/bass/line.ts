@@ -49,6 +49,8 @@ export interface LineNote {
   passing?: boolean;
   /** How much of its space it sounds, the line's gap aside: a walk's note (`Walk.length`). */
   connects?: number;
+  /** Played at least as hard as the seat's note before it (`WrittenNote.noSofter`). */
+  noSofter?: boolean;
 }
 
 interface Onset {
@@ -344,6 +346,7 @@ export function write(notes: readonly LineNote[], piece: Piece, line: BassLine):
       pitch: note.pitch,
       velocity: Math.min(127, Math.max(1, Math.round(velocity))),
       ...(note.dead ? { voice: DEAD_VOICE } : {}),
+      ...(note.noSofter ? { noSofter: true } : {}),
     });
   });
   return written;

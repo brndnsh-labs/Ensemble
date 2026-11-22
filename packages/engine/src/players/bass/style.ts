@@ -540,6 +540,27 @@ export interface WalkPolicy {
   };
   /** The walks for each way the bass note can move. A move with none is never walked. */
   readonly kinds: Readonly<Partial<Record<RootMotion, readonly Walk[]>>>;
+  /**
+   * The walk home (EN-45 to EN-48): the bar before an ending that is one chord
+   * struck on its downbeat, in 4/4, is walked into the final root every time,
+   * at any level, whatever is offered above. The root on 1, then the 5th, 6th
+   * and 7th counted from the landing on beats 2, 3 and 4, the 7th the chord's
+   * own tone a whole step under the landing where it has one, else the leading
+   * tone; over the V its root, the run's 5th, holds through beat 2; from the IV
+   * the line walks down (its root held, the landing's 3rd and 2nd); a root
+   * inside the run keeps the line and goes in on beat 4 alone; a chord struck
+   * on beat 3 keeps its root there and adds at most one note on 4. The run and
+   * the final root lie in the lowest octave whose 5th is on the instrument.
+   * A note on 4 never rubs a half step over the chord it is played on.
+   * `velocity`: the written level on each beat, 1 to 4 (a note held from 1 is
+   * played at the first); the final root is at least as loud as the last
+   * (`BassStyle.ending.velocity`). `length`: how much of its beat each note
+   * sounds.
+   */
+  readonly ending?: {
+    readonly velocity: readonly [number, number, number, number];
+    readonly length: number;
+  };
 }
 
 /** How the bassist chooses a phrase: plans drawn, each played out, and the critic picks one. */

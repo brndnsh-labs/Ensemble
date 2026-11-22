@@ -137,6 +137,9 @@ const walks: BassStyle["walks"] = {
       walk("a step down", "down", ["R"], "whole", ONE_STEP),
     ],
   },
+  // The walk home, every time at any level: the root on 1, then 5, 6 and 7 counted from the
+  // landing on 2, 3 and 4, at 100, 92, 96 and 102, the notes connecting (EN-46, BA-52).
+  ending: { velocity: [100, 92, 96, 102], length: 0.92 },
 };
 
 export const countryBass: BassStyle = {
@@ -157,6 +160,7 @@ export const countryBass: BassStyle = {
   walks,
   // No weights: the first plan drawn is played, so a walk is played as often as it is offered.
   phrase: { candidates: 1, answers: 0, halfSteps: { min: 0, max: 1 } },
-  // Crash and kick on 1, the low root under them (ST-country-10).
-  ending: { velocity: 100 },
+  // Crash and kick on 1, the low root under them, struck at least as hard as the walk's last
+  // note (ST-country-10, EN-46).
+  ending: { velocity: 102 },
 };

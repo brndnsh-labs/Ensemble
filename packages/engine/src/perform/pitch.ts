@@ -104,7 +104,10 @@ export function pitchCurve(move: PitchMove, secondsPerTick: number, seconds: num
  * pitch (the one it is held at longest, and the recording a sampler takes),
  * stands at the first's pitch until the second's time and jumps to it there,
  * shakes as the second shakes from where the second's shake starts, and
- * sounds until the second ends. A slurred note with nothing before it is
+ * sounds until the second ends. Where the seat's notes before it are a chord
+ * struck together (a guitar's stinger, EN-49) it is not joined: it is struck at
+ * its own level, and the chord's note it follows has stopped, since one channel's
+ * bend would move the whole chord. A slurred note with nothing before it is
  * struck. Anything that makes sound, and the MIDI file, read the
  * performance through this; everything else reads the notes as written.
  */
@@ -116,16 +119,24 @@ export function asStruck(
   if (!events.some((event) => event.kind === "note" && event.slur)) return [...events];
   const out: PerformanceEvent[] = [];
   const last = new Map<string, number>();
+  // Each seat's notes struck at its latest written tick: one, or a chord.
+  const struckTogether = new Map<string, { tick: number; notes: number }>();
   for (const event of events) {
     if (event.kind !== "note") {
       out.push(event);
       continue;
     }
-    const at = last.get(event.seat);
+    // After a chord, a finger pulling off one string of it is heard as two notes: the chord's,
+    // stopped, and this one sounded at its own level. A bend would move the whole chord.
+    const chord = (struckTogether.get(event.seat)?.notes ?? 0) > 1;
+    const at = event.slur && !chord ? last.get(event.seat) : undefined;
     const first = at === undefined ? undefined : (out[at] as NoteEvent);
     if (!event.slur || first === undefined) {
       const { slur: _, ...struck } = event;
       last.set(event.seat, out.length);
+      const group = struckTogether.get(event.seat);
+      if (!event.slur && group?.tick === event.tick) group.notes++;
+      else if (!event.slur) struckTogether.set(event.seat, { tick: event.tick, notes: 1 });
       out.push(struck);
       continue;
     }

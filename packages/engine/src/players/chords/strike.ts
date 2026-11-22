@@ -50,6 +50,12 @@ export interface Strike {
    * the soloist has done since.
    */
   readonly again?: true;
+  /**
+   * The final chord's stinger (`ChordStyle.ending.pullOff`): where the grip
+   * has one, its 6th is struck and pulled off to the 5th an eighth later, at
+   * this share of the strike's level.
+   */
+  readonly pullOff?: number;
 }
 
 /**

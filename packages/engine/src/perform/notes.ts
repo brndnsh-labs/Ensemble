@@ -47,6 +47,11 @@ export interface WrittenNote {
    */
   readonly slur?: boolean;
   /**
+   * Played at least as hard as the seat's note before it, as it is played,
+   * whatever the hand's touch does to either: a final root walked into (EN-46).
+   */
+  readonly noSofter?: boolean;
+  /**
    * It leads into the next bar (a soloist's pickup, SO-36): it is played in a bar
    * its seat sits out, where the seat plays the bar it leads into.
    */

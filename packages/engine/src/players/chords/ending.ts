@@ -8,6 +8,7 @@ import type { Arrival } from "../../perform/harmony.ts";
 import { pulseTicks } from "../../perform/meter.ts";
 import type { PlanBar } from "../../plan/types.ts";
 import { tierOf } from "../../style/types.ts";
+import { pitchClass } from "../../theory/pitch.ts";
 import { pulseStarts, stretches } from "./plain.ts";
 import type { Strike } from "./strike.ts";
 import type { ChordStyle } from "./style.ts";
@@ -35,6 +36,7 @@ export function endingStrikes(
     velocity: number,
     arrival: Arrival,
     again = false,
+    pullOff?: number,
   ) =>
     strikes.push({
       bar: bar.index,
@@ -46,6 +48,7 @@ export function endingStrikes(
       // The final chord is a downstroke on a guitar, wherever it lands (CH-74).
       down: true,
       ...(again ? { again: true as const } : {}),
+      ...(pullOff !== undefined ? { pullOff } : {}),
     });
 
   // A chord on the way to the final one (the V of a last bar that gets home itself).
@@ -65,9 +68,18 @@ export function endingStrikes(
   const barEnd = bar.start + bar.ticks;
   switch (ending.gesture.kind) {
     case "hold":
-    case "soft":
-      strike(from, until - from, level, arrival);
+    case "soft": {
+      // The stinger, on the final tonic only, where it rings past the eighth it is pulled off on
+      // (EN-49). Whether the grip has one is the guitar's to say.
+      const chord = arrival.chord;
+      const tonic = chord !== null && pitchClass(chord.root) === pitchClass(bar.key.tonic);
+      const pullOff =
+        chords.ending.pullOff && tonic && until - from > EIGHTH * 2
+          ? chords.ending.pullOff.level
+          : undefined;
+      strike(from, until - from, level, arrival, false, pullOff);
       break;
+    }
     case "stop":
       strike(from, Math.min(EIGHTH, until - from), level, arrival);
       break;
