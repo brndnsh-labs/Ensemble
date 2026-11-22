@@ -293,6 +293,13 @@ const STRESS_KINDS: readonly Omit<TakeOptions, "seed">[] = [
  */
 export const SOLO_SECTION: LibraryChart = testChart("solo-section.chart");
 
+/**
+ * A chart with two Solo sections in one time through the form, each the next chorus of the
+ * soloist's solo. Written here, not in the stress charts: only plan-only properties read it.
+ */
+export const TWO_SOLOS =
+  "title: Two solos\nkey: C\n\n[Verse]\n| C | F | G | C |\n\n[Solo]\n| C | F | G | C |\n\n[Chorus]\n| F | G | C | C |\n\n[Solo 2]\n| Am | F | G7 | C |\n";
+
 const STRESS_SPECS: readonly JamSpec[] = STYLES.flatMap((style) => [
   ...STRESS.flatMap((chart) =>
     SEEDS.slice(0, 4).flatMap((seed) =>

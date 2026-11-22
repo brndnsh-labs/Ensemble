@@ -43,6 +43,7 @@ import {
   STYLES,
   soloistTakes,
   stressTakes,
+  TWO_SOLOS,
   takeOf,
   takes,
   written,
@@ -219,7 +220,7 @@ test("the soloist from the top: asked for in a jam, it has the lead from the fir
   }
 });
 
-test("the band builds with the solo: it never comes down from one chorus of a solo to the next, and under the last of three it is louder than under the first", () => {
+test("the band builds with the solo: it never comes down from one chorus of a solo to the next, and under the last of three it is louder than under the first, wherever in the time round a solo's last chorus falls", () => {
   for (const style of STYLES) {
     // A chart with a Solo section too: the band builds with the solo wherever the chart puts it.
     for (const chart of [...ownCharts(style), SOLO_SECTION]) {
@@ -258,6 +259,45 @@ test("the band builds with the solo: it never comes down from one chorus of a so
             );
           }
         }
+      }
+    }
+    // Two Solo sections a time round: a solo's last chorus may fall in either. Where the pass
+    // the band would peak on by itself holds a solo's last chorus, the band peaks there with the
+    // soloist too; and after the peak, under each later solo that ends before the last pass, the
+    // band is louder on the pass with its last chorus than on the pass with its first.
+    const twice = parse(TWO_SOLOS).chart;
+    for (let passes = 3; passes <= 12; passes++) {
+      const where = `${style.id}, two Solo sections, ${passes} passes`;
+      const means = (bars: readonly PlanBar[]) => {
+        const sums = Array.from({ length: passes }, () => [0, 0]);
+        for (const bar of bars) {
+          if (bar.kind !== "music" || bar.section.role !== "body") continue;
+          sums[bar.pass]![0]! += bar.energy;
+          sums[bar.pass]![1]! += 1;
+        }
+        return sums.map(([sum, n]) => sum! / n!);
+      };
+      const peakOf = (levels: readonly number[]) => levels.indexOf(Math.max(...levels));
+      const alone = peakOf(means(plan(twice, style, { mode: "jam", passes }).bars));
+      const roadmap = plan(twice, style, { mode: "jam", passes, solo: true });
+      const level = means(roadmap.bars);
+      const peak = peakOf(level);
+      const sections = roadmap.bars
+        .filter((bar) => bar.solo && bar.barInSection === 0)
+        .map((bar) => ({ pass: bar.pass, ...bar.solo! }));
+      const ends = (mark: { chorus: number; of: number }) =>
+        mark.of > 1 && mark.chorus === mark.of - 1;
+      if (sections.some((mark) => mark.pass === alone && ends(mark))) {
+        assert.equal(peak, alone, `${where}: the band peaks off the solo's last chorus`);
+      }
+      for (const [i, first] of sections.entries()) {
+        if (first.chorus !== 0 || first.of === 1 || first.pass <= peak) continue;
+        const last = sections[i + first.of - 1]!;
+        if (last.pass >= passes - 1 || last.pass === first.pass) continue;
+        assert.ok(
+          level[last.pass]! > level[first.pass]! + 1e-9,
+          `${where}, the solo from pass ${first.pass}: ${level[first.pass]} then ${level[last.pass]}`,
+        );
       }
     }
   }

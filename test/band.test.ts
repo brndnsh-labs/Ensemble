@@ -46,6 +46,7 @@ import {
   SOLO_SECTION,
   STYLES,
   soloistTakes,
+  TWO_SOLOS,
   takes,
 } from "./takes.ts";
 
@@ -217,7 +218,7 @@ test("making an open jam one pass longer changes nothing that was already played
   }
 });
 
-test("a jam told to finish plays everything before its last pass as it would have, and that pass is a last pass like any other: marked, and landed", () => {
+test("a jam told to finish plays everything before its last pass as it would have, and that pass is a last pass like any other: marked, and landed, the solo under way ending on it with its choruses in order", () => {
   for (const style of STYLES) {
     const check = (
       chart: LibraryChart,
@@ -285,6 +286,44 @@ test("a jam told to finish plays everything before its last pass as it would hav
     // A chart with a Solo section, the soloist asked for: each solo is the arc the jam set out with.
     check(SOLO_SECTION, { mode: "jam", passes: 6 }, 4, 1, true, false);
     check(SOLO_SECTION, { mode: "jam", open: true, passes: 3 }, 2, 1, true, false);
+    // Two Solo sections a time round, the soloist asked for: told to finish, a solo's choruses
+    // still come in order. After a solo's last chorus a new solo starts, every other Solo
+    // section is the next chorus of the same solo, of the same length, and the last Solo
+    // section played ends its solo. The passes before the word keep the solos set out.
+    const twice = parse(TWO_SOLOS).chart;
+    const marks = (bars: readonly PlanBar[]) =>
+      bars.filter((bar) => bar.solo && bar.barInSection === 0).map((bar) => bar.solo!);
+    const told: PlanOptions[] = [
+      ...[0, 1, 2, 3, 4, 5].map((endAfter) => ({ mode: "jam" as const, passes: 6, endAfter })),
+      ...[0, 1, 2].map((endAfter) => ({ mode: "jam" as const, open: true, passes: 3, endAfter })),
+    ];
+    for (const options of told) {
+      const where = `${style.id}, two Solo sections, told on pass ${options.endAfter}${options.open ? ", open" : ""}`;
+      const roadmap = plan(twice, style, { ...options, solo: true, seed: 1 });
+      const solos = marks(roadmap.bars);
+      for (const [i, mark] of solos.entries()) {
+        const before = solos[i - 1];
+        if (!before || before.chorus === before.of - 1) {
+          assert.equal(mark.chorus, 0, `${where}: Solo section ${i} does not start a solo`);
+        } else {
+          assert.deepEqual(
+            mark,
+            { chorus: before.chorus + 1, of: before.of },
+            `${where}: Solo section ${i} is not the next chorus of its solo`,
+          );
+        }
+      }
+      const last = solos.at(-1)!;
+      assert.equal(last.chorus, last.of - 1, `${where}: the last solo goes on past the end`);
+      const { endAfter: _word, ...going } = options;
+      const early = (bars: readonly PlanBar[]) =>
+        marks(bars.filter((bar) => bar.pass < options.endAfter!));
+      assert.deepEqual(
+        early(roadmap.bars),
+        early(plan(twice, style, { ...going, solo: true, seed: 1 }).bars),
+        `${where}: the solos before it`,
+      );
+    }
   }
 });
 
