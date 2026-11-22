@@ -87,7 +87,8 @@ function strokesOf(grid: readonly string[], from = 0, figure?: Figure): Onset[] 
       space: length * STEP,
       echo: symbol === "o",
       ...(tone ? { tone } : {}),
-      ...(tone && under ? { under: true } : {}),
+      // A named tone, or an `x`'s tone of the sequence: either is taken under the root.
+      ...(under && symbol !== "o" && symbol !== DEAD_NOTE ? { under: true } : {}),
       ...(tone && tone !== "8" && near ? { near: true } : {}),
       ...(symbol === DEAD_NOTE ? { dead: true } : {}),
     });

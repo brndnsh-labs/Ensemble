@@ -56,6 +56,8 @@ export function toneOf(tone: Tone, chord: Chord, scale: ChordScale): number | nu
       return 0;
     case "8":
       return 12;
+    case "1":
+      return 0;
     case "3": {
       // A chord with no third is played on what stands in its place: the suspension,
       // or the eleventh of an eleventh chord.
@@ -106,6 +108,7 @@ const FALLBACK: Readonly<Record<Tone, Tone>> = {
   "6": "5",
   b7: "8",
   "7": "R",
+  "1": "R",
 };
 
 /**

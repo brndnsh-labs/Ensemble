@@ -25,6 +25,9 @@ import type { ChordFamily } from "../../theory/chord.ts";
  *        dominant or a minor seventh, the sixth of a sixth chord; on a chord with none, the
  *        major sixth where its scale has one, or else the root (ST-neosoul-14)
  * - `8`  the octave above the bass note
+ * - `1`  the chord's own root: the bass note itself, but under a slash chord the
+ *        root its name gives (over C/G, the C), which `R` is not (BA-51: a two-beat
+ *        bass over a chord standing on its fifth alternates with the root)
  *
  * The third and fifth are read from the chord. The second, fourth, sixth and
  * flat seventh are played as written unless the chord's scale holds a different
@@ -40,7 +43,7 @@ import type { ChordFamily } from "../../theory/chord.ts";
  * after in the same direction, and never on a held note (BA-15, X-A-26). A
  * shape that would land one anywhere else is not played on that chord.
  */
-export type Tone = "R" | "2" | "b3" | "3" | "4" | "#4" | "5" | "b6" | "6" | "b7" | "7" | "8";
+export type Tone = "R" | "2" | "b3" | "3" | "4" | "#4" | "5" | "b6" | "6" | "b7" | "7" | "8" | "1";
 export const TONES: readonly Tone[] = [
   "R",
   "2",
@@ -54,6 +57,7 @@ export const TONES: readonly Tone[] = [
   "b7",
   "7",
   "8",
+  "1",
 ];
 
 /** What a chord must be for a sequence to be played over it. Every condition given must hold. */
@@ -134,7 +138,9 @@ export interface Figure {
   /**
    * The tones it names are taken under the root, not over it, wherever the
    * instrument has the note: a pickup that climbs into the One, the deep shape
-   * of a riff whose fifth falls a fourth below (BA-68).
+   * of a riff whose fifth falls a fourth below (BA-68). So are the tones of the
+   * line's sequence its `x`s play: a two-beat bass's fifth under its root
+   * (BA-51). A chord's arrival is its bass note wherever it falls.
    */
   readonly under?: boolean;
   /**
