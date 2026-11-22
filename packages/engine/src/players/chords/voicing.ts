@@ -344,6 +344,7 @@ export function voiceStrikes(
           family,
           voicings: clean.length > 0 ? clean : every,
           led: new Map(),
+          topped: new Map(),
           root,
           needed: new Set(identity(chord, scale).map((tone) => tone.interval)),
         };
@@ -362,22 +363,30 @@ export function voiceStrikes(
     if (line) away = true;
     // A choice that hears the line, or is on its way home from one, is its own: only a
     // strike with the hand in its own place is remembered.
+    // A strum across only the top strings is judged by what it sounds: where one of the
+    // chord's grips sounds three notes or more there with no growl, the hand takes one of
+    // those (A13 as x02022 strummed on its top four: E3 G3 C#4 F#4, not F#3 G3 C#4). Where
+    // none does, the grips as for any strike.
+    const across = strike.top !== undefined && idiom.sounds ? topped(way, strike, idiom) : null;
+    const led = across ? across.led : way.led;
     let next: Voicing | null | undefined =
-      idiom.holds && way === held && previous ? previous : away ? undefined : way.led.get(previous);
+      idiom.holds && way === held && previous ? previous : away ? undefined : led.get(previous);
     held = way;
     if (next === undefined) {
       const { family } = way;
       const from: Voicing | null = previous;
-      const candidates: VoicingCandidate[] = way.voicings.map((voicing) => ({
-        voicing: idiom.placed?.(voicing, from) ?? voicing,
-        previous,
-        register: chords.register,
-        family,
-        line,
-        away,
-      }));
+      const candidates: VoicingCandidate[] = (across ? across.voicings : way.voicings).map(
+        (voicing) => ({
+          voicing: idiom.placed?.(voicing, from) ?? voicing,
+          previous,
+          register: chords.register,
+          family,
+          line,
+          away,
+        }),
+      );
       next = choose(candidates, VOICING_FEATURES, weights)?.candidate.voicing ?? null;
-      if (!away) way.led.set(previous, next);
+      if (!away) led.set(previous, next);
     }
     if (next === null) continue;
     // Home again: the line is gone and the top is back within reach of where the style aims it.
@@ -397,8 +406,36 @@ interface Way {
   readonly voicings: readonly Voicing[];
   /** From the voicing in hand (null: the first strike) to the one chosen; null when there is none. */
   readonly led: Map<Voicing | null, Voicing | null>;
+  /** The same for a strum across only the top N strings, by N: its grips, and where each is led. */
+  readonly topped: Map<number, Topped>;
   /** The chord's root, as a pitch class. */
   readonly root: number;
   /** The tones the chord is heard by, as pitch classes above the root: never left out. */
   readonly needed: ReadonlySet<number>;
+}
+
+/** A chord's grips for a strum across only its top strings, and where the hand is led among them. */
+interface Topped {
+  readonly voicings: readonly Voicing[];
+  readonly led: Map<Voicing | null, Voicing | null>;
+}
+
+/**
+ * The grips a strum across only the top N strings may take: those whose top strings sound
+ * three notes or more with no growl (Q-03), or, where none does, every grip the chord has.
+ */
+function topped(way: Way, strike: Strike, idiom: InstrumentIdiom): Topped | null {
+  const n = strike.top!;
+  let found = way.topped.get(n);
+  if (!found) {
+    const sounding = way.voicings.filter((voicing) => {
+      const sounded = idiom.sounds!(voicing, strike);
+      return sounded.length >= 3 && !growls({ pitches: sounded }, way.family);
+    });
+    const voicings = sounding.length > 0 ? sounding : way.voicings;
+    found = { voicings, led: new Map() };
+    way.topped.set(n, found);
+  }
+  // Where every grip sounds well across the top strings, the choice is the strike's as any.
+  return found.voicings.length === way.voicings.length ? null : found;
 }
