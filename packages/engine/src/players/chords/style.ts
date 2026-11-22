@@ -261,6 +261,16 @@ export interface Attack {
    * single string cannot state a chord (ST-acoustic-30).
    */
   readonly pluck?: readonly PickPlace[];
+  /**
+   * The stroke crosses only the grip's top this many strings, as an upstroke
+   * already catches only its top few (CH-27), and as many more under them as it
+   * takes to sound every tone the chord is heard by (X-B-13). On a guitar only.
+   * A boom-chick guitar's chick on the top four strings of the grip whose low
+   * strings the thumb plays as the boom (ST-country-07). An upstroke catches the
+   * fewer of this and the style's `strum.up`. Left out, a downstroke crosses the
+   * whole grip.
+   */
+  readonly top?: number;
 }
 
 /** The symbols a figure may be written in, and how each is played. */

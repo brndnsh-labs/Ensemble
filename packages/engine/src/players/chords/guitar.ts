@@ -498,7 +498,9 @@ export function guitar(style: Guitar): InstrumentIdiom {
         // as it takes to sound every tone the chord is heard by (X-B-13), and to leave no
         // growl on the bottom of what it sounds: a grip with the 13th under the 7th is clean
         // from its root, and its top three strings are not (Q-03).
-        let from = upstroke ? Math.max(0, voicing.pitches.length - up) : 0;
+        // A stroke written across only the top strings catches no more of them, either way.
+        const reach = Math.min(upstroke ? up : Infinity, strike.top ?? Infinity);
+        let from = Number.isFinite(reach) ? Math.max(0, voicing.pitches.length - reach) : 0;
         if (from > 0) {
           const needed = heardBy(voicing, strike.arrival.chord);
           const family = strike.arrival.chord ? chordFamily(strike.arrival.chord.quality) : null;

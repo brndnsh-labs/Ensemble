@@ -62,8 +62,20 @@ export function validateChordStyle(chords: ChordStyle): string[] {
       );
     }),
   );
-  /** A plucked attack is a guitar's, names one or two places of the grip, and is not a scratch. */
+  /**
+   * A plucked attack is a guitar's, names one or two places of the grip, and is not a
+   * scratch. A strum across the top strings is a guitar's, crosses two or more of them,
+   * no more than the grip has, and is not also plucked.
+   */
   const plucks = (attack: Attack, where: string) => {
+    if (attack.top !== undefined) {
+      say(guitar !== null, `${where}: a strum across the top strings needs a guitar in the seat.`);
+      say(
+        Number.isInteger(attack.top) && attack.top >= 2 && attack.top <= (guitar?.strings ?? 6),
+        `${where}: a strum across the top ${attack.top} strings is not a whole number from 2 to the grip's strings.`,
+      );
+      say(attack.pluck === undefined, `${where}: a stroke is plucked or strummed, not both.`);
+    }
     if (attack.pluck === undefined) return;
     say(guitar !== null, `${where}: a plucked stroke needs a guitar in the seat.`);
     say(!attack.muted, `${where}: a stroke is plucked or deadened, not both.`);

@@ -94,7 +94,7 @@ export function barStrikes(chords: ChordStyle, book: RhythmBook, setting: BarSet
     duration: number,
     velocity: number,
     arrival: Arrival,
-    how: Pick<Strike, "muted" | "down" | "pluck"> = {},
+    how: Pick<Strike, "muted" | "down" | "pluck" | "top"> = {},
   ) =>
     strikes.push({
       bar: bar.index,
@@ -106,8 +106,10 @@ export function barStrikes(chords: ChordStyle, book: RhythmBook, setting: BarSet
       ...how,
     });
   /** How a stroke of the figure touches the strings: deadened, plucked, or plainly. */
-  const touch = (stroke: FigureStroke): Pick<Strike, "muted" | "pluck"> =>
-    stroke.muted ? { muted: true } : stroke.pluck ? { pluck: stroke.pluck } : {};
+  const touch = (stroke: FigureStroke): Pick<Strike, "muted" | "pluck" | "top"> => ({
+    ...(stroke.muted ? { muted: true } : stroke.pluck ? { pluck: stroke.pluck } : {}),
+    ...(stroke.top !== undefined && !stroke.pluck ? { top: stroke.top } : {}),
+  });
   /** A chord rings no longer than it is written, and breathes before what follows it. */
   const ring = (stroke: FigureStroke, stretch: Stretch) =>
     Math.min(stroke.length, Math.round((stretch.end - stroke.at) * book.hold));
@@ -229,7 +231,7 @@ export function barStrikes(chords: ChordStyle, book: RhythmBook, setting: BarSet
     // it was struck there, and the bar is the bass's and the ride's (ST-jazz-28).
     const rests = setting.strokes.length === 0 && i === 0 && setting.heldOver;
     if (!struck && !rests) {
-      const { level, steps, pluck } = vocabulary.arrival;
+      const { level, steps, pluck, top } = vocabulary.arrival;
       const stroke = { at: stretch.start, level, length: steps * STEP };
       const sitting = strikes.findIndex((other) => other.muted && other.tick === stroke.at);
       if (sitting >= 0) strikes.splice(sitting, 1);
@@ -238,7 +240,7 @@ export function barStrikes(chords: ChordStyle, book: RhythmBook, setting: BarSet
         ring(stroke, stretch),
         level,
         stretch.arrival,
-        pluck ? { pluck } : { down: true },
+        pluck ? { pluck } : { down: true, ...(top !== undefined ? { top } : {}) },
       );
     }
   });
