@@ -592,12 +592,12 @@ test('jazz: in a waltz the piano comps, not a pad (prompts/jazz-waltz-study.md):
   const shares = underTheSolo.eighths.map((n) => n / underTheSolo.bars);
   assert.ok(underTheSolo.bars > 600, `only ${pooled}`);
   assert.ok(
-    shares.every((share) => share >= 0.15 && share <= 0.55),
-    `${pooled}: struck on 1 1& 2 2& 3 3& in ${shares.map((share) => `${Math.round(share * 100)}%`).join(" ")}`,
-  );
-  assert.ok(
     underTheSolo.thin <= 0.3 * underTheSolo.bars,
     `${pooled}: ${underTheSolo.thin} with one strike or none`,
+  );
+  assert.ok(
+    shares.every((share) => share >= 0.15 && share <= 0.55),
+    `${pooled}: struck on 1 1& 2 2& 3 3& in ${shares.map((share) => `${Math.round(share * 100)}%`).join(" ")}`,
   );
 });
 
@@ -631,7 +631,14 @@ const playsTwoBars = (style: (typeof STYLES)[number], bar: PlanBar): boolean => 
  * hemiola in a solo phrase were the soloist not heard; a long one whose draw runs phrases on
  * past eight bars and over a chorus's top were a run not stopped.
  */
-const HEMIOLA_HELD: readonly TakeOptions[] = [];
+const HEMIOLA_HELD: readonly TakeOptions[] = [
+  // With the soloist not heard, the hemiola in bars 18 to 24 and 33 to 36, under the alto.
+  { mode: "jam", passes: 3, solo: true, energy: 0.55, seed: 3 },
+  // With a run let go on over a section's top: bars 49 to 52 go on over the fourth chorus's top.
+  { mode: "jam", passes: 4, energy: 0.55, seed: 3 },
+  // With a run let go on past eight bars: bars 113 to 124, a run of twelve.
+  { mode: "jam", passes: 8, energy: 0.55, seed: 7 },
+];
 
 /**
  * A phrase played on the hemiola: its bars alternate the figure's two bars from the phrase's
