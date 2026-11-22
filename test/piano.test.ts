@@ -158,13 +158,15 @@ test("the hand does not growl: a chord's two lowest notes are a half step apart 
   // is a cluster where the 7th on the bottom (C E F A) is the chord. Hard under a soloist,
   // where the hand is pressed down; and no voicing on the way into or out of a solo needs it.
   let judged = 0;
-  // Thirteenths in every style, in four and in three, with the bass in: a grip that is clean
+  // Thirteenths in every style, in four and in three, with the bass in and without: a grip that is clean
   // struck whole can growl across only its top strings (A13's F#3 G3 C#4); and the take where
   // country's chick in six first did, which the full run alone reaches.
   const thirteenths = ["4/4", "3/4"].map(
     (meter): LibraryChart => ({
       file: `thirteenths-in-${meter.replace("/", "-")}`,
-      text: `title: Thirteenths\nkey: D\nmeter: ${meter}\n\n[A]\n| A13 | E13 | D13 | G13 |\n| B13 | C13 | F#13 | Bb13 |\n`,
+      // And two chords whose top strings sound two notes at most, which keep the grips they
+      // had: with no grip that sounds three notes there, the hand chooses as for any strike.
+      text: `title: Thirteenths\nkey: D\nmeter: ${meter}\n\n[A]\n| A13 | E13 | D13 | G13 |\n| B13 | C13 | F#13 | Bb13 |\n| E5 | A5 | A13 | E13 |\n`,
       meter,
     }),
   );
@@ -173,8 +175,11 @@ test("the hand does not growl: a chord's two lowest notes are a half step apart 
   const extra = [
     ...STYLES.flatMap((style) =>
       thirteenths.flatMap((chart) =>
-        [0.3, 0.6, 0.85].map((energy) =>
-          takeOf({ style, chart, options: { mode: "jam", passes: 1, energy, seed: 1 } }),
+        [0.3, 0.6, 0.85].flatMap((energy) =>
+          // With the bass in, and with none: then a picked boom takes the grip the chick holds.
+          [[], ["bass" as const]].map((without) =>
+            takeOf({ style, chart, options: { mode: "jam", passes: 1, energy, seed: 1, without } }),
+          ),
         ),
       ),
     ),
