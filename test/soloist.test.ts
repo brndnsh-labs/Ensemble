@@ -146,6 +146,17 @@ test("the soloist is off unless asked for; asked for, it rests through the intro
         const of = Math.min(3, turns.length - (n - turn.chorus));
         assert.equal(turn.of, of, `${where}: time ${n} of ${turn.of}`);
       });
+      // Here too an open jam's solo does not depend on how long the jam turns out to be.
+      const open = (n: number) =>
+        plan(sectioned, style, { mode: "jam", open: true, passes: n, solo: true }).bars;
+      const shorter = open(passes);
+      assert.deepEqual(
+        open(passes + 1)
+          .slice(0, shorter.length)
+          .map((bar) => bar.solo),
+        shorter.map((bar) => bar.solo),
+        `${where}: an open jam's solos moved when it grew`,
+      );
     }
   }
 });
