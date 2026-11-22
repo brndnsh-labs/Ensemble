@@ -330,7 +330,7 @@ export function voiceStrikes(
         const family = chordFamily(chord.quality);
         const every = stacks.flatMap((voices) =>
           idiom.candidates(
-            fitRecipe({ voices }, chord, scale),
+            fitRecipe({ voices, ...(recipe.free ? { free: recipe.free } : {}) }, chord, scale),
             root,
             chords.register,
             kind.position,

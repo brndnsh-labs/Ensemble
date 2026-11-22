@@ -70,6 +70,14 @@ export interface Recipe {
    * `voices`: the 3rd-and-7th shell beside the root-and-7th (ST-neosoul-19).
    */
   readonly also?: readonly (readonly Voice[])[];
+  /**
+   * Tones the hand may sound or leave out, on top of `voices`: a guitar's grip
+   * may fret one where its shape has it, as often as it likes, or none at all.
+   * Open C6 is x32210 and C7 x32310, with no fifth, and A13 is x02022, with
+   * one (CH-24): the open shape's fifth is free. A keyboard leaves a free tone
+   * out.
+   */
+  readonly free?: readonly Exclude<VoiceTone, "T">[];
 }
 
 /**

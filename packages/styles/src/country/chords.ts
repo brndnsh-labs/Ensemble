@@ -21,7 +21,9 @@ import type {
  * there. A plain major triad on the I or the IV of a major key takes the major
  * 6th (C6 is x32210, G6 320000 on the top four strings, D6 xx0202); on the V, a
  * minor chord, a seventh chord or anything with no degree in the key it stays a
- * triad (ST-country-06).
+ * triad (ST-country-06). A sixth or seventh chord's fifth is the shape's to hold
+ * or leave (CH-24): C6 x32210 and C7 x32310 have none, A13 x02022 and E13
+ * 020120 have one beside the 13th. A triad keeps its fifth: Dsus4 is xx0233.
  */
 const open: VoicingKind = {
   position: "close",
@@ -29,10 +31,11 @@ const open: VoicingKind = {
     { when: { family: ["power"] }, voices: ["R", "5"] },
     {
       when: { family: ["major"], lacks: ["7"], degrees: ["I", "IV"], mode: "major" },
-      voices: ["R", "3", "5", "13"],
+      voices: ["R", "3", "13"],
+      free: ["5"],
     },
     { when: { lacks: ["7"] }, voices: ["R", "3", "5", "T"] },
-    { voices: ["R", "3", ["T", "5"], "7"] },
+    { voices: ["R", "3", "T", "7"], free: ["5"] },
   ],
 };
 

@@ -155,6 +155,14 @@ export function validateChordStyle(chords: ChordStyle): string[] {
         ...(recipe.when?.lacks ?? []),
       ];
       for (const tone of tones) say(VOICE_TONES.includes(tone), `${at}: "${tone}" is not a tone.`);
+      const voiced = new Set(stacks.flat().flatMap((voice: Voice) => voice));
+      for (const tone of recipe.free ?? []) {
+        say(
+          VOICE_TONES.includes(tone) && (tone as string) !== "T",
+          `${at}: free "${tone}" is not a tone.`,
+        );
+        say(!voiced.has(tone), `${at}: "${tone}" is both a voice and free.`);
+      }
       for (const voice of stacks.flat()) {
         say(typeof voice === "string" || voice.length > 0, `${at}: a voice lists no tones.`);
       }
