@@ -25,6 +25,10 @@ import type { ChordFamily } from "../../theory/chord.ts";
  *        dominant or a minor seventh, the sixth of a sixth chord; on a chord with none, the
  *        major sixth where its scale has one, or else the root (ST-neosoul-14)
  * - `8`  the octave above the bass note
+ * - `M7` the seventh of the chord's scale: the major seventh, or the flat seventh where
+ *        the scale has that and not the major (a dominant's, a minor chord's). Over a plain
+ *        triad, where `7` is the sixth that stands in for a seventh, this is the leading
+ *        note down from the root: C, B, A into G (ST-country-05, EN-47)
  * - `1`  the chord's own root: the bass note itself, but under a slash chord the
  *        root its name gives (over C/G, the C), which `R` is not (BA-51: a two-beat
  *        bass over a chord standing on its fifth alternates with the root)
@@ -43,7 +47,21 @@ import type { ChordFamily } from "../../theory/chord.ts";
  * after in the same direction, and never on a held note (BA-15, X-A-26). A
  * shape that would land one anywhere else is not played on that chord.
  */
-export type Tone = "R" | "2" | "b3" | "3" | "4" | "#4" | "5" | "b6" | "6" | "b7" | "7" | "8" | "1";
+export type Tone =
+  | "R"
+  | "2"
+  | "b3"
+  | "3"
+  | "4"
+  | "#4"
+  | "5"
+  | "b6"
+  | "6"
+  | "b7"
+  | "7"
+  | "M7"
+  | "8"
+  | "1";
 export const TONES: readonly Tone[] = [
   "R",
   "2",
@@ -56,6 +74,7 @@ export const TONES: readonly Tone[] = [
   "6",
   "b7",
   "7",
+  "M7",
   "8",
   "1",
 ];
@@ -489,7 +508,12 @@ export interface Walk {
    * (BA-53). It replaces the bar's figure where the walk is played, so a line
    * whose figure strikes fewer notes than the walk needs (a two-beat bass) can
    * still walk. A bar of another length than the grid is never walked this
-   * way. Left out, the walk is played on the bar's own figure's strokes.
+   * way, and a grid must be a bar of 4/4 or of a meter the line is written
+   * for. The grid may also name tones as a riff does (`5` the chord's fifth):
+   * those are the figure's, played around the walk under the root where the
+   * instrument has the note, and are not steps of it, so `x------- 5--- x---`
+   * keeps the boom-chick and walks in on beat 4 alone (EN-47). Left out, the
+   * walk is played on the bar's own figure's strokes.
    */
   readonly grid?: string;
 }

@@ -345,8 +345,9 @@ export function validateBassStyle(bass: BassStyle): string[] {
           );
         if (walk.grid !== undefined) {
           const grid = cells(walk.grid);
-          if (grid.some((symbol) => symbol !== "x" && symbol !== "-" && symbol !== "."))
-            problems.push(`${at}: its grid is written in x, - and . only.`);
+          const named = (symbol: string) => symbol in RIFF_TONES;
+          if (grid.some((symbol) => !["x", "-", "."].includes(symbol) && !named(symbol)))
+            problems.push(`${at}: its grid is written in x, -, . and the tones a riff names.`);
           if (grid[0] !== "x")
             problems.push(
               `${at}: its grid strikes the root on the downbeat, where it states the chord.`,
@@ -355,6 +356,18 @@ export function validateBassStyle(bass: BassStyle): string[] {
           if (strokes !== walk.tones.length + 1)
             problems.push(
               `${at}: its grid strikes ${strokes} notes; a walk of ${walk.tones.length + 1} notes needs as many.`,
+            );
+          // A bar of four, or of a meter the line is written for: any other grid never walks.
+          const bars = [
+            FIGURE_STEPS,
+            ...Object.keys(bass.meters ?? {}).flatMap((name) => {
+              const meter = readMeter(name);
+              return meter ? [barSteps(meter)] : [];
+            }),
+          ];
+          if (!bars.includes(grid.length))
+            problems.push(
+              `${at}: its grid is ${grid.length} sixteenths, which is no bar the line is written for (${bars.join(", ")}).`,
             );
         }
       });

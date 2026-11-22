@@ -13,8 +13,18 @@ import type { Landing } from "./leadin.ts";
 import { knownAbove, OCTAVE, rootMotion } from "./leadin.ts";
 import type { LineNote } from "./line.ts";
 import { HELD, isStrong } from "./line.ts";
-import type { Walk, WalkPolicy } from "./style.ts";
-import { bassPitchClass, inHarmony, isChordTone, LOW_E, meets, TOP, toneOf } from "./tones.ts";
+import type { Tone, Walk, WalkPolicy } from "./style.ts";
+import { RIFF_TONES } from "./style.ts";
+import {
+  bassPitchClass,
+  inHarmony,
+  isChordTone,
+  LOW_E,
+  meets,
+  TOP,
+  toneOf,
+  tonePitch,
+} from "./tones.ts";
 
 /** The first move of a walk may be a third (R up to the 3rd); every move after it is a step. */
 const FIRST_MOVE = 4;
@@ -59,7 +69,8 @@ export function walkInto(
     .filter(
       (option): option is { walk: Walk; played: LineNote[] } =>
         option.played !== null &&
-        option.walk.tones.length + 1 === option.played.filter((note) => !note.echo).length,
+        option.walk.tones.length + 1 ===
+          option.played.filter((note) => !note.echo && !NAMED.has(note)).length,
     )
     .filter((option) => meets(option.walk.when, chord, scale))
     .map((option) => ({ ...option, pitches: pitchesOf(option.walk, request) }))
@@ -68,7 +79,7 @@ export function walkInto(
         option.pitches !== null &&
         heldTonesFit(
           option.pitches,
-          option.played.filter((note) => !note.echo),
+          option.played.filter((note) => !note.echo && !NAMED.has(note)),
           request,
         ),
     );
@@ -79,6 +90,14 @@ export function walkInto(
   // it follows (BA-31).
   let n = -1;
   const walked = played.map((note): LineNote => {
+    // A tone the walk's grid names is the figure's, played around the walk: under the root
+    // where the instrument has the note, as a two-beat bass's fifth.
+    const named = NAMED.get(note);
+    if (named !== undefined) {
+      let pitch = tonePitch(named, chord, scale, request.root, request.ceiling);
+      if (pitch > request.root && pitch - 12 >= LOW_E) pitch -= 12;
+      return { ...note, pitch };
+    }
     if (!note.echo) n++;
     const last = n === pitches.length - 1;
     return { ...note, pitch: pitches[n]!, level: last && !note.echo ? "approach" : note.level };
@@ -91,13 +110,17 @@ export function walkInto(
  * for each stroke of its grid, held as the grid writes it. Null where the bar
  * is not as long as the grid.
  */
+/** The notes of a walk's grid that are tones it names, not steps of the walk, and which tone. */
+const NAMED = new WeakMap<LineNote, Tone>();
+
 function ownRhythm(grid: string, piece: Piece): LineNote[] | null {
   const steps = cells(grid);
   const { bar } = piece;
   if (steps.length * SIXTEENTH !== bar.ticks) return null;
   const notes: LineNote[] = [];
   steps.forEach((symbol, step) => {
-    if (symbol !== "x") return;
+    const tone = symbol === "x" ? undefined : RIFF_TONES[symbol];
+    if (symbol !== "x" && tone === undefined) return;
     let length = 1;
     while (steps[step + length] === "-") length++;
     const tick = step * SIXTEENTH;
@@ -115,6 +138,7 @@ function ownRhythm(grid: string, piece: Piece): LineNote[] | null {
             ? "strong"
             : "weak",
     });
+    if (tone !== undefined) NAMED.set(notes[notes.length - 1]!, tone);
   });
   return notes;
 }
