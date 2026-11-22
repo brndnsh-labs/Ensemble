@@ -199,7 +199,10 @@ export function fingerings(
 /** The tones a grip gives up, first to last, when no hand can hold them all (X-B-13: never a guide tone). */
 const GIVEN_UP: readonly Tone[] = ["R", "5", "13", "11", "9"];
 
-/** Every grip of exactly these tones on `count` strings. */
+/**
+ * Every grip of exactly these tones on `count` strings: each tone at least once, but a free
+ * one (`Recipe.free`), which the grip may hold as often as it likes or not at all.
+ */
 function grips(
   guitar: Guitar,
   tones: readonly FittedTone[],
@@ -208,16 +211,19 @@ function grips(
   count: number,
 ): Voicing[] {
   const toneAt = new Map(tones.map((tone) => [mod12(root + tone.interval), tone.tone]));
+  const free = new Set(tones.filter((tone) => tone.free).map((tone) => tone.tone));
+  const required = tones.filter((tone) => !tone.free);
   // With more strings than tones only the root or the fifth is doubled (CH-21). In open
   // position the third may be doubled too, once, with the copy on the top two strings (CH-24).
   const doubles = (tone: Tone, held: readonly Tone[]) =>
+    free.has(tone) ||
     tone === "R" ||
     tone === "5" ||
     (guitar.openPosition !== undefined &&
       tone === "3" &&
       held.length >= count - 2 &&
       held.filter((other) => other === "3").length === 1);
-  const spare = count - tones.length;
+  const spare = count - required.length;
   // A chord so dense that its root has given way to an alteration stands on what it has.
   const stands = guitar.rootOnBottom && tones.some((tone) => tone.tone === "R");
   const byPitches = new Map<string, number[][]>();
@@ -238,7 +244,8 @@ function grips(
       return !held.includes(tone) || (doubles(tone, held) && doubled < spare);
     });
     for (const pitches of found) {
-      if (new Set(pitches.map((pitch) => mod12(pitch))).size < tones.length) continue;
+      const held = new Set(pitches.map((pitch) => mod12(pitch)));
+      if (required.some((tone) => !held.has(mod12(root + tone.interval)))) continue;
       const key = pitches.join(" ");
       byPitches.set(key, [...(byPitches.get(key) ?? []), [...strings]]);
     }
@@ -605,7 +612,8 @@ export function guitar(style: Guitar): InstrumentIdiom {
         // In open position the chord is whichever shape it has at the nut, on however many
         // strings that is (CH-24): every count is looked at, and a shape at the nut wins.
         const all: Voicing[] = [];
-        for (let count = most; count >= wanted.length && count > 0; count--) {
+        const least = wanted.filter((tone) => !tone.free).length;
+        for (let count = most; count >= least && count > 0; count--) {
           const found = grips(style, wanted, root, register.floor, count);
           if (nut === undefined && found.length > 0) return found.sort(tighter);
           all.push(...found);

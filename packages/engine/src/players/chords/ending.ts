@@ -48,6 +48,8 @@ export function endingStrikes(
       // The final chord is a downstroke on a guitar, wherever it lands (CH-74).
       down: true,
       ...(again ? { again: true as const } : {}),
+      // The final chord leaves nothing out (`Strike.whole`).
+      ...(arrival === final?.arrival ? { whole: true as const } : {}),
       ...(pullOff !== undefined ? { pullOff } : {}),
     });
 

@@ -22,7 +22,9 @@ export const keys: InstrumentIdiom = {
    * given, each the nearest of its note above the one before, from its bottom
    * note in every octave.
    */
-  candidates(tones, root, register, position) {
+  candidates(given, root, register, position) {
+    // A free tone is the hand's to add or leave (`Recipe.free`): a keyboard leaves it.
+    const tones = given.filter((tone) => !tone.free);
     const result: Voicing[] = [];
     const classOf = (interval: number) => mod12(root + interval);
     if (position === "spread") {
