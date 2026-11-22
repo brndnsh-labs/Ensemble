@@ -130,7 +130,7 @@ export function takeName(take: KeptTake): string {
   return `Kept take, ${today ? kept.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) : dayOf(take.kept)}`;
 }
 
-/** A take as it was heard: its style, its chart in the key it was played in, and its roadmap. */
+/** A take as it was heard: its style, its chart in the key and meter it was played in, and its roadmap. */
 export interface Heard {
   readonly style: StylePack;
   readonly chart: Chart;
@@ -148,8 +148,10 @@ export function heardAs(recipe: TakeRecipe): Heard | undefined {
   if (known === undefined) {
     const style = styleById(recipe.style);
     try {
-      const chart = chartOf(recipe.chartText, recipe.options.key);
-      known = style ? { style, chart, plan: plan(chart, style, recipe.options) } : null;
+      // In the key and the meter it was played in; a take kept before a meter could be chosen has
+      // none, and is in its chart's own.
+      const chart = style && chartOf(recipe.chartText, recipe.options, style);
+      known = style && chart ? { style, chart, plan: plan(chart, style, recipe.options) } : null;
     } catch {
       known = null;
     }

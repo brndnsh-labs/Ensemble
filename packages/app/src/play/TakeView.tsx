@@ -27,7 +27,7 @@ import {
 import { midiOf } from "./band.ts";
 import type { Reading } from "./ChordSymbol.tsx";
 import type { Call } from "./jam.ts";
-import { SEAT_ORDER, seatsOf } from "./jam.ts";
+import { meterWords, SEAT_ORDER, seatsOf } from "./jam.ts";
 import type { Rig } from "./rig.ts";
 import type { Seated } from "./Stage.tsx";
 import { playedOn, Stage, soloWords } from "./Stage.tsx";
@@ -180,8 +180,8 @@ function TakeStage({
       // What was played, said and not offered: a take is a recording, not a setup.
       sentence={
         <p className="sentence told take-told">
-          A take kept {dayOf(take.kept)}: {heard.style.name} in {keyToString(heard.chart.key)},{" "}
-          {Math.round(plan.tempo)} bpm, {clock(seconds(plan))}
+          A take kept {dayOf(take.kept)}: {heard.style.name} in {keyToString(heard.chart.key)}
+          {meterWords(heard.chart.meter)}, {Math.round(plan.tempo)} bpm, {clock(seconds(plan))}
           {soloWords(recipe.options) && `, ${soloWords(recipe.options)}`}
           {recipe.options.breathe && ", the tempo breathing"}
         </p>

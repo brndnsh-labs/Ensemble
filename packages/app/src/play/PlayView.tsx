@@ -7,11 +7,15 @@ import type { Key, Seat, StylePack, TakeRecipe } from "@ensemble/engine";
 import {
   conventionalKey,
   keyToString,
+  meterName,
   parseKey,
+  parseMeter,
   pitchClass,
   plan as planOf,
   SOLO_INSTRUMENTS,
+  sameMeter,
   seatChoice,
+  tempoIn,
   tempoRange,
 } from "@ensemble/engine";
 import { STYLES, styleById } from "@ensemble/styles";
@@ -32,7 +36,7 @@ import type { KeptTake } from "../takes.ts";
 import { followTake, keepTake, keptTakes, takeName } from "../takes.ts";
 import { midiOf } from "./band.ts";
 import type { Call, JamSetup } from "./jam.ts";
-import { chartOf, SEAT_ORDER, takeOptions, tempoFor } from "./jam.ts";
+import { chartOf, meterOf, metersFor, SEAT_ORDER, takeOptions, tempoFor } from "./jam.ts";
 import type { Rig } from "./rig.ts";
 import { Sheet } from "./Sheet.tsx";
 import type { Seated } from "./Stage.tsx";
@@ -105,7 +109,10 @@ export function PlayView(props: Props) {
     });
 
   const style: StylePack = styleById(choices.style ?? entry.chart.styleId ?? "") ?? STYLES[0]!;
-  const tempo = tempoFor(entry.chart, style, choices.tempo);
+  // The meter it is played in: the one chosen for it, while the chart fits it, else its own.
+  const meter = meterOf(entry.chart, choices.meter);
+  const meterChosen = sameMeter(meter, entry.chart.meter) ? null : meterName(meter);
+  const tempo = tempoFor(entry.chart, style, choices.tempo, meter);
   // The style's own soloist, unless the player chose another for this chart.
   const chosen = choices.soloInstrument;
   const soloInstrument =
@@ -139,6 +146,7 @@ export function PlayView(props: Props) {
       minutes: settings.minutes,
       tempo,
       key: choices.key === undefined ? null : parseKey(choices.key),
+      meter: meterChosen === null ? null : parseMeter(meterChosen),
       band: settings.band,
       soloInstrument,
       soloDensity: settings.soloDensity,
@@ -153,6 +161,7 @@ export function PlayView(props: Props) {
       settings.minutes,
       tempo,
       choices.key,
+      meterChosen,
       settings.band,
       soloInstrument,
       settings.soloDensity,
@@ -162,15 +171,15 @@ export function PlayView(props: Props) {
     ],
   );
 
-  const chart = useMemo(() => chartOf(setup.text, setup.key), [setup.text, setup.key]);
+  const howPlayed = useMemo(() => takeOptions(setup), [setup]);
+  // The chart as the band will read it: in the key and the meter it is played in.
+  const chart = useMemo(
+    () => chartOf(setup.text, howPlayed, setup.style),
+    [setup.text, setup.style, howPlayed],
+  );
   const call: Call = useMemo(
-    () => ({
-      name: chart.title,
-      text: setup.text,
-      style: setup.style,
-      options: takeOptions(setup),
-    }),
-    [chart, setup],
+    () => ({ name: chart.title, text: setup.text, style: setup.style, options: howPlayed }),
+    [chart, setup, howPlayed],
   );
   // The take kept from this screen, and the seed that makes it that jam and no other: while that
   // jam is the one playing, or the last played, every change to it is the kept take's too.
@@ -321,14 +330,17 @@ export function PlayView(props: Props) {
   });
 
   // The tempo without one set: what "back" goes to.
-  const unset = tempoFor(entry.chart, style, undefined);
-  const written = entry.chart.tempo;
-  // The style's limits in the chart's meter: a slow blues in twelve goes under the shuffle's floor.
-  const range = tempoRange(style, entry.chart.meter);
+  const unset = tempoFor(entry.chart, style, undefined, meter);
+  // The chart's own tempo, counted in the meter it is played in (the eighth note as written).
+  const written =
+    entry.chart.tempo === null ? null : tempoIn(entry.chart.tempo, entry.chart.meter, meter);
+  // The style's limits in the meter played: a slow blues in twelve goes under the shuffle's floor.
+  const range = tempoRange(style, meter);
   const usual = unset ?? written ?? range.default;
   const inLimits = (bpm: number) => Math.min(range.max, Math.max(range.min, bpm));
 
   const writtenKey = entry.chart.key;
+  const meters = useMemo(() => metersFor(entry.chart, style), [entry.chart, style]);
   const keyShown = keyToString(chart.key);
   const length = lengthWords(song, settings.minutes);
 
@@ -343,8 +355,8 @@ export function PlayView(props: Props) {
       <b className="part">{shown}</b>
     );
 
-  // A chart counted in anything but four says so: it is what the tempo counts.
-  const { beats, unit } = entry.chart.meter;
+  // A chart counted in anything but four says so: it is what the tempo counts. The meter played.
+  const { beats, unit } = meter;
   const meterShown = beats === 4 && unit === 4 ? "" : `${beats}/${unit}`;
 
   // The soloist is in the line only when it is not playing as the style has it, as the meter is
@@ -479,6 +491,45 @@ export function PlayView(props: Props) {
                   </label>
                 </li>
               ))}
+            {/* The meter it is played in, settled before Play: the meters the chart fits, the style's
+                own first and a rule before the rest. The chart's text is the editing mode's. */}
+            {idle && !editing && meters.own.length + meters.others.length > 1 && (
+              <li>
+                <label className="menu-pick">
+                  <span>Meter</span>
+                  <small>{meterName(meter)}</small>
+                  <select
+                    value={meterName(meter)}
+                    onChange={(e) => {
+                      const { meter: _, ...rest } = choices;
+                      const picked = e.target.value;
+                      change({
+                        ...settings,
+                        charts: {
+                          ...settings.charts,
+                          [entry.id]:
+                            picked === meterName(entry.chart.meter)
+                              ? rest
+                              : { ...rest, meter: picked },
+                        },
+                      });
+                    }}
+                  >
+                    {meters.own.map((one) => (
+                      <option key={meterName(one)} value={meterName(one)}>
+                        {meterName(one)}
+                      </option>
+                    ))}
+                    {meters.own.length > 0 && meters.others.length > 0 && <hr />}
+                    {meters.others.map((one) => (
+                      <option key={meterName(one)} value={meterName(one)}>
+                        {meterName(one)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </li>
+            )}
             {idle && (
               <li>
                 <label className="menu-pick">
