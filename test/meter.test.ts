@@ -16,6 +16,7 @@ import {
   meterName,
   onPulse,
   parse,
+  parseMeter,
   plan,
   remeter,
   render,
@@ -36,8 +37,9 @@ const chartsDir = new URL("./charts/", import.meta.url);
 /**
  * What is read in each meter: the library, the charts written to reach what it cannot, and a
  * few bars no chart in the library has: a chord a beat, a change a pulse late, a bar held from
- * the one before, a waltz's two kinds of bar, a change written off the beat, and a section in
- * a meter of its own.
+ * the one before, a waltz's two kinds of bar, a change written off the beat (in four, three,
+ * six and twelve), a section in a meter of its own, a label defined twice, and charts in 5/4,
+ * 7/8 and 2/2, meters the band writes nothing for.
  */
 const SOURCES: readonly Source[] = [
   ...LIBRARY.map((chart) => ({ name: chart.file, text: chart.text })),
@@ -62,6 +64,38 @@ const SOURCES: readonly Source[] = [
     name: "a section of its own",
     text: "title: Its own\nkey: C\n\n[A]\n| C | G7 |\n\n[B]\nmeter: 3/4\n| F | C |\n",
   },
+  // A change written off the pulse of the chart's own meter, which lands on a pulse of another.
+  { name: "off three's beat", text: "title: X\nkey: C\nmeter: 3/4\n\n| C . . . . G | C |\n" },
+  { name: "off six's pulse", text: "title: X\nkey: C\nmeter: 6/8\n\n| C . G | C |\n" },
+  { name: "off twelve's pulse", text: "title: X\nkey: C\nmeter: 12/8\n\n| C . . . G . | C |\n" },
+  // A label defined twice: the first definition plays, and the second is never played.
+  {
+    name: "a label twice",
+    text: "title: X\nkey: C\n\n[A]\n| C | G |\n\n[A]\n| C F G A |\n",
+  },
+  // Meters the band writes no parts for, read in one of its own.
+  { name: "a five", text: "title: X\nkey: C\nmeter: 5/4\n\n| C | C . . F . | G |\n" },
+  { name: "a five, a chord a beat", text: "title: X\nkey: C\nmeter: 5/4\n\n| C D E F G |\n" },
+  { name: "a seven", text: "title: X\nkey: C\nmeter: 7/8\n\n| C | F . G . . . . | C |\n" },
+  { name: "a seven, off its pulse", text: "title: X\nkey: C\nmeter: 7/8\n\n| C . . G . . . |\n" },
+  { name: "a two", text: "title: X\nkey: C\nmeter: 2/2\n\n| C | Dm G | C |\n" },
+  { name: "a two, off its beat", text: "title: X\nkey: C\nmeter: 2/2\n\n| C . . G . . . . |\n" },
+];
+
+/** What is to fit and what is to be refused, where a reading could go either way. */
+const MUST: readonly { readonly name: string; readonly meter: string; readonly fits: boolean }[] = [
+  { name: "off three's beat", meter: "6/4", fits: false },
+  { name: "off six's pulse", meter: "3/4", fits: false },
+  { name: "off twelve's pulse", meter: "3/4", fits: false },
+  { name: "a label twice", meter: "3/4", fits: true },
+  { name: "a five", meter: "4/4", fits: true },
+  { name: "a five, a chord a beat", meter: "4/4", fits: false },
+  { name: "a seven", meter: "4/4", fits: true },
+  { name: "a seven, off its pulse", meter: "4/4", fits: false },
+  { name: "a two", meter: "4/4", fits: true },
+  { name: "a two, off its beat", meter: "4/4", fits: false },
+  { name: "funk-intro-outro-c.chart", meter: "3/4", fits: true },
+  { name: "standard-body-and-soul.chart", meter: "6/8", fits: false },
 ];
 
 const PARSED = SOURCES.map((source) => ({ ...source, chart: parse(source.text).chart }));
@@ -93,6 +127,12 @@ test("a chart read in another meter keeps its chords in order, bar for bar; each
         assert.equal(bar.ticks, barTicks(meter), here);
         assert.equal(bar.source.start, was.source.start, `${here}: the bar it was typed as`);
         assert.deepEqual(harmony(bar), harmony(was), `${here}: the chords, in order`);
+        // Only a change on a pulse where it was written is read: one written off it is the song's.
+        for (const span of was.spans)
+          assert.ok(
+            onPulse(was.meter, span.start),
+            `${here}: a change at ${span.start} written off its own pulse, read`,
+          );
         let tick = 0;
         for (const span of bar.spans) {
           assert.equal(span.start, tick, `${here}: the bar is covered, end to end`);
@@ -115,6 +155,16 @@ test("a chart read in another meter keeps its chords in order, bar for bar; each
     }
   }
   assert.ok(read > 5_000 && moved > 100, `only ${read} bars read, ${moved} of them moved`);
+  for (const must of MUST) {
+    const source = PARSED.find((one) => one.name === must.name);
+    assert.ok(source, must.name);
+    const fit = fits(source.chart, parseMeter(must.meter)!);
+    assert.equal(
+      fit.ok,
+      must.fits,
+      `${must.name} in ${must.meter}: ${fit.ok ? "fits" : fit.reason}`,
+    );
+  }
 });
 
 test("a chart that does not fit a meter is refused, by `fits` and by a plan and a take alike, with the same reason naming a bar or a section; one that fits is planned in it", () => {
