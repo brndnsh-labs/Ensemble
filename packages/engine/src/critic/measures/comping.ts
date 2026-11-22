@@ -355,7 +355,7 @@ function hemiolaInThree(take: Take): Measurement | null {
     const before = hits.filter((hit) => hit.tick < 2 * PPQ);
     return before.length === 1 && before[0]!.tick === PPQ && before[0]!.length <= EIGHTH;
   };
-  const runs = whole.filter((bars) => bars.some((bar) => bar.phrase.bar % 2 === 1 && second(bar)));
+  const runs = whole.filter((bars) => bars.some(second));
   return share(runs.length, whole.length);
 }
 

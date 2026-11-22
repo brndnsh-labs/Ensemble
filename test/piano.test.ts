@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { PlanBar, Take } from "@ensemble/engine";
+import type { PlanBar, Take, TakeOptions } from "@ensemble/engine";
 import {
   chordFamily,
   chordTones,
@@ -518,17 +518,27 @@ test("jazz: in six and twelve the piano comps round the pulses, not a pad (AU-94
   );
 });
 
-test('jazz: in a waltz the piano comps, not a pad (prompts/jazz-waltz-study.md): no bar of three it comps is struck more than four times, besides a lean into the next bar on the "and" of 3; quiet, with the band to itself, a bar of one chord is one chord laid in on 1, the "and" of 1 or beat 2 and held, to the barline or to the lean (F4, F5, F7), or left alone; and from the working level, away from a soloist, two bars in five or more strike the "and" of 1 or of 2 (F6, F9, F2)', {
+test('jazz: in a waltz the piano comps, not a pad (prompts/jazz-waltz-study.md): no bar of three it comps is struck more than four times, besides a lean into the next bar on the "and" of 3; quiet, with the band to itself, a bar of one chord is one chord laid in on 1, the "and" of 1 or beat 2 and held, to the barline or to the lean (F4, F5, F7), or left alone; and from the working level, away from a soloist, two bars in five or more strike the "and" of 1 or of 2 (F6, F9, F2); and on the full run, pooled over the bars under a soloist from the working level up, each of the six eighths of the bar struck in 15% to 55% of them (Kelly: 31% to 44%, study 1.1) and 30% of them at most with one strike or none (Kelly: 4 bars of 16)', {
   skip: only("jazz").skip || !LIBRARY.some((chart) => chart.meter === "3/4"),
 }, () => {
   const jazz = STYLES.find((style) => style.id === "jazz")!;
-  const counted = { bars: 0, quiet: 0, working: 0, ands: 0 };
+  const counted = { bars: 0, quiet: 0, working: 0, ands: 0, takes: 0 };
+  const underTheSolo = { bars: 0, thin: 0, eighths: [0, 0, 0, 0, 0, 0] };
+  // On the full run, twelve more jams of the waltz with the soloist, so the pooled shares are
+  // read over a dozen sections' figures and more (the waltz is one section of sixteen bars).
+  const waltz = LIBRARY.find((chart) => chart.file === "jazz-waltz-f.chart");
+  const more = FULL && waltz ? Array.from({ length: 12 }, (_, i) => i + 1) : [];
   for (const { chart, options, take } of [
     ...takes((jam) => jam.style.id === "jazz" && jam.chart.meter === "3/4"),
     ...heldTakes(jazz, "3/4", false, true),
     ...heldTakes(jazz, "3/4", true, true),
+    ...more.map((seed) => {
+      const options: TakeOptions = { mode: "jam", passes: 4, solo: true, seed: 100 + seed };
+      return { chart: waltz!, options, take: render(waltz!.text, jazz, options) };
+    }),
   ]) {
     const byBar = strikesByBar(take);
+    if (options.solo) counted.takes++;
     for (const bar of take.plan.bars) {
       if (bar.kind !== "music" || bar.ending || bar.seats.chords === null) continue;
       if (bar.meter.beats !== 3 || bar.meter.unit !== 4) continue;
@@ -541,7 +551,13 @@ test('jazz: in a waltz the piano comps, not a pad (prompts/jazz-waltz-study.md):
       const steps = body.map((strike) => (strike.tick - bar.start) / STEP);
       counted.bars++;
       assert.ok(body.length <= 4, `${where}: ${body.length} strikes (${steps.join(" ")})`);
-      if (bar.solo !== null) continue;
+      if (bar.solo !== null) {
+        if (tierOf(bar.seats.chords) === "low") continue;
+        underTheSolo.bars++;
+        if (own.length <= 1) underTheSolo.thin++;
+        for (const strike of own) underTheSolo.eighths[(strike.tick - bar.start) / (PPQ / 2)]!++;
+        continue;
+      }
       if (tierOf(bar.seats.chords) === "low") {
         if (bar.spans.filter((span) => !span.tied).length !== 1 || bar.spans[0]!.chord === null)
           continue;
@@ -569,6 +585,20 @@ test('jazz: in a waltz the piano comps, not a pad (prompts/jazz-waltz-study.md):
     counted.ands >= 0.4 * counted.working,
     `an "and" of 1 or of 2 struck in ${counted.ands} of ${counted.working} working bars`,
   );
+  // Pooled: a proportion, read over enough bars to mean one (the full run's waltz takes with a
+  // soloist; a push sees too few).
+  if (!FULL) return;
+  const pooled = `${underTheSolo.bars} bars under a soloist in ${counted.takes} takes`;
+  const shares = underTheSolo.eighths.map((n) => n / underTheSolo.bars);
+  assert.ok(underTheSolo.bars > 600, `only ${pooled}`);
+  assert.ok(
+    shares.every((share) => share >= 0.15 && share <= 0.55),
+    `${pooled}: struck on 1 1& 2 2& 3 3& in ${shares.map((share) => `${Math.round(share * 100)}%`).join(" ")}`,
+  );
+  assert.ok(
+    underTheSolo.thin <= 0.3 * underTheSolo.bars,
+    `${pooled}: ${underTheSolo.thin} with one strike or none`,
+  );
 });
 
 /**
@@ -592,17 +622,43 @@ const playsTwoBars = (style: (typeof STYLES)[number], bar: PlanBar): boolean => 
   return book?.tiers[tierOf(bar.seats.chords ?? bar.energy)].twoBars !== undefined;
 };
 
-test("jazz: in a waltz, with the band to itself at the working level, the piano now and then plays a whole phrase as the hemiola (three short chords over two bars, F1): from the phrase's first bar every bar plays it, 1 and 3 then 2, and it stops where the phrase does, so never across a section's end; never where a soloist has the lead; in a minority of the phrases", {
+/**
+ * Takes held on a push for the hemiola's rules, each one whose draw would break a rule if the
+ * rule were not kept (found by planting the fault): a jam with the soloist whose draw puts the
+ * hemiola in a solo phrase were the soloist not heard; a long one whose draw runs phrases on
+ * past eight bars and over a chorus's top were a run not stopped.
+ */
+const HEMIOLA_HELD: readonly TakeOptions[] = [];
+
+/**
+ * A phrase played on the hemiola: its bars alternate the figure's two bars from the phrase's
+ * first, in either phase (1 and 3 then 2, or 2 then 1 and 3). Null where it is not.
+ */
+function hemiolaPhase(bars: readonly PlanBar[], strikes: (bar: PlanBar) => Strike[]): 0 | 1 | null {
+  for (const phase of [0, 1] as const)
+    if (bars.every((bar) => hemiolaBar(bar, strikes(bar), ((bar.phrase.bar + phase) % 2) as 0 | 1)))
+      return phase;
+  return null;
+}
+
+test("jazz: in a waltz, with the band to itself at the working level, the piano now and then plays a whole phrase as the hemiola (three short chords over two bars, F1, in either phase): from the phrase's first bar every bar plays it, and it stops where the phrase does; a run of such phrases is eight bars at most and never goes on over the first bar of a section or of a chorus; never where a soloist has the lead; in a minority of the phrases", {
   skip: only("jazz").skip || !LIBRARY.some((chart) => chart.meter === "3/4"),
 }, () => {
   const jazz = STYLES.find((style) => style.id === "jazz")!;
-  const counted = { phrases: 0, runs: 0 };
+  const waltz = LIBRARY.find((chart) => chart.file === "jazz-waltz-f.chart")!;
+  const counted = { phrases: 0, runs: 0, longest: 0 };
   for (const { chart, options, take } of [
     ...takes((jam) => jam.style.id === "jazz" && jam.chart.meter === "3/4"),
     ...heldTakes(jazz, "3/4", false, true),
     ...heldTakes(jazz, "3/4", true, true),
+    ...HEMIOLA_HELD.map((options) => ({
+      chart: waltz,
+      options,
+      take: render(waltz.text, jazz, options),
+    })),
   ]) {
     const byBar = strikesByBar(take);
+    const strikes = (bar: PlanBar) => byBar.get(bar.index) ?? [];
     const phrases = new Map<string, PlanBar[]>();
     for (const bar of take.plan.bars) {
       if (bar.kind !== "music" || bar.ending || bar.seats.chords === null) continue;
@@ -610,30 +666,52 @@ test("jazz: in a waltz, with the band to itself at the working level, the piano 
       const place = `${bar.section.occurrence}/${bar.phrase.index}`;
       phrases.set(place, [...(phrases.get(place) ?? []), bar]);
     }
+    // The run of phrases on the hemiola that ends at the phrase before: its bars, its last bar.
+    let run = { bars: 0, last: -1 };
     for (const bars of phrases.values()) {
       const first = bars[0]!;
       const where = `${chart.file} ${JSON.stringify(options)} bars ${first.index} to ${bars.at(-1)!.index}`;
-      const strikes = (bar: PlanBar) => byBar.get(bar.index) ?? [];
-      const run = bars.some((bar) => bar.phrase.bar % 2 === 1 && hemiolaBar(bar, strikes(bar), 1));
-      const band = bars.every((bar) => bar.solo === null) && first.phrase.bar === 0;
-      if (band && bars.length === first.phrase.length && tierOf(first.seats.chords!) === "mid")
-        counted.phrases++;
-      if (!run) continue;
-      counted.runs++;
-      assert.ok(band, `${where}: the hemiola under a soloist, or not from the phrase's top`);
+      const band = bars.every((bar) => bar.solo === null);
+      const whole = first.phrase.bar === 0 && bars.length === first.phrase.length;
+      if (band && whole && tierOf(first.seats.chords!) === "mid") counted.phrases++;
+      // Under a soloist: no phrase of it is the hemiola throughout.
+      if (!band) {
+        assert.equal(hemiolaPhase(bars, strikes), null, `${where}: the hemiola under a soloist`);
+        run = { bars: 0, last: -1 };
+        continue;
+      }
+      // With the band alone a bar of the hemiola that no other figure plays (a lone stab on 2)
+      // says the phrase is played on it, and then all of it is.
+      const said = bars.some((bar) => hemiolaBar(bar, strikes(bar), 1));
+      if (!said) {
+        run = { bars: 0, last: -1 };
+        continue;
+      }
+      const at = bars.map((bar) =>
+        strikes(bar)
+          .map((strike) => (strike.tick - bar.start) / STEP)
+          .join(" "),
+      );
+      assert.ok(whole, `${where}: the hemiola, not from the phrase's top`);
+      assert.notEqual(
+        hemiolaPhase(bars, strikes),
+        null,
+        `${where}: not the hemiola throughout (${at.join(" | ")})`,
+      );
       assert.equal(tierOf(first.seats.chords!), "mid", `${where}: the hemiola, not working`);
       assert.ok(
         first.phrase.length >= 4 && first.phrase.length <= 8,
         `${where}: a phrase of ${first.phrase.length}`,
       );
-      for (const bar of bars) {
-        const half = (bar.phrase.bar % 2) as 0 | 1;
-        const at = strikes(bar).map((strike) => (strike.tick - bar.start) / STEP);
-        assert.ok(
-          hemiolaBar(bar, strikes(bar), half),
-          `${where}: bar ${bar.index} is not the hemiola's bar ${half + 1} (${at.join(" ")})`,
-        );
-      }
+      counted.runs++;
+      const goesOn = run.last === first.index - 1;
+      assert.ok(
+        !goesOn || first.barInSection !== 0,
+        `${where}: the hemiola goes on over the top of a section`,
+      );
+      run = { bars: (goesOn ? run.bars : 0) + bars.length, last: bars.at(-1)!.index };
+      counted.longest = Math.max(counted.longest, run.bars);
+      assert.ok(run.bars <= 8, `${where}: a run of the hemiola ${run.bars} bars long`);
     }
   }
   assert.ok(counted.phrases > 20 && counted.runs > 0, `only ${JSON.stringify(counted)}`);
@@ -764,7 +842,9 @@ test("a section keeps its figure: away from a solo, every phrase opens on the sa
       if (
         playsTwoBars(style, bar) &&
         next?.phrase.index === bar.phrase.index &&
-        hemiolaBar(next, byBar.get(next.index) ?? [], 1)
+        (hemiolaBar(next, byBar.get(next.index) ?? [], 1) ||
+          (hemiolaBar(bar, byBar.get(bar.index) ?? [], 1) &&
+            hemiolaBar(next, byBar.get(next.index) ?? [], 0)))
       )
         continue;
       // Leave out the first eighth and the last beat, where a push comes and goes with the
