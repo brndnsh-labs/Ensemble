@@ -189,7 +189,7 @@ const HOME_CHARTS: readonly LibraryChart[] = (
   })),
 );
 
-test("in a style whose bass walks home, every ending that is one chord struck on its downbeat, in four after a bar of four of one chord (or two, the second on beat 3), is walked into: a note on beat 4 a step from the final root (none after a V struck on beat 3); a bar of one chord whose root is outside the run climbs on 2, 3 and 4 from the fifth under the root by steps (over the V the fifth is held from 1; from the IV the line comes down from the fourth over it), unless no octave holds that climb or it would leave the chord's scale; the walk on the instrument and in the bass's register, moving by a fourth at most (a V on beat 3 drops a fifth onto it, any other chord on 3 no more than an octave), and the final root in the lowest octave where all that holds; and the final root played at least as hard as the note it is walked in on", {
+test("in a style whose bass walks home, every ending that is one chord struck on its downbeat, in four after a bar of four of one chord (or two, the second on beat 3), is walked into: a note on beat 4 a step from the final root (none after a V struck on beat 3); a bar of one chord whose root is outside the run climbs on 2, 3 and 4 from the fifth under the root by steps, onto it from the root on 1 by an octave at most, (over the V the fifth is held from 1; from the IV the line comes down from the fourth over it), unless no octave holds that climb or it would leave the chord's scale; the walk on the instrument and in the bass's register, moving by a fourth at most (a V on beat 3 drops a fifth onto it, any other chord on 3 no more than an octave), and the final root in the lowest octave where all that holds; and the final root played at least as hard as the note it is walked in on", {
   skip: !STYLES.some((style) => style.bass.walks?.ending !== undefined),
 }, () => {
   let walked = 0;
@@ -296,7 +296,13 @@ test("in a style whose bass walks home, every ending that is one chord struck on
           (pitch, i) =>
             i === 0 ||
             Math.abs(pitch - moves[i - 1]!) <=
-              (i === 1 && from !== null && walk.length > 0 ? 7 : widest),
+              (i !== 1
+                ? widest
+                : from !== null && walk.length > 0
+                  ? 7
+                  : form === "climb"
+                    ? 12
+                    : widest),
         )
       );
     };
@@ -343,7 +349,10 @@ test("in a style whose bass walks home, every ending that is one chord struck on
         (byName === 1 || byName === 2) &&
         Math.abs(prior.pitch - root) > 2;
       const leaps = prior !== undefined && Math.abs(prior.pitch - root) > 12;
-      return Math.abs(root - (landing - 5)) <= 5 && !led && !leaps;
+      // Onto the run's 5th from the root on 1 by an octave at most: from the root in the run's
+      // octave, or from where the line has it (EN-46, EN-48).
+      const fromOwn = first !== undefined && Math.abs(first.pitch - (landing - 5)) <= 12;
+      return (Math.abs(root - (landing - 5)) <= 12 && !led && !leaps) || fromOwn;
     });
     assert.ok(
       !climbable ||

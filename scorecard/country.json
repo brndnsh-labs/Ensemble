@@ -54,13 +54,13 @@
     "inTarget": 1
   },
   "bass.semitones-per-move": {
-    "mean": 4.8107,
+    "mean": 4.8079,
     "p10": 4.3061,
     "p90": 5.4545,
     "inTarget": null
   },
   "bass.register": {
-    "mean": 34.4073,
+    "mean": 34.417,
     "p10": 32.5521,
     "p90": 36.6186,
     "inTarget": 1
@@ -108,8 +108,8 @@
     "inTarget": null
   },
   "bass.boom-chick": {
-    "mean": 0.9864,
-    "p10": 0.9787,
+    "mean": 0.9856,
+    "p10": 0.9677,
     "p90": 1,
     "inTarget": 1
   },
@@ -126,7 +126,7 @@
     "inTarget": 1
   },
   "bass.notes-per-beat": {
-    "mean": 0.5366,
+    "mean": 0.5368,
     "p10": 0.5106,
     "p90": 0.5585,
     "inTarget": 1
@@ -174,13 +174,13 @@
     "inTarget": 1
   },
   "chords.crowds-the-bass": {
-    "mean": 0.0069,
+    "mean": 0.0076,
     "p10": 0,
-    "p90": 0.0208,
+    "p90": 0.0227,
     "inTarget": null
   },
   "chords.closest-to-bass": {
-    "mean": 6.435,
+    "mean": 5.705,
     "p10": 0,
     "p90": 12,
     "inTarget": null

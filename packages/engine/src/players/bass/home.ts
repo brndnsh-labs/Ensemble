@@ -72,6 +72,8 @@ interface Way {
   readonly widest: number;
   /** The widest move onto the walk from the line's own note, where the path starts on one. */
   readonly enter?: number;
+  /** A run the walk plays itself, wanted before any way in from the line's own notes. */
+  readonly run?: boolean;
 }
 
 /**
@@ -212,6 +214,7 @@ export function walkHome(
         ],
         path: [landing + 5, third, landing + 2, landing],
         placed: true,
+        run: true,
         widest: FOURTH,
       });
     }
@@ -221,26 +224,32 @@ export function walkHome(
         notes: [note(0, 2, fifth, one), note(2, 1, sixth, three), note(3, 1, seventh, four, true)],
         path: [fifth, sixth, seventh, landing],
         placed: true,
+        run: true,
         widest: FOURTH,
       });
     }
     // The run from the bar's root, played in the walk's octave: the 5th, 6th and 7th on 2, 3
     // and 4. A root already inside the run (the bVI, the vi, the bVII) does not climb.
     if (motion <= 7 && into(seventh)) {
+      // The root on 1 where the line has it, or in the run's own octave: onto the run's 5th
+      // from it, up or down, by an octave at most (EN-48), the run itself by steps.
       let near = root;
       for (let pitch = lowestRoot(bassPitchClass(chord)); pitch <= register.highest; pitch += 12)
         if (inside(pitch) && Math.abs(pitch - fifth) < Math.abs(near - fifth)) near = pitch;
-      found.push({
-        notes: [
-          note(0, 1, near, one),
-          note(1, 1, fifth, two),
-          note(2, 1, sixth, three),
-          note(3, 1, seventh, four, true),
-        ],
-        path: [near, fifth, sixth, seventh, landing],
-        placed: true,
-        widest: FOURTH,
-      });
+      for (const at of [near, root])
+        found.push({
+          notes: [
+            note(0, 1, at, one),
+            note(1, 1, fifth, two),
+            note(2, 1, sixth, three),
+            note(3, 1, seventh, four, true),
+          ],
+          path: [at, fifth, sixth, seventh, landing],
+          placed: at !== root,
+          run: true,
+          widest: FOURTH,
+          enter: OCTAVE,
+        });
     }
     // Otherwise the bar keeps the line and goes in on beat 4 alone: a root inside the run from
     // the run's note above it, any other from the 7th, else the leading tone; where these would
@@ -287,12 +296,12 @@ export function walkHome(
   for (let k = 0; k < count; k++) {
     for (const [i, list] of byOctave.entries()) {
       const way = list[k];
-      if (way && !half && way.placed && ok(way)) return { notes: way.notes, landing: landings[i]! };
+      if (way && !half && way.run && ok(way)) return { notes: way.notes, landing: landings[i]! };
     }
   }
   for (const [i, list] of byOctave.entries()) {
     for (const way of list) {
-      if ((half || !way.placed) && ok(way)) return { notes: way.notes, landing: landings[i]! };
+      if ((half || !way.run) && ok(way)) return { notes: way.notes, landing: landings[i]! };
     }
   }
   return null;
