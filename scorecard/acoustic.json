@@ -531,19 +531,25 @@
     "mean": 0,
     "p10": 0,
     "p90": 0,
-    "inTarget": null
+    "inTarget": 1
   },
   "bass.laid-out": {
     "mean": 0,
     "p10": 0,
     "p90": 0,
-    "inTarget": null
+    "inTarget": 1
   },
   "chords.laid-out": {
     "mean": 0,
     "p10": 0,
     "p90": 0,
-    "inTarget": null
+    "inTarget": 1
+  },
+  "band.takes-thinned": {
+    "mean": 0,
+    "p10": 0,
+    "p90": 0,
+    "inTarget": 1
   },
   "band.backbeat-swell": {
     "mean": 22.3352,
