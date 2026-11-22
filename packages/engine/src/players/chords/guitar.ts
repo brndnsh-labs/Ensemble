@@ -323,6 +323,47 @@ function alternate(voicing: Voicing, chord: Chord | null): Plucked {
   return { string: strings[k]!, pitch: voicing.pitches[k]! };
 }
 
+/** The highest fret a thumb over the neck stops the low string at, beside a grip (ST-country-07). */
+const THUMB_FRET = 4;
+
+/**
+ * The boom-chick's alternate bass (ST-country-07): the chord's fifth on the low
+ * strings and never the bass again. The fifth under the bass a string down,
+ * as the alternating thumb takes it, or there with the thumb over the neck at
+ * the fourth fret or under; else the grip's own fifth on the two strings over
+ * the bass; else the fifth over the bass on the next string up, where the hand
+ * holding the grip can fret it. With no fifth anywhere there, the bass.
+ */
+function boomFifth(voicing: Voicing, chord: Chord | null): Plucked {
+  const strings = voicing.strings ?? voicing.pitches.map((_, k) => k);
+  const [string, bass] = [strings[0]!, voicing.pitches[0]!];
+  const fifth = chord
+    ? mod12(pitchClass(chord.root) + (toneInterval(chord.quality, "fifth") ?? 7))
+    : -1;
+  const thumbed = alternate(voicing, chord);
+  if (thumbed.pitch < bass) return thumbed;
+  const below = string - 1;
+  if (below >= 0 && mod12(bass - 5) === fifth) {
+    const fret = bass - 5 - OPEN_STRINGS[below]!;
+    if (fret >= 0 && fret <= THUMB_FRET) return { string: below, pitch: bass - 5 };
+  }
+  if (thumbed.pitch !== bass) return thumbed;
+  const up = string + 1;
+  const free = !strings.includes(up) && up < OPEN_STRINGS.length;
+  if (free && mod12(bass + 7) === fifth) {
+    const fret = bass + 7 - OPEN_STRINGS[up]!;
+    const frets = fretsOf(strings, voicing.pitches);
+    // A bass on the low string at the fourth fret or under is the thumb's, over the neck:
+    // the fingers have the rest.
+    const thumb = string === 0 && frets[0]! <= THUMB_FRET;
+    const fingers = thumb ? [fret, ...frets.slice(1)] : [frets[0]!, fret, ...frets.slice(1)];
+    if (fret >= 0 && fingered(fingers)) {
+      return { string: up, pitch: bass + 7 };
+    }
+  }
+  return thumbed;
+}
+
 /** The string a place of the picking hand is, in the grip the hand is holding. */
 function placeIn(voicing: Voicing, chord: Chord | null, place: PickPlace): Plucked {
   const strings = voicing.strings ?? voicing.pitches.map((_, k) => k);
@@ -330,6 +371,7 @@ function placeIn(voicing: Voicing, chord: Chord | null, place: PickPlace): Pluck
   // A finger's string is counted from the top of the grip, as a guitarist numbers them.
   if (typeof place === "number") return at(Math.max(0, strings.length - place));
   if (place === "bass") return at(0);
+  if (place === "fifth") return boomFifth(voicing, chord);
   const other = alternate(voicing, chord);
   if (place === "alternate") return other;
   // The upper string: the next one of the grip over the bass and its alternate.

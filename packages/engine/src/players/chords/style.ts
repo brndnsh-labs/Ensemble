@@ -235,14 +235,20 @@ export interface PlainRhythm {
  *   fifth on one of the two strings over the bass (E2 with B2); and with no
  *   fifth there, the bass again
  * - `upper`: the next string of the grip above those two
+ * - `fifth`: the boom-chick's alternate bass (ST-country-07): the chord's
+ *   fifth on the low strings, never the bass again. Under the bass on the
+ *   string below where the hand has it (the thumb over the neck may fret the
+ *   low string, at the fourth fret or under); else the grip's own fifth on the
+ *   two strings over the bass; else the fifth over the bass on the next string
+ *   up, fretted with the grip. Only with no fifth anywhere there, the bass.
  *
  * and each finger one: `1`, `2`, `3` are the grip's strings counted from the
  * top, as a guitarist numbers them. On a grip with fewer strings than a place
  * asks for, the place is the nearest string the grip has. Under a new chord
  * the thumb's first note is its bass, whichever of its places is written.
  */
-export type PickPlace = "bass" | "alternate" | "upper" | 1 | 2 | 3;
-export const PICK_PLACES: readonly PickPlace[] = ["bass", "alternate", "upper", 1, 2, 3];
+export type PickPlace = "bass" | "alternate" | "fifth" | "upper" | 1 | 2 | 3;
+export const PICK_PLACES: readonly PickPlace[] = ["bass", "alternate", "fifth", "upper", 1, 2, 3];
 
 /**
  * How the hand plays one written symbol of a figure: how hard, and for how
