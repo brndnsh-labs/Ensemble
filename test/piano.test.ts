@@ -1993,6 +1993,8 @@ test(
  * The open shapes country's guitar holds, as a player writes them (CH-24, the style's own
  * notes), by key: a plain major on the I or the IV with its 6th, on the V a triad. A6 is left
  * out: the hand takes x04220, a four-note shape with the root, where x02222 would do as well.
+ * The sevenths and thirteenths whose open shape drops or adds a fifth (C7 x32310, A13 x02022)
+ * are #2304's.
  */
 const COUNTRY_SHAPES: readonly (readonly [
   key: string,
@@ -2002,14 +2004,13 @@ const COUNTRY_SHAPES: readonly (readonly [
     "C",
     {
       C: "x32210",
+      // After C, as it resolves: led down from G's G4, the hand takes x33013 (F3 G3 C4 G4).
+      Csus4: "x33011",
       F: "1x0211",
       G: "3x0003",
-      C7: "x32310",
-      Csus4: "x33011",
       Am: "x02210",
       Dm: "xx0231",
       Em: "022000",
-      F13: "131231",
     },
   ],
   [
@@ -2043,19 +2044,15 @@ const COUNTRY_SHAPES: readonly (readonly [
       E: "022100",
       E7: "022130",
       B7: "x21202",
-      A13: "x02022",
       Asus4: "x02230",
       Am7: "x02010",
     },
   ],
-  [
-    "E",
-    { E: "022120", B7: "x21202", E13: "020120", Esus4: "022200", Em7: "022030", B13: "x21204" },
-  ],
+  ["E", { E: "022120", B7: "x21202", Esus4: "022200", Em7: "022030", B13: "x21204" }],
 ];
 
 test(
-  "country: with a bassist the chick sounds the top four strings of the open shape a player holds (CH-24, ST-country-07): C6 is x32210, E3 A3 C4 E4, and C7 x32310, four notes with the root among them, not three with the B string silent; the thirteenths in their open shapes too (A13 x02022, E13 020120, F13 131231)",
+  "country: with a bassist the chick sounds the top four strings of the open shape a player holds (CH-24, ST-country-07): C6 is x32210, E3 A3 C4 E4, four notes with the root among them, not three with the B string silent",
   only("country"),
   () => {
     const country = STYLES.find((style) => style.id === "country")!;
@@ -2100,7 +2097,7 @@ test(
 );
 
 test(
-  "country: the final tonic chord of an ending leaves nothing out: it sounds the chord's fifth, struck with it or as the stinger's landing, in every key (EN-49; a chick may leave the open shape's fifth to the bass, a chord that rings as the end may not)",
+  "country: the final tonic chord of an ending leaves nothing out: a triad or a sixth chord sounds its fifth, struck with it or as the stinger's landing, in every key (EN-49; a chick may leave the open shape's fifth to the bass, a chord that rings as the end may not)",
   only("country"),
   () => {
     const country = STYLES.find((style) => style.id === "country")!;
@@ -2114,8 +2111,13 @@ test(
       const landing = last.start + last.ending.at;
       const final = harmonyOf(take).findLast((arrival) => arrival.tick <= landing)?.chord;
       if (!final || pitchClass(final.root) !== pitchClass(last.key.tonic)) continue;
-      const fifth = chordTones(final.quality).find((tone) => tone.role === "fifth");
-      if (fifth?.interval !== 7) continue;
+      // A triad or a sixth chord, whose every voicing holds its fifth: a seventh's may give
+      // its seat to a tension.
+      const tones = chordTones(final.quality);
+      const plain = tones.every((tone) =>
+        ["root", "third", "sus", "fifth", "sixth"].includes(tone.role),
+      );
+      if (!plain || !tones.some((tone) => tone.role === "fifth" && tone.interval === 7)) continue;
       const sounded = notesOf(take, "chords").filter(
         (note) => note.tick === landing || (note.slur && note.tick === landing + PPQ / 2),
       );
@@ -2126,7 +2128,7 @@ test(
         `${chart.file} seed ${options.seed} ${JSON.stringify(options)}: the final ${sounded.map((note) => note.pitch)} has no fifth`,
       );
     }
-    assert.ok(finals > enough(300), `only ${finals} final chords`);
+    assert.ok(finals > enough(2400), `only ${finals} final chords`);
   },
 );
 
