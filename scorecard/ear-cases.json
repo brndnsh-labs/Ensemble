@@ -765,6 +765,19 @@
       "seat": "band",
       "styles": ["jazz", "blues", "funk", "disco", "reggae"],
       "heard": "out/who-plays/: jazz and the blues with the alto, funk, disco and reggae, each a jam of eight passes and an open jam told to finish inside its lay-out, main beside the build on the same seed; rock, where nobody sits out. Rendered from the branch that merged as 060a260f."
+    },
+    {
+      "id": "jazz-waltz-sounds-great",
+      "date": "2026-11-22",
+      "words": "just listened, that sounds great!",
+      "source": "docs/decisions/critic.md: his ear on the jazz waltz (2026-11-22, #2241)",
+      "kind": "passed",
+      "medium": "notes",
+      "recorded": "6ee3ed7b",
+      "doubt": "One sentence for the whole page. He did not say which clips he played, nor answer the questions put (does the piano read as comping a waltz, does it leave the alto room, does the hemiola sit right with the bass and drums, could he play along without the piano stating the 1) one by one. One chart on two seeds; the hemiola clip was chosen because it has one, and how often it comes was given to him in numbers, not heard. Not tried on his phone.",
+      "seat": "chords",
+      "styles": ["jazz"],
+      "heard": "out/jazz-waltz/: Jazz Waltz in F as jazz, seed 1, quiet and working, the band alone and under the alto, main beside the build; seed 3 at the working level with the band alone, for the hemiola. Rendered from the branch that merged as 0417d849."
     }
   ],
   "leftOut": [

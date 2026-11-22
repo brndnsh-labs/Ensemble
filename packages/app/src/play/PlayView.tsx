@@ -16,18 +16,20 @@ import {
 } from "@ensemble/engine";
 import { STYLES, styleById } from "@ensemble/styles";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { go, swap } from "../address.ts";
+import { cameFrom, go, openedHere, routeOf, swap } from "../address.ts";
 import { copyOf, deleteChart, duplicateChart, renameChart } from "../charts.ts";
+import { chartCalled, count } from "../counts.ts";
 import { download, fileName } from "../download.ts";
 import { useEditor } from "../edit/useEditor.tsx";
+import { shownLately } from "../HomeView.tsx";
 import type { LibraryChart } from "../library.ts";
 import { instrument } from "../posters.ts";
-import { notePlayed } from "../recent.ts";
+import { notePlayed, recentlyPlayed } from "../recent.ts";
 import { takeRow } from "../rows.tsx";
 import type { ChartChoices, Settings } from "../settings.ts";
 import { placeOf } from "../Trail.tsx";
 import type { KeptTake } from "../takes.ts";
-import { followTake, keepTake, takeName } from "../takes.ts";
+import { followTake, keepTake, keptTakes, takeName } from "../takes.ts";
 import { midiOf } from "./band.ts";
 import type { Call, JamSetup } from "./jam.ts";
 import { chartOf, SEAT_ORDER, takeOptions, tempoFor } from "./jam.ts";
@@ -178,7 +180,7 @@ export function PlayView(props: Props) {
   }>();
   const following = useRef(kept);
   following.current = kept;
-  const band = useJam(rig, call, (take) => {
+  const band = useJam(rig, call, chartCalled(entry), (take) => {
     const to = following.current;
     if (to && take.options.seed === to.seed) followTake(to.id, take);
   });
@@ -192,6 +194,19 @@ export function PlayView(props: Props) {
   };
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, as the screen opens
   useEffect(() => {
+    // Opened on the chart's screen (the screen opening as the editor is not a chart opened, nor is
+    // going to the editor and back): from what home shows as played lately, or else as what it
+    // is. Counted before an autoplay below puts it at the top of what was played.
+    if (!(props.mode === "edit" && entry.own)) {
+      const fromHome = !openedHere() && routeOf(cameFrom()).screen === "home";
+      const lately = shownLately(recentlyPlayed(), keptTakes()).some(
+        (shown) => shown.played.id === `#/chart/${entry.id}`,
+      );
+      count("chart_opened", {
+        from: fromHome && lately ? "recent" : entry.own ? "own" : "library",
+        chart: chartCalled(entry),
+      });
+    }
     if (copied) madeCopy(undefined);
     if (!autoplay) return;
     jam.play();
@@ -266,7 +281,10 @@ export function PlayView(props: Props) {
   const exportMidi = (recipe: TakeRecipe) => {
     setProblem(undefined);
     midiOf(recipe).then(
-      (bytes) => download(bytes, "audio/midi", fileName(recipe.chartName, "take", ".mid")),
+      (bytes) => {
+        download(bytes, "audio/midi", fileName(recipe.chartName, "take", ".mid"));
+        count("midi_downloaded");
+      },
       () => setProblem("The MIDI file could not be made."),
     );
   };
@@ -295,7 +313,10 @@ export function PlayView(props: Props) {
       seat,
       on: playedOn(style, options, seat),
       state: !on ? "out" : inTake ? "in" : "next",
-      press: () => change({ ...settings, band: { ...settings.band, [seat]: !on } }),
+      press: () => {
+        count("seat_toggled", { seat, on: !on });
+        change({ ...settings, band: { ...settings.band, [seat]: !on } });
+      },
     };
   });
 
@@ -424,9 +445,11 @@ export function PlayView(props: Props) {
               type="button"
               className="keep"
               disabled={!take || isKept}
-              onClick={() =>
-                take && setKept({ id: keepTake(take, entry.id), seed: take.options.seed })
-              }
+              onClick={() => {
+                if (!take) return;
+                setKept({ id: keepTake(take, entry.id), seed: take.options.seed });
+                count("take_kept");
+              }}
             >
               {isKept ? "Kept" : "Keep"}
             </button>
@@ -466,7 +489,10 @@ export function PlayView(props: Props) {
                   </small>
                   <select
                     value={soloInstrument}
-                    onChange={(e) => choose({ soloInstrument: e.target.value })}
+                    onChange={(e) => {
+                      count("soloist_changed", { instrument: e.target.value });
+                      choose({ soloInstrument: e.target.value });
+                    }}
                   >
                     {Object.entries(SOLO_INSTRUMENTS).map(([id, played]) => (
                       <option key={id} value={id}>
@@ -660,6 +686,8 @@ export function PlayView(props: Props) {
               data-style={s.id}
               aria-pressed={s.id === style.id}
               onClick={() => {
+                // The style already playing, pressed again, is not a change to count.
+                if (s.id !== style.id) count("style_changed", { style: s.id });
                 // Another style brings its own band: instruments chosen for the last one go.
                 const { soloInstrument: _, instruments: __, ...rest } = choices;
                 change({
