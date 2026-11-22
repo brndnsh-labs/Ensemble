@@ -39,6 +39,7 @@ import {
   enough,
   FULL,
   heldTakes,
+  homeTakes,
   LIBRARY,
   notesOf,
   only,
@@ -1859,7 +1860,12 @@ test("in a style whose guitar pulls off its final chord, the stinger is played o
   skip: !STYLES.some((style) => style.chords.ending.pullOff),
 }, () => {
   let stung = 0;
-  for (const { style, chart, options, take } of [...takes(), ...stressTakes()]) {
+  // The short endings in every key the walk-home property plays, the same takes: the library's
+  // endings lean on C, whose open shape has no stinger (EN-49).
+  const endings = STYLES.filter(
+    (style) => style.chords.ending.pullOff && style.chords.idiom !== "keys",
+  ).flatMap(homeTakes);
+  for (const { style, chart, options, take } of [...takes(), ...stressTakes(), ...endings]) {
     const slurs = notesOf(take, "chords").filter((note) => note.slur);
     const where = `${chart.file} seed ${options.seed} ${JSON.stringify(options)}`;
     const pullOff = style.chords.ending.pullOff;
