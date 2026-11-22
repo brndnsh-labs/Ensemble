@@ -157,3 +157,128 @@ test("export downloads a MIDI file that matches the CLI's output for the same ta
   // The kept take's screen hands over the same file.
   expect(readFileSync(again).equals(readFileSync(cli))).toBe(true);
 });
+
+test("the app counts its use on production only, and only what it says it counts", async ({
+  browser,
+  baseURL,
+}) => {
+  const UMAMI = "https://umami.brndn.zip/api/send";
+  const base = baseURL!;
+  const own = new URL(base).origin;
+
+  /** A fresh visit, told before it loads what it is to take itself for. Nothing it asks of another origin leaves the machine. */
+  const visit = async (as: { production?: boolean; doNotTrack?: boolean; play?: boolean }) => {
+    // No service worker: the instruments it would save are not wanted here, nor the count of their saving.
+    const context = await browser.newContext({ baseURL: base, serviceWorkers: "block" });
+    const sent: unknown[] = [];
+    const wrong: string[] = [];
+    // Caught before anything is done: the endpoint answered here, anywhere else refused.
+    await context.route(
+      (url) => url.origin !== own,
+      async (route) => {
+        const request = route.request();
+        if (request.url() !== UMAMI) {
+          wrong.push(request.url());
+          return route.abort();
+        }
+        const cors = {
+          "access-control-allow-origin": own,
+          "access-control-allow-headers": "content-type",
+        };
+        if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
+        sent.push(request.postDataJSON());
+        // Nothing beside the payload says who or where from: no cookie, no referrer.
+        const headers = await request.allHeaders();
+        if (headers.cookie !== undefined || headers.referer !== undefined) wrong.push(UMAMI);
+        return route.fulfill({ status: 200, headers: cors, json: {} });
+      },
+    );
+    await context.addInitScript((as) => {
+      // The app's own hook (`counts.ts`), which only a script run before it loads can set.
+      if (as.production)
+        (window as unknown as { ensembleCountsAsProduction: boolean }).ensembleCountsAsProduction =
+          true;
+      if (as.doNotTrack)
+        Object.defineProperty(Navigator.prototype, "doNotTrack", { get: () => "1" });
+      // Every request for another origin and what it carries, in the order the page makes them:
+      // there is no waiting to see that none was, and two sent together cannot pass each other.
+      const asked: { url: string; body: unknown }[] = [];
+      (window as unknown as { asked: typeof asked }).asked = asked;
+      const fetched = window.fetch;
+      window.fetch = (input, init) => {
+        const url = new URL(input instanceof Request ? input.url : String(input), location.href);
+        if (url.origin !== location.origin)
+          asked.push({
+            url: url.href,
+            body: typeof init?.body === "string" ? JSON.parse(init.body) : undefined,
+          });
+        return fetched(input, init);
+      };
+    }, as);
+    const page = await context.newPage();
+
+    // A chart opened, played, stopped and given another style.
+    await page.goto("./");
+    await page.getByRole("link", { name: "12-Bar Blues" }).click();
+    if (as.play !== false) {
+      await page.getByRole("button", { name: "Play", exact: true }).click();
+      await expect(page.locator(".bar").nth(0)).toHaveAttribute("aria-current", "true");
+      await page.getByRole("button", { name: "Stop", exact: true }).click();
+    }
+    await page.getByRole("button", { name: /^Style:/ }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Rock", exact: true }).click();
+    await expect(page.getByRole("button", { name: /^Style:/ })).toHaveText(/Rock/);
+
+    const asked = () =>
+      page.evaluate(() => (window as unknown as { asked: { url: string; body: unknown }[] }).asked);
+    return { context, sent, wrong, asked };
+  };
+
+  // As served, which is not production: nothing goes to another origin.
+  const served = await visit({});
+  expect(await served.asked()).toEqual([]);
+  expect(served.sent).toEqual([]);
+  expect(served.wrong).toEqual([]);
+  await served.context.close();
+
+  // Taken for production: each of those is counted, with its fields and nothing more.
+  const production = await visit({ production: true });
+  const events = [
+    { name: "session_class", data: { device: "desktop", installed: false } },
+    { name: "chart_opened", data: { from: "library", chart: "blues-12-bar-a" } },
+    {
+      name: "play_started",
+      data: { style: "blues", meter: "4/4", mode: "jam", soloist: "none", chart: "blues-12-bar-a" },
+    },
+    { name: "play_ended", data: { how: "stopped", length: "0-1" } },
+    { name: "style_changed", data: { style: "rock" } },
+  ];
+  const paths = ["/", "/chart", "/chart", "/chart", "/chart"];
+  const payloads = events.map((event, i) => ({
+    type: "event",
+    payload: {
+      website: "3b7ffbc5-a7bd-4dcd-9587-8eef4053c0ad",
+      hostname: new URL(own).hostname,
+      url: paths[i],
+      title: "Ensemble",
+      referrer: "",
+      language: expect.any(String),
+      screen: expect.stringMatching(/^\d+x\d+$/),
+      ...event,
+    },
+  }));
+  // In the order the page sent them, each to the endpoint and nowhere else; and each caught there.
+  expect(await production.asked()).toEqual(payloads.map((body) => ({ url: UMAMI, body })));
+  await expect.poll(() => production.sent.length).toBe(events.length);
+  expect(production.sent).toEqual(expect.arrayContaining(payloads));
+  expect(production.wrong).toEqual([]);
+  await production.context.close();
+
+  // Taken for production, with do-not-track set: nothing at all. No play, to keep it short: the
+  // visit, the chart opened and the style changed would each have been counted.
+  const declined = await visit({ production: true, doNotTrack: true, play: false });
+  expect(await declined.asked()).toEqual([]);
+  expect(declined.sent).toEqual([]);
+  expect(declined.wrong).toEqual([]);
+  await declined.context.close();
+});

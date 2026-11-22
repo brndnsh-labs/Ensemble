@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App.tsx";
+import { count, countSession } from "./counts.ts";
 import { installMotion } from "./motion.ts";
 import { keepOffline } from "./offline.ts";
 import "./style.css";
@@ -17,6 +18,16 @@ document.addEventListener("touchstart", () => {}, { passive: true });
 
 keepOffline();
 installMotion();
+
+// Counted once as the app opens (`counts.ts`: production only).
+countSession();
+// A page served by one build, taken charge of by the next (the worker takes over as soon as it is
+// installed): the app has updated. A page no worker served yet is a first install, not an update.
+if (navigator.serviceWorker?.controller) {
+  navigator.serviceWorker.addEventListener("controllerchange", () => count("app_updated"), {
+    once: true,
+  });
+}
 
 // The motion study's switches were kept here; the study is over, and the browser need not keep them.
 try {

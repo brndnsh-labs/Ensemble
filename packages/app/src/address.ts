@@ -73,6 +73,8 @@ let current = location.hash;
 /** The address the screens are drawn for: `current`, except while a view transition captures the old screen (`motion.ts`). */
 let shown = current;
 let entries = 0;
+/** Some address has been arrived at since the app opened. */
+let moved = false;
 
 /**
  * A hold on an arrival (`motion.ts`): given the way the screens are told, it
@@ -99,6 +101,7 @@ const mark = (): void => {
 
 function arrive(at: string, byHistory: boolean): void {
   if (at === current) return;
+  moved = true;
   before = current;
   current = at;
   returned = byHistory;
@@ -133,6 +136,9 @@ export const cameBack = (): boolean => returned;
 
 /** The address shown before this one, or empty when the app opened here. */
 export const cameFrom = (): string => before;
+
+/** True while the app shows the screen it was opened at: until the first address is gone to. */
+export const openedHere = (): boolean => !moved;
 
 /**
  * Go to an address, from a press. The screens are told before this returns:
