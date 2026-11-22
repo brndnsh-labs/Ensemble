@@ -18,6 +18,7 @@ import type { ReactNode } from "react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { keptOnDevice, retitled, saveChart } from "../charts.ts";
+import { count } from "../counts.ts";
 import { download, fileName } from "../download.ts";
 import type { LibraryChart } from "../library.ts";
 import type { Editing } from "../play/ChartView.tsx";
@@ -170,6 +171,8 @@ export function useEditor({ entry, on, style, copied, remove }: Options): Editor
   const history = useRef<{ past: string[]; future: string[] }>({ past: [], future: [] });
   /** A stretch of typing in the text box is under way: it is one step to take back. */
   const run = useRef(false);
+  /** How the chart has been changed since the pencil went down: typed in the text, pressed on the chart or the grid. */
+  const ways = useRef(new Set<"text" | "grid">());
 
   // The pencil put down and taken up again starts from the chart as it was saved, on the
   // chart's own side, with nothing to take back: the steps last as long as the mode is open.
@@ -250,12 +253,14 @@ export function useEditor({ entry, on, style, copied, remove }: Options): Editor
   /** A change made by tapping: a step that can be taken back. */
   const commit = (next: string) => {
     if (next === latest.current) return;
+    ways.current.add("grid");
     remember();
     run.current = false;
     write(next);
   };
   /** A change typed in the text box: the stretch of typing, from the first letter to leaving the box, is one step. */
   const typed = (next: string) => {
+    ways.current.add("text");
     if (!run.current) remember();
     run.current = true;
     write(next);
@@ -298,7 +303,16 @@ export function useEditor({ entry, on, style, copied, remove }: Options): Editor
     return () => {
       removeEventListener("pagehide", save);
       document.removeEventListener("visibilitychange", hidden);
+      // A bar typed and not yet closed is a change pressed on the chart.
+      if (pending.current !== undefined) ways.current.add("grid");
       save();
+      // The pencil taken up, or the screen left: a stretch of editing that changed the chart is one save.
+      const { size } = ways.current;
+      if (size > 0)
+        count("chart_saved", {
+          editor: size > 1 ? "both" : ways.current.has("text") ? "text" : "grid",
+        });
+      ways.current.clear();
     };
   }, [on, save]);
 
@@ -694,6 +708,7 @@ export function useEditor({ entry, on, style, copied, remove }: Options): Editor
       )?.value ?? "4/4",
     remeter: (meter) => commit(remetered(latest.current, meter)),
     forget: () => {
+      ways.current.clear();
       clearTimeout(timer.current);
       timer.current = undefined;
       pending.current = undefined;

@@ -14,6 +14,9 @@ export interface Played {
 
 const KEY = "ensemble.recent.1";
 
+/** What home shows of it: the last played as a poster, and the two before it as smaller bills under it. */
+export const ON_HOME = 3;
+
 /** More than the home screen shows, so that deleting a chart does not leave the shelf short. */
 const REMEMBERED = 12;
 

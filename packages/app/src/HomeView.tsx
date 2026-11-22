@@ -6,12 +6,14 @@
 import { STYLES } from "@ensemble/styles";
 import { go, LIBRARY, showing } from "./address.ts";
 import { addChart, findChart, readChartFile, STARTER } from "./charts.ts";
+import { count as countUse } from "./counts.ts";
 import type { LibraryChart } from "./library.ts";
 import { LIBRARY as BUILT_IN } from "./library.ts";
 import type { Saving } from "./offline.ts";
 import { PosterName, usePosterWidths } from "./PosterName.tsx";
 import { count, lineUp, spelled, writtenFor } from "./posters.ts";
 import type { Played } from "./recent.ts";
+import { ON_HOME } from "./recent.ts";
 import type { Row } from "./rows.tsx";
 import { Charts, chartRow, inkOf, Lines, PLAY, playedRow, takeRow } from "./rows.tsx";
 import type { ChartChoices } from "./settings.ts";
@@ -21,9 +23,6 @@ import { dayOf } from "./takes.ts";
 /** Where someone starts who has played nothing yet: a blues, a rock song and a funk vamp, all easy keys on a guitar or a bass. */
 const FIRST = ["blues-12-bar-a", "rock-four-chord-g", "funk-vamp-a"];
 
-/** The last thing played is a poster; this many before it are smaller bills under it. */
-const LATELY = 2;
-
 /** Open a chart of the player's on its screen, with the pencil down. */
 const edit = (id: string) => go(`#/edit/${id}`);
 
@@ -31,7 +30,14 @@ const edit = (id: string) => go(`#/edit/${id}`);
 export function NewCharts() {
   return (
     <div className="actions">
-      <button type="button" className="act first" onClick={() => edit(addChart(STARTER))}>
+      <button
+        type="button"
+        className="act first"
+        onClick={() => {
+          countUse("chart_created");
+          edit(addChart(STARTER));
+        }}
+      >
         New chart
       </button>
       <label className="act">
@@ -45,7 +51,10 @@ export function NewCharts() {
             if (!file) return;
             const text = await readChartFile(file);
             if (text === undefined) alert(`${file.name} is too big to be a chart.`);
-            else edit(addChart(text));
+            else {
+              countUse("chart_imported");
+              edit(addChart(text));
+            }
           }}
         />
       </label>
@@ -118,7 +127,7 @@ export function HomeCharts({ play, own, takes, recent, choices, saving }: Props)
       const entry = id === undefined ? undefined : findChart(id);
       return entry ? [{ ...playedRow(entry, choices[entry.id]), at: item.played }] : [];
     })
-    .slice(0, 1 + LATELY);
+    .slice(0, ON_HOME);
   const [last, ...lately] = played;
   const first = FIRST.flatMap((id) => BUILT_IN.filter((entry) => entry.id === id));
   const [start, ...next] = first;

@@ -8,6 +8,7 @@ import { address, cameBack, go, routeOf, subscribeAddress } from "./address.ts";
 import { Browse } from "./Browse.tsx";
 import { CreditsView } from "./CreditsView.tsx";
 import { findChart, ownCharts, subscribeCharts } from "./charts.ts";
+import { count } from "./counts.ts";
 import { arrived, screenOf } from "./motion.ts";
 import type { Saving } from "./offline.ts";
 import { saveInstruments } from "./offline.ts";
@@ -55,7 +56,15 @@ export function App() {
 
   // Once the app is open, bring the instruments onto the device for next time.
   useEffect(() => {
-    saveInstruments(PACKS_URL, setSaving, () => rig.idle()).catch(() => {
+    // The first report is what was already on the device: only a visit that brought the rest in
+    // has saved the instruments, and it says so once, at its end.
+    let first = true;
+    const report = (now: Saving) => {
+      setSaving(now);
+      if (!first && now.finished && now.done === now.total) count("instruments_saved_offline");
+      first = false;
+    };
+    saveInstruments(PACKS_URL, report, () => rig.idle()).catch(() => {
       // No connection, or no room: whatever was saved stays, and the next visit tries again.
     });
   }, []);
