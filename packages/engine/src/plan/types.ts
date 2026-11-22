@@ -179,6 +179,13 @@ export interface PlanBar {
 
   /** Where this bar was typed, for linking the playhead to the text. */
   readonly source: SourceRange | null;
+  /**
+   * Seats that come in on this bar though the bar before was theirs to play: a jam told to
+   * finish on a pass a seat was going to sit out from its top. Nobody leans into it from the bar
+   * before, and its first chord is struck afresh, as by a seat coming back from a lay-out. Left
+   * out: none.
+   */
+  readonly enters?: readonly Seat[];
 }
 
 export interface Plan {

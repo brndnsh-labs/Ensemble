@@ -194,9 +194,10 @@ export function compStrikes(
   });
 
   // Whether the hand leans into the next bar: one decision per barline, each time through
-  // (CH-36). Never into the ending bar, a bar the seat sits out, or a rest.
+  // (CH-36). Never into the ending bar, a bar the seat sits out or comes in on, or a rest.
   const pushAfter = once((bar): boolean => {
-    if (!changeAfter(bar) || !comps(planBar(plan, bar.index + 1), chords)) return false;
+    const next = planBar(plan, bar.index + 1);
+    if (!changeAfter(bar) || !comps(next, chords) || next.enters?.includes("chords")) return false;
     const last = own(bar).at(-1)!;
     const figure = asPlayed(bar, home(bar));
     const tier = tierAt(bar);
@@ -220,7 +221,9 @@ export function compStrikes(
   // it comped: that chord has been struck, and is owed nothing more (CH-34).
   const heldOver = once((bar): boolean => {
     const before = plan.bars[bar.index - 1];
-    const last = before && comps(before, chords) ? own(before).at(-1) : undefined;
+    // A seat that comes in here strikes afresh (`PlanBar.enters`).
+    const fresh = bar.enters?.includes("chords") === true;
+    const last = before && comps(before, chords) && !fresh ? own(before).at(-1) : undefined;
     const first = own(bar)[0];
     return (
       !!last?.chord &&

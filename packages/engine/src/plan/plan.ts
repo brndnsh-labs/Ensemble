@@ -197,7 +197,8 @@ export function planBars(
     occurrence++;
   }
 
-  const solos = soloMarks(drafts, options, planned, open, top).map((mark, i) =>
+  const asSet = soloMarks(drafts, options, planned, open, top);
+  const solos = asSet.map((mark, i) =>
     // A solo under way when the band is told to finish makes this chorus its last (SO-05).
     mark && told !== undefined && drafts[i]!.run.pass === told
       ? { chorus: mark.chorus, of: mark.chorus + 1 }
@@ -205,19 +206,21 @@ export function planBars(
   );
 
   // Who is in: now and then a seat sits out a section or a pass at a low point of the arc.
-  const outs =
+  const { outs, enters } =
     options.mode === "jam" && !ownArrangement
-      ? layOuts(drafts, solos, style, options, {
+      ? // The solos as the jam set out: one cut short by the word is not where a seat was to sit out.
+        layOuts(drafts, asSet, style, options, {
           planned,
           passes,
           open,
           ends,
           without,
+          ...(told === undefined ? {} : { told }),
           ...(climax === undefined ? {} : { climax }),
           ...(breath === undefined ? {} : { breath }),
           rise,
         })
-      : drafts.map(() => null);
+      : { outs: drafts.map(() => null), enters: drafts.map(() => null) };
 
   // The one-bar build into a bigger section, then the rule about the high-tier line.
   const energies = drafts.map((draft, i) => {
@@ -348,6 +351,7 @@ export function planBars(
       lastPass: ends && options.mode === "jam" && draft.run.pass === passes - 1,
       ending: endingMark,
       source: flat.source,
+      ...(enters[i] ? { enters: [enters[i]] } : {}),
     });
     tick += flat.ticks;
   });
@@ -762,6 +766,8 @@ interface Shape {
   readonly open: boolean;
   readonly ends: boolean;
   readonly without: ReadonlySet<Seat>;
+  /** The pass the band was told to finish on. */
+  readonly told?: number;
   readonly climax?: number;
   readonly breath?: number;
   readonly rise: (pass: number) => number | undefined;
@@ -793,13 +799,15 @@ function layOuts(
   style: StylePack,
   options: PlanOptions,
   shape: Shape,
-): (Seat | null)[] {
+): { outs: (Seat | null)[]; enters: (Seat | null)[] } {
   const outs: (Seat | null)[] = drafts.map(() => null);
+  const enters: (Seat | null)[] = drafts.map(() => null);
+  const none = { outs, enters };
   const data = style.arc.layOut;
-  if (!data || options.seed === undefined || options.energy !== undefined) return outs;
+  if (!data || options.seed === undefined || options.energy !== undefined) return none;
   const band = (["drums", "bass", "chords"] as const).filter((seat) => !shape.without.has(seat));
   const seats = data.seats.filter((seat) => !shape.without.has(seat));
-  if (band.length < LAY_OUT_BAND || seats.length === 0) return outs;
+  if (band.length < LAY_OUT_BAND || seats.length === 0) return none;
 
   const byPass = Map.groupBy(
     drafts.flatMap((draft, i) => (draft.run.part === "body" ? [i] : [])),
@@ -815,7 +823,8 @@ function layOuts(
   for (const [pass, bars] of byPass) {
     if (pass < LAY_OUT_FROM || pass === peak) continue;
     if (pass - lastPass <= LAY_OUT_PASSES_BETWEEN) continue;
-    if (shape.ends && pass === shape.passes - 1) continue;
+    const toldHere = pass === shape.told;
+    if (shape.ends && pass === shape.passes - 1 && !toldHere) continue;
     const soloing = (i: number) => solos[i] !== null && !shape.without.has("solo");
     if (data.under === "solo") {
       if (!bars.every(soloing)) continue;
@@ -851,11 +860,19 @@ function layOuts(
           ]);
     const out = bars.filter((i) => chosen.has(drafts[i]!.run));
     if (out[0]! < LAY_OUT_FIRST_BAR || out[0]! - lastEnd < LAY_OUT_BARS_BETWEEN) continue;
+    if (toldHere) {
+      // Told to finish on a pass the seat was to sit out from its top: everyone is in for it,
+      // but the seat was not going to play its first bar, so it comes in there as it comes back
+      // from any lay-out, and nobody leans into it from the bar before, which is played as the
+      // jam as planned played it.
+      if (out[0] === bars[0]) enters[out[0]!] = seat;
+      continue;
+    }
     for (const i of out) outs[i] = seat;
     lastPass = pass;
     lastEnd = out.at(-1)! + 1;
   }
-  return outs;
+  return none;
 }
 
 /** Add a lift without leaving the tier the bar is in. */
