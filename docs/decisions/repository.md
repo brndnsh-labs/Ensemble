@@ -193,3 +193,17 @@ Brandon: "trim pass can't hurt if you see anything that isn't providing much val
 - **Left whole, because sampling them broke a floor or a tolerance they hold**: the guitar's hand on one chart per instrument (blues 9 bent notes, disco 3, under `enough`); the listening comp on seed 1 (blues, rock and neo-soul under eight takes compared); the soloist's setting on two seeds (disco's share sounding fell past the hundredth it is allowed). No floor was changed to fit.
 - **Not taken**: dropping the horn's own takes at 66 and 120 from "a horn breathes", which would leave its 120 checked on a push by nothing. Also left: the determinism replay, the open jam made one pass longer, the jam told to finish, the count-in, and the listening piano against a deaf one with nobody soloing, each of which needs its second take.
 - Whole suite after: 169.0 CPU s on a push (183.5 measured at 0417d849 by the brief); the full run 520.4 (507 to 512 before, so unchanged within noise: the caching saves little there and the rest plays whole).
+
+## the suite's processes stay all at once (2026-11-22, #2288)
+
+At nine styles the suite starts ten processes on eight cores, and each style then costs more CPU than it does alone. Measured before changing anything: `pnpm test`'s work with the processes all at once, at most eight at a time, and at most seven, three runs each in turn, quiet and then with a second suite looping beside it (CPU seconds, and seconds on the clock):
+
+| at once | quiet, CPU | quiet, clock | loaded, CPU | loaded, clock | CPU moved by the load |
+| --- | --- | --- | --- | --- | --- |
+| all ten | 206.8, 210.7, 212.1 (209.9) | 29.8 | 219.8, 229.7, 224.5 (224.7) | 46.3 | 7.0% |
+| eight | 204.2, 208.0, 207.2 (206.5) | 33.4 | 217.8, 222.7, 224.0 (221.5) | 50.3 | 7.3% |
+| seven | 200.5, 203.0, 202.9 (202.1) | 34.0 | 218.4, 224.6, 221.9 (221.6) | 54.1 | 9.6% |
+
+- **No cap.** A cap at the core count saves 1.6% of the CPU quiet and one below it 3.7%, and each costs about four seconds on the clock (12% to 14%): nine processes of one size do not fit eight places, so the last starts when the first ends. The issue's own bar was a second or two.
+- **A cap does not steady the figure under load.** The other suite's processes are what oversubscribe the machine, and ours waiting in a queue does not relieve that: the figure moved as much with a cap as without. The rule stays what `scripts/budget.ts` says: an overrun on a busy machine is run again alone before it is believed. The build check reports its budgets and does not judge them (a runner read 154.8 CPU seconds at nine styles), so only a local run can trip.
+- **Room, for the owner to know**: quiet, the nine styles cost 22.9 CPU seconds each beside the others (country alone 21.6) against the rule's 24, and these runs read 207 to 212 of 220. Each style past the core count has raised every style's cost, so a tenth may read over 24 a style quiet. If it does, a cap at the core count is the first thing to try (it buys CPU with clock), before the rule's figures are his to change.
