@@ -50,6 +50,15 @@ export const country: StylePack = {
   instruments: { bass: 32, chords: 25 },
   sound: {
     packs: { drums: "drum-kit", bass: "upright-bass", chords: "steel-guitar" },
-    mix: DEFAULT_MIX,
+    // Measured (`pnpm levels country`, the song in G): at the default mix drums -22.9, bass
+    // -22.8, guitar -23.2, the band -19.3 LUFS (rock's -18.3, acoustic's -19.3), and the clean
+    // guitar 0.6 dB under it. The soloist comes down 0.4 dB to sit about a decibel under. No ear.
+    mix: {
+      ...DEFAULT_MIX,
+      seats: {
+        ...DEFAULT_MIX.seats,
+        solo: { ...DEFAULT_MIX.seats.solo, level: DEFAULT_MIX.seats.solo.level - 0.4 },
+      },
+    },
   },
 };
