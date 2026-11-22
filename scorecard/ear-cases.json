@@ -778,6 +778,19 @@
       "seat": "chords",
       "styles": ["jazz"],
       "heard": "out/jazz-waltz/: Jazz Waltz in F as jazz, seed 1, quiet and working, the band alone and under the alto, main beside the build; seed 3 at the working level with the band alone, for the hemiola. Rendered from the branch that merged as 0417d849."
+    },
+    {
+      "id": "country-sounding-pretty-good",
+      "date": "2026-11-22",
+      "words": "country is sounding pretty good on the listening page. it's not one of my usual genres that i play, so i'm probably not the absolute best person to judge it haha",
+      "source": "docs/decisions/critic.md: his ear on country (2026-11-22, #2243, #2278)",
+      "kind": "passed",
+      "medium": "notes",
+      "recorded": "a46a8a27",
+      "doubt": "By his own word he does not play country, so this is a pass from outside the idiom. One sentence for the whole page: he did not say which clips he played. The one question put by ear (after the walk-up in G and E, is the root an octave over the lowest one the right place to end) was answered only by this and by his word to merge. What the reviews left and the page named (the hot walk down through the seventh under the guitar's upstroke, the three-note C6 chick, six strikes a bar under a hot solo, the walk bar's root a seventh over the note before in G and E) was not spoken to. Not tried on his phone.",
+      "seat": "band",
+      "styles": ["country"],
+      "heard": "out/country/: the ballad held quiet, the two-step at the middle level, the train held hot, a jam on its arc with the lead guitar, the same jam with no bassist, an ending in E with the stinger and one in G with none, and the song chart whole. Rendered from the branch that merged as a46a8a27, before its last fix (a chord on beat 3 under the landing), which moved none of the takes on the page."
     }
   ],
   "leftOut": [
