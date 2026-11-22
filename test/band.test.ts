@@ -223,25 +223,11 @@ test("a jam told to finish plays everything before its last pass as it would hav
           const where = `${chart.file} seed ${seed}, told on pass ${endAfter}`;
 
           const top = told.plan.bars.find((bar) => bar.kind === "music" && bar.pass === endAfter)!;
-          // The pass markers say "1/2" once the band knows how many there are; nothing else may differ,
-          // but for one thing: where the jam as planned had a seat sit out from the top of the pass it
-          // is told on, everyone is in for that pass (#2240), and that seat's last eighth before it
-          // may lean into its first bar (the comp's push over the barline, which takes the place of
-          // what it struck there). The take as heard is joined where the band was told, at that top or
-          // after, so the lean is never played: there the bar before is the jam as it was.
-          const comesIn = (seat: string) =>
-            asPlanned.plan.bars[top.index]!.seats[seat as "chords"] === null &&
-            top.seats[seat as "chords"] !== null;
+          // The pass markers say "1/2" once the band knows how many there are; nothing else may differ.
           const before = (take: Take) =>
             take.events.filter(
               (event) =>
-                event.tick < top.start &&
-                !(event.kind === "marker" && event.marker === "pass") &&
-                !(
-                  event.kind === "note" &&
-                  comesIn(event.seat) &&
-                  event.tick >= top.start - PPQ / 2
-                ),
+                event.tick < top.start && !(event.kind === "marker" && event.marker === "pass"),
             );
           assert.deepEqual(before(told), before(asPlanned), where);
           // The band may be told at any phrase top of the pass it turns on (the app tells it where
