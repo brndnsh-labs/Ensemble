@@ -2097,6 +2097,48 @@ test(
 );
 
 test(
+  "country: with no bassist the boom on a plain major on the I or the IV is on the low E or the A string, in Gb and in Db too: the pick carries the root, and the chord's fifth is the shape's, not the bassist's to leave (CH-24: a fifth is dropped only over a bassist; ST-country-07)",
+  only("country"),
+  () => {
+    const country = STYLES.find((style) => style.id === "country")!;
+    let booms = 0;
+    for (const [key, chords] of [
+      ["Gb", "| Gb | Gb | Db7 | Db7 | Gb | Cb | Gb | Gb |"],
+      ["Db", "| Db | Db | Gb | Gb | Ab7 | Ab7 | Db | Db |"],
+    ] as const) {
+      const chart: LibraryChart = {
+        file: `boom-${key}`,
+        text: `title: Boom in ${key}\nkey: ${key}\nstyle: country\n\n[A]\n${chords}\n`,
+        meter: "4/4",
+      };
+      for (const energy of [0.3, 0.6]) {
+        const { take } = takeOf({
+          style: country,
+          chart,
+          options: { mode: "jam", passes: 1, energy, seed: 1, without: ["bass"] },
+        });
+        const tonic = pitchClass(take.plan.bars[0]!.key.tonic);
+        for (const bar of take.plan.bars) {
+          if (bar.kind !== "music" || bar.ending) continue;
+          const chord = harmonyOf(take).findLast((arrival) => arrival.tick <= bar.start)?.chord;
+          if (!chord || chord.quality.base !== "" || chord.quality.alterations.length > 0) continue;
+          const degree = (pitchClass(chord.root) - tonic + 12) % 12;
+          if (degree !== 0 && degree !== 5) continue;
+          const boom = pluckedOf(take).find((strike) => strike.tick === bar.start);
+          if (!boom) continue;
+          booms++;
+          assert.ok(
+            boom.pitches[0]! < OPEN[2]!,
+            `boom in ${key} at ${energy}, bar ${bar.index}: ${boom.pitches} is not on the low E or the A string`,
+          );
+        }
+      }
+    }
+    assert.ok(booms >= 12, `only ${booms} booms`);
+  },
+);
+
+test(
   "country: the final tonic chord of an ending leaves nothing out: a triad or a sixth chord sounds its fifth, struck with it or as the stinger's landing, in every key (EN-49; a chick may leave the open shape's fifth to the bass, a chord that rings as the end may not)",
   only("country"),
   () => {
