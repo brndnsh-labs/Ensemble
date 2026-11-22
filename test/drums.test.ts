@@ -20,6 +20,7 @@ import {
 import { POCKET } from "./reading.ts";
 import {
   enough,
+  FULL,
   heldTakes,
   type Jam,
   LIBRARY,
@@ -723,8 +724,8 @@ const anyCompound = LIBRARY.some((chart) => compound({ chart }));
 
 /**
  * The bars of dotted pulses a style plays time in: every take of the library's in six-eight
- * or twelve-eight that it is handed, and each such chart held quiet and held loud. Read once,
- * for both the properties of six and twelve below.
+ * or twelve-eight that it is handed, and each such chart held quiet and held loud (on a push, the
+ * style's own). Read once, for both the properties of six and twelve below.
  */
 type CompoundBar = { where: string; bar: PlanBar; kit: Kit; held: number | undefined };
 let compoundRead: CompoundBar[] | undefined;
@@ -739,15 +740,22 @@ function readCompound(): CompoundBar[] {
       take,
       held: undefined,
     })),
+    // On a push only the style's own charts are held (it is handed the rest among the
+    // library's takes above); the full run holds every one.
     ...STYLES.flatMap((style) =>
-      LIBRARY.filter((chart) => compound({ chart })).flatMap((chart) =>
-        [0.3, 0.85].map((held) => ({
-          where: `${style.id} ${chart.file} at ${held}`,
-          take: takeOf({ style, chart, options: { mode: "jam", passes: 2, energy: held, seed: 1 } })
-            .take,
-          held,
-        })),
-      ),
+      (FULL ? LIBRARY : ownCharts(style))
+        .filter((chart) => compound({ chart }))
+        .flatMap((chart) =>
+          [0.3, 0.85].map((held) => ({
+            where: `${style.id} ${chart.file} at ${held}`,
+            take: takeOf({
+              style,
+              chart,
+              options: { mode: "jam", passes: 2, energy: held, seed: 1 },
+            }).take,
+            held,
+          })),
+        ),
     ),
   ];
   return played.flatMap(({ where, take, held }) =>
