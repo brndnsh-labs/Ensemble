@@ -96,6 +96,11 @@ function validateTime(drums: DrumTime, meter: { beats: number; unit: 2 | 4 | 8 }
       if (when?.playing) voice(when.playing, `${where}, "playing"`);
       if (when?.phraseBars?.some((bar) => !Number.isInteger(bar) || bar < 1))
         problems.push(`${where}: phrase bars are counted from 1.`);
+      for (const name of when?.meters ?? []) {
+        if (readMeter(name) === null) problems.push(`${where}: "${name}" is not a meter.`);
+      }
+      if (when?.meters?.length === 0)
+        problems.push(`${where}: names no meter, so it is never played.`);
       for (const energy of [when?.energyFrom, when?.energyBelow]) {
         if (energy !== undefined && !(energy >= 0 && energy <= 1))
           problems.push(`${where}: an energy is between 0 and 1, not ${energy}.`);
