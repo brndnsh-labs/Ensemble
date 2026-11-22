@@ -45,6 +45,10 @@ export const reggae: StylePack = {
   },
   arc: {
     ...DEFAULT_ARC,
+    // A section labelled Solo at the level of a plain one: at the usual 0.65 it sits a hair under
+    // the line it may not cross, and the band has no room to build under a second solo there
+    // (docs/decisions/soloist.md, a chart with a Solo section).
+    levels: [["solo", DEFAULT_ARC.defaultLevel], ...DEFAULT_ARC.levels],
     // The song-length arc at half depth: a plain chart's climax reaches about 0.65, so the build
     // and the breath are heard in dynamics only (ST-reggae-34).
     depth: 0.5,

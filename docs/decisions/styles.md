@@ -271,6 +271,7 @@ Read on the main thread: the planner and player diff (five optional fields and t
   - "A note held across a change is a tone of the new chord" measured the hold as heard against the change on the grid. Neo-soul lays its lead back 25 ms, and its Rhodes with it; on rhythm changes at 176, two and a half times its own tempo, that carried a note written to stop before a change 28 ms past it. The hold is now measured with the style's own lay-back of the soloist set aside.
   Nothing in an engine was changed for either.
 - Not built, as the build said: the fast count (the planner would read written bars two for one at half the tempo), ST-reggae-04's drums in other meters (in 3/4 there is no drop), the keyboard double and the organ bubble, a horn's scoop. One of the notes' four solo endings is left out (it broke the breath in a short bar at a fast tempo).
+- **A section labelled Solo is at reggae's plain level** (0.55, from 0.65; 2026-11-22, #2282): at 0.65 it sits under the line no lift crosses (ST-reggae-33), and the band had no room to build under a second solo there. No library chart labels one, so nothing played moved (docs/decisions/soloist.md, a jam on a chart with a Solo section).
 
 ## acoustic, and a guitar that picks (stage 6, part 5)
 

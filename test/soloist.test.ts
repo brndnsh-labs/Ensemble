@@ -33,21 +33,24 @@ import {
   FULL,
   type Jam,
   type JamSpec,
+  LIBRARY,
   notesOf,
   only,
   ownCharts,
   readSmf,
   SEEDS,
+  SOLO_SECTION,
   STYLES,
   soloistTakes,
   stressTakes,
+  takeOf,
   takes,
   written,
 } from "./takes.ts";
 
 // ── the soloist ─────────────────────────────────────────────────────────────
 
-test("the soloist is off unless asked for; asked for, it rests through the intro and a written ending, lays out and returns, and never solos more than three choruses in a row", () => {
+test("the soloist is off unless asked for; asked for, it rests through the intro and a written ending, lays out and returns, and never solos more than three choruses in a row; and on a chart with a section labelled Solo, asked for, the soloist has the lead in exactly those sections, every time round from the first pass, and in no other bar; each time round is the next chorus of an arc of at most three, which knows its length", () => {
   for (const style of STYLES) {
     for (const chart of ownCharts(style)) {
       const written = parse(chart.text).chart;
@@ -108,10 +111,59 @@ test("the soloist is off unless asked for; asked for, it rests through the intro
         );
       }
     }
+
+    // A chart with a section labelled Solo has said where the solo goes.
+    const sectioned = parse(SOLO_SECTION.text).chart;
+    for (const passes of [1, 2, 3, 4, 5, 6, 9]) {
+      const where = `${SOLO_SECTION.file}, ${passes} passes`;
+      assert.ok(
+        plan(sectioned, style, { mode: "jam", passes }).bars.every(
+          (bar) => bar.solo === null && bar.seats.solo === null,
+        ),
+        `${where}: a soloist nobody asked for`,
+      );
+      const roadmap = plan(sectioned, style, { mode: "jam", passes, solo: true });
+      const times = new Map<number, PlanBar[]>();
+      for (const bar of roadmap.bars) {
+        assert.equal(bar.solo !== null, bar.seats.solo !== null, `${where}: bar ${bar.index}`);
+        const named =
+          bar.kind === "music" &&
+          bar.section.role === "body" &&
+          bar.section.identity.startsWith("solo");
+        assert.equal(bar.solo !== null, named, `${where}: bar ${bar.index} (${bar.section.label})`);
+        if (named)
+          times.set(bar.section.occurrence, [...(times.get(bar.section.occurrence) ?? []), bar]);
+      }
+      const turns = [...times.values()];
+      assert.deepEqual(
+        turns.map((bars) => bars[0]!.pass),
+        Array.from({ length: passes }, (_, pass) => pass),
+        `${where}: the passes the Solo section is the soloist's`,
+      );
+      turns.forEach((bars, n) => {
+        const marks = new Set(bars.map((bar) => JSON.stringify(bar.solo)));
+        assert.equal(marks.size, 1, `${where}: a time round that changes its mind`);
+        const turn = bars[0]!.solo!;
+        assert.equal(turn.chorus, n % 3, `${where}: time ${n} is chorus ${turn.chorus}`);
+        const of = Math.min(3, turns.length - (n - turn.chorus));
+        assert.equal(turn.of, of, `${where}: time ${n} of ${turn.of}`);
+      });
+      // Here too an open jam's solo does not depend on how long the jam turns out to be.
+      const open = (n: number) =>
+        plan(sectioned, style, { mode: "jam", open: true, passes: n, solo: true }).bars;
+      const shorter = open(passes);
+      assert.deepEqual(
+        open(passes + 1)
+          .slice(0, shorter.length)
+          .map((bar) => bar.solo),
+        shorter.map((bar) => bar.solo),
+        `${where}: an open jam's solos moved when it grew`,
+      );
+    }
   }
 });
 
-test("the soloist from the top: asked for in a jam, it has the lead from the first pass in every style, and its solos are those of a jam a pass longer, moved up past the band's pass (an open jam made longer keeps them); a song, and a chart with a section written for the solo, are played as they are without it", () => {
+test("the soloist from the top: asked for in a jam, it has the lead from the first pass in every style on a chart with no section labelled Solo, and its solos are those of a jam a pass longer, moved up past the band's pass (an open jam made longer keeps them); a song, and a chart with a section written for the solo, are played as they are without it", () => {
   const turns = (bars: readonly PlanBar[]) => {
     const byPass = new Map<number, string>();
     for (const bar of bars) {
@@ -130,8 +182,10 @@ test("the soloist from the top: asked for in a jam, it has the lead from the fir
         const where = `${style.id}, ${chart.file}, ${passes} passes`;
         const top = plan(written, style, { mode: "jam", passes, solo: true, soloFromTop: true });
         const first = top.bars.filter((bar) => bar.kind === "music" && bar.pass === 0);
+        const named = top.bars.some((bar) => bar.section.identity.startsWith("solo"));
         assert.ok(
-          first.filter((bar) => bar.section.role === "body").every((bar) => bar.solo !== null),
+          named ||
+            first.filter((bar) => bar.section.role === "body").every((bar) => bar.solo !== null),
           `${where}: the first pass is not the soloist's`,
         );
         const longer = plan(written, style, { mode: "jam", passes: passes + 1, solo: true });
@@ -167,7 +221,8 @@ test("the soloist from the top: asked for in a jam, it has the lead from the fir
 
 test("the band builds with the solo: it never comes down from one chorus of a solo to the next, and under the last of three it is louder than under the first", () => {
   for (const style of STYLES) {
-    for (const chart of ownCharts(style)) {
+    // A chart with a Solo section too: the band builds with the solo wherever the chart puts it.
+    for (const chart of [...ownCharts(style), SOLO_SECTION]) {
       const written = parse(chart.text).chart;
       for (const passes of [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20]) {
         const roadmap = plan(written, style, { mode: "jam", passes, solo: true });
@@ -208,17 +263,26 @@ test("the band builds with the solo: it never comes down from one chorus of a so
   }
 });
 
-/** A take's solos: each one's notes, and the plan bars it runs over. */
+/**
+ * A take's solos: each one's notes, and the plan bars it has the lead in. A solo runs from its
+ * first chorus to its last, across any rest the form puts between them (a chart's Solo section
+ * comes round once a pass).
+ */
 function solosOf(take: Take): { bars: PlanBar[]; notes: ReturnType<typeof notesOf> }[] {
   const solos: { bars: PlanBar[]; notes: ReturnType<typeof notesOf> }[] = [];
   let current: PlanBar[] | null = null;
+  let before: PlanBar | undefined;
   for (const bar of take.plan.bars) {
-    if (bar.solo && (!current || (bar.solo.chorus === 0 && bar.barInPass === 0))) {
+    const prev = before;
+    before = bar;
+    if (!bar.solo) continue;
+    // A chorus starts at the top of a pass, or where the soloist takes the lead again.
+    const top = !prev?.solo || bar.barInPass === 0;
+    if (!current || (top && bar.solo.chorus === 0)) {
       current = [];
       solos.push({ bars: current, notes: [] });
     }
-    if (bar.solo) current!.push(bar);
-    else current = null;
+    current.push(bar);
   }
   const all = notesOf(take, "solo");
   for (const solo of solos) {
@@ -318,8 +382,19 @@ test("a solo breathes and keeps going: no silence inside it reaches three bars (
       const barTicks = isCompound(bars[0]!.meter)
         ? Math.max(bars[0]!.ticks, 4 * 1.5 * PPQ)
         : bars[0]!.ticks;
+      // The bars the form gives the band between two choruses are the soloist's rest, not a
+      // silence inside its solo.
+      const rests = take.plan.bars.filter(
+        (bar) => !bar.solo && bar.index > bars[0]!.index && bar.index < bars.at(-1)!.index,
+      );
       for (let i = 1; i < notes.length; i++) {
-        const gap = notes[i]!.tick - (notes[i - 1]!.tick + notes[i - 1]!.duration);
+        const [from, to] = [notes[i - 1]!.tick + notes[i - 1]!.duration, notes[i]!.tick];
+        const rested = rests.reduce(
+          (sum, bar) =>
+            sum + Math.max(0, Math.min(to, bar.start + bar.ticks) - Math.max(from, bar.start)),
+          0,
+        );
+        const gap = to - from - rested;
         assert.ok(gap < barTicks * 3, `${where}: ${(gap / barTicks).toFixed(1)} bars of silence`);
       }
       const of = bars[0]!.solo!.of;
@@ -923,6 +998,23 @@ const HELD: Readonly<Record<string, number>> = {
   neosoul: 4,
 };
 
+/**
+ * A take of this property's own, that the library's takes do not reach: jazz on
+ * `reggae-one-four-g`, a jam of four passes, seed 1. The pickup into a phrase there was laid a
+ * breath after the phrase before only once swung, and read from the notes it ran on from that
+ * phrase; an idea moved a beat later was measured against it with that note (#2287).
+ */
+const DISPLACED_OWN = (): Jam[] =>
+  STYLES.some((style) => style.id === "jazz")
+    ? [
+        takeOf({
+          style: STYLES.find((style) => style.id === "jazz")!,
+          chart: LIBRARY.find((chart) => chart.file === "reggae-one-four-g.chart")!,
+          options: { mode: "jam", passes: 4, solo: true, seed: 1 },
+        }),
+      ]
+    : [];
+
 test("an idea comes back a beat early or late: in the styles that do it most some phrases say an earlier one of the solo again, the same rhythm and contour moved by one of the bar's pulses, only where the form asks what the style says; never the top of a chorus, the solo's first or last phrase, nor the tune's last, and never late in a section's last bar (nor an answer that carries a moved rhythm there); every note of the idea so moved inside its own phrase's bars and the tune, led in by no pickup, a chord tone where it falls on a beat (SO-33), and as long as it was, shaken where it was shaken, its last note a pulse shorter at most and an idea main's rules refuse, moved by the stricter ones, no note longer by more than a sixteenth and each move within a whole step of the idea's; a note held over a barline only in a style that holds one there (never in funk, rock or disco), only where it sounds across it, and then a tone of every chord it is held into (SO-02, SO-33), and some held so in the styles that hold; and every idea so moved heard as one", () => {
   const failures = new Map<string, string[]>();
   const fail = (clause: string, where: string) =>
@@ -932,7 +1024,9 @@ test("an idea comes back a beat early or late: in the styles that do it most som
     const floor = DISPLACED[style.id];
     const { roles, holds } = style.solo.habits.displace;
     let [phrases, moved] = [0, 0];
-    for (const { chart, options, take } of soloTakes().filter((jam) => jam.style === style)) {
+    for (const { chart, options, take } of [...soloTakes(), ...DISPLACED_OWN()].filter(
+      (jam) => jam.style === style,
+    )) {
       const counted = MEASURES.find((measure) => measure.id === "solo.displaced")!.of(take, style);
       if (!counted) continue;
       phrases += counted.cases;

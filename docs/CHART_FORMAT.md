@@ -95,6 +95,7 @@ A section starts with a label in square brackets on its own line, followed by it
   - `Outro`, `Ending`, `Coda`, `Tag`: played once at the end, replacing the style's generated ending.
   - Everything else is the body, which loops.
   - A reserved word followed by a number (`Intro 2`, `Tag 2`) keeps its role. Anything longer (`Intro vamp`) is body.
+  - A body section labelled `Solo` (or `Solo 2`, `Solos`) is where the soloist plays, when it is asked for: in a jam it has that section every time round, from the first pass, and rests through the rest of the form; each time round is the next chorus of a solo of at most three, and the band builds under it as under any solo.
 
   In song mode, all sections play once in file order.
 
