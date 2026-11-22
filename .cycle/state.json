@@ -1,10 +1,10 @@
 {
   "upstream": "667639e",
   "files": {
-    ".claude/skills/DOCTRINE.md": "3789e3e5a941",
+    ".claude/skills/DOCTRINE.md": "c406993ae207",
     ".claude/skills/cycle/SKILL.md": "4c40a1ba60a7",
-    ".claude/skills/intake/SKILL.md": "e4a8d857e5dd",
-    ".claude/skills/review/SKILL.md": "57770e3c4e77",
+    ".claude/skills/intake/SKILL.md": "7fc128aa41d8",
+    ".claude/skills/review/SKILL.md": "fd9c5146dc07",
     ".claude/skills/next/SKILL.md": "ba5a0dcd8d9b",
     ".claude/skills/scout/SKILL.md": "bb988322b450",
     ".claude/skills/wrap-up/SKILL.md": "ca11b2eeab49",

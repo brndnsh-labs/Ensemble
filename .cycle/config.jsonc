@@ -88,7 +88,7 @@
     "the release path: the release in `.github/workflows/` (`ci.yml`'s release jobs, `release.yml`) and `.github/actions/release/`, `hosting/`, `scripts/image.sh`, repository secrets and variables, branch protection",
     "a sample pack's source or licence: `scripts/packs/sources.ts`, a pack's `LICENCE` file, the credits",
     "what the app keeps in the browser: the stored lists (`packages/app/src/stored.ts` and the keys and shapes kept through it) and the service worker (`packages/app/service-worker.js`, `offline.ts`)",
-    "loosening a gate: raising a time budget or a scorecard tolerance, accepting a scorecard drop, deleting or weakening a property"
+    "loosening a gate: raising a budget's figures or changing its rule (a budget that grows by `docs/TESTING.md`'s own rule, a style added, is not raised), raising a scorecard tolerance, accepting a scorecard drop, deleting or weakening a property"
   ],
   "branch": {
     "minor_edits_direct": true

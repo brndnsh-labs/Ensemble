@@ -1,4 +1,4 @@
-<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=3789e3e5a941 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=c406993ae207 — managed by the-cycle; edit the template, not this file -->
 # Pipeline doctrine (shared)
 
 The rules every ensemble pipeline skill shares; a skill citing `§N` means this file. **Read it
@@ -108,7 +108,7 @@ the main thread.
   references or contradictions is enough.
 - **Normal** — any real code change: run `/review` in a fresh-context
   subagent, so the reviewer doesn't share the builder's assumptions.
-- **Brake surface** (running the release by hand (it puts production on a named commit), or anything done on the Docker host, anything that would publish a secret, a private address, a network detail or a private email (the repository is public), the release path: the release in `.github/workflows/` (`ci.yml`'s release jobs, `release.yml`) and `.github/actions/release/`, `hosting/`, `scripts/image.sh`, repository secrets and variables, branch protection, a sample pack's source or licence: `scripts/packs/sources.ts`, a pack's `LICENCE` file, the credits, what the app keeps in the browser: the stored lists (`packages/app/src/stored.ts` and the keys and shapes kept through it) and the service worker (`packages/app/service-worker.js`, `offline.ts`), loosening a gate: raising a time budget or a scorecard tolerance, accepting a scorecard drop, deleting or weakening a property): `/review` plus `/security-review`, and surface the result to
+- **Brake surface** (running the release by hand (it puts production on a named commit), or anything done on the Docker host, anything that would publish a secret, a private address, a network detail or a private email (the repository is public), the release path: the release in `.github/workflows/` (`ci.yml`'s release jobs, `release.yml`) and `.github/actions/release/`, `hosting/`, `scripts/image.sh`, repository secrets and variables, branch protection, a sample pack's source or licence: `scripts/packs/sources.ts`, a pack's `LICENCE` file, the credits, what the app keeps in the browser: the stored lists (`packages/app/src/stored.ts` and the keys and shapes kept through it) and the service worker (`packages/app/service-worker.js`, `offline.ts`), loosening a gate: raising a budget's figures or changing its rule (a budget that grows by `docs/TESTING.md`'s own rule, a style added, is not raised), raising a scorecard tolerance, accepting a scorecard drop, deleting or weakening a property): `/review` plus `/security-review`, and surface the result to
   Brandon before merging.
 
 **Findings get fixed, not parked.** Fix anything about this diff in the same cycle. A finding too
@@ -132,7 +132,7 @@ pnpm score
 A spawned agent's "gates green" or "done" is a claim: re-run the gates yourself and confirm its
 files actually changed before you rely on it.
 
-- **`pnpm check`** is typecheck, lint and the engine suite (corpus, properties, goldens on two seeds) under a time budget, and an exceeded budget fails it. The answer to that is to consolidate or delete, never to raise the limit: raising it is a §5 brake. Lint also holds the boundaries: no `Math.random`, `Date.now` or `performance.now` in `packages/engine/src` (`tools/no-ambient-inputs.grit`), and the import rules between `engine`, `audio` and `app` (`biome.json`).
+- **`pnpm check`** is typecheck, lint and the engine suite (corpus, properties, goldens on two seeds) under its budget, counted in CPU seconds (`docs/TESTING.md`), and an exceeded budget fails it. The answer to that is to consolidate or delete, never to raise the limit: raising it is a §5 brake. Lint also holds the boundaries: no `Math.random`, `Date.now` or `performance.now` in `packages/engine/src` (`tools/no-ambient-inputs.grit`), and the import rules between `engine`, `audio` and `app` (`biome.json`).
 - **`pnpm score`** compares every style's scorecard with its baseline in `scorecard/<style>.json` and fails only on a drop past a metric's tolerance. Movement inside tolerance is reported in the PR, not hidden. `ensemble score --update` accepts a new baseline: an improvement may be accepted with a line in `docs/decisions/`; accepting a drop is a §5 brake.
 - **A golden that moved** (`test/goldens/`) is either the point of the change or a bug. If it is the point, `pnpm goldens` and a line in `docs/decisions/` saying why the output changed; never rewrite goldens to get green without knowing which notes moved.
 - **Before a listening gate**, also `pnpm test:full` (six seeds).
@@ -157,7 +157,7 @@ do and keep going.
 - **the release path: the release in `.github/workflows/` (`ci.yml`'s release jobs, `release.yml`) and `.github/actions/release/`, `hosting/`, `scripts/image.sh`, repository secrets and variables, branch protection** — Brandon wants to see this even when you could proceed.
 - **a sample pack's source or licence: `scripts/packs/sources.ts`, a pack's `LICENCE` file, the credits** — Brandon wants to see this even when you could proceed.
 - **what the app keeps in the browser: the stored lists (`packages/app/src/stored.ts` and the keys and shapes kept through it) and the service worker (`packages/app/service-worker.js`, `offline.ts`)** — Brandon wants to see this even when you could proceed.
-- **loosening a gate: raising a time budget or a scorecard tolerance, accepting a scorecard drop, deleting or weakening a property** — Brandon wants to see this even when you could proceed.
+- **loosening a gate: raising a budget's figures or changing its rule (a budget that grows by `docs/TESTING.md`'s own rule, a style added, is not raised), raising a scorecard tolerance, accepting a scorecard drop, deleting or weakening a property** — Brandon wants to see this even when you could proceed.
 Work that touches a brake still gets built, reviewed (with `/security-review`), and opened as a PR —
 but it **never merges** without Brandon: leave the PR open and say what needs their eyes. An
 action a brake calls destructive or irreversible (running it, not writing code for it) is never
