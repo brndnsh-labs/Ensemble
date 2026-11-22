@@ -263,9 +263,11 @@ function strikesInSix(take: Take): number[][] {
 }
 
 /**
- * The chords struck in each bar of three (3/4) the seat plays, short of the ending bar, at
- * every level, as ticks from the barline: under a soloist, or with the band to itself. The
- * 4/4 reading above does not read these bars.
+ * The chords struck in each bar of three (3/4) the seat plays, short of the ending bar, as
+ * ticks from the barline: with the band to itself, at every level; or under a soloist, from
+ * the working level up (where a style holds its hand to the working book under a soloist, that
+ * is the book read; a quiet bar is the quiet book's held chord, soloist or not). The 4/4
+ * reading above does not read these bars.
  */
 function strikesInThree(take: Take, soloing: boolean): number[][] {
   const struck = new Map<number, Set<number>>();
@@ -288,10 +290,24 @@ function strikesInThree(take: Take, soloing: boolean): number[][] {
         bar.meter.beats === 3 &&
         bar.meter.unit === 4 &&
         bar.seats.chords !== null &&
-        (bar.solo !== null) === soloing,
+        (bar.solo !== null) === soloing &&
+        (!soloing || tierOf(bar.seats.chords) !== "low"),
     )
     .map((bar) => [...(struck.get(bar.index) ?? [])]);
 }
+
+/** Under a soloist in three, the share of bars struck on one of the bar's six eighths. */
+const eighthUnderTheSolo = (eighth: number, name: string, label: string): Measure => ({
+  id: `chords.under-the-solo-in-three-on-${name}`,
+  seat: "chords",
+  idiom: true,
+  says: `In three, under a solo, from the working level up, the share of bars the piano strikes on ${label}: the strikes spread over the bar, none of its eighths always or never struck.`,
+  unit: "share",
+  of(take) {
+    const bars = strikesInThree(take, true);
+    return share(bars.filter((ticks) => ticks.includes((eighth * PPQ) / 2)).length, bars.length);
+  },
+});
 
 /** In three: how many chords a bar, the share of bars of one or none, and of bars struck on 1. */
 const inThree = {
@@ -359,7 +375,7 @@ export const compingMeasures: readonly Measure[] = [
     id: "chords.thin-bars-under-the-solo-in-three",
     seat: "chords",
     idiom: true,
-    says: "In three, under a solo, few bars have one strike or none: the hand is sparse under the line and still keeps the time (ST-jazz-30, in four under 21%).",
+    says: "In three, under a solo, from the working level up, few bars have one strike or none: the hand is sparse under the line and still keeps the time (in three, Kelly's 4 bars of 16).",
     unit: "share",
     of: (take) => inThree.thin(take, true),
   },
@@ -367,7 +383,7 @@ export const compingMeasures: readonly Measure[] = [
     id: "chords.strikes-per-bar-in-three-under-the-solo",
     seat: "chords",
     idiom: true,
-    says: "In three, under a solo, the piano strikes about two chords a bar, one to four.",
+    says: "In three, under a solo, from the working level up, the piano strikes about two chords a bar, one to four.",
     unit: "per bar",
     of: (take) => inThree.perBar(take, true),
   },
@@ -375,10 +391,16 @@ export const compingMeasures: readonly Measure[] = [
     id: "chords.on-one-in-three-under-the-solo",
     seat: "chords",
     idiom: true,
-    says: "In three, under a solo, the piano leaves beat 1 to the bass more often than it plays it: the share of bars it strikes on 1.",
+    says: "In three, under a solo, from the working level up, the piano leaves beat 1 to the bass more often than it plays it: the share of bars it strikes on 1.",
     unit: "share",
     of: (take) => inThree.onOne(take, true),
   },
+  eighthUnderTheSolo(0, "1", "beat 1"),
+  eighthUnderTheSolo(1, "and-of-1", 'the "and" of 1'),
+  eighthUnderTheSolo(2, "2", "beat 2"),
+  eighthUnderTheSolo(3, "and-of-2", 'the "and" of 2'),
+  eighthUnderTheSolo(4, "3", "beat 3"),
+  eighthUnderTheSolo(5, "and-of-3", 'the "and" of 3'),
   {
     id: "chords.strikes-per-bar-in-three",
     seat: "chords",
