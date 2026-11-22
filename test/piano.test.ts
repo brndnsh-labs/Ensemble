@@ -1218,6 +1218,37 @@ const pickers = guitars.filter((style) => {
   );
 });
 const picked = (jam: { style: (typeof STYLES)[number] }) => pickers.includes(jam.style);
+/** The symbols a figure's grid strikes with, by what each attack is. */
+const attacksOf = (style: (typeof STYLES)[number]) => {
+  const book = style.chords.rhythm;
+  if (!book) return [];
+  return [book.tiers.low, book.tiers.mid, book.tiers.high].flatMap((tier) =>
+    tier.figures.map((figure) => {
+      const articulation = { ...tier.articulation, ...(figure.articulation ?? {}) };
+      const attacks = (grid: string) =>
+        [...grid].flatMap((symbol) => (articulation[symbol] ? [articulation[symbol]!] : []));
+      return { grid: attacks(figure.grid), alone: figure.alone ? attacks(figure.alone) : null };
+    }),
+  );
+};
+/**
+ * A guitar that picks with the band: a figure it plays with a bassist has plucked strings in it.
+ * Its plucks are common, so the rule below must see enough of them; a guitar that picks only the
+ * boom with no bassist (country's, ST-country-07) is held to the rule on every string it plucks,
+ * and to no count of them.
+ */
+const picksWithTheBand = (style: (typeof STYLES)[number]): boolean =>
+  attacksOf(style).some(({ grid }) => grid.some((attack) => attack.pluck !== undefined));
+/**
+ * A guitar that picks a whole bar with no bassist: a figure's second grid that is all plucked
+ * strings, the Travis hand. Only such a bar is read by the rule below; a boom-chick's bar with no
+ * bassist strums its chick, and is not one.
+ */
+const picksAlone = (style: (typeof STYLES)[number]): boolean =>
+  attacksOf(style).some(
+    ({ alone }) =>
+      alone !== null && alone.length > 0 && alone.every((attack) => attack.pluck !== undefined),
+  );
 
 test("a picked note is a string of the shape the hand is holding: everything the guitar plucks under one chord, with whatever it strums there, is no more notes than it has strings and one shape a hand can hold; and a plucked string rings on under the hand until it is plucked again, never past its chord and never into a strum", {
   skip: pickers.length === 0,
@@ -1303,10 +1334,11 @@ test("a picked note is a string of the shape the hand is holding: everything the
       });
     });
   }
-  assert.ok(
-    chords > enough(1200) && plucks > enough(9000) && rang > enough(7000),
-    `only ${chords} picked chords, ${plucks} plucked notes, ${rang} that rang on`,
-  );
+  if (STYLES.some(picksWithTheBand))
+    assert.ok(
+      chords > enough(1200) && plucks > enough(9000) && rang > enough(7000),
+      `only ${chords} picked chords, ${plucks} plucked notes, ${rang} that rang on`,
+    );
   if (guitarsInSix.length > 0) assert.ok(six > PICKED_IN_SIX, `only ${six} chords picked in six`);
   if (guitarsInTwelve.length > 0)
     assert.ok(twelve > PICKED_IN_TWELVE, `only ${twelve} chords picked in twelve`);
@@ -1376,10 +1408,11 @@ test("with no bassist the picking thumb is the bass: in a bar of four, or of six
       }
     }
   }
-  assert.ok(
-    bars > enough(60) && stated > enough(60),
-    `only ${bars} bars picked with no bassist, ${stated} chords stated`,
-  );
+  if (STYLES.some(picksAlone))
+    assert.ok(
+      bars > enough(60) && stated > enough(60),
+      `only ${bars} bars picked with no bassist, ${stated} chords stated`,
+    );
   if (guitarsInSix.length > 0)
     assert.ok(six > ALONE_IN_SIX, `only ${six} bars of six picked alone`);
   if (guitarsInTwelve.length > 0)
