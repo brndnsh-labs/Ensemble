@@ -253,6 +253,9 @@ export function pickupsOf(world: World, notes: readonly Sounding[]): Set<Soundin
  * idea. Only then: two phrases that have nothing to do with each other often
  * line up a pulse apart by chance, and are not alike for it.
  */
+/** More ticks than any bar has: a bar's place in a phrase times this, and the step inside it, is a note's place. */
+const PLACES = 1 << 20;
+
 export function likeness(a: Heard, b: Heard, moved = false): number {
   const moves = (notes: readonly Sounding[]) => {
     const first = notes[0]?.bar.index ?? 0;
@@ -263,11 +266,14 @@ export function likeness(a: Heard, b: Heard, moved = false): number {
     }));
   };
   type Moves = ReturnType<typeof moves>;
-  /** The best match of two phrases' notes, lined up bar against bar every way; `key` says where a note is. */
+  /**
+   * The best match of two phrases' notes, lined up bar against bar every way; `key` says where a
+   * note is, as a number no other place in the phrases has.
+   */
   const best = (
     these: Moves,
     those: Moves,
-    key: (bar: number, step: number) => string | number,
+    key: (bar: number, step: number) => number,
     shift = 0,
   ): number => {
     const placed = new Map(these.map((note) => [key(note.bar, note.step), note.move]));
@@ -291,7 +297,8 @@ export function likeness(a: Heard, b: Heard, moved = false): number {
   };
   const [one, two] = [moves(idea(asRun(a))), moves(idea(asRun(b)))];
   if (one.length === 0 || two.length === 0) return 0;
-  const inPlace = best(one, two, (bar, step) => `${bar}:${step}`);
+  // A step is inside its bar, so a bar and a step are one number: the bar in the high digits.
+  const inPlace = best(one, two, (bar, step) => bar * PLACES + step);
   if (!moved) return inPlace;
   // A pulse either side. Moved, a bar's notes may all fall in its later half, where a
   // pickup would be, so here the phrases are taken whole, pickups inside them and all;

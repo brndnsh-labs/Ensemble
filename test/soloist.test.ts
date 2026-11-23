@@ -27,7 +27,7 @@ import {
   timedNotes,
   toMidi,
 } from "@ensemble/engine";
-import { chordsUnder, harmonyOf, POCKET, strikesOf } from "./reading.ts";
+import { barAt, chordsUnder, harmonyOf, POCKET, strikesOf } from "./reading.ts";
 import {
   enough,
   FULL,
@@ -350,7 +350,7 @@ test("the soloist plays only where it has the lead (a pickup may lead in from ha
     const where = `${chart.file} seed ${options.seed}`;
     solo.forEach((note, i) => {
       notes++;
-      const bar = take.plan.bars.findLast((candidate) => candidate.start <= note.tick)!;
+      const bar = barAt(take.plan.bars, note.tick)!;
       const next = take.plan.bars[bar.index + 1];
       const leadsIn =
         next?.solo && bar.kind === "music" && (next.start - note.tick) * 2 <= bar.ticks;
@@ -1748,7 +1748,7 @@ test("a guitar hammers on and pulls off as one struck string: inside a phrase, a
     const hammers = hand.hammers !== false;
     const changes = (tick: number) =>
       harmony.some((arrival) => arrival.tick === tick && arrival.changed && arrival.chord);
-    const barOf = (tick: number) => bars.findLast((bar) => bar.start <= tick)!;
+    const barOf = (tick: number) => barAt(bars, tick)!;
     const gapBefore = (i: number) => notes[i]!.tick - (notes[i - 1]!.tick + notes[i - 1]!.duration);
     const starts = (i: number) => i === 0 || gapBefore(i) >= owed;
     // Surely after a breath, as heard: the breath itself, and the pocket's slack.
@@ -1955,7 +1955,7 @@ test("a horn moves a note's pitch as a player does, and seldom: the alto shakes 
           take.plan.open || gone <= take.plan.ticks,
           `${where}: a fall past the take's end`,
         );
-        const into = bars.findLast((other) => other.start <= gone)!;
+        const into = barAt(bars, gone)!;
         assert.equal(into.ending, null, `${where}: a fall into the band's last chord`);
         // What it is: off a phrase's long last note once it has sounded, the alto's drop.
         assert.ok(breathes, `${where}: a fall off a note inside a phrase`);
@@ -2012,7 +2012,7 @@ function meetings(take: Take): { strikes: number; under: number; onNote: number 
   const bars = take.plan.bars;
   let [strikes, under, onNote, at] = [0, 0, 0, 0];
   for (const strike of strikesOf(take)) {
-    const bar = bars.findLast((candidate) => candidate.start <= strike.tick);
+    const bar = barAt(bars, strike.tick);
     if (!bar?.solo) continue;
     strikes++;
     while (solo[at] && solo[at]!.tick + solo[at]!.duration <= strike.tick) at++;
@@ -2077,7 +2077,7 @@ test(
       const perBar = new Map<number, number>();
       const bars = take.plan.bars;
       for (const strike of strikesOf(take)) {
-        const bar = bars.findLast((candidate) => candidate.start <= strike.tick)!;
+        const bar = barAt(bars, strike.tick)!;
         perBar.set(bar.index, (perBar.get(bar.index) ?? 0) + 1);
       }
       for (const bar of bars) {
@@ -2123,7 +2123,7 @@ test("under a solo the piano leaves the soloist its note: a voice held on the so
     const strikes = strikesOf(take);
     const bars = take.plan.bars;
     strikes.forEach((strike, i) => {
-      const bar = bars.findLast((candidate) => candidate.start <= strike.tick);
+      const bar = barAt(bars, strike.tick);
       if (!bar?.solo || strike.pitches.length <= 2) return;
       // A comp that does not listen plays as if nobody were soloing, by design (a strummed
       // groove, CH-60, CH-68): its strokes are short, so it holds nothing under the line
@@ -2193,7 +2193,7 @@ test(
         // Struck in the eighth before a change, it may be the chord coming (X-B-07).
         const coming = harmony[at + 1];
         if (coming && coming.tick - note.tick <= PPQ / 2 && has(coming, note.pitch)) return;
-        const bar = take.plan.bars.findLast((candidate) => candidate.start <= note.tick)!;
+        const bar = barAt(take.plan.bars, note.tick)!;
         chromatic++;
         const where = `${chart.file} seed ${options.seed} bar ${bar.index}: ${note.pitch} over ${harmony[at]!.chord!.text}`;
         assert.ok(!onPulse(bar.meter, note.tick - bar.start), `${where}: on a beat`);

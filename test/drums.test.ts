@@ -17,7 +17,7 @@ import {
   TIER_MID,
   tierOf,
 } from "@ensemble/engine";
-import { POCKET } from "./reading.ts";
+import { barAt, POCKET } from "./reading.ts";
 import {
   enough,
   FULL,
@@ -361,7 +361,7 @@ test(
       for (const note of (["drums", "bass", "chords", "solo"] as const).flatMap((seat) =>
         notesOf(take, seat),
       )) {
-        const bar = take.plan.bars.findLast((candidate) => candidate.start <= note.tick)!;
+        const bar = barAt(take.plan.bars, note.tick)!;
         if (bar.kind !== "music" || (bar.meter.unit !== 4 && !isCompound(bar.meter))) continue;
         const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}: the ${note.seat} (${note.voice})`;
         const run = note.seat === "solo" && doubled.has(note.tick);
