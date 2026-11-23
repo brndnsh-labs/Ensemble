@@ -20,7 +20,7 @@ import {
   strongPulses,
   tierOf,
 } from "@ensemble/engine";
-import { barsOnChord, bluesWritten, harmonyOf } from "./reading.ts";
+import { barAt, barsOnChord, bluesWritten, harmonyOf } from "./reading.ts";
 import {
   COUNTRY_WALTZ,
   enough,
@@ -112,7 +112,7 @@ test("a bass note held for a half note or more is a tone of its chord", () => {
     for (const note of notesOf(take, "bass")) {
       // A half note as it sounds: a note with two beats to itself is let go a little early.
       if (note.duration < PPQ * 1.6) continue;
-      const bar = take.plan.bars.findLast((candidate) => candidate.start <= note.tick)!;
+      const bar = barAt(take.plan.bars, note.tick)!;
       const span = bar.spans.findLast((candidate) => bar.start + candidate.start <= note.tick);
       const chord = span?.chord;
       if (!chord) continue;
@@ -872,7 +872,7 @@ test(
           const before = bass[i - 1];
           // The note before is the one it follows: in this bar or the last. A bass that has
           // laid out for a section comes back on whatever the chord asks.
-          const from = before && take.plan.bars.findLast((b) => b.start <= before.tick);
+          const from = before && barAt(take.plan.bars, before.tick);
           if (!before || !from || from.index < bar.index - 1 || !walking(from)) continue;
           assert.notEqual(note.pitch, before.pitch, `${where}: ${note.pitch} twice running`);
           if (changes.get(note.tick) !== note.pitch % 12) continue;
@@ -1310,7 +1310,7 @@ test(
       }
       for (const kick of notesOf(take, "drums")) {
         if (kick.voice !== "kick") continue;
-        const bar = take.plan.bars.findLast((candidate) => candidate.start <= kick.tick)!;
+        const bar = barAt(take.plan.bars, kick.tick)!;
         if (bar.kind !== "music" || bar.seats.bass === null || bar.ending) continue;
         if (bar.spans.some((span) => span.chord === null)) continue;
         kicks++;
@@ -1321,7 +1321,7 @@ test(
         );
       }
       for (const note of bass) {
-        const bar = take.plan.bars.findLast((candidate) => candidate.start <= note.tick)!;
+        const bar = barAt(take.plan.bars, note.tick)!;
         const where = `${chart.file} ${JSON.stringify(options)} bar ${bar.index}`;
         const grid = isCompound(bar.meter) ? PPQ / 2 : PPQ / 4;
         assert.equal(

@@ -24,6 +24,7 @@ import {
   tierOf,
 } from "@ensemble/engine";
 import {
+  barAt,
   barsOnChord,
   bluesWritten,
   chordsUnder,
@@ -1140,7 +1141,7 @@ test("a guitar's chords can be held: every stroke is three notes or more and no 
       assert.ok(holdable(stroke.pitches, idiom), `${where}: no hand holds this`);
       // In a bar of four the book plays, short of the ending, every strum crosses the top strings.
       if (top === null) continue;
-      const bar = take.plan.bars.findLast((candidate) => candidate.start <= stroke.tick);
+      const bar = barAt(take.plan.bars, stroke.tick);
       if (!bar || bar.ending || bar.meter.beats !== 4 || bar.meter.unit !== 4) continue;
       topped++;
       const lowest = OPEN[OPEN.length - top]!;
@@ -1273,7 +1274,7 @@ test("the strumming hand is a pendulum: on the grid it strums, a stroke between 
     const harmony = harmonyOf(take);
     const byTick = Map.groupBy(notesOf(take, "chords"), (note) => note.tick);
     for (const [tick, notes] of byTick) {
-      const bar = take.plan.bars.findLast((candidate) => candidate.start <= tick)!;
+      const bar = barAt(take.plan.bars, tick)!;
       // A pulse of three eighths is down, down, up: the "and" is the pulse's last eighth
       // (ST-acoustic-04, DR-10), and the hand comes back up unheard between the first two.
       const dotted = eighths && isCompound(bar.meter);
@@ -1976,7 +1977,7 @@ test(
       ),
     ]) {
       for (const strike of strikesOf(take)) {
-        const bar = take.plan.bars.findLast((candidate) => candidate.start <= strike.tick)!;
+        const bar = barAt(take.plan.bars, strike.tick)!;
         if (bar.kind !== "music" || bar.ending || bar.seats.bass === null) continue;
         if (bar.meter.beats !== 4 || bar.meter.unit !== 4) outside++;
         assert.ok(

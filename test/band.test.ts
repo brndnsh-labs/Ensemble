@@ -31,7 +31,7 @@ import {
 } from "@ensemble/engine";
 import { styleIds } from "@ensemble/styles";
 import { corpus } from "./corpus.ts";
-import { bluesWritten, POCKET } from "./reading.ts";
+import { barAt, bluesWritten, POCKET } from "./reading.ts";
 import type { Jam, LibraryChart } from "./takes.ts";
 import {
   enough,
@@ -619,7 +619,7 @@ Outro    2 1 - - .
         const leads = section === 4 || section === 5;
         // A pickup into the solo is played in the later half of the bar before it.
         const own = played("solo", section).filter((note) => {
-          const bar = music.findLast((other) => other.start <= note.tick)!;
+          const bar = barAt(music, note.tick)!;
           const next = take.plan.bars[bar.index + 1];
           return !(next?.solo && (note.tick - bar.start) * 2 >= bar.ticks);
         });
@@ -925,7 +925,7 @@ test("neo-soul: in six and twelve the whole band is on the triplet's eighths, th
       ...(options.open ? [last.start + last.ticks] : []),
     ]);
     for (const note of notesOf(take)) {
-      const bar = take.plan.bars.findLast((candidate) => candidate.start <= note.tick)!;
+      const bar = barAt(take.plan.bars, note.tick)!;
       if (bar.kind !== "music" || !isCompound(bar.meter)) continue;
       seats.add(note.seat);
       const where = `${chart.file} ${JSON.stringify(options)}: the ${note.seat} (${note.voice ?? ""}) at ${note.tick}`;
@@ -968,7 +968,7 @@ test("disco: in six and twelve the whole band is on the triplet's eighths, the d
   const seats = new Set<string>();
   for (const { chart, options, take } of played) {
     for (const note of notesOf(take)) {
-      const bar = take.plan.bars.findLast((candidate) => candidate.start <= note.tick)!;
+      const bar = barAt(take.plan.bars, note.tick)!;
       if (bar.kind !== "music" || !isCompound(bar.meter)) continue;
       seats.add(note.seat);
       const where = `${chart.file} ${JSON.stringify(options)}: the ${note.seat} (${note.voice ?? ""}) at ${note.tick}`;
