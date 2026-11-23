@@ -67,11 +67,29 @@ const TOMS = ["highTom", "midTom", "lowTom"];
 /** The meters funk has written besides four. */
 const inSixOrTwelve = (meter: string) => meter === "6/8" || meter === "12/8";
 const funk = STYLES.find((style) => style.id === "funk");
+/**
+ * Funk's own chart in twelve held quiet, a short jam on each of twelve seeds: the quiet turn is
+ * the foot alone, and in twelve two of the section's kicks of five already strike where the
+ * first turn would, so a section meets it about one time in four (#2299).
+ */
+const QUIET_TWELVE_SEEDS = Array.from({ length: 12 }, (_, i) => i + 1);
+const quietTwelve = (): Jam[] => {
+  const chart = LIBRARY.find((one) => one.file === "funk-twelve-eight-gm.chart");
+  if (!funk || !chart) return [];
+  return QUIET_TWELVE_SEEDS.map((seed) =>
+    takeOf({ style: funk, chart, options: { mode: "jam", passes: 2, energy: 0.3, seed } }),
+  );
+};
+
 /** Funk where it plays its own parts, and funk in six and in twelve held at each of its levels. */
 const funkPlayed = (): Jam[] => [
   ...takes(itsOwn("funk")),
   ...(funk
-    ? [...heldTakes(funk, "6/8", false, true), ...heldTakes(funk, "12/8", false, true)]
+    ? [
+        ...heldTakes(funk, "6/8", false, true),
+        ...heldTakes(funk, "12/8", false, true),
+        ...quietTwelve(),
+      ]
     : []),
 ];
 
