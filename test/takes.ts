@@ -386,7 +386,10 @@ export const HOME_CHARTS: readonly LibraryChart[] = (
         inThreeHome(`${key}-${before}`, key, `| ${key} | ${key} | ${before} | ${key} |`),
       ),
   ])
-  .concat(threeInEveryKey());
+  .concat(threeInEveryKey())
+  // An ending written both ways (C's in three from the V, the IV and the bVII, and A minor's) is
+  // played once.
+  .filter((chart, at, all) => all.findIndex((other) => other.text === chart.text) === at);
 
 /** A four-bar ending in three, as a chart. */
 function inThreeHome(name: string, key: string, bars: string): LibraryChart {

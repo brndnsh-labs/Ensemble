@@ -130,3 +130,20 @@ export function barsOnChord(take: Take, seat: "bass" | "chords"): Map<number, nu
   }
   return result;
 }
+
+/**
+ * The last of a take's bars (in order) to start at or before a tick: what
+ * `bars.findLast((bar) => bar.start <= tick)` finds, found by halves.
+ */
+export function barAt<B extends { readonly start: number }>(
+  bars: readonly B[],
+  tick: number,
+): B | undefined {
+  let [low, high] = [0, bars.length];
+  while (low < high) {
+    const mid = (low + high) >> 1;
+    if (bars[mid]!.start <= tick) low = mid + 1;
+    else high = mid;
+  }
+  return bars[low - 1];
+}
