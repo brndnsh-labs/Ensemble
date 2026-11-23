@@ -18,7 +18,7 @@
     "inTarget": 1
   },
   "drums.fills-that-repeat": {
-    "mean": 0.0021,
+    "mean": 0.0025,
     "p10": 0,
     "p90": 0,
     "inTarget": 0.99
@@ -36,7 +36,7 @@
     "inTarget": 1
   },
   "drums.answer-bars": {
-    "mean": 0.9988,
+    "mean": 1,
     "p10": 1,
     "p90": 1,
     "inTarget": 1
@@ -72,7 +72,7 @@
     "inTarget": null
   },
   "bass.register": {
-    "mean": 37.4044,
+    "mean": 37.4046,
     "p10": 34.7184,
     "p90": 41.9099,
     "inTarget": 0.995
@@ -150,7 +150,7 @@
     "inTarget": 1
   },
   "bass.note-length": {
-    "mean": 1.4716,
+    "mean": 1.4715,
     "p10": 1.2029,
     "p90": 1.8106,
     "inTarget": 1
