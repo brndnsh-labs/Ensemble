@@ -214,7 +214,6 @@ At nine styles `pnpm check` read 213 of 220 and `pnpm test:full` 628 to 649 of 6
 
 Taken, each its own commit; the nine processes each alone, push and six seeds:
 
-- **The horn's own breath takes without the drums and the chords** ("a horn breathes" reads only the solo and the tempo). Its 144 takes on the six-seed run, every style, chart and seed, are the same with the two seats out in the solo's notes, its timed sounds, the MIDI file's Solo and tempo tracks and the plan but for who plays. 147.9 to 147.7, 427.4 to 425.2.
 - **A timed jam's lengths planned once a chart.** The same plans, compared as before; about 0.4 across the nine.
 - **An ending in three written twice in the home charts played once** (six of them, 219 charts to 213). The counts fall by exactly the duplicates and stay over their floors: walked home in three 644 to 620 on a push (floor 20) and 1932 to 1860 on six (60), stingers 460 to 436 (30) and 1358 to 1286 (90), final tonic chords 934 to 910 (800) and 2818 to 2746 (2400); the rest unchanged. Inside the noise, about 0.1 and 0.3.
 - **A note's bar found by halves** (`barAt` in `test/reading.ts`) in eighteen places in fifteen properties that scanned every bar for every note. 147.6 to 145.7, 425.2 to 416.4.
@@ -222,6 +221,7 @@ Taken, each its own commit; the nine processes each alone, push and six seeds:
 
 Tried and not taken:
 
+- **The horn's own breath takes without the drums and the chords** ("a horn breathes" reads only the solo and the tempo). Its 144 takes on the six-seed run were the same with the two seats out, but it saved 0.2 on a push and 2.2 on six seeds, inside the noise, and nothing holds that a solo is the same without its band (the guitar-hand takes below show it is not always). Built, then taken back: the property reads the band that plays.
 - **The guitar-hand takes without the drums and the chords** (`handedTakes`: bends, slides, hammer-ons; on six seeds the dearest thing in the suite, 61 CPU seconds): of 1554, 17 in reggae differ in the solo's notes with the two seats out. They keep the band.
 - **A take another test already rendered, shared** (a cache key that reads options in any order and a false flag as one left out, for the open jam made longer, the jam told to finish and the listening piano): the set of distinct takes was the same before and after by content hash (4611 on a push, 16388 on six) and 53 and 201 renders fewer, but it cost more than it saved, 98.9 against 100.3 and 100.7 for two styles on six seeds: a take kept for the rest of the process is paid for by the collector. For the same reason **a take's notes found once and kept** (`notesOf` cached) read 152.7 against 147.6 on a push. What a process holds costs CPU here as much as what it renders.
 
@@ -233,4 +233,4 @@ Left for Brandon, with their figures, for whoever next meets the budget (none wa
 - **`--single-threaded` for each process**: jazz alone 19.8 to 17.9 CPU seconds and 12.5 to 17.7 on the clock; the whole suite read 215 to 206, on a reading another suite overlapped.
 - **The six-seed run's memory.** Country's process peaks at 1.2 GB on six seeds, so the nine at once ask for more than this machine had free when its memory moved during these readings (swap full): two such runs read 706 and 739 at twice the clock time. It is the machine's to fix, or a cap's.
 
-Where it stands: read alone at the branch's tip, `pnpm check` 199.3, 202.7, 203.3, 206.0, 206.7, 208.0 and 209.4; `pnpm test:full` 596.4, 611.8, 616.0, 606.9, 618.3 and 620.8 (and the two under memory pressure). Run side by side with `main` at 9d01de1c, alternately, on the same machine at the same hour: `pnpm test` 220.0 and 220.1 on `main`, 206.2 and 207.8 here, so about 13 CPU seconds (6%) less on a push. That is short of the targets of 200 and 600: about 205 and 610.
+Where it stands: read alone, with the horn's takes still trimmed (0.2 and 2.2 less than the tip), `pnpm check` 199.3, 202.7, 203.3, 206.0, 206.7, 208.0 and 209.4; `pnpm test:full` 596.4, 611.8, 616.0, 606.9, 618.3 and 620.8 (and the two under memory pressure). Run side by side with `main` at 9d01de1c, alternately, on the same machine at the same hour: `pnpm test` 220.0 and 220.1 on `main`, 206.2 and 207.8 here, so about 13 CPU seconds (6%) less on a push. That is short of the targets of 200 and 600: about 205 and 610.
