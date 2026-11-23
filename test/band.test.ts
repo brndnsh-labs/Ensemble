@@ -101,9 +101,17 @@ test("a timed jam is a whole number of passes, the number that lands closest to 
     for (const chart of LIBRARY) {
       // The roadmap alone answers this: nobody needs to play it.
       const written = parse(chart.text).chart;
+      // A jam of so many passes is planned once for the chart, whichever time asks after it.
+      const lengths = new Map<number, number>();
+      const lengthWith = (passes: number): number => {
+        let seconds = lengths.get(passes);
+        if (seconds === undefined) {
+          seconds = musicSeconds(plan(written, style, { mode: "jam", passes }));
+          lengths.set(passes, seconds);
+        }
+        return seconds;
+      };
       for (const minutes of [0.2, 1, 3, 7]) {
-        const lengthWith = (passes: number) =>
-          musicSeconds(plan(written, style, { mode: "jam", passes }));
         const take = { plan: plan(written, style, { mode: "jam", minutes }) };
         const passes = take.plan.passes;
         assert.ok(Number.isInteger(passes) && passes >= 1, `${chart.file}: ${passes} passes`);
