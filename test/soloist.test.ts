@@ -1399,6 +1399,8 @@ test("a horn breathes: the alto never plays eight seconds without half a second 
     for (const [c, chart] of ownCharts(style).entries()) {
       // On a push, slow and medium by turns.
       for (const tempo of [66, 120].filter((_, t) => FULL || (c + t) % 2 === 0)) {
+        // The horn plays the same note for note with the drums and the chords left out (every
+        // style, chart, tempo and seed here: checked for #2306), and the take costs a third less.
         const take = render(chart.text, style, {
           mode: "jam",
           passes: 4,
@@ -1406,6 +1408,7 @@ test("a horn breathes: the alto never plays eight seconds without half a second 
           solo: true,
           tempo,
           soloInstrument: "alto-sax",
+          without: ["drums", "chords"],
         });
         horn(take, take.plan.quarters, `${chart.file} at ${tempo}`);
       }
@@ -1426,6 +1429,7 @@ test("a horn breathes: the alto never plays eight seconds without half a second 
       solo: true,
       tempo: 50,
       soloInstrument: "alto-sax",
+      without: ["drums", "chords"],
     });
     horn(take, 50, `${chart.file} at 50, seed ${seed}`);
   }
