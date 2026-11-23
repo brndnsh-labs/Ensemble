@@ -185,3 +185,19 @@ Asked whether "everything sounds (and looks) good on the test server" had taken 
 - **Country is passed by ear, by a listener who says it is not a genre he plays.** The case is recorded with that said, so it weighs as a pass from outside the idiom and not as a player's.
 - **The one question put to his ear**, after the walk-up in G and E, is the root an octave over the lowest one the right place to end: he heard both endings on the page, and it was not answered apart from the verdict. The exception it needs in "the last bass note of a jam that ends is the lowest root" changes an existing property, so the pull request waited for his word on that: "yes, you can merge it" (2026-11-22).
 - What the reviews left for his ear and the page named (the hot walk down through the seventh under the guitar's upstroke, the three-note C6 chick, six strikes a bar from the guitar under a hot solo, the lead's first chorus against its last) was not spoken to: it keeps what is built.
+
+## his ear on the meter choice, country's waltz and chick, and the drums' answer bars (2026-11-22, #2298, #2300, #2302, #2299, #2308)
+
+"done listening, you can bring that down", and, asked which of the five pages passed: "all pass, was just trying to be brief :)". One verdict for five listening pages, each rendered from the branch that merged:
+
+- **`out/meter-choice/`** (#2298, merged as 95f1e273): the Meter row in More at phone size, light and dark, on a chart that fits all five meters and on one that fits two; `blues-12-bar-a` and `jazz-two-five-one-c` as blues and as jazz in each meter they fit, two passes on seed 1, with the tempo played, the bars and how the two-chord bars split beside each.
+- **`out/country-waltz/`** (#2300, merged as c30c353c): country in three, before and after: the bass alone, the band, the band with the bass off, and twelve for the chick.
+- **`out/country-chick/`** (#2302, merged as 7740aa52): a bar of C with the bass and without, a chorus of `country-sixteen-c`, the waltz's IV and an ending in C, before and after.
+- **`out/funk-quiet-turn/`** (#2299, merged as b81832dd): funk's own chart in twelve held at 0.3 on seed 4, drums alone and the band, before and after; and country's eighths train at 0.85 on seed 13, drums alone, before and after.
+- **`out/fitted-turn/`** (#2308, merged as 525bb770): funk, rock and country, each a 4/4 chart of its own in 3/4, drums alone and the band, before and after.
+
+What follows from it:
+
+- **All five are passed by ear and their issues closed.** Country's and funk's scorecard baselines were re-accepted as that band (#2311) before this was written, so the scorecards as they stood before this record are the ones he heard.
+- **The one question put to his ear by name**, whether country's hot answer over the eighths train should be the soft kick on the "and" of 3 or the snare on the "and" of 4 struck louder (styles.md, #2299): answered only by the pass, with the pair on the page. The rule stays as built.
+- **Not spoken to, and kept as built:** the two fitted sections with no turn that survives (rock in three when quiet, acoustic in three at the working level), reggae and acoustic fitted to three (noted on #2244), and whether a country waltz chart goes in the library, which is still his to say.
