@@ -7,9 +7,13 @@ import { test } from "node:test";
 import type { PlanBar, Take } from "@ensemble/engine";
 import {
   burstPhrases,
+  cells,
+  GHOST_BELOW,
   isCompound,
+  LEVELS,
   PPQ,
   parse,
+  parseMeter,
   plan,
   pulseStarts,
   STEP,
@@ -848,6 +852,109 @@ test("a button ending is the whole band's: where the bass plays the short last h
     );
   }
   assert.ok(played > enough(20), `only ${played} buttons`);
+});
+
+// ── a fitted meter ──────────────────────────────────────────────────────────
+
+/** A take in a meter its style's drummer has no part written for: the bar is fitted from 4/4's. */
+const fitted = (jam: Pick<Jam, "style" | "chart">) =>
+  jam.chart.meter !== "4/4" && jam.style.drums.meters?.[jam.chart.meter as "6/8"] === undefined;
+
+/**
+ * Where a sixteenth of the 4/4 bar is played in a fitted bar (DR-10): beat 1 on the One, beat 2
+ * on the backbeat pulses (every second one), beat 3 on the strong pulses between them, beat 4
+ * on the last. A pulse of a quarter keeps the whole beat; a dotted pulse keeps the beat's
+ * downbeat and its "and", which goes to the pulse's last eighth; a beat no pulse plays is gone.
+ */
+function fittedSteps(bar: PlanBar, step: number): number[] {
+  const starts = pulseStarts(bar.meter).map((tick) => tick / STEP);
+  const beat = Math.floor(step / 4);
+  const sixteenth = step % 4;
+  return starts.flatMap((start, i) => {
+    const role = i === 0 ? 0 : i === starts.length - 1 ? 3 : i % 2 === 1 ? 1 : 2;
+    if (role !== beat) return [];
+    const pulse = (starts[i + 1] ?? bar.ticks / STEP) - start;
+    if (pulse === 4) return [start + sixteenth];
+    if (sixteenth === 0) return [start];
+    if (sixteenth === 2 && pulse > 4) return [start + pulse - 2];
+    return [];
+  });
+}
+
+/** Funk's own two-chord vamp in three, held quiet: on seed 2 the turn first drawn is on beat 3, which three has no pulse for (#2308). */
+const funkInThree = (): Jam[] => {
+  const chart = LIBRARY.find((one) => one.file === "funk-two-chord-dm.chart");
+  const meter = parseMeter("3/4");
+  if (!funk || !chart || !meter) return [];
+  return [
+    takeOf({
+      style: funk,
+      chart: { ...chart, meter: "3/4" },
+      options: { mode: "jam", passes: 2, energy: 0.3, seed: 2, meter },
+    }),
+  ];
+};
+
+const turning = STYLES.filter((style) =>
+  (["low", "mid", "high"] as const).some((tier) =>
+    style.drums.grooves[tier].some((layer) => layer.audible),
+  ),
+);
+
+test("in a meter a style has no drum part for, the bar is fitted from four's and the turn is one the fit keeps: where one of the section's turns can be heard in the bar as fitted, an answer bar's back half is not the bar before's again (DR-05, DR-06, DR-95)", {
+  skip: turning.length === 0,
+}, () => {
+  let answers = 0;
+  const played = [...takes((jam) => !jam.options.open && fitted(jam)), ...funkInThree()];
+  for (const { style, chart, options, take } of played) {
+    const bars = kitBars(take);
+    for (const [i, { bar, kit, energy }] of bars.entries()) {
+      const before = bars[i - 1];
+      if (bar.fill || bar.ending || !before || before.bar.fill) continue;
+      if (before.bar.index !== bar.index - 1 || tierOf(before.energy) !== tierOf(energy)) continue;
+      const half = bar.ticks / STEP / 2;
+      // The section's turns that may play here: an answer bar's, for a hand on the piece it names.
+      const turns = style.drums.grooves[tierOf(energy)].filter(
+        (layer) =>
+          layer.audible &&
+          layer.when?.phraseBars?.includes(bar.phrase.bar + 1) &&
+          (!layer.when.playing || before.kit.has(layer.when.playing)),
+      );
+      // One that can be heard: a stroke, as fitted, in the back half where the bar before has
+      // none on that piece (a ghost is its own sound), or a stroke taken where it has one.
+      const heard = turns.some((layer) =>
+        layer.options.some(
+          (option) =>
+            option.weight > 0 &&
+            Object.entries(option.lines).some(([voice, line]) =>
+              cells(line ?? "").some((symbol, step) =>
+                fittedSteps(bar, step).some((at) => {
+                  if (at < half) return false;
+                  if (symbol === "-") return strikes(before.kit, voice, at);
+                  if (!(symbol in LEVELS)) return false;
+                  const level = LEVELS[symbol as keyof typeof LEVELS];
+                  const sound = voice === "snare" && level < GHOST_BELOW ? "ghostSnare" : voice;
+                  return !strikes(before.kit, sound, at);
+                }),
+              ),
+            ),
+        ),
+      );
+      if (!heard) continue;
+      answers++;
+      const backHalf = (of: Kit) =>
+        [...of]
+          .map(([voice, steps]) => `${voice}:${[...steps].filter((s) => s >= half).sort()}`)
+          .sort()
+          .join(" ");
+      assert.notEqual(
+        backHalf(kit),
+        backHalf(before.kit),
+        `${style.id} ${chart.file} in ${chart.meter} ${JSON.stringify(options)} bar ${bar.index}: the bar before, again`,
+      );
+    }
+  }
+  assert.ok(answers > enough(30) * turning.length, `only ${answers} answer bars`);
 });
 
 // ── acoustic ────────────────────────────────────────────────────────────────
