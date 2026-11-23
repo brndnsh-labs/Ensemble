@@ -9,7 +9,7 @@ import type { PlayerContext } from "../../perform/notes.ts";
 import { heldRng } from "../../perform/notes.ts";
 import type { Plan, PlanBar } from "../../plan/types.ts";
 import { tierOf } from "../../style/types.ts";
-import { type DrumVoice, GHOST_BELOW } from "./kit.ts";
+import { type DrumVoice, GHOST_BELOW, voiceName } from "./kit.ts";
 import type { DrumStyle, DrumTime, GrooveOption, Lines, When } from "./style.ts";
 
 /** One bar of the kit: for each piece, its written level at every sixteenth (0 is a rest). */
@@ -87,7 +87,13 @@ export function overlay(part: BarPart, lines: Lines, from: number, steps: number
   }
 }
 
-/** Whether laying these lines over the bar would change a stroke of it. */
+/**
+ * Whether laying these lines over the bar would change what it strikes: a stroke
+ * where the piece is silent, a stroke taken away, or a snare crossing into or out
+ * of a ghost (a different sound, DR-02). A stroke written where the piece already
+ * sounds is the stroke that is there, louder or softer, and changes nothing (DR-06:
+ * "the kick is already there").
+ */
 function changes(part: BarPart, lines: Lines): boolean {
   return (Object.entries(lines) as [DrumVoice, string][]).some(([voice, text]) => {
     const line = part[voice];
@@ -95,7 +101,8 @@ function changes(part: BarPart, lines: Lines): boolean {
     return cells(text).some((symbol, i) => {
       const now = line?.[i] ?? 0;
       if (symbol === TAKEN) return now > 0;
-      return written[i]! > 0 && written[i] !== now;
+      const level = written[i]!;
+      return level > 0 && (now === 0 || voiceName(voice, level) !== voiceName(voice, now));
     });
   });
 }
