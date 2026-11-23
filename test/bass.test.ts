@@ -21,11 +21,11 @@ import {
   tierOf,
 } from "@ensemble/engine";
 import { barsOnChord, bluesWritten, harmonyOf } from "./reading.ts";
-import type { LibraryChart } from "./takes.ts";
 import {
   COUNTRY_WALTZ,
   enough,
   heldTakes,
+  homeTakes,
   LIBRARY,
   notesOf,
   only,
@@ -164,94 +164,6 @@ const inFour = (bar: PlanBar) => bar.meter.beats === 4 && bar.meter.unit === 4;
 /** A bar of three quarters: a waltz's. */
 const inThree = (bar: PlanBar) => bar.meter.beats === 3 && bar.meter.unit === 4;
 
-/**
- * Charts the library does not have, written to end every way a walk home can meet: from each
- * degree of a major and a minor key, from a chord struck on beat 3, and into a landing whose
- * low root has no fifth under it (E) and one whose does (C), and from a chord on beat 3 whose
- * root the line has under a landing that has no octave below it (D).
- */
-const HOME_CHARTS: readonly LibraryChart[] = (
-  [
-    [
-      "C",
-      [
-        "C",
-        "F",
-        "G",
-        "G7",
-        "Am",
-        "Bb",
-        "Ab",
-        "Dm",
-        "Em",
-        "D7",
-        "C7",
-        "F G",
-        "Dm G",
-        "Am Bb",
-        "G F",
-      ],
-    ],
-    ["Am", ["Am", "Dm", "E7", "F", "G", "F E7", "Dm G"]],
-    ["E", ["E", "A", "B7", "C#m", "D", "A B7"]],
-    ["G", ["G", "C", "D7", "Em", "F"]],
-    ["D", ["D Em", "G Em"]],
-  ] as const
-)
-  .flatMap(([key, befores]) => [
-    ...befores.map((before) => ({
-      file: `home-${key}-${before.replace(" ", "-")}`,
-      text: `title: Home\nkey: ${key}\ntempo: 100\n\n[A]\n| ${key} | ${key} | ${before} | ${key} |\n`,
-      meter: "4/4",
-    })),
-    // The same endings in three, from every degree of C and of A minor, each from a bar of one
-    // chord.
-    ...(key === "C" || key === "Am" ? befores : [])
-      .filter((before) => !before.includes(" "))
-      .map((before) =>
-        inThreeHome(`${key}-${before}`, key, `| ${key} | ${key} | ${before} | ${key} |`),
-      ),
-  ])
-  .concat(threeInEveryKey());
-
-/** A four-bar ending in three, as a chart. */
-function inThreeHome(name: string, key: string, bars: string): LibraryChart {
-  return {
-    file: `home-${name}-in-three`,
-    text: `title: Home\nkey: ${key}\nmeter: 3/4\ntempo: 100\n\n[A]\n${bars}\n`,
-    meter: "3/4",
-  };
-}
-
-/**
- * Every way into the end in three, in all twelve major and twelve minor keys: from the V, the
- * IV and the bVII struck in the bar before, from the tonic held into that bar (the waltz's
- * fifth), from the V and the IV carried into it, and from a bar of two chords, the second on
- * beat 3. Which octave each lands in, and whether the walk's top fits, is the instrument's
- * range: the keys at its edges are where a walk has no room.
- */
-function threeInEveryKey(): LibraryChart[] {
-  const names = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
-  const at = (pc: number) => names[((pc % 12) + 12) % 12]!;
-  return names.flatMap((_, t) =>
-    [false, true].flatMap((minor) => {
-      const I = at(t) + (minor ? "m" : "");
-      const V = `${at(t + 7)}7`;
-      const IV = at(t + 5) + (minor ? "m" : "");
-      const bVII = at(t + 10);
-      return [
-        inThreeHome(`${I}-V`, I, `| ${I} | ${I} | ${V} | ${I} |`),
-        inThreeHome(`${I}-IV`, I, `| ${I} | ${I} | ${IV} | ${I} |`),
-        inThreeHome(`${I}-bVII`, I, `| ${I} | ${I} | ${bVII} | ${I} |`),
-        inThreeHome(`${I}-held`, I, `| ${V} | ${I} | ${I} | ${I} |`),
-        inThreeHome(`${I}-V-carried`, I, `| ${I} | ${V} | ${V} | ${I} |`),
-        inThreeHome(`${I}-IV-carried`, I, `| ${I} | ${IV} | ${IV} | ${I} |`),
-        inThreeHome(`${I}-two`, I, `| ${I} | ${I} | ${IV} . ${V} | ${I} |`),
-      ];
-    }),
-  );
-}
-
 test("in a style whose bass walks home, every ending that is one chord struck on its downbeat, in four after a bar of four of one chord (or two, the second on beat 3), is walked into: a note on beat 4 a step from the final root (none after a V struck on beat 3); a bar of one chord whose root is outside the run climbs on 2, 3 and 4 from the fifth under the root by steps, onto it from the root on 1 by an octave at most, (over the V the fifth is held from 1; from the IV the line comes down from the fourth over it), unless no octave holds that climb or it would leave the chord's scale; the walk on the instrument and in the bass's register, moving by a fourth at most (a V on beat 3 drops a fifth onto it, any other chord on 3 no more than an octave), and the final root in the lowest octave where all that holds; and the final root played at least as hard as the note it is walked in on. In three, after a bar of three of one chord, the same with the run's last two notes: on 1 the chord's root over the V or the IV (5-6-7 from the V; from the IV it always comes down, root, 3rd, 2nd), and over any other chord the line's own note (the root, or a waltz's fifth on a chord carried into the bar); then a note on 3 a step from the final root (never a seventh under it); a bar whose root is outside the run climbs the 6th and 7th on 2 and 3, every move from the note on 1 a fourth at most, into the octave whose 5th is on the instrument, unless no octave holds that climb or it would leave the chord's scale. A bar of three with a chord on 3 is not walked, and nothing of it rings past its three beats", {
   skip: !STYLES.some((style) => style.bass.walks?.ending !== undefined),
 }, () => {
@@ -259,15 +171,7 @@ test("in a style whose bass walks home, every ending that is one chord struck on
   let walkedInThree = 0;
   let splitInThree = 0;
   const homeward = (style: StylePack) => style.bass.walks?.ending !== undefined;
-  const own = STYLES.filter(homeward).flatMap((style) =>
-    HOME_CHARTS.flatMap((chart) =>
-      [0.3, 0.85].flatMap((energy) =>
-        SEEDS.map((seed) =>
-          takeOf({ style, chart, options: { mode: "jam", passes: 1, energy, seed } }),
-        ),
-      ),
-    ),
-  );
+  const own = STYLES.filter(homeward).flatMap(homeTakes);
   // The country waltz as the waltz bass's property plays it: in by the V7 in three.
   const waltz = STYLES.filter(homeward).flatMap((style) =>
     [0.3, 0.85].flatMap((energy) =>

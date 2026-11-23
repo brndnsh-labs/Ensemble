@@ -39,6 +39,7 @@ import {
   enough,
   FULL,
   heldTakes,
+  homeTakes,
   LIBRARY,
   notesOf,
   only,
@@ -1859,7 +1860,12 @@ test("in a style whose guitar pulls off its final chord, the stinger is played o
   skip: !STYLES.some((style) => style.chords.ending.pullOff),
 }, () => {
   let stung = 0;
-  for (const { style, chart, options, take } of [...takes(), ...stressTakes()]) {
+  // The short endings in every key the walk-home property plays, the same takes: the library's
+  // endings lean on C, whose open shape has no stinger (EN-49).
+  const endings = STYLES.filter(
+    (style) => style.chords.ending.pullOff && style.chords.idiom !== "keys",
+  ).flatMap(homeTakes);
+  for (const { style, chart, options, take } of [...takes(), ...stressTakes(), ...endings]) {
     const slurs = notesOf(take, "chords").filter((note) => note.slur);
     const where = `${chart.file} seed ${options.seed} ${JSON.stringify(options)}`;
     const pullOff = style.chords.ending.pullOff;
@@ -1980,6 +1986,191 @@ test(
       }
     }
     assert.ok(outside > enough(600), `only ${outside} strokes outside 4/4`);
+  },
+);
+
+/**
+ * The open shapes country's guitar holds, as a player writes them (CH-24, the style's own
+ * notes), by key: a plain major on the I or the IV with its 6th, on the V a triad. A6 is left
+ * out: the hand takes x04220, a four-note shape with the root, where x02222 would do as well.
+ * The sevenths and thirteenths whose open shape drops or adds a fifth (C7 x32310, A13 x02022)
+ * are #2304's.
+ */
+const COUNTRY_SHAPES: readonly (readonly [
+  key: string,
+  shapes: Readonly<Record<string, string>>,
+])[] = [
+  [
+    "C",
+    {
+      C: "x32210",
+      // After C, as it resolves: led down from G's G4, the hand takes x33013 (F3 G3 C4 G4).
+      Csus4: "x33011",
+      F: "1x0211",
+      G: "3x0003",
+      Am: "x02210",
+      Dm: "xx0231",
+      Em: "022000",
+    },
+  ],
+  [
+    "G",
+    {
+      G: "3x0000",
+      C: "x32210",
+      D: "xx0232",
+      G7: "3x0001",
+      D7: "xx0212",
+      Gsus4: "3x0013",
+      G13: "3x3000",
+    },
+  ],
+  [
+    "D",
+    {
+      D: "xx0202",
+      A: "x02220",
+      D7: "xx0212",
+      Bm: "x24432",
+      Dsus4: "xx0233",
+      A7: "x02020",
+      Dm7: "xx0211",
+    },
+  ],
+  [
+    "A",
+    {
+      D: "xx0202",
+      E: "022100",
+      E7: "022130",
+      B7: "x21202",
+      Asus4: "x02230",
+      Am7: "x02010",
+    },
+  ],
+  ["E", { E: "022120", B7: "x21202", Esus4: "022200", Em7: "022030", B13: "x21204" }],
+];
+
+test(
+  "country: with a bassist the chick sounds the top four strings of the open shape a player holds (CH-24, ST-country-07): C6 is x32210, E3 A3 C4 E4, four notes with the root among them, not three with the B string silent",
+  only("country"),
+  () => {
+    const country = STYLES.find((style) => style.id === "country")!;
+    const wrong: string[] = [];
+    let checked = 0;
+    for (const [key, shapes] of COUNTRY_SHAPES) {
+      const symbols = Object.keys(shapes);
+      // Each chord for a bar, then home: the last bar is the ending, which is not a chick.
+      const text = `title: Open shapes in ${key}\nkey: ${key}\nstyle: country\n\n[A]\n${symbols.map((symbol) => `| ${symbol} `).join("")}| ${key} | ${key} |\n`;
+      const chart: LibraryChart = { file: `open-shapes-${key}`, text, meter: "4/4" };
+      const { take } = takeOf({
+        style: country,
+        chart,
+        options: { mode: "jam", passes: 1, energy: 0.5, seed: 1 },
+      });
+      for (const [i, symbol] of symbols.entries()) {
+        const shape = shapes[symbol]!;
+        // The shape's top four strings, the D string up, as a player frets them.
+        const expected = [...shape]
+          .map((fret, string) => (fret === "x" ? null : OPEN[string]! + Number(fret)))
+          .slice(2)
+          .filter((pitch): pitch is number => pitch !== null);
+        const bar = take.plan.bars.filter((candidate) => candidate.kind === "music")[i];
+        if (!bar || bar.seats.bass === null) continue;
+        const struck = strikesOf(take).filter(
+          (strike) =>
+            strike.tick >= bar.start &&
+            strike.tick < bar.start + bar.ticks &&
+            (strike.tick - bar.start) % PPQ === 0,
+        );
+        for (const strike of struck) {
+          checked++;
+          if (strike.pitches.join(" ") !== expected.join(" ")) {
+            wrong.push(`${symbol} in ${key} (${shape}): ${strike.pitches} where ${expected}`);
+          }
+        }
+      }
+    }
+    assert.deepEqual([...new Set(wrong)], []);
+    assert.ok(checked > 60, `only ${checked} chicks`);
+  },
+);
+
+test(
+  "country: with no bassist the boom on a plain major on the I or the IV is on the low E or the A string, in Gb and in Db too: the pick carries the root, and the chord's fifth is the shape's, not the bassist's to leave (CH-24: a fifth is dropped only over a bassist; ST-country-07)",
+  only("country"),
+  () => {
+    const country = STYLES.find((style) => style.id === "country")!;
+    let booms = 0;
+    for (const [key, chords] of [
+      ["Gb", "| Gb | Gb | Db7 | Db7 | Gb | Cb | Gb | Gb |"],
+      ["Db", "| Db | Db | Gb | Gb | Ab7 | Ab7 | Db | Db |"],
+    ] as const) {
+      const chart: LibraryChart = {
+        file: `boom-${key}`,
+        text: `title: Boom in ${key}\nkey: ${key}\nstyle: country\n\n[A]\n${chords}\n`,
+        meter: "4/4",
+      };
+      for (const energy of [0.3, 0.6]) {
+        const { take } = takeOf({
+          style: country,
+          chart,
+          options: { mode: "jam", passes: 1, energy, seed: 1, without: ["bass"] },
+        });
+        const tonic = pitchClass(take.plan.bars[0]!.key.tonic);
+        for (const bar of take.plan.bars) {
+          if (bar.kind !== "music" || bar.ending) continue;
+          const chord = harmonyOf(take).findLast((arrival) => arrival.tick <= bar.start)?.chord;
+          if (chord?.quality.base !== "" || chord.quality.alterations.length > 0) continue;
+          const degree = (pitchClass(chord.root) - tonic + 12) % 12;
+          if (degree !== 0 && degree !== 5) continue;
+          const boom = pluckedOf(take).find((strike) => strike.tick === bar.start);
+          if (!boom) continue;
+          booms++;
+          assert.ok(
+            boom.pitches[0]! < OPEN[2]!,
+            `boom in ${key} at ${energy}, bar ${bar.index}: ${boom.pitches} is not on the low E or the A string`,
+          );
+        }
+      }
+    }
+    assert.ok(booms >= 12, `only ${booms} booms`);
+  },
+);
+
+test(
+  "country: the final tonic chord of an ending leaves nothing out: a triad or a sixth chord sounds its fifth, struck with it or as the stinger's landing, in every key (EN-49; a chick may leave the open shape's fifth to the bass, a chord that rings as the end may not)",
+  only("country"),
+  () => {
+    const country = STYLES.find((style) => style.id === "country")!;
+    let finals = 0;
+    for (const { chart, options, take } of [
+      ...takes((jam) => jam.style === country),
+      ...homeTakes(country),
+    ]) {
+      const last = take.plan.bars.findLast((bar) => bar.kind === "music");
+      if (!last?.ending || last.seats.chords === null) continue;
+      const landing = last.start + last.ending.at;
+      const final = harmonyOf(take).findLast((arrival) => arrival.tick <= landing)?.chord;
+      if (!final || pitchClass(final.root) !== pitchClass(last.key.tonic)) continue;
+      // A triad or a sixth chord, whose every voicing holds its fifth: a seventh's may give
+      // its seat to a tension.
+      const tones = chordTones(final.quality);
+      const plain = tones.every((tone) =>
+        ["root", "third", "sus", "fifth", "sixth"].includes(tone.role),
+      );
+      if (!plain || !tones.some((tone) => tone.role === "fifth" && tone.interval === 7)) continue;
+      const sounded = notesOf(take, "chords").filter(
+        (note) => note.tick === landing || (note.slur && note.tick === landing + PPQ / 2),
+      );
+      if (sounded.length === 0) continue;
+      finals++;
+      assert.ok(
+        sounded.some((note) => (note.pitch - pitchClass(final.root) + 120) % 12 === 7),
+        `${chart.file} seed ${options.seed} ${JSON.stringify(options)}: the final ${sounded.map((note) => note.pitch)} has no fifth`,
+      );
+    }
+    assert.ok(finals > enough(2400), `only ${finals} final chords`);
   },
 );
 

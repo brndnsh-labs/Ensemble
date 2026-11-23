@@ -15,6 +15,8 @@ export interface FittedTone {
   readonly tone: Exclude<VoiceTone, "T">;
   /** Semitones above the root, 0 to 11. */
   readonly interval: number;
+  /** The hand may sound it or leave it out (`Recipe.free`). */
+  readonly free?: true;
 }
 
 /** A written tension, by the interval the chart's symbol gives it (above the root, past the octave). */
@@ -199,6 +201,12 @@ export function fitRecipe(recipe: Recipe, chord: Chord, scale: ChordScale): Fitt
     const spare = expendable(result, chord);
     if (spare < 0) result.push(need);
     else result[spare] = need;
+  }
+  // Free tones last: what the hand may add or leave, never in place of a voice.
+  for (const tone of recipe.free ?? []) {
+    const interval = toneOf(tone, chord, scale);
+    if (interval === null || result.some((t) => t.interval === interval)) continue;
+    result.push({ tone, interval, free: true });
   }
   return result;
 }

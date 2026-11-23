@@ -43,7 +43,14 @@ export function chordStrikes(context: PlayerContext, pick?: Pick): VoicedStrike[
     ...compStrikes(context, harmony, pick ?? byCritic(style.critic.weights.comping ?? {})),
     ...plainStrikes(plan, harmony, chords, (bar) => comps(bar, chords)),
     ...plan.bars.flatMap((bar) => endingStrikes(bar, harmony, chords)),
-  ].sort((a, b) => a.tick - b.tick);
+  ]
+    // With no bassist the chord is voiced whole: a free tone is free only over a bass (CH-24).
+    .map((strike) =>
+      plan.bars[strike.bar]?.seats.bass === null && !strike.whole
+        ? { ...strike, whole: true as const }
+        : strike,
+    )
+    .sort((a, b) => a.tick - b.tick);
 
   // 2. Voicing. Where the seat listens, each strike hears what the soloist plays over it.
   // When the solo is over the hand is led on from where the line left it, and the pull
