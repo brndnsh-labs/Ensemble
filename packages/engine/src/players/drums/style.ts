@@ -95,7 +95,9 @@ export interface GrooveLayer {
    * in the bar (the hat already opens there), the next option in the list that
    * would is played instead. The draw is not made again. A stroke written where
    * the piece already strikes, at another level, changes nothing; one that turns
-   * a snare into a ghost or a ghost into a snare does (DR-02).
+   * a snare into a ghost or a ghost into a snare does (DR-02). It is heard in the
+   * bar as played: in a meter fitted from 4/4, after the fit, which can drop the
+   * stroke a turn adds; where no option would be heard, the layer plays nothing.
    */
   readonly audible?: boolean;
   readonly options: readonly GrooveOption[];

@@ -10,7 +10,7 @@ import { heldRng } from "../../perform/notes.ts";
 import type { Plan, PlanBar } from "../../plan/types.ts";
 import { tierOf } from "../../style/types.ts";
 import { type DrumVoice, GHOST_BELOW, voiceName } from "./kit.ts";
-import type { DrumStyle, DrumTime, GrooveOption, Lines, When } from "./style.ts";
+import type { DrumStyle, DrumTime, GrooveLayer, GrooveOption, Lines, When } from "./style.ts";
 
 /** One bar of the kit: for each piece, its written level at every sixteenth (0 is a rest). */
 export type BarPart = Partial<Record<DrumVoice, number[]>>;
@@ -88,23 +88,58 @@ export function overlay(part: BarPart, lines: Lines, from: number, steps: number
 }
 
 /**
- * Whether laying these lines over the bar would change what it strikes: a stroke
- * where the piece is silent, a stroke taken away, or a snare crossing into or out
- * of a ghost (a different sound, DR-02). A stroke written where the piece already
- * sounds is the stroke that is there, louder or softer, and changes nothing (DR-06:
- * "the kick is already there").
+ * What a bar strikes, as it is heard: each piece at each step it sounds, a snare under the
+ * ghost line a different sound (DR-02). A stroke louder or softer is the same stroke.
  */
-function changes(part: BarPart, lines: Lines): boolean {
-  return (Object.entries(lines) as [DrumVoice, string][]).some(([voice, text]) => {
-    const line = part[voice];
-    const written = levels(text);
-    return cells(text).some((symbol, i) => {
-      const now = line?.[i] ?? 0;
-      if (symbol === TAKEN) return now > 0;
-      const level = written[i]!;
-      return level > 0 && (now === 0 || voiceName(voice, level) !== voiceName(voice, now));
+function struck(part: BarPart): string {
+  const strokes: string[] = [];
+  for (const [voice, line] of Object.entries(part) as [DrumVoice, number[]][]) {
+    line.forEach((level, step) => {
+      if (level > 0) strokes.push(`${voiceName(voice, level)}@${step}`);
     });
-  });
+  }
+  return strokes.sort().join(" ");
+}
+
+/**
+ * Which of a turn's options would be heard over a bar laid this far: asked again in every
+ * answer bar of a section, which lays the same bar, so answered once. The answer reads only
+ * the part the layer is in (its touches), the bar's meter, and what has been laid, and those
+ * are its key.
+ */
+const HEARD = new WeakMap<DrumTime, WeakMap<GrooveLayer, Map<string, readonly boolean[]>>>();
+
+function heardIn(
+  time: DrumTime,
+  layer: GrooveLayer,
+  meter: Meter,
+  part: BarPart,
+  answer: () => readonly boolean[],
+): readonly boolean[] {
+  let layers = HEARD.get(time);
+  if (!layers) {
+    layers = new WeakMap();
+    HEARD.set(time, layers);
+  }
+  let known = layers.get(layer);
+  if (!known) {
+    known = new Map();
+    layers.set(layer, known);
+  }
+  let key = meterName(meter);
+  for (const [voice, line] of Object.entries(part)) key += `|${voice}:${line.join(",")}`;
+  let heard = known.get(key);
+  if (!heard) {
+    heard = answer();
+    known.set(key, heard);
+  }
+  return heard;
+}
+
+function copyOf(part: BarPart): BarPart {
+  return Object.fromEntries(
+    Object.entries(part).map(([voice, line]) => [voice, [...line]]),
+  ) as BarPart;
 }
 
 /** A bar's pulses, each a length in sixteenths. */
@@ -131,28 +166,48 @@ export function grooveBar(
   const time = written ?? drums;
   const steps = written ? barSteps(bar.meter) : GROOVE_STEPS;
   const dotted = pulses(bar.meter).some((pulse) => pulse > BEAT);
+  const laid = (lines: Lines) => (written || !dotted ? lines : onThePulse(lines));
+  /** The bar as it will be played: one hand to the hat, the touches, and the fit to its meter. */
+  const played = (groove: BarPart) => finish(groove, time, bar, written !== undefined);
   for (const layer of time.grooves[tierOf(energy)]) {
     if (!applies(layer.when, bar, energy, reading, part)) continue;
     // One draw per decision per span: the section's kick is the same kick every bar (X-A-29).
     const options = layer.options.filter((option) => option.weight > 0);
     if (options.length === 0) continue;
     const held = heldRng(rng, `groove:${layer.id}`, layer.hold, bar);
-    let choice: GrooveOption = held.weighted(options, (option) => option.weight);
+    let choice: GrooveOption | undefined = held.weighted(options, (option) => option.weight);
     if (layer.audible) {
-      // The next one in the written list that would be heard, from the one drawn, round to it.
+      // A turn is heard in the bar as played: a stroke where the piece is silent, one taken
+      // away, a snare across the ghost line. In a bar fitted from 4/4 that is the bar after the
+      // fit, which can drop the stroke a turn adds (#2308). The next one in the written list
+      // that would be heard, from the one drawn, round to it; where none would, no turn.
+      const heard = heardIn(time, layer, bar.meter, part, () => {
+        const without = struck(played(copyOf(part)));
+        return layer.options.map((option) => {
+          if (option.weight <= 0) return false;
+          const turned = copyOf(part);
+          overlay(turned, laid(option.lines), 0, steps);
+          return struck(played(turned)) !== without;
+        });
+      });
       const list = layer.options;
       const at = list.indexOf(choice);
+      choice = undefined;
       for (let i = 0; i < list.length; i++) {
-        const next = list[(at + i) % list.length]!;
-        if (next.weight > 0 && changes(part, next.lines)) {
-          choice = next;
+        if (heard[(at + i) % list.length]) {
+          choice = list[(at + i) % list.length]!;
           break;
         }
       }
+      if (!choice) continue;
     }
-    overlay(part, written || !dotted ? choice.lines : onThePulse(choice.lines), 0, steps);
+    overlay(part, laid(choice.lines), 0, steps);
   }
+  return played(part);
+}
 
+/** The groove as laid, made the bar: one hand to the hat, the touches, the fit to the bar's meter. */
+function finish(part: BarPart, time: DrumTime, bar: PlanBar, written: boolean): BarPart {
   // One hand, one cymbal (DR-03): the stick that opens the hat is not also closing it.
   const open = part.openHat;
   const closed = part.closedHat;
