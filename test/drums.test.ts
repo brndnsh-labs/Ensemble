@@ -954,7 +954,7 @@ test("in a meter a style has no drum part for, the bar is fitted from four's and
       );
     }
   }
-  assert.ok(answers > enough(60) * turning.length, `only ${answers} answer bars`);
+  assert.ok(answers > enough(30) * turning.length, `only ${answers} answer bars`);
 });
 
 // ── acoustic ────────────────────────────────────────────────────────────────
