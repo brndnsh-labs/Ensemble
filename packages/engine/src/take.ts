@@ -4,6 +4,7 @@
 import { expand } from "./chart/expand.ts";
 import type { Chart } from "./chart/model.ts";
 import { parse } from "./chart/parse.ts";
+import { fits, remeter, sameMeter } from "./chart/remeter.ts";
 import { transpose } from "./chart/transpose.ts";
 import type { Diagnostic } from "./chart/types.ts";
 import { PPQ } from "./chart/types.ts";
@@ -13,6 +14,7 @@ import { quartersAt } from "./perform/time.ts";
 import { planBars } from "./plan/plan.ts";
 import type { Plan, PlanBar, PlanOptions } from "./plan/types.ts";
 import type { MovedIdea } from "./players/solo/play.ts";
+import { tempoRange } from "./style/meters.ts";
 import type { Seat, StylePack } from "./style/types.ts";
 import type { Key } from "./theory/pitch.ts";
 
@@ -81,12 +83,30 @@ export interface Take {
   readonly moved: readonly MovedIdea[];
 }
 
-/** The roadmap of a performance, without playing it. */
+/**
+ * The chart as a take plays it: in the meter the options ask for, if any (`PlanOptions.meter`),
+ * read as `remeter` reads it, its written tempo held inside the style's range in that meter.
+ * In its own meter, the chart itself. A meter the chart does not fit is refused with the reason
+ * `fits` gives.
+ */
+export function chartIn(chart: Chart, style: StylePack, options: PlanOptions): Chart {
+  const meter = options.meter;
+  if (meter === undefined || sameMeter(meter, chart.meter)) return chart;
+  const fit = fits(chart, meter);
+  if (!fit.ok) throw new Error(fit.reason);
+  const read = remeter(chart, meter);
+  if (read.tempo === null) return read;
+  const { min, max } = tempoRange(style, meter);
+  return { ...read, tempo: Math.min(max, Math.max(min, read.tempo)) };
+}
+
+/** The roadmap of a performance, without playing it. Give it the chart as written: `options.meter` is read here. */
 export function plan(chart: Chart, style: StylePack, options: PlanOptions): Plan {
+  const played = chartIn(chart, style, options);
   // A chart with an arrangement of its own is played as its writer arranged it: the band lays
   // nobody out of a jam on it by itself either.
-  const arranged = chart.arrangement?.lines != null;
-  return planBars(expand(chart), chart.tempo, chart.meter, style, options, arranged);
+  const arranged = played.arrangement?.lines != null;
+  return planBars(expand(played), played.tempo, played.meter, style, options, arranged);
 }
 
 /**
@@ -138,7 +158,9 @@ export function render(text: string, style: StylePack, options: TakeOptions): Ta
 
 function whole(text: string, style: StylePack, options: TakeOptions): Take {
   const parsed = parse(text);
-  const chart = options.key ? transpose(parsed.chart, options.key) : parsed.chart;
+  const written = options.key ? transpose(parsed.chart, options.key) : parsed.chart;
+  // The chart as played, in the meter asked for: what the take says it played.
+  const chart = chartIn(written, style, options);
   const roadmap = plan(chart, style, options);
   const played =
     options.soloInstrument === undefined

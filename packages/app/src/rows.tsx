@@ -2,14 +2,14 @@
 // button playing it in one tap. The button is printed in the ink of the
 // chart's style, which is the mark every chart carries wherever it is listed.
 
-import { keyToString, seconds, tempoRange } from "@ensemble/engine";
+import { chartIn, keyToString, seconds, tempoRange } from "@ensemble/engine";
 import { STYLES, styleById } from "@ensemble/styles";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { deleteChart, duplicateChart, renameChart } from "./charts.ts";
 import { download, fileName } from "./download.ts";
 import type { LibraryChart } from "./library.ts";
-import { tempoFor } from "./play/jam.ts";
+import { meterOf, meterWords, tempoFor } from "./play/jam.ts";
 import { clock } from "./play/StatusStrip.tsx";
 import { count, writtenFor } from "./posters.ts";
 import type { ChartChoices } from "./settings.ts";
@@ -57,16 +57,19 @@ export function chartRow(entry: LibraryChart, withStyle: boolean): Row {
 export function playedRow(entry: LibraryChart, choices: ChartChoices | undefined): Row {
   const style = styleById(choices?.style ?? entry.chart.styleId ?? "") ?? STYLES[0]!;
   // The tempo the chart's own screen shows, and its Play starts.
+  // In the meter chosen for it, where it is not its own: the chart's tempo is then counted there.
+  const meter = meterOf(entry.chart, choices?.meter);
   const tempo =
-    tempoFor(entry.chart, style, choices?.tempo) ??
-    entry.chart.tempo ??
-    tempoRange(style, entry.chart.meter).default;
+    tempoFor(entry.chart, style, choices?.tempo, meter) ??
+    chartIn(entry.chart, style, { mode: "jam", meter }).tempo ??
+    tempoRange(style, meter).default;
   const key = choices?.key ?? keyToString(entry.chart.key);
+  const shown = `${style.name} in ${key}${meterWords(meter)}`;
   return {
     address: `#/chart/${entry.id}`,
     title: entry.chart.title,
-    facts: `${style.name} in ${key}, ${count(entry.bars, "bar", "bars")}, ${Math.round(tempo)} bpm`,
-    short: `${style.name} in ${key}, ${Math.round(tempo)} bpm`,
+    facts: `${shown}, ${count(entry.bars, "bar", "bars")}, ${Math.round(tempo)} bpm`,
+    short: `${shown}, ${Math.round(tempo)} bpm`,
     style: style.id,
   };
 }
@@ -82,7 +85,7 @@ export function takeRow(take: KeptTake): Row {
       style: undefined,
       length: "",
     };
-  const short = `${heard.style.name} in ${keyToString(heard.chart.key)}, ${Math.round(heard.plan.tempo)} bpm`;
+  const short = `${heard.style.name} in ${keyToString(heard.chart.key)}${meterWords(heard.chart.meter)}, ${Math.round(heard.plan.tempo)} bpm`;
   return {
     ...base,
     facts: `${short}. ${kept}`,

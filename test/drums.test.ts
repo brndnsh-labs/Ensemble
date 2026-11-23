@@ -719,7 +719,9 @@ test("neo-soul: in six and twelve the hat plays the soul ballad's triplets: from
 
 // ── six and twelve ──────────────────────────────────────────────────────────
 
-const compound = (jam: Pick<Jam, "chart">) => isCompound(parse(jam.chart.text).chart.meter);
+// The meter the take is played in, which is the chart's own unless it was asked for in another.
+const compound = (jam: Pick<Jam, "chart">) =>
+  jam.chart.meter === "6/8" || jam.chart.meter === "12/8";
 const anyCompound = LIBRARY.some((chart) => compound({ chart }));
 
 /**

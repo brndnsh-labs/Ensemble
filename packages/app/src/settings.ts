@@ -11,6 +11,11 @@ export interface ChartChoices {
   readonly key?: string;
   readonly tempo?: number;
   /**
+   * The meter it is played in, as a chart writes it (`12/8`), where it is not the chart's own.
+   * One the chart no longer fits (it was edited) is passed over: the chart plays in its own.
+   */
+  readonly meter?: string;
+  /**
    * Played as a song, once through, in place of a jam of the length chosen
    * for every chart. Unset: a song when the chart's arrangement fits it.
    */

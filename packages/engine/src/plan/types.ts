@@ -12,6 +12,13 @@ export interface PlanOptions {
   /** Overrides the chart's tempo, which overrides the style's default. Pulses a minute, as `Plan.tempo`. */
   readonly tempo?: number;
   /**
+   * Play the chart in another of the band's meters (`BAND_METERS`): it is read as if its header
+   * said this one (`remeter`), and refused where it does not fit (`fits`). Its written tempo is
+   * counted in the new meter's pulse, the eighth note at the speed it had, and held inside the
+   * style's range there. Left out, or the chart's own: the chart's meter, the take it always was.
+   */
+  readonly meter?: Meter;
+  /**
    * Jam mode: how many times through the form. Wins over `minutes`. A vamp
    * shorter than eight bars is counted in choruses of several laps.
    */

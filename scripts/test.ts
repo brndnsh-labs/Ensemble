@@ -12,7 +12,7 @@ import { readdirSync } from "node:fs";
 import { STYLES } from "../packages/styles/src/index.ts";
 
 /** Files that read no style: they run once. */
-const STYLE_FREE = new Set(["audio.test.ts", "chart.test.ts", "goldens.test.ts"]);
+const STYLE_FREE = new Set(["audio.test.ts", "chart.test.ts", "goldens.test.ts", "meter.test.ts"]);
 
 const files = readdirSync(new URL("../test/", import.meta.url)).filter((file) =>
   file.endsWith(".test.ts"),

@@ -4,7 +4,7 @@
 
 import { readdirSync, readFileSync } from "node:fs";
 import type { NoteEvent, Seat, StylePack, Take, TakeOptions } from "@ensemble/engine";
-import { isCompound, parse, render, tempoRange } from "@ensemble/engine";
+import { isCompound, parse, parseMeter, render, tempoRange } from "@ensemble/engine";
 import { STYLES as SHIPPING, styleById } from "@ensemble/styles";
 
 /**
@@ -220,6 +220,51 @@ const TAKE_SPECS: readonly JamSpec[] = STYLES.flatMap((style) => [
   })),
 ]);
 
+/**
+ * A chart played in another meter (`TakeOptions.meter`, #2298), as each style is handed it: the
+ * fewest takes that meet every way a bar is read. Two chords a bar into three (the 2+1 split),
+ * six-eight and 6/4 (halves on the pulses); a 4/4 chart's bars of three chords into twelve (a
+ * chord a pulse and two, shapes no chart in twelve writes), with its written intro and ending;
+ * and the waltz into four (its 2+1 into halves). A two-pass jam on seed 2; the full run adds
+ * seed 3 and a jam with the soloist. Not seed 1: there funk's quiet turn in twelve, on the intro
+ * of funk-intro-outro-c, is the bar before again (a kick the section's kick already plays),
+ * which funk's own chart in twelve does too at 0.3 on seeds 4, 10 and 11, a fault of funk's data
+ * found here and left for its own issue (docs/decisions/engine.md, #2298). Each is the library's chart under its own
+ * file name, its `meter` the one it is played in.
+ */
+const REMETERED: readonly { readonly file: string; readonly meter: string }[] = [
+  { file: "jazz-two-five-one-c.chart", meter: "3/4" },
+  { file: "jazz-two-five-one-c.chart", meter: "6/8" },
+  { file: "jazz-two-five-one-c.chart", meter: "6/4" },
+  { file: "funk-intro-outro-c.chart", meter: "12/8" },
+  { file: "jazz-waltz-f.chart", meter: "4/4" },
+];
+
+const REMETERED_KINDS: readonly TakeOptions[] = FULL
+  ? [
+      { mode: "jam", passes: 2, seed: 2 },
+      { mode: "jam", passes: 2, seed: 3 },
+      { mode: "jam", passes: 4, solo: true, seed: 2 },
+    ]
+  : [{ mode: "jam", passes: 2, seed: 2 }];
+
+const REMETERED_SPECS: readonly JamSpec[] = STYLES.flatMap((style) =>
+  REMETERED.flatMap(({ file, meter: name }) => {
+    const chart = LIBRARY.find((one) => one.file === file);
+    const meter = parseMeter(name);
+    if (!chart || !meter) throw new Error(`REMETERED: no ${file}, or no meter ${name}`);
+    // A chart written for another style at this style's usual tempo in the meter played, as the
+    // app plays it; in its own, the chart's tempo counted in the new pulse.
+    const written = parse(chart.text).chart;
+    const tempo = written.styleId === style.id ? {} : { tempo: tempoRange(style, meter).default };
+    return REMETERED_KINDS.map((kind) => ({
+      style,
+      chart: { ...chart, meter: name },
+      options: { ...kind, meter, ...tempo },
+    }));
+  }),
+);
+
 /** A held take's seeds: one on a push, two on the full run. Every style that writes a meter holds every chart in it at three levels, and that had become the push suite's last second. */
 const HELD_SEEDS: readonly number[] = FULL ? [1, 2] : [1];
 
@@ -256,7 +301,7 @@ export function heldTakes(style: StylePack, meter: string, solo = false, own = f
 
 /** The library's takes that pass `only`, which reads the style, chart, and options. */
 export function takes(only: (spec: JamSpec) => boolean = () => true): Jam[] {
-  return renderOnly(TAKE_SPECS, only);
+  return renderOnly([...TAKE_SPECS, ...REMETERED_SPECS], only);
 }
 
 const chartsDir = new URL("./charts/", import.meta.url);

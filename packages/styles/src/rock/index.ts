@@ -16,6 +16,8 @@ export const rock: StylePack = {
   // quarters: two thirds of that range would make the usual ballad 80 and the slowest 53,
   // where the slow dance and the rock ballad in twelve-eight live lower, so the usual is 66
   // and the floor 48. The ceiling stays two thirds of four's: eighths no quicker than there.
+  // The meters a player of rock would call its own: listed first. Four, the ballad in six and the fifties slow dance in twelve (docs/decisions/styles.md, #2298).
+  ownMeters: ["4/4", "6/8", "12/8"],
   tempo: {
     default: 120,
     min: 80,

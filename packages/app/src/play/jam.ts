@@ -5,6 +5,7 @@ import type { Mix, Sound } from "@ensemble/audio";
 import type {
   Chart,
   Key,
+  Meter,
   Plan,
   PlanBar,
   Seat,
@@ -14,12 +15,18 @@ import type {
   TakeRecipe,
 } from "@ensemble/engine";
 import {
+  BAND_METERS,
+  chartIn,
   chordText,
+  fits,
+  meterName,
   parse,
+  parseMeter,
   planBar,
   pulseStarts,
   RECIPE_VERSION,
   render,
+  sameMeter,
   seatChoice,
   secondsAt,
   tempoRange,
@@ -43,6 +50,8 @@ export interface JamSetup {
   readonly tempo: number | null;
   /** Null for the key the chart is written in. */
   readonly key: Key | null;
+  /** Null for the meter the chart is written in: another it fits (`metersFor`). */
+  readonly meter: Meter | null;
   /** Who plays. */
   readonly band: Readonly<Record<Seat, boolean>>;
   readonly soloInstrument: string;
@@ -85,6 +94,7 @@ export function takeOptions(setup: JamSetup): HowPlayed {
     ...length,
     ...(setup.tempo === null ? {} : { tempo: setup.tempo }),
     ...(setup.key === null ? {} : { key: setup.key }),
+    ...(setup.meter === null ? {} : { meter: setup.meter }),
     solo: setup.band.solo,
     soloInstrument: setup.soloInstrument,
     // Said only where they change what is played: at the style's own, or with no soloist, or for
@@ -113,8 +123,10 @@ export function tempoFor(
   chart: Chart,
   style: StylePack,
   chosen: number | undefined,
+  /** The meter it is played in, where that is not the chart's own: the limits are that meter's. */
+  meter: Meter = chart.meter,
 ): number | null {
-  const { min, max, default: usual } = tempoRange(style, chart.meter);
+  const { min, max, default: usual } = tempoRange(style, meter);
   if (chosen !== undefined) return Math.min(max, Math.max(min, chosen));
   // A style this version does not have is no style: the chart is played as written.
   const written = styleById(chart.styleId ?? "");
@@ -155,10 +167,45 @@ export function performanceOf(recipe: TakeRecipe, style: StylePack, since = 0): 
   };
 }
 
-/** The chart as it will be read while playing: in the key the jam is in. */
-export function chartOf(text: string, key: Key | null | undefined): Chart {
+/**
+ * The chart as it will be read while playing: in the key and the meter the jam is in, its
+ * written tempo counted in that meter and held in the style's range there (`chartIn`), as the
+ * take is. A meter the chart does not fit is refused; ask `metersFor` first.
+ */
+export function chartOf(text: string, options: HowPlayed, style: StylePack): Chart {
   const { chart } = parse(text);
-  return key ? transpose(chart, key) : chart;
+  return chartIn(options.key ? transpose(chart, options.key) : chart, style, options);
+}
+
+/**
+ * The meters a chart can be played in, as the player is offered them: the style's own that
+ * the chart fits, in the style's order, then the band's others it fits, in the band's order.
+ * A chart in a meter the band has no other parts for (5/4) has it among the others. Where the
+ * chart fits only its own, the list is that one.
+ */
+export function metersFor(
+  chart: Chart,
+  style: StylePack,
+): { readonly own: readonly Meter[]; readonly others: readonly Meter[] } {
+  const fitting = [
+    ...BAND_METERS,
+    ...(BAND_METERS.some((meter) => sameMeter(meter, chart.meter)) ? [] : [chart.meter]),
+  ].filter((meter) => fits(chart, meter).ok);
+  const own = style.ownMeters.flatMap((name) =>
+    fitting.filter((meter) => meterName(meter) === name),
+  );
+  return { own, others: fitting.filter((meter) => !own.includes(meter)) };
+}
+
+/** A meter as a line of facts says it: nothing for 4/4, else ", 12/8". It is what the tempo counts. */
+export const meterWords = (meter: Meter): string =>
+  meter.beats === 4 && meter.unit === 4 ? "" : `, ${meterName(meter)}`;
+
+/** The meter a chart is played in: the one chosen for it, where the chart still fits that, else its own. */
+export function meterOf(chart: Chart, chosen: unknown): Meter {
+  // Read defensively: settings are the browser's to lose or mangle, and anything else is no choice.
+  const meter = typeof chosen === "string" ? parseMeter(chosen) : null;
+  return meter && fits(chart, meter).ok ? meter : chart.meter;
 }
 
 /** Who is in a take: a seat left out has no part in it, and the others play differently for that. */

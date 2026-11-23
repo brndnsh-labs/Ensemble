@@ -203,6 +203,13 @@ export interface StylePack {
   readonly tempo: TempoRange & {
     readonly meters?: Readonly<Partial<Record<MeterName, TempoRange>>>;
   };
+  /**
+   * The meters a player of the style would call its own, in the order a player is offered them:
+   * the first is the style's home. Each one of the band's meters (`BAND_METERS`). Every other
+   * meter the band plays is still the player's to choose; this says only where it is listed.
+   * Not whether a part is written for it: a style may call a meter its own and play the fit there.
+   */
+  readonly ownMeters: readonly MeterName[];
   readonly feel: FeelStyle;
   readonly arc: ArcStyle;
   readonly ending: EndingStyle;

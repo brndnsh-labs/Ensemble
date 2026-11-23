@@ -12,6 +12,8 @@ export const blues: StylePack = {
   id: "blues",
   name: "Blues",
   // In twelve the same range, a shuffle being a bar of 12/8, but a slow blues goes under its floor.
+  // The meters a player of blues would call its own: listed first. The shuffle, and the slow blues in twelve (docs/decisions/styles.md, #2298).
+  ownMeters: ["4/4", "12/8"],
   tempo: {
     default: 100,
     min: 60,
