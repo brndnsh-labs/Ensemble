@@ -2,7 +2,7 @@
   "name": "ensemble",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@12.18.0",
+  "packageManager": "pnpm@12.23.0",
   "engines": {
     "node": ">=26"
   },
@@ -33,7 +33,7 @@
     "image": "sh scripts/image.sh"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.7",
+    "@biomejs/biome": "2.6.8",
     "@playwright/test": "1.65.1",
     "@types/node": "26.6.6",
     "typescript": "7.0.2"
