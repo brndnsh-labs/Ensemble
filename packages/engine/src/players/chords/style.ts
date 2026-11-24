@@ -59,6 +59,14 @@ export interface VoicingCondition {
   readonly degrees?: readonly string[];
   /** Only in a key of this mode. */
   readonly mode?: "major" | "minor";
+  /**
+   * Tensions the chord's symbol must not name: C9 names its 9th and C13 its
+   * 13th (not the 9th under it), C7b9 and C7#9 a 9th, C7#11 an 11th, C7alt
+   * its altered 9ths and 13th. `has` and `lacks` read what the chord can give,
+   * its scale's colour too; this reads only the symbol: C7 and C9 in one key
+   * give the same 9th, and only one of them names it.
+   */
+  readonly unwritten?: readonly ("9" | "11" | "13")[];
 }
 
 export interface Recipe {
@@ -71,20 +79,17 @@ export interface Recipe {
    */
   readonly also?: readonly (readonly Voice[])[];
   /**
-   * Tones the hand may sound or leave out, on top of `voices`: a guitar's grip
-   * may fret one where its shape has it, as often as it likes, or none at all.
-   * Open C6 is x32210, with no fifth: CH-24 lets an open shape's fifth double
-   * freely, and lets a seventh chord drop it over a bassist (C7 as x32310).
-   * A keyboard leaves a free tone out. The final chord of an ending is voiced
-   * whole: there a free tone is a voice (`Strike.whole`).
-   *
-   * A free tone is honoured literally: `"5"` frees whatever fifth the chord
-   * has, b5 and #5 too, and no alteration takes its seat. So a recipe that
-   * also serves altered or diminished chords must not free the fifth until
-   * the engine frees only a perfect fifth and lets an alteration take the
-   * free seat (the sevenths, #2304).
+   * The fifth, freed: on top of `voices`, the hand may sound it or leave it
+   * out, and a guitar's grip may fret it where its shape has it, as often as
+   * it likes, or not at all. Open C6 is x32210 and C7 x32310, with none, and
+   * A13 x02022 holds it for its root: CH-24 lets an open shape's fifth double
+   * freely, and lets a seventh chord drop it over a bassist. Only a perfect
+   * fifth is free: a flat or sharp fifth (Am7b5, C7#5, a diminished chord) is
+   * part of the chord and a voice. A keyboard leaves a free fifth out. The
+   * final chord of an ending and a bar with no bassist are voiced whole:
+   * there it is a voice (`Strike.whole`).
    */
-  readonly free?: readonly Exclude<VoiceTone, "T">[];
+  readonly free?: readonly "5"[];
 }
 
 /**

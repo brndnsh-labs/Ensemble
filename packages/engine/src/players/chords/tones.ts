@@ -8,7 +8,7 @@ import type { Key } from "../../theory/pitch.ts";
 import { mod12, pitchClass } from "../../theory/pitch.ts";
 import type { ChordScale } from "../../theory/scale.ts";
 import { scaleHas } from "../../theory/scale.ts";
-import type { Recipe, VoiceTone, VoicingCondition, VoicingKind } from "./style.ts";
+import type { Recipe, Voice, VoiceTone, VoicingCondition, VoicingKind } from "./style.ts";
 
 /** One tone the hand will play: its name in the recipe and its pitch class above the root. */
 export interface FittedTone {
@@ -43,6 +43,27 @@ function written(chord: Chord): { name: string; interval: number; tone: "9" | "1
     .map(([name, interval, tone]) => ({ name, interval, tone }))
     .sort((a, b) => order.indexOf(a.name) - order.indexOf(b.name));
 }
+
+/**
+ * The tensions a chord's symbol names (`VoicingCondition.unwritten`): its
+ * highest, the altered ones its quality stacks (C7alt), and its alterations.
+ */
+function named(chord: Chord): Set<"9" | "11" | "13"> {
+  const names = new Set<"9" | "11" | "13">();
+  const stacked = written({ ...chord, quality: { ...chord.quality, alterations: [] } });
+  const highest = stacked.reduce((top, t) => Math.max(top, t.interval), 0);
+  for (const t of stacked) {
+    if (t.interval === highest || !NATURAL.has(t.interval)) names.add(t.tone);
+  }
+  for (const alteration of chord.quality.alterations) {
+    const tone = ALTERATION_TONE[alteration].tone;
+    if (tone === "9" || tone === "11" || tone === "13") names.add(tone);
+  }
+  return names;
+}
+
+/** A natural 9th, 11th or 13th, in semitones above the root. */
+const NATURAL = new Set([14, 17, 21]);
 
 /**
  * A tone as semitones above the root (0 to 11), or null when the chord cannot
@@ -128,6 +149,7 @@ function meets(
   if (when.lacks?.some((tone) => tone !== "T" && can(tone))) return false;
   // With no key to read it from, a chord has no degree, and meets no condition on one.
   if (when.mode !== undefined && key?.mode !== when.mode) return false;
+  if (when.unwritten?.some((tone) => named(chord).has(tone))) return false;
   if (when.degrees !== undefined) {
     if (!key) return false;
     const above = mod12(pitchClass(chord.root) - pitchClass(key.tonic));
@@ -164,7 +186,12 @@ export function recipeFor(
  * (X-B-13, X-B-09).
  */
 export function fitRecipe(recipe: Recipe, chord: Chord, scale: ChordScale): FittedTone[] {
-  const tones: (FittedTone | null)[] = recipe.voices.map(() => null);
+  // A free fifth is free only where it is perfect (CH-24): a flat or sharp fifth is part of the
+  // chord, so it is a voice, and it takes its own seat before identity gives up the root.
+  const perfect = (tone: "5") => toneOf(tone, chord, scale) === 7;
+  const freed = (recipe.free ?? []).filter(perfect);
+  const voices = [...recipe.voices, ...(recipe.free ?? []).filter((tone) => !perfect(tone))];
+  const tones: (FittedTone | null)[] = voices.map(() => null);
   const taken = () => new Set(tones.flatMap((t) => (t ? [t.interval] : [])));
   const fill = (index: number, tone: Exclude<VoiceTone, "T">) => {
     const interval = toneOf(tone, chord, scale);
@@ -173,13 +200,13 @@ export function fitRecipe(recipe: Recipe, chord: Chord, scale: ChordScale): Fitt
     return true;
   };
   // Named tones first, so a `T` knows which written tensions are already being played.
-  recipe.voices.forEach((voice, index) => {
+  voices.forEach((voice, index) => {
     for (const tone of typeof voice === "string" ? [voice] : voice) {
       if (tone === "T") break;
       if (fill(index, tone)) break;
     }
   });
-  recipe.voices.forEach((voice, index) => {
+  voices.forEach((voice, index) => {
     if (tones[index]) return;
     const options = typeof voice === "string" ? [voice] : voice;
     const from = options.indexOf("T");
@@ -202,13 +229,27 @@ export function fitRecipe(recipe: Recipe, chord: Chord, scale: ChordScale): Fitt
     if (spare < 0) result.push(need);
     else result[spare] = need;
   }
-  // Free tones last: what the hand may add or leave, never in place of a voice.
-  for (const tone of recipe.free ?? []) {
+  // A free fifth last: the hand may add it or leave it, never in place of a voice.
+  for (const tone of freed) {
     const interval = toneOf(tone, chord, scale);
     if (interval === null || result.some((t) => t.interval === interval)) continue;
     result.push({ tone, interval, free: true });
   }
   return result;
+}
+
+/**
+ * A recipe's voices with its free fifth made a voice, as a chord voiced whole
+ * plays it (`Strike.whole`): in the seat of a tension the chart may not write,
+ * which a written one takes (X-B-13: a written 13th takes the 5th's place),
+ * or, where the recipe has no such seat, beside the rest. C7 voiced whole is
+ * R 3 5 7 and A13 R 3 13 7, as `R 3 [T 5] 7` voices them.
+ */
+export function wholeVoices(voices: readonly Voice[], free: readonly "5"[]): Voice[] {
+  if (free.length === 0) return [...voices];
+  const seat = voices.indexOf("T");
+  if (seat < 0) return [...voices, ...free];
+  return voices.map((voice, index) => (index === seat ? ["T", ...free] : voice));
 }
 
 /** What the chord cannot be heard without: guide tones and written alterations. */
