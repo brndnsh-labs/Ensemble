@@ -57,11 +57,12 @@ export interface Strike {
    */
   readonly pullOff?: number;
   /**
-   * Voiced whole, a recipe's free fifth is a voice (`Recipe.free`), in the
-   * seat of a tension the chart may not write (`wholeVoices`): the final chord of an ending, which rings and leaves nothing out, and a
-   * strike in a bar with no bassist, where the pick's boom carries the root and
-   * takes its alternate bass from the fifth. The freedom is a short stroke's,
-   * with the bass under it (CH-24: "over a bassist").
+   * Voiced whole, a recipe's free fifth is a voice (`Recipe.free`), in the seat
+   * of a tension the chart may not write (`wholeVoices`): the final chord of an
+   * ending, which rings and leaves nothing out, and a strike in a bar with no
+   * bassist, where the pick's boom carries the root and takes its alternate bass
+   * from the fifth. The freedom is a short stroke's, with the bass under it
+   * (CH-24: "over a bassist").
    */
   readonly whole?: true;
 }
