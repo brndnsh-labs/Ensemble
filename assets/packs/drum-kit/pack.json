@@ -17,8 +17,8 @@
     "codec": "opus",
     "sampleRate": 48000,
     "channels": 1,
-    "bytes": 1908516,
-    "decodedBytes": 39098208
+    "bytes": 1839826,
+    "decodedBytes": 37485408
   },
   "level": {
     "measure": "peak",
@@ -34,11 +34,11 @@
               "takes": [
                 {
                   "file": "kick-v1-1.webm",
-                  "seconds": 1.2
+                  "seconds": 0.5
                 },
                 {
                   "file": "kick-v1-2.webm",
-                  "seconds": 1.2
+                  "seconds": 0.5
                 }
               ]
             }
@@ -51,19 +51,19 @@
               "takes": [
                 {
                   "file": "kick-v2-1.webm",
-                  "seconds": 1.2
+                  "seconds": 0.5
                 },
                 {
                   "file": "kick-v2-2.webm",
-                  "seconds": 1.2
+                  "seconds": 0.5
                 },
                 {
                   "file": "kick-v2-3.webm",
-                  "seconds": 1.2
+                  "seconds": 0.5
                 },
                 {
                   "file": "kick-v2-4.webm",
-                  "seconds": 1.2
+                  "seconds": 0.5
                 }
               ]
             }
@@ -76,19 +76,19 @@
               "takes": [
                 {
                   "file": "kick-v3-1.webm",
-                  "seconds": 1.2
+                  "seconds": 0.5
                 },
                 {
                   "file": "kick-v3-2.webm",
-                  "seconds": 1.2
+                  "seconds": 0.5
                 },
                 {
                   "file": "kick-v3-3.webm",
-                  "seconds": 1.2
+                  "seconds": 0.5
                 },
                 {
                   "file": "kick-v3-4.webm",
-                  "seconds": 1.2
+                  "seconds": 0.5
                 }
               ]
             }
@@ -101,11 +101,11 @@
               "takes": [
                 {
                   "file": "kick-v4-1.webm",
-                  "seconds": 1.2
+                  "seconds": 0.5
                 },
                 {
                   "file": "kick-v4-2.webm",
-                  "seconds": 1.2
+                  "seconds": 0.5
                 }
               ]
             }

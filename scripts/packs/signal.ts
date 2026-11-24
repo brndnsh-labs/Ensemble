@@ -179,6 +179,48 @@ export function scale(x: Float32Array, db: number): Float32Array {
   return x.map((v) => v * g);
 }
 
+/**
+ * A drum damped, as a pillow in it would: at full for `hold` seconds from sample
+ * `from`, then falling evenly in decibels to 60 down over `decay`, then silent.
+ */
+export function damp(
+  x: Float32Array,
+  from: number,
+  { hold, decay }: { readonly hold: number; readonly decay: number },
+  rate = RATE,
+): void {
+  for (let i = from + Math.round(hold * rate); i < x.length; i++) {
+    const t = (i - from) / rate - hold;
+    x[i]! *= t >= decay ? 0 : 10 ** ((-3 * t) / decay);
+  }
+}
+
+/** Everything over `hz` lifted by `db`: a high shelf, the audio EQ cookbook's, slope 1. */
+export function highShelf(
+  x: Float32Array,
+  hz: number,
+  db: number,
+  rate = RATE,
+): Float32Array<ArrayBuffer> {
+  const a = 10 ** (db / 40);
+  const w = (2 * Math.PI * hz) / rate;
+  const [c, r] = [Math.cos(w), Math.sqrt(2 * a) * Math.sin(w)];
+  const b0 = a * (a + 1 + (a - 1) * c + r);
+  const b1 = -2 * a * (a - 1 + (a + 1) * c);
+  const b2 = a * (a + 1 + (a - 1) * c - r);
+  const a0 = a + 1 - (a - 1) * c + r;
+  const a1 = 2 * (a - 1 - (a + 1) * c);
+  const a2 = a + 1 - (a - 1) * c - r;
+  const y = new Float32Array(x.length);
+  let [x1, x2, y1, y2] = [0, 0, 0, 0];
+  for (let i = 0; i < x.length; i++) {
+    const v = (b0 * x[i]! + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2) / a0;
+    [x2, x1, y2, y1] = [x1, x[i]!, y1, v];
+    y[i] = v;
+  }
+  return y;
+}
+
 /** Raised-cosine fade over the first `n` samples. */
 export function fadeIn(x: Float32Array, n: number): void {
   for (let i = 0; i < n && i < x.length; i++) x[i]! *= 0.5 - 0.5 * Math.cos((Math.PI * i) / n);

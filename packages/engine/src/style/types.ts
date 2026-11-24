@@ -300,6 +300,8 @@ export interface MixStyle {
     readonly predelay: number;
     /** The reverb's level in dB. */
     readonly level: number;
+    /** Cut what the room returns under this many Hz. None when absent. */
+    readonly highpass?: number;
   };
   /** Gain in dB on the whole band before the limiter. */
   readonly master: number;
@@ -335,7 +337,8 @@ export const DEFAULT_MIX: MixStyle = {
     // About a decibel under the band it plays over, as `pnpm levels` reads them.
     solo: { level: 1.5, reverb: -12, highpass: 120 },
   },
-  room: { seconds: 1.2, predelay: 0.012, level: 0 },
+  // The room's lows cut, so no seat's ring sits under the bass and the kick (by ear, 2026-11-24).
+  room: { seconds: 1.2, predelay: 0.012, level: 0, highpass: 200 },
   // Rendered takes peaked within a decibel of full scale at 0; this leaves room.
   master: -1.5,
 };

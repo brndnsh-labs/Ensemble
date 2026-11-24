@@ -28,12 +28,14 @@ import { uprightBass } from "./recipes/upright-bass.ts";
 import { vibraphone } from "./recipes/vibraphone.ts";
 import {
   bandPowers,
+  damp,
   decode,
   encodeOpus,
   FFMPEG,
   fadeIn,
   fadeOut,
   ffmpegVersion,
+  highShelf,
   loudness,
   measurePitch,
   mix,
@@ -114,6 +116,8 @@ function cutTake(recipe: Recipe, level: PackLevel, take: Take, measureRoots: boo
   const endedBy = length === cap ? "cap" : length === decay ? "decay" : "file";
   let seg = x.slice(start, start + length);
   if (pre > 0) fadeIn(seg, pre);
+  if (take.click) seg = highShelf(seg, take.click.hz, take.click.db, rate);
+  if (take.damp) damp(seg, pre, take.damp, rate);
   // Through the amp while the note still has its own shape: the clip then eases as the note dies away.
   if (recipe.amp) seg = throughAmp(seg, recipe.amp, take.push);
   const fadeLength = Math.min(length, Math.max(Math.round(0.08 * RATE), Math.round(0.1 * length)));

@@ -174,7 +174,13 @@ async function perform(): Promise<Performance> {
     setup,
     length: seconds(take.plan),
     missing,
-    bandKey: JSON.stringify([packs, layers, mix.room.seconds, mix.room.predelay]),
+    bandKey: JSON.stringify([
+      packs,
+      layers,
+      mix.room.seconds,
+      mix.room.predelay,
+      mix.room.highpass,
+    ]),
   };
 }
 

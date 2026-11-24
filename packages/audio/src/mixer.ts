@@ -32,6 +32,8 @@ export interface RoomMix {
   readonly predelay: number;
   /** The reverb's own level in dB. */
   readonly level: number;
+  /** Cut what the room returns under this many Hz, so its ring does not cloud the bass and the kick. None when absent. */
+  readonly highpass?: number;
 }
 
 const db = (value: number): number => 10 ** (value / 20);
@@ -60,7 +62,15 @@ export class Mixer {
     room.buffer = roomImpulse(context, mix.room.seconds);
     this.#room = context.createGain();
     this.#room.gain.value = db(mix.room.level);
-    this.#send.connect(predelay).connect(room).connect(this.#room).connect(this.#bus);
+    let ring: AudioNode = this.#send.connect(predelay).connect(room);
+    if (mix.room.highpass !== undefined) {
+      const filter = context.createBiquadFilter();
+      filter.type = "highpass";
+      filter.frequency.value = mix.room.highpass;
+      filter.Q.value = Math.SQRT1_2;
+      ring = ring.connect(filter);
+    }
+    ring.connect(this.#room).connect(this.#bus);
 
     // Light compression to hold the band together, then a limiter so nothing clips.
     const glue = context.createDynamicsCompressor();
@@ -118,7 +128,7 @@ export class Mixer {
 
   /**
    * Change the levels while the band plays: each channel's level and reverb
-   * send, the room's level, the master. The room's length and the filters are
+   * send, the room's level, the master. The room's length, its filter and the channels' filters are
    * fixed when the mixer is made.
    */
   adjust(mix: Mix): void {

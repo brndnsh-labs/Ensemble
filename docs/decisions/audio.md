@@ -195,3 +195,14 @@ From the study (2026-11-16): "neo-soul - B / reggae - F / funk - B".
 - **Rock is left as it was**: he passed it earlier and did not name it.
 - Measured after (`pnpm levels`): with everyone playing, funk -17.1 LUFS, disco -17.0, neo-soul -17.6, reggae -17.1 with the alto 1.1 dB under the band. All where they were. Notes are untouched: no golden and no scorecard reads a sound.
 
+
+## the kick, damped and its click lifted; the room's lows cut (by Brandon's ear)
+
+He heard the kick as "loose ... maybe boomy" against the bass, on headphones (2026-11-24). Measured on the cut: it rang for about a second (40 dB down at 0.8 to 1.1 s), nearly all of it one tone near 83 Hz, among the bass's low notes, and its beater click (over 2 kHz, the hit's first 30 ms) sat 47 dB under the hit. The kick mic is 22 dB over the snare and overhead mics in the hit, so the mics' balance was no lever.
+
+Two studies (a page of the same rock, funk and blues takes, with the band and drums and bass alone): first four dampings, then the one he leaned to with the click lifted 12 and 18 dB and the room's lows cut. He chose the last: "let's go with D".
+
+- **The kick is damped** as the library's own "kick dampen" control does (`Take.damp` in the recipe, applied from the onset): at full for 80 ms, then 60 dB down over 350 ms. 40 dB down at about 195 ms. Its cap falls from 1.2 s to 0.5; the kit decodes to 37.5 MB, 1.6 MB less.
+- **Its click is lifted 18 dB**: a high shelf over 2.5 kHz on the kick alone (`Take.click`). The click now reads 30 to 34 dB under the hit. A 10 dB lift at 4 kHz, tried first, moved it 6 dB and was not put to him.
+- **The room's lows are cut under 200 Hz** (`MixStyle.room.highpass`, a 12 dB an octave high-pass on what the shared reverb returns, set in `DEFAULT_MIX`), so no seat's ring sits under the bass and the kick. Every style spreads the default room, so every style has it.
+- Measured after (`pnpm levels`, against main): drums 0.2 to 0.6 dB quieter (blues -23.4 to -23.6 LUFS, funk -21.9 to -22.5, rock -22.4 to -22.9), the band 0.2 quieter, the soloist 0.2 nearer it. Left as they are: he chose by ear at these levels. No note moves: no golden and no scorecard reads a sound.

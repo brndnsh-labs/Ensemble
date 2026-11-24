@@ -44,6 +44,10 @@ interface Piece {
   readonly softest?: boolean;
   /** Semitones to retune the hit by resampling. */
   readonly shift?: number;
+  /** Damped as the library's "kick dampen" control does (a pillow in the drum). */
+  readonly damp?: Take["damp"];
+  /** The beater's click lifted. */
+  readonly click?: Take["click"];
   readonly chokes?: readonly string[];
 }
 
@@ -53,8 +57,14 @@ interface Piece {
 // caps are now near where the voice's median take has fallen 40 dB, the ride
 // and bell ring 3.5 s, and the outer layers keep two alternates.
 const PIECES: Record<string, Piece> = {
-  // KICK_SNRIGHT: the kick with the snares on, as the snare is.
-  kick: { program: BASIC, key: 36, alternates: 4, outer: 2, cap: 1.2, trim: 0, pan: 0 },
+  // KICK_SNRIGHT: the kick with the snares on, as the snare is. Undamped it rang for a second,
+  // nearly all of it a tone near 83 Hz among the bass's low notes, with its click 47 dB under
+  // the hit: damped and its click lifted 18 dB, by Brandon's ear (docs/decisions/audio.md).
+  kick: {
+    ...{ program: BASIC, key: 36, alternates: 4, outer: 2, cap: 0.5, trim: 0, pan: 0 },
+    damp: { hold: 0.08, decay: 0.35 },
+    click: { hz: 2500, db: 18 },
+  },
   // SNARE_CENTER
   snare: { program: BASIC, key: 38, alternates: 4, outer: 2, cap: 1, trim: 0, pan: 0 },
   ghostSnare: { program: BASIC, key: 38, alternates: 4, cap: 1, trim: 0, pan: 0, softest: true },
@@ -158,8 +168,13 @@ export const drumKit: Recipe = {
             i === 0 || i === n - 1 ? (piece.outer ?? piece.alternates) : piece.alternates,
           );
       const take = (r: SfzRegion): Take => {
-        const t = { parts: lead.get(r)!.map(part), cap: piece.cap };
-        return piece.shift ? { ...t, shift: piece.shift } : t;
+        return {
+          parts: lead.get(r)!.map(part),
+          cap: piece.cap,
+          ...(piece.shift ? { shift: piece.shift } : {}),
+          ...(piece.damp ? { damp: piece.damp } : {}),
+          ...(piece.click ? { click: piece.click } : {}),
+        };
       };
       const voice: Voice = {
         name,

@@ -13,11 +13,12 @@ export interface Chair {
 /** The sampler's name for a chair. The same pack can sit in two chairs: a piano comping and a piano soloing. */
 export const chairName = (chair: Chair): string => `${chair.channel}:${chair.pack}`;
 
-/** What a mixer cannot change once it is made: the room, and each channel's filter. */
+/** What a mixer cannot change once it is made: the room and its filter, and each channel's filter. */
 const fixedParts = (mix: Mix): string =>
   JSON.stringify([
     mix.room.seconds,
     mix.room.predelay,
+    mix.room.highpass,
     Object.entries(mix.channels).map(([name, channel]) => [
       name,
       channel.highpass,
