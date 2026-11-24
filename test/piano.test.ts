@@ -2102,11 +2102,20 @@ test(
 );
 
 test(
-  "country: a chord whose fifth is altered or diminished keeps that fifth and its root, with a bassist and without: Am7b5 is not Am7, C7#5 not C7, and with no bassist the boom is the root (CH-24 frees only a perfect fifth; X-B-13)",
+  "country: a chord whose fifth is altered or diminished keeps that fifth, with a bassist and without: Am7b5 is not Am7 and C7#5 not C7; with a bassist the chick holds the grip it held before the seventh freed its fifth (D7b5 and G7#5 with their roots), and with none the boom is the root (CH-24 frees only a perfect fifth; X-B-13)",
   only("country"),
   () => {
     const country = STYLES.find((style) => style.id === "country")!;
-    const symbols = ["Am7b5", "Em7b5", "D7b5", "C7#5", "G7#5", "F#dim7"];
+    // With a bassist the chick on each, as it was before #2304 (seed 1, quiet and working).
+    const held: Readonly<Record<string, string>> = {
+      Am7b5: "55,60,63",
+      Em7b5: "52,58,62,67",
+      D7b5: "50,56,60,66",
+      "C7#5": "52,58,68",
+      "G7#5": "51,55,59,65",
+      "F#dim7": "51,57,60,66",
+    };
+    const symbols = Object.keys(held);
     const chart: LibraryChart = {
       file: "altered-fifths",
       text: `title: Altered fifths\nkey: C\nstyle: country\n\n[A]\n${symbols.map((symbol) => `| ${symbol} `).join("")}| C | C |\n`,
@@ -2139,6 +2148,10 @@ test(
               wrong.push(`${where}: ${strike.pitches} sounds a perfect fifth`);
             if (new Set(classes).size < 3)
               wrong.push(`${where}: ${strike.pitches} under three notes`);
+            const onBeat = (strike.tick - bar.start) % PPQ === 0;
+            if (!without.length && onBeat && `${strike.pitches}` !== held[symbol]) {
+              wrong.push(`${where}: ${strike.pitches} where ${held[symbol]}`);
+            }
           }
           if (without.length) {
             const boom = pluckedOf(take).find((strike) => strike.tick === bar.start);
