@@ -158,10 +158,7 @@ export function validateChordStyle(chords: ChordStyle): string[] {
       const voiced = new Set(stacks.flat().flatMap((voice: Voice) => voice));
       const free = recipe.free ?? [];
       free.forEach((tone, k) => {
-        say(
-          VOICE_TONES.includes(tone) && (tone as string) !== "T",
-          `${at}: free "${tone}" is not a tone.`,
-        );
+        say(tone === "5", `${at}: free "${tone}" is not the fifth, the one tone a recipe frees.`);
         say(!voiced.has(tone), `${at}: "${tone}" is both a voice and free.`);
         if (free.indexOf(tone) !== k) say(false, `${at}: free "${tone}" is listed twice.`);
       });
@@ -180,6 +177,9 @@ export function validateChordStyle(chords: ChordStyle): string[] {
             `${at}: "${degree}" is not a degree; write a numeral, I to VII, with b or # where it is off the major scale.`,
           );
         }
+      }
+      for (const tone of recipe.when?.unwritten ?? []) {
+        say(["9", "11", "13"].includes(tone), `${at}: unwritten "${tone}" is not a tension.`);
       }
       const mode = recipe.when?.mode;
       say(

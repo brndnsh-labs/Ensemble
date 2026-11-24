@@ -24,7 +24,12 @@ import type {
  * triad (ST-country-06). The 6th chord's fifth is the shape's to hold or leave:
  * open C6 is x32210, with none, and the chick sounds its top four, E3 A3 C4 E4.
  * The final chord of an ending holds it (the engine voices it whole). A triad
- * keeps its fifth (Dsus4 is xx0233); the sevenths wait for #2304.
+ * keeps its fifth (Dsus4 is xx0233). A dominant seventh's perfect fifth is
+ * the shape's too, where the chart writes no 9th or 11th (CH-24): C7 is
+ * x32310, with none, E13 020120 and A13 x02022, which holds E3 on the D
+ * string for its root. A flat or sharp fifth stays a voice. The ninths, minor
+ * and major sevenths keep their seat for the fifth: freed, their chick gave
+ * its root up for the fifth (Gm9, Cm7, Bb9, #2304).
  */
 const open: VoicingKind = {
   position: "close",
@@ -36,6 +41,11 @@ const open: VoicingKind = {
       free: ["5"],
     },
     { when: { lacks: ["7"] }, voices: ["R", "3", "5", "T"] },
+    {
+      when: { family: ["dominant"], unwritten: ["9", "11"] },
+      voices: ["R", "3", "T", "7"],
+      free: ["5"],
+    },
     { voices: ["R", "3", ["T", "5"], "7"] },
   ],
 };

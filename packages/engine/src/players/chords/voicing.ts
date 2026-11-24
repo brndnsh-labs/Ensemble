@@ -18,7 +18,7 @@ import type { StrikeLine } from "./line.ts";
 import type { Strike, VoicedStrike, Voicing } from "./strike.ts";
 import { LOW_LIMITS } from "./strike.ts";
 import type { ChordRegister, ChordStyle } from "./style.ts";
-import { fitRecipe, identity, readsTheKey, recipeFor } from "./tones.ts";
+import { fitRecipe, identity, readsTheKey, recipeFor, wholeVoices } from "./tones.ts";
 
 export { LOW_LIMITS };
 
@@ -346,11 +346,11 @@ export function voiceStrikes(
         const recipe = recipeFor(kind, chord, scale, context.key);
         const stacks =
           kind.position === "spread" ? [recipe.voices, ...(recipe.also ?? [])] : [recipe.voices];
-        // Voiced whole, the free tones join the voices; otherwise they stay the hand's to leave.
+        // Voiced whole, the free fifth is a voice (`wholeVoices`); otherwise it stays the hand's to leave.
         const free = recipe.free ?? [];
         const fitted = (voices: (typeof stacks)[number]) =>
           isWhole || free.length === 0
-            ? { voices: isWhole ? [...voices, ...free] : voices }
+            ? { voices: isWhole ? wholeVoices(voices, free) : voices }
             : { voices, free };
         const family = chordFamily(chord.quality);
         const every = stacks.flatMap((voices) =>
