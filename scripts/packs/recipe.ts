@@ -24,6 +24,10 @@ export interface Take {
   readonly cap: number;
   /** Semitones to move the pitch by resampling when it is cut (the mid tom). */
   readonly shift?: number;
+  /** Damped from its onset: at full for `hold` seconds, then 60 dB down over `decay`, then silent. */
+  readonly damp?: { readonly hold: number; readonly decay: number };
+  /** The beater's click brought up: everything over `hz` lifted by `db` (a high shelf). */
+  readonly click?: { readonly hz: number; readonly db: number };
   /** In a pack with an amp: how hard this take drives it, as a multiple of the amp's drive. Default 1. */
   readonly push?: number;
 }
