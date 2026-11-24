@@ -1994,8 +1994,8 @@ test(
  * The open shapes country's guitar holds, as a player writes them (CH-24, the style's own
  * notes), by key: a plain major on the I or the IV with its 6th, on the V a triad. A6 is left
  * out: the hand takes x04220, a four-note shape with the root, where x02222 would do as well.
- * The sevenths and thirteenths whose open shape drops or adds a fifth (C7 x32310, A13 x02022)
- * are #2304's.
+ * A seventh or a thirteenth drops its perfect fifth or holds it as its shape has it (C7
+ * x32310 with none, A13 x02022 with the 5th for its root, #2304).
  */
 const COUNTRY_SHAPES: readonly (readonly [
   key: string,
@@ -2005,6 +2005,8 @@ const COUNTRY_SHAPES: readonly (readonly [
     "C",
     {
       C: "x32210",
+      C7: "x32310",
+      F13: "1x1231",
       // After C, as it resolves: led down from G's G4, the hand takes x33013 (F3 G3 C4 G4).
       Csus4: "x33011",
       F: "1x0211",
@@ -2035,6 +2037,7 @@ const COUNTRY_SHAPES: readonly (readonly [
       Bm: "x24432",
       Dsus4: "xx0233",
       A7: "x02020",
+      A13: "x02022",
       Dm7: "xx0211",
     },
   ],
@@ -2047,6 +2050,7 @@ const COUNTRY_SHAPES: readonly (readonly [
       B7: "x21202",
       Asus4: "x02230",
       Am7: "x02010",
+      E13: "020120",
     },
   ],
   ["E", { E: "022120", B7: "x21202", Esus4: "022200", Em7: "022030", B13: "x21204" }],
@@ -2094,6 +2098,59 @@ test(
     }
     assert.deepEqual([...new Set(wrong)], []);
     assert.ok(checked > 60, `only ${checked} chicks`);
+  },
+);
+
+test(
+  "country: a chord whose fifth is altered or diminished keeps that fifth and its root, with a bassist and without: Am7b5 is not Am7, C7#5 not C7, and with no bassist the boom is the root (CH-24 frees only a perfect fifth; X-B-13)",
+  only("country"),
+  () => {
+    const country = STYLES.find((style) => style.id === "country")!;
+    const symbols = ["Am7b5", "Em7b5", "D7b5", "C7#5", "G7#5", "F#dim7"];
+    const chart: LibraryChart = {
+      file: "altered-fifths",
+      text: `title: Altered fifths\nkey: C\nstyle: country\n\n[A]\n${symbols.map((symbol) => `| ${symbol} `).join("")}| C | C |\n`,
+      meter: "4/4",
+    };
+    const wrong: string[] = [];
+    let checked = 0;
+    for (const without of [[], ["bass" as const]]) {
+      for (const energy of [0.3, 0.6]) {
+        const { take } = takeOf({
+          style: country,
+          chart,
+          options: { mode: "jam", passes: 1, energy, seed: 1, without },
+        });
+        const bars = take.plan.bars.filter((bar) => bar.kind === "music");
+        for (const [i, symbol] of symbols.entries()) {
+          const bar = bars[i]!;
+          const chord = harmonyOf(take).findLast((arrival) => arrival.tick <= bar.start)!.chord!;
+          const root = pitchClass(chord.root);
+          const fifth = chordTones(chord.quality).find((tone) => tone.role === "fifth")!.interval;
+          const where = `${symbol} ${without.length ? "alone" : "with bass"} at ${energy}`;
+          const inBar = (strike: Strike) =>
+            strike.tick >= bar.start && strike.tick < bar.start + bar.ticks;
+          for (const strike of strikesOf(take).filter(inBar)) {
+            checked++;
+            const classes = strike.pitches.map((pitch) => (pitch - root + 12) % 12);
+            if (!classes.includes(fifth % 12))
+              wrong.push(`${where}: ${strike.pitches} lacks its fifth`);
+            if (classes.includes(7))
+              wrong.push(`${where}: ${strike.pitches} sounds a perfect fifth`);
+            if (new Set(classes).size < 3)
+              wrong.push(`${where}: ${strike.pitches} under three notes`);
+          }
+          if (without.length) {
+            const boom = pluckedOf(take).find((strike) => strike.tick === bar.start);
+            if (!boom || pitchClass(chord.root) !== boom.pitches[0]! % 12) {
+              wrong.push(`${where}: the boom is ${boom?.pitches}, not the root`);
+            }
+          }
+        }
+      }
+    }
+    assert.deepEqual([...new Set(wrong)], []);
+    assert.ok(checked > 40, `only ${checked} strikes`);
   },
 );
 
