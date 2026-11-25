@@ -208,3 +208,11 @@ What follows from it:
 
 - **Passed by ear, and #2304 closed.** No scorecard moved with the change, so there is no baseline to re-accept.
 - **The two questions the page put to him**, the 0.9 Eb7 upstroke that now sounds two pitch classes (G3 Db4 G4, where main had Bb3 Db4 G4) and whether xx1023 (Eb7) and xx0334 (Bb7) are grips a country player holds, were answered only by the pass: both stay as built.
+
+## his ear on the two new standards (2026-11-25, #2315)
+
+"someday my prince will come and maiden voyage both sound great, awesome job", after listening to `out/standards-two/`. The page: each chart as jazz on seed 1, the band alone for two passes and with the alto for three, with the scorecard's readings beside the clips. Rendered from the branch that merged as 942c351b; he listened before it merged.
+
+- **Passed by ear, and #2315 and #2316 closed.** Jazz's baseline had been accepted on his word before he listened (two waltz measures past tolerance, `docs/decisions/engine.md`), so the scorecard as it stood at the merge is the band he heard.
+- **What the pass covers on the scorecard**: the three measures the change took outside what he had passed (`chords.thin-bars-under-the-solo-in-three` 25%, `band.takes-thinned` 24%, `band.backbeat-swell` 5.16) are jazz's over all 22 charts; the page played the two new ones.
+- **Not on the page**: the soloist's fix (#2316; it moved one jazz measure by 0.01 and had no clip), Blue in Green (held, #2319), and what the review read in the notes of these two charts (#2317, #2318), which the page named in numbers and did not point to in the clips.
