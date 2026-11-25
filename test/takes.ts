@@ -167,7 +167,7 @@ const BAND_KINDS = KINDS.filter((kind) => !kind.solo);
 
 /**
  * A style with few charts of its own: the blues has six, and no seed of them to spare. Jazz's
- * standards are its own too (fourteen of them), so it is not short of material.
+ * standards are its own too (sixteen of them), so it is not short of material.
  */
 const few = (style: StylePack): boolean => ownCharts(style).length + standardsOf(style).length <= 6;
 
