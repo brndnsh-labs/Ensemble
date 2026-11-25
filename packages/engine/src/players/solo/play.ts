@@ -412,11 +412,16 @@ function landsHeld(world: World, at: number, notes: readonly SoloNote[]): boolea
   return soundsFor(world, note.bar, note.tick, note.duration) >= pulse;
 }
 
+/** The furthest a note sounds from where it is written, in ticks: the band's lean and the hand's placement. */
+const PLACED = 40;
+
 /**
  * Whether a run in double time comes straight out of the line as heard: no silence of a pulse
  * or more in the two pulses before its first note, once every note has its length and its
  * breath is taken. `burst.ts` asks the same of the notes' slots when it makes the run; a held
  * note let go early for a breath (a slow tune, a horn) leaves a rest its slot does not show.
+ * A note sounds up to `PLACED` ticks from where it is written, so a gap that much under a pulse
+ * on paper may be a pulse as heard, and is refused too.
  */
 function outOfTheLine(world: World, from: number, notes: readonly SoloNote[]): boolean {
   const first = notes.find((one) => one.tick === from && !one.lead);
@@ -427,10 +432,10 @@ function outOfTheLine(world: World, from: number, notes: readonly SoloNote[]): b
     if (note.tick >= from) continue;
     const ends = note.tick + soundsFor(world, note.bar, note.tick, note.duration);
     if (ends <= reach) continue;
-    if (note.tick - reach >= pulse) return false;
+    if (note.tick - reach >= pulse - PLACED) return false;
     reach = Math.max(reach, ends);
   }
-  return from - reach < pulse;
+  return from - reach < pulse - PLACED;
 }
 
 /**

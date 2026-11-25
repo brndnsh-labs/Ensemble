@@ -197,9 +197,10 @@ const TWELVE_MINOR_KEYS = [
  * LEFT FOR THE ENGINEER (the library's standards, docs/decisions/engine.md): charts that do not come home
  * through every key, held out of that one check and nothing else. Each spells a chromatic chord
  * by its less usual name, as the tune is written (F#m7 in A-flat and in D-flat, C#m7 F#7 in
- * B-flat, F#dim7 passing up from F, Bb7 in B, C#dim7 passing down from Dm7 in B-flat), and in some key that name is also what the usual degree spells (#VI and
- * bVII are both B in D-flat), so the text read back takes the usual degree and comes home
- * spelt the other way. Which degree a name is read as is a decision about the format, not a fix.
+ * B-flat, F#dim7 passing up from F, Bb7 in B, C#dim7 passing down from Dm7 in B-flat), and in
+ * some key that name is also what the usual degree spells (#VI and bVII are both B in D-flat),
+ * so the text read back takes the usual degree and comes home spelt the other way. Which degree
+ * a name is read as is a decision about the format, not a fix.
  */
 const NOT_THROUGH_EVERY_KEY = new Set([
   "standard-all-the-things-you-are.chart",

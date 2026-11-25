@@ -1228,7 +1228,7 @@ test("double time is earned, late, short, rare and playable, and it lands: a run
     const plays = doubleTime.chance > 0;
     // Every take with the soloist at the default, and a style that plays double time on its
     // own charts at the ends of the setting.
-    const jams = [
+    const jams: { take: Take; where: string; held?: boolean }[] = [
       ...soloTakes()
         .filter((jam) => jam.style === style)
         .map((jam) => ({
@@ -1246,14 +1246,17 @@ test("double time is earned, late, short, rare and playable, and it lands: a run
         ? [BREATH_BEFORE_A_RUN].map((options) => ({
             take: takeOf({ style, chart: SOMEDAY, options }).take,
             where: `${SOMEDAY.file} ${JSON.stringify(options)}`,
+            held: true,
           }))
         : []),
     ];
     let atTop = 0;
-    for (const { take, where: said } of jams) {
+    for (const { take, where: said, held } of jams) {
       const setting = take.plan.soloDensity ?? 0.5;
       const found = burstPhrases(take, style);
       if (setting === 1) atTop += found.length;
+      // A take held for its run still has one: if a change moves the draws, find another.
+      if (held && found.length === 0) fail("a held take has no run", said);
       if (found.length === 0) continue;
       const voice = notesOf(take, "solo")[0]!.voice ?? "";
       const instrument = SOLO_INSTRUMENTS[voice]!;
