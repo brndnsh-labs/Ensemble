@@ -869,6 +869,19 @@
       "seat": "chords",
       "styles": ["country"],
       "heard": "out/2304/: | F | C7 | C7 | and | D | A13 | A13 | at 0.5 and | Bbm7 | Eb7 | Ab | at 0.9, seed 1, guitar alone and with the band, before and after. Rendered from the branch that merged as 63ffe641."
+    },
+    {
+      "id": "two-standards-pass",
+      "date": "2026-11-25",
+      "words": "someday my prince will come and maiden voyage both sound great, awesome job",
+      "source": "docs/decisions/critic.md: his ear on the two new standards (2026-11-25, #2315)",
+      "kind": "passed",
+      "medium": "notes",
+      "recorded": "3d2638d6",
+      "doubt": "One sentence after listening; he did not say which of the four clips he played or on what. The page played the two new charts on one seed each, and the measures that left his range are jazz's over all 22 charts, moved mostly by which seeds fall on which chart. He listened before the merge, to the branch as it merged.",
+      "seat": "band",
+      "styles": ["jazz"],
+      "heard": "out/standards-two/: standard-someday-my-prince-will-come and standard-maiden-voyage as jazz at the chart's tempo, seed 1, the band alone (two passes) and with the alto (three). Rendered from the branch that merged as 942c351b."
     }
   ],
   "leftOut": [
