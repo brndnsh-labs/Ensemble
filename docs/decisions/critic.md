@@ -201,3 +201,10 @@ What follows from it:
 - **All five are passed by ear and their issues closed.** Country's and funk's scorecard baselines were re-accepted as that band (#2311) before this was written, so the scorecards as they stood before this record are the ones he heard.
 - **The one question put to his ear by name**, whether country's hot answer over the eighths train should be the soft kick on the "and" of 3 or the snare on the "and" of 4 struck louder (styles.md, #2299): answered only by the pass, with the pair on the page. The rule stays as built.
 - **Not spoken to, and kept as built:** the two fitted sections with no turn that survives (rock in three when quiet, acoustic in three at the working level), reggae and acoustic fitted to three (noted on #2244), and whether a country waltz chart goes in the library, which is still his to say.
+
+## his ear on country's sevenths and thirteenths (2026-11-25, #2304)
+
+"sounds good to me, nice job", after listening to `out/2304/` from his laptop. The page: three 4/4 test charts on seed 1, before and after, guitar alone and with the band, with each strike's notes beside it: `| F | C7 | C7 |` and `| D | A13 | A13 |` at energy 0.5, and `| Bbm7 | Eb7 | Ab |` at 0.9. Rendered from the branch that merged as 63ffe641.
+
+- **Passed by ear, and #2304 closed.** No scorecard moved with the change, so there is no baseline to re-accept.
+- **The two questions the page put to him**, the 0.9 Eb7 upstroke that now sounds two pitch classes (G3 Db4 G4, where main had Bb3 Db4 G4) and whether xx1023 (Eb7) and xx0334 (Bb7) are grips a country player holds, were answered only by the pass: both stay as built.
