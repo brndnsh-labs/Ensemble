@@ -1,0 +1,24 @@
+title: Someday My Prince Will Come
+key: Bb
+tempo: 150
+meter: 3/4
+style: jazz
+
+// Thirty-two bars in three, ABAC, a chord to a bar. The A leaves the one for
+// the three made a dominant with a sharp five, lands on the four, and goes to
+// the two by its own five; B walks down from the three through a diminished
+// chord to the two-five, twice; C goes to the four by its two-five, climbs
+// through a diminished chord back to the one, and turns round.
+[A]
+| Bbmaj7 | D7#5 | Ebmaj7 | G7b9 |
+| Cm7    | G7b9 | Cm7    | F7   |
+
+[B]
+| Dm7 | C#dim7 | Cm7 | F7 |
+| Dm7 | C#dim7 | Cm7 | F7 |
+
+[A]
+
+[C]
+| Fm7    | Bb7 | Ebmaj7 | Edim7 |
+| Bbmaj7 | G7  | Cm7    | F7    |
