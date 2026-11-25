@@ -3,6 +3,8 @@ key: Am
 tempo: 90
 style: blues
 
+// Twelve bars in a minor key, the four in bar two. The last line comes down
+// from the flat six to the five, both dominants, and turns round on the five.
 [A]
 | Am7 | Dm7 | Am7 | %  |
 | Dm7 | %   | Am7 | %  |

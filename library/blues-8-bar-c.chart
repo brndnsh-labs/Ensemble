@@ -3,6 +3,8 @@ key: C
 tempo: 110
 style: blues
 
+// Eight bars: the five comes in bar two, the four gets two bars, and after
+// the one and the five again the last two bars turn round, a chord a half bar.
 [A]
 | C7 | G7 | F7    | %     |
 | C7 | G7 | C7 F7 | C7 G7 |

@@ -3,6 +3,9 @@ key: A
 tempo: 100
 style: blues
 
+// The twelve bars as they come: four on the one, two on the four and two
+// home, then the five, the four, the one, and a bar of the five to turn it
+// round.
 [A]
 | A7 | %  | %  | %  |
 | D7 | %  | A7 | %  |

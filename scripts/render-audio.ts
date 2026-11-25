@@ -2,7 +2,7 @@
 // at a browser: a headless Chrome opens the audition page, the page renders
 // faster than real time and hands the file back.
 //
-//   node scripts/render-audio.ts <name> chart=jazz-blues-f.chart [style=jazz] [seed=1] \
+//   node scripts/render-audio.ts <name> chart=blues-jazz-f.chart [style=jazz] [seed=1] \
 //       [passes=4] [solo=alto-sax] [density=0..1] [fromtop=1] [breathe=1] [open=1 endafter=N toldat=T] \
 //       [layers=1] [only=bass,drums] [energy=0.3] [song=1] [without=bass] [meter=12/8] \
 //       [mix='{...}'] [live=1]

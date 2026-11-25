@@ -3,6 +3,9 @@ key: F
 tempo: 140
 style: blues
 
+// The twelve bars as a jazz band plays them: the quick change, a two-five
+// into the four, a diminished chord climbing out of it, the three and the six
+// into the two, and a two-five home that turns round by the six.
 [A]
 | F7  | Bb7   | F7    | Cm7 F7 |
 | Bb7 | Bdim7 | F7    | Am7 D7 |
