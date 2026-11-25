@@ -856,6 +856,19 @@
       "seat": "drums",
       "styles": ["funk", "rock", "country"],
       "heard": "out/fitted-turn/: funk-two-chord-dm (seed 2, 0.3), rock-four-chord-g (seed 2, 0.55) and country-two-seven-a (seed 1, 0.55), each in 3/4, drums alone and the band, before and after. Rendered from the branch that merged as 525bb770."
+    },
+    {
+      "id": "country-sevenths-thirteenths-pass",
+      "date": "2026-11-25",
+      "words": "sounds good to me, nice job",
+      "source": "docs/decisions/critic.md: his ear on country's sevenths and thirteenths (2026-11-25, #2304)",
+      "kind": "passed",
+      "medium": "notes",
+      "recorded": "662611e8",
+      "doubt": "One sentence after listening from his laptop; he did not say which clips he played. From outside the idiom, by his own earlier word. Three chords on one seed each; the 66 other takes that moved across the library (Bb7, F13, Fm7, Ab) were measured, not heard.",
+      "seat": "chords",
+      "styles": ["country"],
+      "heard": "out/2304/: | F | C7 | C7 | and | D | A13 | A13 | at 0.5 and | Bbm7 | Eb7 | Ab | at 0.9, seed 1, guitar alone and with the band, before and after. Rendered from the branch that merged as 63ffe641."
     }
   ],
   "leftOut": [
