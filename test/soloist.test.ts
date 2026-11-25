@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { PlanBar, Seat, Take } from "@ensemble/engine";
+import type { PlanBar, Seat, Take, TakeOptions } from "@ensemble/engine";
 import {
   burstPhrases,
   chordFamily,
@@ -1206,6 +1206,18 @@ test("an idea comes back a beat early or late: in the styles that do it most som
 // on its own charts it plays none (docs/decisions/soloist.md, double time).
 const DOUBLES = ["jazz", "blues"];
 
+const SOMEDAY = LIBRARY.find(
+  (chart) => chart.file === "standard-someday-my-prince-will-come.chart",
+)!;
+const BREATH_BEFORE_A_RUN: TakeOptions = {
+  tempo: 60,
+  mode: "jam",
+  passes: 3,
+  solo: true,
+  soloInstrument: "alto-sax",
+  seed: 2,
+};
+
 test("double time is earned, late, short, rare and playable, and it lands: a run at twice the style's running subdivision only in a style that plays it (the climb alone where the style says), in a solo's last chorus and never its first phrase, at the busiest level (or the climb) straight after a phrase at the busiest level, out of the line's own notes without a breath (no rest of a pulse in the two before it), after a phrase with no empty bar and at least the first chorus's notes a beat, come to by a fourth at most (a fifth into the climb) and no move inside it wider than a fifth; on the doubled grid as heard from a pulse to a pulse, half a bar to two bars (on a ballad, only toward the top of the setting and no longer than the style says), never faster than the instrument's fastest; one way (straight, or a pulse at a time in sequence), a chord tone on every pulse, landing on a chord tone on a pulse, held a pulse; one at most a solo, none at the bottom of the setting, and some at its top in the styles that play it most", () => {
   const failures = new Map<string, string[]>();
   const fail = (clause: string, where: string) =>
@@ -1216,7 +1228,7 @@ test("double time is earned, late, short, rare and playable, and it lands: a run
     const plays = doubleTime.chance > 0;
     // Every take with the soloist at the default, and a style that plays double time on its
     // own charts at the ends of the setting.
-    const jams = [
+    const jams: { take: Take; where: string; held?: boolean }[] = [
       ...soloTakes()
         .filter((jam) => jam.style === style)
         .map((jam) => ({
@@ -1228,12 +1240,23 @@ test("double time is earned, late, short, rare and playable, and it lands: a run
             takes.map((take, i) => ({ take, where: `setting ${SETTINGS[i]}` })),
           )
         : []),
+      // Held whatever the rotation hands round: at 60 in three the alto lets a held note go
+      // early for its breath in the bar before a run, a rest the run's slots do not show.
+      ...(style.id === "blues"
+        ? [BREATH_BEFORE_A_RUN].map((options) => ({
+            take: takeOf({ style, chart: SOMEDAY, options }).take,
+            where: `${SOMEDAY.file} ${JSON.stringify(options)}`,
+            held: true,
+          }))
+        : []),
     ];
     let atTop = 0;
-    for (const { take, where: said } of jams) {
+    for (const { take, where: said, held } of jams) {
       const setting = take.plan.soloDensity ?? 0.5;
       const found = burstPhrases(take, style);
       if (setting === 1) atTop += found.length;
+      // A take held for its run still has one: if a change moves the draws, find another.
+      if (held && found.length === 0) fail("a held take has no run", said);
       if (found.length === 0) continue;
       const voice = notesOf(take, "solo")[0]!.voice ?? "";
       const instrument = SOLO_INSTRUMENTS[voice]!;

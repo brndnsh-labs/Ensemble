@@ -235,7 +235,13 @@ export function soloPart(
     const mainKept = new Set<Phrase>();
     const keeps = offered.map((phrase, i) => {
       const { inPlace } = phrase;
-      if (!inPlace) return !phrase.burst || landsHeld(world, phrase.burst.lands, realised[i]!);
+      if (!inPlace) {
+        if (!phrase.burst) return true;
+        return (
+          landsHeld(world, phrase.burst.lands, realised[i]!) &&
+          outOfTheLine(world, phrase.burst.from, [...leading, ...realised[i]!])
+        );
+      }
       if (!phrase.newly) {
         const kept = asLong(realise(world, inPlace, accent, from), realised[i]!);
         if (kept) mainKept.add(inPlace);
@@ -404,6 +410,32 @@ function landsHeld(world: World, at: number, notes: readonly SoloNote[]): boolea
   if (!note) return false;
   const pulse = pulseTicks(note.bar.meter)[0]!;
   return soundsFor(world, note.bar, note.tick, note.duration) >= pulse;
+}
+
+/** The furthest a note sounds from where it is written, in ticks: the band's lean and the hand's placement. */
+const PLACED = 40;
+
+/**
+ * Whether a run in double time comes straight out of the line as heard: no silence of a pulse
+ * or more in the two pulses before its first note, once every note has its length and its
+ * breath is taken. `burst.ts` asks the same of the notes' slots when it makes the run; a held
+ * note let go early for a breath (a slow tune, a horn) leaves a rest its slot does not show.
+ * A note sounds up to `PLACED` ticks from where it is written, so a gap that much under a pulse
+ * on paper may be a pulse as heard, and is refused too.
+ */
+function outOfTheLine(world: World, from: number, notes: readonly SoloNote[]): boolean {
+  const first = notes.find((one) => one.tick === from && !one.lead);
+  if (!first) return false;
+  const pulse = pulseTicks(first.bar.meter)[0]!;
+  let reach = from - 2 * pulse;
+  for (const note of notes) {
+    if (note.tick >= from) continue;
+    const ends = note.tick + soundsFor(world, note.bar, note.tick, note.duration);
+    if (ends <= reach) continue;
+    if (note.tick - reach >= pulse - PLACED) return false;
+    reach = Math.max(reach, ends);
+  }
+  return from - reach < pulse - PLACED;
 }
 
 /**

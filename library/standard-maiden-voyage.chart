@@ -1,0 +1,20 @@
+title: Maiden Voyage
+key: D
+tempo: 126
+style: jazz
+
+// Thirty-two bars, AABA, four chords in all, four bars each, and not one of
+// them a dominant that resolves: a suspended ninth on D, another a minor third
+// up, the bridge's a half step above the first, and a minor ninth. Nothing
+// pulls anywhere, so the players have to make the motion.
+[A]
+| D9sus4 | % | % | % |
+| F9sus4 | % | % | % |
+
+[A]
+
+[B]
+| Eb9sus4 | % | % | % |
+| C#m9    | % | % | % |
+
+[A]
