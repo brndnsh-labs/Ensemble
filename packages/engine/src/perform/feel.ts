@@ -107,8 +107,10 @@ export function applyFeel(
       place = rng.fork("place", note.seat, voice, tickInBar).next();
       kept.places.set(tickInBar, place);
     }
-    const where = (inPass[note.bar] ??= barInPass(bar));
-    const touches = (kept.touches[note.pitch] ??= new Map());
+    inPass[note.bar] ??= barInPass(bar);
+    kept.touches[note.pitch] ??= new Map();
+    const where = inPass[note.bar]!;
+    const touches = kept.touches[note.pitch]!;
     const touchName = `${where}/${tickInBar}`;
     let touch = touches.get(touchName);
     if (touch === undefined) {

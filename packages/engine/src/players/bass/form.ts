@@ -149,6 +149,6 @@ export function linesIn(bass: BassStyle, form: readonly Piece[]): BassLine[] {
 }
 
 /** A bar's pulses as lengths in ticks. */
-export function pulses(bar: PlanBar): number[] {
+export function pulses(bar: PlanBar): readonly number[] {
   return pulseTicks(bar.meter);
 }

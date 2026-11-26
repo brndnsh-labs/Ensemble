@@ -165,7 +165,20 @@ export function chordFamily(quality: Quality): ChordFamily {
  * natural tone in the same role (b5 replaces the fifth), except that b9 and #9
  * can stand together.
  */
-export function chordTones(quality: Quality): ChordTone[] {
+export function chordTones(quality: Quality): readonly ChordTone[] {
+  // A symbol's tones are the same every time it is asked: worked out once for each.
+  const name = `${quality.base} ${quality.alterations.join(" ")}`;
+  let tones = TONES.get(name);
+  if (!tones) {
+    tones = tonesOf(quality);
+    TONES.set(name, tones);
+  }
+  return tones;
+}
+
+const TONES = new Map<string, readonly ChordTone[]>();
+
+function tonesOf(quality: Quality): readonly ChordTone[] {
   let tones = RECIPES[quality.base][1].map(([role, interval]) => ({ role, interval }));
   for (const alteration of quality.alterations) {
     const [role, interval] = ALTERED_TONE[alteration];
@@ -173,8 +186,10 @@ export function chordTones(quality: Quality): ChordTone[] {
     tones = tones.filter((t) => !isNatural(t) && t.interval !== interval);
     tones.push({ role, interval });
   }
-  return tones.sort(
-    (a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role) || a.interval - b.interval,
+  return Object.freeze(
+    tones.sort(
+      (a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role) || a.interval - b.interval,
+    ),
   );
 }
 

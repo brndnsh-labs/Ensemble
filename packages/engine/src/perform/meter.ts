@@ -12,7 +12,19 @@ import { STEP } from "./grid.ts";
  * (6/8, 12/8), otherwise quarters with the odd eighth joining the last one
  * (7/8 is 2+2+3).
  */
-export function pulseTicks(meter: Meter): number[] {
+export function pulseTicks(meter: Meter): readonly number[] {
+  const name = meterName(meter);
+  let found = PULSES.get(name);
+  if (!found) {
+    found = Object.freeze(pulsesOf(meter));
+    PULSES.set(name, found);
+  }
+  return found;
+}
+
+const PULSES = new Map<string, readonly number[]>();
+
+function pulsesOf(meter: Meter): number[] {
   const { beats, unit } = meter;
   if (unit !== 8) {
     return new Array<number>(Math.max(1, Math.round((beats * 4) / unit))).fill(PPQ);

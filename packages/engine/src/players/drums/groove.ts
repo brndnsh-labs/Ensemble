@@ -241,7 +241,7 @@ function finish(part: BarPart, time: DrumTime, bar: PlanBar, written: boolean): 
 function onThePulse(lines: Lines): Lines {
   const moved: Record<string, string> = {};
   for (const [voice, text] of Object.entries(lines)) {
-    const symbols = cells(text);
+    const symbols = [...cells(text)];
     for (let beat = 0; beat + 1 < symbols.length; beat += BEAT) {
       const late = symbols[beat + 1]!;
       if (symbols[beat] === TAKEN && late in LEVELS) {

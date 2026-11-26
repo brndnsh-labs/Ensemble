@@ -72,8 +72,17 @@ const SCALES: Readonly<Record<ScaleName, readonly number[]>> = {
  */
 export function chordScale(chord: Chord, context: HarmonicContext): ChordScale {
   const name = scaleName(chord, context);
-  return { name, intervals: fitToChord(SCALES[name], chord.quality) };
+  // A scale fitted to a symbol is the same every time: worked out once for each.
+  const fitted = `${name} ${chord.quality.base} ${chord.quality.alterations.join(" ")}`;
+  let intervals = FITTED.get(fitted);
+  if (!intervals) {
+    intervals = Object.freeze(fitToChord(SCALES[name], chord.quality));
+    FITTED.set(fitted, intervals);
+  }
+  return { name, intervals };
 }
+
+const FITTED = new Map<string, readonly number[]>();
 
 /** Whether the scale holds a note this many semitones above the chord root. */
 export function scaleHas(scale: ChordScale, interval: number): boolean {
