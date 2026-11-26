@@ -195,8 +195,9 @@ export interface SoloStyle {
     /**
      * Notes over each chord's own root, by the chord's family, as semitones
      * above that root: a scale moved with every chord, as a pentatonic on each
-     * chord's root is (ST-disco-21: 1 2 3 5 6 over a major chord). A family
-     * left out adds nothing. Left out, none.
+     * chord's root is (ST-disco-21: 1 2 3 5 6 over a major chord). One the
+     * chord's own scale lacks is not played over that chord: the 2nd over a
+     * written b9. A family left out adds nothing. Left out, none.
      */
     readonly overRoot?: Readonly<Partial<Record<ChordFamily, readonly number[]>>>;
     /** Notes of the key that are in whatever the chord, as semitones above the tonic. */

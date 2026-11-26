@@ -53,8 +53,12 @@ export function poolOf(
 
   const all = new Set(chordPcs);
   if (solo.notes.chordScale) for (const pc of inScale) all.add(pc);
+  // A scale moved with the chord's root gives up the tones this chord's own scale has no
+  // place for: its 2nd over a written b9, its 2nd and 6th over a V on its way to a minor
+  // chord, its 2nd on the iii of a major key (X-B-11, X-B-13).
   for (const interval of solo.notes.overRoot?.[chordFamily(chord.quality)] ?? []) {
-    all.add(mod12(root + interval));
+    const pc = mod12(root + interval);
+    if (inScale.has(pc)) all.add(pc);
   }
   const tonic = pitchClass(arrival.key.tonic);
   const over = mod12(root - tonic);
