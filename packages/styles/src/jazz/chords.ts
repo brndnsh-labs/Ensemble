@@ -575,7 +575,15 @@ export const jazzChords: ChordStyle = {
   // 92, what the figure already plays in a breath is 8 harder (ST-jazz-29, CH-71, X-C-41).
   // The hand stays in its working book however hot the band gets: louder is harder, not
   // busier, under a horn (gate 3, `listening.busiest`).
-  listening: { breath: 6, answer: { level: 92, steps: 2 }, lift: 8, busiest: "mid" },
+  // Where the alto goes under the hand, the hand goes under the alto with the shell: a sus
+  // chord's four notes have no inversion low enough without a half step in the mud (#2317).
+  listening: {
+    breath: 6,
+    answer: { level: 92, steps: 2 },
+    lift: 8,
+    busiest: "mid",
+    under: "shell",
+  },
   // The final chord at 92, the button 12 harder (ST-jazz-48, X-C-40).
   ending: { velocity: 92, soft: 72, accent: 12 },
 };

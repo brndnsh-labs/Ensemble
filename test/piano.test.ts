@@ -2304,3 +2304,64 @@ test(
     assert.ok(booms > enough(600), `only ${booms} bars with no bassist`);
   },
 );
+
+test(
+  "jazz: the piano does not sit over a line that has gone under it: a strike with the soloist sounding below its lowest note for half its length or a full beat is the chord's first in its bar, struck ahead of its chord, the strike before it again, or a strike that is the whole chord (an ending's last chord, a bar with no bassist); anywhere else the hand has gone under the line with two or three notes, or left the strike out",
+  only("jazz"),
+  () => {
+    let under = 0;
+    let shells = 0;
+    for (const { chart, options, take } of [
+      ...takes((jam) => jam.options.solo === true),
+      ...soloistTakes(),
+    ]) {
+      const bars = take.plan.bars;
+      const harmony = harmonyOf(take);
+      const line = notesOf(take, "solo");
+      const strikes = strikesOf(take);
+      const opened = new Set<string>();
+      // Strikes come in order: the line and the harmony are walked once.
+      let from = 0;
+      let at = 0;
+      strikes.forEach((strike, i) => {
+        const bar = barAt(bars, strike.tick)!;
+        while (harmony[at + 1] && harmony[at + 1]!.tick <= strike.tick) at++;
+        const arrival = harmony[at]!.tick <= strike.tick ? harmony[at] : undefined;
+        const key = `${bar.index} ${arrival?.index}`;
+        const opens = !opened.has(key);
+        opened.add(key);
+        const ends = Math.min(strike.ends, strikes[i + 1]?.tick ?? Infinity, bar.start + bar.ticks);
+        const length = Math.max(1, ends - strike.tick);
+        let below = 0;
+        let lowest = Infinity;
+        while (line[from] && line[from]!.tick + line[from]!.duration <= strike.tick) from++;
+        for (let n = from; line[n] && line[n]!.tick < ends; n++) {
+          const note = line[n]!;
+          const ticks =
+            Math.min(note.tick + note.duration, ends) - Math.max(note.tick, strike.tick);
+          if (ticks <= 0) continue;
+          lowest = Math.min(lowest, note.pitch);
+          if (note.pitch < strike.pitches[0]!) below += ticks;
+        }
+        if (strike.pitches.length <= 3 && strike.pitches.at(-1)! <= lowest - 2) shells++;
+        if (below === 0 || (below * 2 < length && below < PPQ)) return;
+        const whole =
+          bar.seats.bass === null || (bar.ending && strike.tick >= bar.start + bar.ending.at);
+        if (whole) return;
+        under++;
+        const before = strikes[i - 1];
+        const again = before?.pitches.join() === strike.pitches.join();
+        const next = harmony.slice(at + 1).find((one) => one.changed);
+        const ahead = next !== undefined && next.tick - strike.tick <= PPQ / 2;
+        assert.ok(
+          opens || again || ahead,
+          `${chart.file} seed ${options.seed} ${JSON.stringify(options)} bar ${bar.index}: ${strike.pitches} over a line down to ${lowest}`,
+        );
+      });
+    }
+    assert.ok(
+      under > enough(60) && shells > enough(60),
+      `${under} strikes over the line, ${shells} under it`,
+    );
+  },
+);

@@ -548,6 +548,17 @@ export interface Listening {
    * played with one pair of hands. Left out, the kinds are the rhythm's.
    */
   readonly closes?: string;
+  /**
+   * What one hand plays where the soloist has gone under it, sounding below its
+   * lowest voice for half the strike or a full beat. `"shell"`: the tones the
+   * chord is heard by and nothing else, under the line (CH-66's last resort);
+   * where no shell fits over the floor and the bass, the strike is left out,
+   * unless it is the chord's first in its bar or a push (CH-69's floor). A
+   * strike that asks to be voiced whole (an ending's last chord, a bar with
+   * no bassist) is never thinned. Left out,
+   * the voicing as chosen: the line is under the comp.
+   */
+  readonly under?: "shell";
 }
 
 export interface ChordStyle {

@@ -484,6 +484,10 @@ export function validateChordStyle(chords: ChordStyle): string[] {
       listening.closes === undefined || listening.closes in chords.kinds,
       `listening: the hands close up to "${listening.closes}", which is no voicing kind.`,
     );
+    say(
+      listening.under === undefined || listening.under === "shell",
+      `listening: under the line the hand plays "${listening.under}"; the one way written is "shell".`,
+    );
   }
 
   const ending = chords.ending;

@@ -278,6 +278,60 @@ function clear(voicing: Voicing, line: StrikeLine, needed: ReadonlySet<number>, 
 }
 
 /**
+ * Whether the soloist has gone under the hand: it sounds below the voicing's
+ * lowest note for half the strike or a full beat (CH-60's measure of a note
+ * that matters).
+ */
+function lineUnder(voicing: Voicing, line: StrikeLine): boolean {
+  const bottom = voicing.pitches[0]!;
+  let under = 0;
+  for (const note of line.over) if (note.pitch < bottom) under += note.ticks;
+  return under > 0 && (under * 2 >= line.length || under >= PPQ);
+}
+
+/**
+ * The chord's shell under the line (CH-66's last resort, for one hand): the
+ * tones the chord is heard by (X-B-13) in close position, the top one a whole
+ * step or more under the lowest note sounding over the strike, nothing under
+ * the register's floor, the bottom a fourth clear of the bass, no interval
+ * too low to be clear (X-B-04) and no growl. Of the shells that fit, the one
+ * closest under the line; null where none fits, or the voicing is already
+ * only those tones: there is no room (CH-63).
+ */
+function shellUnder(
+  voicing: Voicing,
+  line: StrikeLine,
+  way: Pick<Way, "needed" | "root" | "family">,
+  register: ChordRegister,
+): Voicing | null {
+  const guides = voicing.pitches
+    .map((pitch, i) => ({ pc: mod12(pitch), tone: voicing.tones[i]! }))
+    .filter((voice) => way.needed.has(mod12(voice.pc - way.root)));
+  if (guides.length < 2 || guides.length === voicing.pitches.length) return null;
+  const limit = Math.min(...line.over.map((note) => note.pitch)) - 2;
+  const floor = Math.max(register.floor, line.bass === null ? 0 : line.bass + CLEAR_OF_THE_BASS);
+  let best: Voicing | null = null;
+  for (const lead of guides) {
+    // Close position under the voice on top: every other tone the nearest of its name below it.
+    const high = limit - mod12(limit - lead.pc);
+    const voices = guides
+      .map((voice) => ({
+        tone: voice.tone,
+        pitch: voice === lead ? high : high - (mod12(high - voice.pc) || 12),
+      }))
+      .sort((a, b) => a.pitch - b.pitch);
+    const pitches = voices.map((voice) => voice.pitch);
+    if (pitches[0]! < floor || growls({ pitches }, way.family)) continue;
+    const muddy = pitches.some(
+      (pitch, i) => i > 0 && pitches[i - 1]! < (LOW_LIMITS[(pitch - pitches[i - 1]!) % 12] ?? 0),
+    );
+    if (muddy) continue;
+    if (!best || high > top(best)) best = { pitches, tones: voices.map((voice) => voice.tone) };
+  }
+  return best;
+}
+
+/**
  * Voice every strike in order, each led from the one before. The same
  * strikes always get the same voicings.
  *
@@ -321,6 +375,8 @@ export function voiceStrikes(
   let held: Way | null = null;
   // Whether the hand is still out of its place after a line it heard.
   let away = false;
+  // The chords already struck in their bar, by bar and arrival.
+  const opened = new Set<string>();
   // The ways to play a strike's chord, worked out once for each chord in each kind; null for a
   // strike with nothing to voice.
   const wayFor = (strike: Strike): Way | null => {
@@ -447,6 +503,23 @@ export function voiceStrikes(
     if (!line && Math.abs(top(next) - target) <= reach) away = false;
     // The hand is led on from the whole voicing it chose, not from what was left sounding.
     previous = next;
+    // The line has gone under the hand (`listening.under`): the shell under it, and where
+    // there is no room for one the strike is left out, as one under a sounding note is
+    // (CH-69), with CH-69's floor: a chord's first strike in its bar and a push are played.
+    // A strike that asks to be voiced whole is the whole chord, whatever the line does: an
+    // ending's last chord, and a bar with no bassist under the hand.
+    const stated = `${strike.bar} ${strike.arrival.index}`;
+    const opens = !opened.has(stated);
+    opened.add(stated);
+    const thins = chords.listening?.under === "shell" && !strike.whole;
+    if (line && thins && lineUnder(next, line)) {
+      const shell = shellUnder(next, line, way, chords.register);
+      if (shell) {
+        voiced.push({ strike, voicing: shell });
+        continue;
+      }
+      if (!opens && strike.arrival.tick <= strike.tick) continue;
+    }
     voiced.push({ strike, voicing: line ? clear(next, line, way.needed, way.root) : next });
   }
   return voiced;
