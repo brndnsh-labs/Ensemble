@@ -23,7 +23,7 @@ const rootless: VoicingKind = {
     // A dominant takes the 9th and 13th in place of the root and 5th, each as written or as
     // its scale implies, so a V going to a minor chord plays b9 and b13 (X-B-11). A sus
     // chord's 4th stands in for the 3rd. A dominant whose scale has no 13th of either kind
-    // (a 7b9 the engine reads as altered over a natural 5th) keeps four notes with its 5th.
+    // keeps four notes with its 5th.
     { when: { family: ["dominant"] }, voices: ["3", "7", "9", ["13", "5"]] },
     { when: { family: ["power"] }, voices: ["R", "5"] },
     // A triad with no 7th or 6th gets its root: root, 3rd, 5th, and the 9th on it

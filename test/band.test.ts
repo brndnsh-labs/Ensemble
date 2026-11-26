@@ -10,7 +10,11 @@ import {
   BREATHE_MOST,
   breatheAmount,
   burstPhrases,
+  chordFamily,
+  chordTones,
+  contextOf,
   isCompound,
+  onPulse,
   PPQ,
   parse,
   pitchClass,
@@ -31,7 +35,7 @@ import {
 } from "@ensemble/engine";
 import { styleIds } from "@ensemble/styles";
 import { corpus } from "./corpus.ts";
-import { barAt, bluesWritten, POCKET } from "./reading.ts";
+import { barAt, bluesWritten, harmonyOf, POCKET } from "./reading.ts";
 import type { Jam, LibraryChart } from "./takes.ts";
 import {
   enough,
@@ -1774,5 +1778,84 @@ test("a seat laid out of a jam is silent: none of its notes starts in a bar it s
         }
       }
     }
+  }
+});
+
+test("a dominant with a written b9 or #9 over its natural fifth, on its way down a fifth to a minor chord, takes that minor key's notes (Phrygian dominant, X-B-11): nobody sounds its major 9th, its #11 or its major 13th over it, and the bass and the piano no #9 the chord does not write, but for a note a half step from the one it goes to: the soloist's short and off the beat, the bass's anywhere in its line or passed through by step", () => {
+  let chords = 0;
+  let judged = 0;
+  const wrong: string[] = [];
+  for (const { style, chart, options, take } of takes()) {
+    const harmony = harmonyOf(take);
+    const bars = take.plan.bars;
+    const toMinor = harmony.filter((arrival) => {
+      const chord = arrival.chord;
+      const next = contextOf(harmony, arrival).next;
+      if (!chord || !next || chordFamily(chord.quality) !== "dominant") return false;
+      const written = (interval: number) =>
+        chordTones(chord.quality).some((tone) => tone.interval === interval);
+      const family = chordFamily(next.quality);
+      return (
+        (written(13) || written(15)) &&
+        written(7) &&
+        !written(21) &&
+        (pitchClass(chord.root) - pitchClass(next.root) + 12) % 12 === 7 &&
+        (family === "minor" || family === "half-diminished")
+      );
+    });
+    if (toMinor.length === 0) continue;
+    chords += toMinor.length;
+    for (const seat of ["solo", "bass", "chords"] as const) {
+      // A soloist who plays a pentatonic on each chord's own root still plays its 2nd and 6th
+      // over these chords (#2324): held to the #11 alone until that is built.
+      const moved = seat === "solo" && style.solo.notes.overRoot?.dominant !== undefined;
+      const out = moved ? [6] : seat === "solo" ? [2, 6, 9] : [2, 3, 6, 9];
+      const line = notesOf(take, seat);
+      line.forEach((note, i) => {
+        const over = toMinor.find(
+          (arrival) => arrival.tick <= note.tick && note.tick < arrival.tick + arrival.duration,
+        );
+        if (!over?.chord) return;
+        // A note struck in the eighth before the next chord and held into it is that chord's (X-B-07).
+        const until = over.tick + over.duration;
+        const ends = note.tick + note.offset + note.duration;
+        if (until - note.tick <= PPQ / 2 && ends >= until - POCKET) return;
+        judged++;
+        const interval = (note.pitch - pitchClass(over.chord.root) + 120) % 12;
+        if (chordTones(over.chord.quality).some((tone) => tone.interval % 12 === interval)) return;
+        if (!out.includes(interval)) return;
+        const measure = barAt(bars, note.tick)!;
+        const where = `${chart.file} seed ${options.seed} ${JSON.stringify(options)} bar ${measure.index}: the ${seat}'s ${note.pitch} over ${over.chord.text}`;
+        if (seat === "chords") {
+          wrong.push(where);
+          return;
+        }
+        // A note struck again before it moves (the bass's lope) goes where the last of them goes.
+        let [first, last] = [i, i];
+        while (line[first - 1]?.pitch === note.pitch) first--;
+        while (line[last + 1]?.pitch === note.pitch) last++;
+        const [before, after] = [line[first - 1], line[last + 1]];
+        // An open jam stops where it is stopped: its last note may lead into a chorus never played.
+        if (!after && take.plan.open) return;
+        const leaves = after ? after.pitch - note.pitch : 0;
+        if (seat === "solo") {
+          const passes =
+            Math.abs(leaves) === 1 &&
+            note.duration < PPQ * 0.75 &&
+            !onPulse(measure.meter, note.tick - measure.start);
+          if (!passes) wrong.push(`${where}, on to ${after?.pitch}`);
+          return;
+        }
+        const from = before ? note.pitch - before.pitch : 0;
+        const passes =
+          Math.abs(leaves) === 1 ||
+          (Math.abs(from) <= 2 && Math.abs(leaves) <= 2 && from * leaves > 0);
+        if (!passes) wrong.push(`${where}, from ${before?.pitch} on to ${after?.pitch}`);
+      });
+    }
+  }
+  assert.equal(wrong.length, 0, `${wrong.length} of ${judged}:\n${wrong.slice(0, 6).join("\n")}`);
+  if (STYLES.some((style) => ownCharts(style).some((one) => /7[b#]9/.test(one.text)))) {
+    assert.ok(chords > 0 && judged > 0, `${chords} such chords, ${judged} notes over them`);
   }
 });
