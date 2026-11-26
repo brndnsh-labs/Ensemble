@@ -2306,7 +2306,7 @@ test(
 );
 
 test(
-  "jazz: the piano does not sit over a line that has gone under it: a strike with the soloist sounding below its lowest note for half its length or a full beat is the chord's first in its bar, struck ahead of its chord, the strike before it again, or a strike that is the whole chord (an ending's last chord, a bar with no bassist); anywhere else the hand has gone under the line with two or three notes, or left the strike out",
+  "jazz: the piano does not sit over a line that has gone under it: a strike with the soloist sounding below its lowest note for half its length or a full beat is the chord's first in its bar, struck ahead of its chord and ringing into it, or a strike that is the whole chord (an ending's last chord and its button, a bar with no bassist); anywhere else the hand has gone under the line with two or three notes, or left the strike out",
   only("jazz"),
   () => {
     let under = 0;
@@ -2349,12 +2349,16 @@ test(
           bar.seats.bass === null || (bar.ending && strike.tick >= bar.start + bar.ending.at);
         if (whole) return;
         under++;
-        const before = strikes[i - 1];
-        const again = before?.pitches.join() === strike.pitches.join();
+        // A push is the chord coming, struck within an eighth before it and ringing into it
+        // (X-B-07). From the notes alone a strike of the chord in hand that does the same
+        // cannot be told from one, so it is passed too.
         const next = harmony.slice(at + 1).find((one) => one.changed);
-        const ahead = next !== undefined && next.tick - strike.tick <= PPQ / 2;
+        const ahead =
+          next !== undefined &&
+          next.tick - strike.tick <= PPQ / 2 &&
+          strike.ends >= next.tick - POCKET;
         assert.ok(
-          opens || again || ahead,
+          opens || ahead,
           `${chart.file} seed ${options.seed} ${JSON.stringify(options)} bar ${bar.index}: ${strike.pitches} over a line down to ${lowest}`,
         );
       });

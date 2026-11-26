@@ -306,7 +306,9 @@ function shellUnder(
 ): Voicing | null {
   const guides = voicing.pitches
     .map((pitch, i) => ({ pc: mod12(pitch), tone: voicing.tones[i]! }))
-    .filter((voice) => way.needed.has(mod12(voice.pc - way.root)));
+    .filter((voice) => way.needed.has(mod12(voice.pc - way.root)))
+    // One voice to a tone: a tone the voicing doubles is in the shell once.
+    .filter((voice, i, all) => all.findIndex((other) => other.pc === voice.pc) === i);
   if (guides.length < 2 || guides.length === voicing.pitches.length) return null;
   const limit = Math.min(...line.over.map((note) => note.pitch)) - 2;
   const floor = Math.max(register.floor, line.bass === null ? 0 : line.bass + CLEAR_OF_THE_BASS);
