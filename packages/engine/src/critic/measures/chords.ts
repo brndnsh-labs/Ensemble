@@ -300,6 +300,68 @@ export const chordMeasures: readonly Measure[] = [
     },
   },
   {
+    id: "chords.flat-13-against-the-fifth",
+    seat: "chords",
+    lowerIsBetter: true,
+    says: "Where the comp holds a b13 over a dominant chord, the bass and the soloist are seldom holding that chord's natural fifth with it: a half step, or a minor ninth, between the hand and the band.",
+    unit: "share",
+    // X-B-11 gives the hand the b13 on the way to a minor chord and X-B-08 calls a held half
+    // step from a chord tone a rub; the fifth is still a chord tone to the bass and the line.
+    // Held is X-B-08's: the two sound together for longer than an eighth, while the chord lasts.
+    of(take) {
+      const harmony = arrivals(take.plan);
+      const fifths = [...notesOf(take, "bass"), ...notesOf(take, "solo")]
+        .map((note) => ({
+          pitch: note.pitch,
+          from: note.tick + note.offset,
+          to: note.tick + note.offset + note.duration,
+        }))
+        .filter((note) => note.to - note.from > EIGHTH)
+        .sort((a, b) => a.from - b.from);
+      const longest = Math.max(0, ...fifths.map((note) => note.to - note.from));
+      const comp = notesOf(take, "chords").filter(
+        (note) => note.voice !== MUTED && note.voice !== PICKED,
+      );
+      let [at, first, held, against] = [0, 0, 0, 0];
+      for (const s of strikes(take)) {
+        if (chordFamily(s.chord.quality) !== "dominant") continue;
+        // The chord lasts until the harmony moves to another: a strike played early is the
+        // chord coming, and that chord's arrival is not its end.
+        const under = chordAt(take, s.tick);
+        const early = !under || chordToString(under) !== chordToString(s.chord);
+        let from = s.tick;
+        while (
+          at < harmony.length &&
+          (harmony[at]!.tick <= s.tick ||
+            (harmony[at]!.chord && chordToString(harmony[at]!.chord!) === chordToString(s.chord)))
+        ) {
+          if (early && from === s.tick) from = Math.max(from, harmony[at]!.tick);
+          at++;
+        }
+        const until = harmony[at]?.tick ?? Number.POSITIVE_INFINITY;
+        const ends = Math.max(
+          0,
+          ...comp
+            .filter((note) => note.tick === s.tick && above(s.chord, note.pitch) === 8)
+            .map((note) => note.tick + note.offset + note.duration),
+        );
+        const to = Math.min(ends, until);
+        if (to - from <= EIGHTH) continue;
+        held++;
+        while (first < fifths.length && fifths[first]!.from < from - longest) first++;
+        for (let i = first; i < fifths.length && fifths[i]!.from < to; i++) {
+          const note = fifths[i]!;
+          if (above(s.chord, note.pitch) !== 7) continue;
+          if (Math.min(to, note.to) - Math.max(from, note.from) > EIGHTH) {
+            against++;
+            break;
+          }
+        }
+      }
+      return share(against, held);
+    },
+  },
+  {
     id: "chords.voicing-faults",
     seat: "chords",
     says: "Almost no chord has a fault a pianist would hear: a half step on the bottom, a minor 9th, a #9 under the 3rd, a muddy low interval.",

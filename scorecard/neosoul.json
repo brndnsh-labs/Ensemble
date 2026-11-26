@@ -203,6 +203,12 @@
     "p90": 1,
     "inTarget": 1
   },
+  "chords.flat-13-against-the-fifth": {
+    "mean": 0.0799,
+    "p10": 0,
+    "p90": 0.3333,
+    "inTarget": null
+  },
   "chords.voicing-faults": {
     "mean": 0.0002,
     "p10": 0,
