@@ -233,6 +233,15 @@ What follows from it:
 - **`chords.over-the-line` stays, reported with no target.** It is the reading of the line under the hand; nothing is asked of it.
 - **Filed (#2329, his word before it merges)**: the scorecard's `chords.in-the-soloists-register` counts piano notes the hand had no room to move, where the voicing critic's own feature forgives them (CH-63), which is what reads Maiden Voyage as out of target.
 
+## a measure for the comp's b13 against a fifth held in the band; the notes stay (#2325, 2026-11-26)
+
+- **His word** (2026-11-26, `/unblock`): "Measure only", on the card "the piano voices the b13 while the bass and soloist still play the fifth, a half step or minor ninth apart": the measure reports, and nobody gives way. X-B-11 gives the hand the b13 on a V going to a minor chord, X-B-08 calls a held half step from a chord tone a rub, and the fifth is still a chord tone to the bass and the line; the two notes disagree, and that is left as it plays.
+- **The measure: `chords.flat-13-against-the-fifth`** (`packages/engine/src/critic/measures/chords.ts`), reported with no target. Of the comp's strikes over a dominant chord that hold a b13 for longer than an eighth while the chord lasts (written or not; a strike played early is counted from its chord's arrival), the share where the bass or the soloist sounds that chord's natural fifth with it for longer than an eighth. Held is X-B-08's own line: "a passing note of an eighth or less may brush".
+- **Narrower than the issue drafted** ("the comp's held voices that are not tones of the chord symbol ... with the chord tone a half step away"): that count would take in the 13th against the b7 and the 9th against a minor 3rd, the colours every style voices on purpose, and say little about the one clash asked about.
+- **What it reads** (each style's 200 takes; a style with no such chord has nothing to read and no line): jazz 16% of such strikes (by take: the middle one 11%, one in ten over 43%, the highest 65%, Autumn Leaves), the blues 12% (the middle take none, one in ten over 29%, the highest 83%, the minor blues), neo-soul 3% (the middle take none). Neo-soul reads low because its bass's fifth there is a brush: in Slow Six, seed 1, bar 7, `2la G1 5 0.92` lasts 0.92 of an eighth under the Rhodes' `Ab4:b13*`.
+- **Checked** against a count made another way, note by note from the harmony, over each style's takes on six seeds: 509 of 3,117 in jazz and 102 of 751 in the blues from both; in neo-soul 129 of 2,039 against 129 of 2,036.
+- **Nothing else moved**: no golden, and no other measure on any scorecard. The three baselines gain the one line. No pass of his vouches for the measure yet, so a change that moves it goes to his ear until one does.
+
 ## the register measure counts only where the hand had room, under a new name (#2329, 2026-11-26)
 
 - **His word** (2026-11-26, `/unblock`): "Build it", on the card "redefine the scorecard's chords.in-the-soloists-register so it stops counting piano notes the hand had no room to move under a low line". The pull request stays open for him with the figures below.
