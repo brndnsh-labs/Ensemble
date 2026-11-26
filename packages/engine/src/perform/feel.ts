@@ -76,6 +76,10 @@ export function applyFeel(
 
   // Each seat's last note as played, for a note that is no softer than it.
   const played = new Map<string, { tick: number; velocity: number }>();
+  // The same place in the bar and the same touch come round every bar and every pass, and a
+  // stream named the same is the same stream: each one's number is drawn once.
+  const places = new Map<string, number>();
+  const touches = new Map<string, number>();
   return notes.map((note) => {
     const bar = plan.bars[note.bar]!;
     const tickInBar = note.tick - bar.start;
@@ -90,10 +94,21 @@ export function applyFeel(
     // Human placement belongs to a position in the bar, so the same sixteenth leans the same
     // way every bar and reads as a pocket. Touch belongs to a position in the pass.
     const voice = note.voice ?? "";
-    const place = rng.fork("place", note.seat, voice, tickInBar);
-    const touch = rng.fork("touch", note.seat, voice, note.pitch, barInPass(bar), tickInBar);
-    const placement = (place.next() * 2 - 1) * HUMAN_MS * human * ticksPerMs;
-    const velocityShift = (touch.next() * 2 - 1) * HUMAN_VELOCITY * human;
+    const placeName = `${note.seat}/${voice}/${tickInBar}`;
+    let place = places.get(placeName);
+    if (place === undefined) {
+      place = rng.fork("place", note.seat, voice, tickInBar).next();
+      places.set(placeName, place);
+    }
+    const inPass = barInPass(bar);
+    const touchName = `${note.seat}/${voice}/${note.pitch}/${inPass}/${tickInBar}`;
+    let touch = touches.get(touchName);
+    if (touch === undefined) {
+      touch = rng.fork("touch", note.seat, voice, note.pitch, inPass, tickInBar).next();
+      touches.set(touchName, touch);
+    }
+    const placement = (place * 2 - 1) * HUMAN_MS * human * ticksPerMs;
+    const velocityShift = (touch * 2 - 1) * HUMAN_VELOCITY * human;
 
     const energy = bar.seats[note.seat] ?? bar.energy;
     const offset = Math.round(start - tickInBar + lean + placement + (note.nudge ?? 0));
