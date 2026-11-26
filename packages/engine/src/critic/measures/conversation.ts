@@ -223,6 +223,32 @@ export const conversationMeasures: readonly Measure[] = [
     },
   },
   {
+    id: "chords.over-the-line",
+    seat: "chords",
+    says: "While the soloist sounds over the piano, it is seldom under the piano's lowest note: the line is not put beneath the comp.",
+    unit: "share",
+    of(take) {
+      const reading = read(take);
+      if (!reading) return null;
+      let over = 0;
+      let under = 0;
+      let notes = 0;
+      for (const note of reading.heard) {
+        let here = 0;
+        for (const hit of reading.hits) {
+          if (hit.tick >= note.ends) break;
+          const ticks = Math.min(note.ends, hit.ends) - Math.max(note.tick, hit.tick);
+          if (ticks <= 0) continue;
+          here += ticks;
+          if (hit.pitches[0]! > note.pitch) under += ticks;
+        }
+        if (here > 0) notes++;
+        over += here;
+      }
+      return over === 0 ? null : { value: under / over, cases: notes };
+    },
+  },
+  {
     id: "chords.overlap",
     seat: "chords",
     says: "Fewer of the piano's strikes come down while the soloist is sounding a note than would if the piano were deaf to the line: it gets out of the way.",
