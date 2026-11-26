@@ -263,10 +263,10 @@
     "p90": 0.1762,
     "inTarget": 0.7674
   },
-  "chords.in-the-soloists-register": {
-    "mean": 0.1048,
-    "p10": 0.0519,
-    "p90": 0.1765,
+  "chords.in-the-soloists-register-with-room": {
+    "mean": 0.079,
+    "p10": 0.0302,
+    "p90": 0.1403,
     "inTarget": null
   },
   "chords.over-the-line": {

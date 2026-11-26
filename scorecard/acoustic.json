@@ -275,7 +275,7 @@
     "p90": 0.2759,
     "inTarget": null
   },
-  "chords.in-the-soloists-register": {
+  "chords.in-the-soloists-register-with-room": {
     "mean": 0.0508,
     "p10": 0.024,
     "p90": 0.0816,

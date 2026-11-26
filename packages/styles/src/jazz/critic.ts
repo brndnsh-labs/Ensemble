@@ -132,7 +132,10 @@ export const jazzCritic: CriticStyle = {
     // of the target for the reason the blues is under the alto: the line lives in the
     // piano's register and lands on the 3rds and 7ths the hand may not give up.
     "chords.on-the-soloists-note": { max: 0.15, kind: "intent", minCases: 20 },
-    "chords.in-the-soloists-register": { max: 0.3, kind: "measured", minCases: 40 },
+    // In the soloist's register where the hand had room to be lower (CH-63): 11%, worst take
+    // 20%. The bound is Maiden Voyage's, whose alto goes under the sus chords: alone it reads
+    // 28%, one take in ten over 37%.
+    "chords.in-the-soloists-register-with-room": { max: 0.3, kind: "measured", minCases: 40 },
     // Strikes under a sounding note 61%, deaf 70%, first 70%; over chance +0.00, deaf +0.09.
     "chords.overlap": { max: 0.75, kind: "measured", minCases: 20 },
     "chords.overlap-over-chance": { max: 0.07, kind: "measured", minCases: 20 },
