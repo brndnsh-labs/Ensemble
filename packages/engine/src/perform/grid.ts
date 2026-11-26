@@ -11,10 +11,17 @@ export const STEP = PPQ / 4;
 export const LEVELS = { X: 118, x: 96, o: 72, g: 36 } as const;
 export type LevelSymbol = keyof typeof LEVELS;
 
-/** The symbols of a line, one per step, with spaces removed. */
-export function cells(line: string): string[] {
-  return [...line.replace(/\s+/g, "")];
+/** The symbols of a line, one per step, with spaces removed. A style's lines are read again and again: each once. */
+export function cells(line: string): readonly string[] {
+  let found = CELLS.get(line);
+  if (!found) {
+    found = Object.freeze([...line.replace(/\s+/g, "")]);
+    CELLS.set(line, found);
+  }
+  return found;
 }
+
+const CELLS = new Map<string, readonly string[]>();
 
 export interface Stroke {
   /** Sixteenths from the start of the line. */

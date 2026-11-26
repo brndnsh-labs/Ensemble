@@ -159,7 +159,7 @@ export function compStrikes(
     }
     return known;
   };
-  const letters = new Map<RhythmBook, { weight: number; letters: string[] }[]>();
+  const letters = new Map<RhythmBook, { weight: number; letters: readonly string[] }[]>();
   const formsOf = (book: RhythmBook) => {
     let known = letters.get(book);
     if (!known) {

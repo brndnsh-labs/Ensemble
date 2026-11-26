@@ -95,7 +95,7 @@ export function validateBassStyle(bass: BassStyle): string[] {
   pulseSteps = 4;
 
   /** A figure's or a turn's grid, symbol by symbol. Returns its cells. */
-  function checkGrid(figure: Figure, line: BassLine, at: string): string[] {
+  function checkGrid(figure: Figure, line: BassLine, at: string): readonly string[] {
     const grid = cells(figure.grid);
     const strikes = (symbol: string | undefined) =>
       symbol === "x" || symbol === DEAD_NOTE || (symbol !== undefined && symbol in RIFF_TONES);
