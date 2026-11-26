@@ -142,9 +142,9 @@ function dominantScale(
   if (flat9 || sharp9) {
     if (!resolvesToMinor(chord, context) || has(21)) return "half-whole diminished";
     // A written b9 or #9 keeps its own colour but still takes the b13 on the way to a minor
-    // chord (X-B-11). Over a natural fifth that is the minor key's own scale, with a written #9
-    // beside its b9: the altered scale has no natural fifth, and fitted to one it keeps a #11
-    // a half step under it and loses the b13.
+    // chord (X-B-11). Over a natural fifth that is Phrygian dominant, the notes of the minor key
+    // it is going to, with a written #9 beside its b9: the altered scale has no natural fifth,
+    // and fitted to one it keeps a #11 a half step under it and loses the b13.
     return naturalFifth ? "phrygian dominant" : "altered";
   }
   if (raisedFifth) return "whole tone";
