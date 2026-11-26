@@ -239,6 +239,86 @@ export function pickupsOf(world: World, notes: readonly Sounding[]): Set<Soundin
   return found;
 }
 
+/** More ticks than any bar has: a bar's place in a phrase times this, and the step inside it, is a note's place. */
+const PLACES = 1 << 20;
+
+interface Move {
+  readonly bar: number;
+  readonly step: number;
+  readonly move: number | null;
+}
+
+/** Each note's bar in its phrase, its step inside the bar, and the interval it moves by. */
+function moves(notes: readonly Sounding[]): Move[] {
+  const first = notes[0]?.bar.index ?? 0;
+  return notes.map((note, i) => ({
+    bar: note.bar.index - first,
+    step: note.tick - note.bar.start,
+    move: i === 0 ? null : note.pitch - notes[i - 1]!.pitch,
+  }));
+}
+
+/**
+ * A phrase's idea as `likeness` lines it up, and where each of its notes is, by bar and step:
+ * the same for a phrase each time it is matched against another, so worked out once for it.
+ * A solo's earlier phrases are matched against every candidate after them.
+ */
+interface Lined {
+  readonly moves: readonly Move[];
+  readonly placed: ReadonlyMap<number, number | null>;
+}
+const lined = new WeakMap<Heard, Lined>();
+function linedUp(heard: Heard): Lined {
+  let found = lined.get(heard);
+  if (!found) {
+    const these = moves(idea(asRun(heard)));
+    found = { moves: these, placed: placedBy(these, inBar) };
+    lined.set(heard, found);
+  }
+  return found;
+}
+
+/** A step is inside its bar, so a bar and a step are one number: the bar in the high digits. */
+const inBar = (bar: number, step: number) => bar * PLACES + step;
+
+function placedBy(
+  these: readonly Move[],
+  key: (bar: number, step: number) => number,
+): Map<number, number | null> {
+  return new Map(these.map((note) => [key(note.bar, note.step), note.move]));
+}
+
+/**
+ * The best match of two phrases' notes, lined up bar against bar every way; `key` says where a
+ * note is, as a number no other place in the phrases has, and `placed` is where the first
+ * phrase's notes are by it.
+ */
+function best(
+  these: readonly Move[],
+  placed: ReadonlyMap<number, number | null>,
+  those: readonly Move[],
+  key: (bar: number, step: number) => number,
+  shift = 0,
+): number {
+  let most = 0;
+  for (let late = -3; late <= 3; late++) {
+    let shared = 0;
+    let moving = 0;
+    let agree = 0;
+    for (const note of those) {
+      const other = placed.get(key(note.bar + late, note.step + shift));
+      if (other === undefined) continue;
+      shared++;
+      if (note.move === null || other === null) continue;
+      moving++;
+      if (Math.sign(note.move) === Math.sign(other) && Math.abs(note.move - other) <= 2) agree++;
+    }
+    const rhythm = shared / (these.length + those.length - shared);
+    most = Math.max(most, rhythm * (0.5 + 0.5 * (moving === 0 ? 0 : agree / moving)));
+  }
+  return most;
+}
+
 /**
  * How alike two phrases are, 0 to 1, as a listener would match them: the
  * share of their attacks that fall in the same places in the bar, scaled by
@@ -253,52 +333,10 @@ export function pickupsOf(world: World, notes: readonly Sounding[]): Set<Soundin
  * idea. Only then: two phrases that have nothing to do with each other often
  * line up a pulse apart by chance, and are not alike for it.
  */
-/** More ticks than any bar has: a bar's place in a phrase times this, and the step inside it, is a note's place. */
-const PLACES = 1 << 20;
-
 export function likeness(a: Heard, b: Heard, moved = false): number {
-  const moves = (notes: readonly Sounding[]) => {
-    const first = notes[0]?.bar.index ?? 0;
-    return notes.map((note, i) => ({
-      bar: note.bar.index - first,
-      step: note.tick - note.bar.start,
-      move: i === 0 ? null : note.pitch - notes[i - 1]!.pitch,
-    }));
-  };
-  type Moves = ReturnType<typeof moves>;
-  /**
-   * The best match of two phrases' notes, lined up bar against bar every way; `key` says where a
-   * note is, as a number no other place in the phrases has.
-   */
-  const best = (
-    these: Moves,
-    those: Moves,
-    key: (bar: number, step: number) => number,
-    shift = 0,
-  ): number => {
-    const placed = new Map(these.map((note) => [key(note.bar, note.step), note.move]));
-    let most = 0;
-    for (let late = -3; late <= 3; late++) {
-      let shared = 0;
-      let moving = 0;
-      let agree = 0;
-      for (const note of those) {
-        const other = placed.get(key(note.bar + late, note.step + shift));
-        if (other === undefined) continue;
-        shared++;
-        if (note.move === null || other === null) continue;
-        moving++;
-        if (Math.sign(note.move) === Math.sign(other) && Math.abs(note.move - other) <= 2) agree++;
-      }
-      const rhythm = shared / (these.length + those.length - shared);
-      most = Math.max(most, rhythm * (0.5 + 0.5 * (moving === 0 ? 0 : agree / moving)));
-    }
-    return most;
-  };
-  const [one, two] = [moves(idea(asRun(a))), moves(idea(asRun(b)))];
-  if (one.length === 0 || two.length === 0) return 0;
-  // A step is inside its bar, so a bar and a step are one number: the bar in the high digits.
-  const inPlace = best(one, two, (bar, step) => bar * PLACES + step);
+  const [one, two] = [linedUp(a), linedUp(b)];
+  if (one.moves.length === 0 || two.moves.length === 0) return 0;
+  const inPlace = best(one.moves, one.placed, two.moves, inBar);
   if (!moved) return inPlace;
   // A pulse either side. Moved, a bar's notes may all fall in its later half, where a
   // pickup would be, so here the phrases are taken whole, pickups inside them and all;
@@ -309,10 +347,12 @@ export function likeness(a: Heard, b: Heard, moved = false): number {
   if ([...whole, ...other].some((note) => note.bar.ticks !== ticks)) return inPlace;
   const pulse = pulseTicks(whole[0]!.bar.meter)[0]!;
   const along = (bar: number, step: number) => bar * ticks + step;
+  const [these, those] = [moves(whole), moves(other)];
+  const placed = placedBy(these, along);
   return Math.max(
     inPlace,
-    best(moves(whole), moves(other), along, pulse),
-    best(moves(whole), moves(other), along, -pulse),
+    best(these, placed, those, along, pulse),
+    best(these, placed, those, along, -pulse),
   );
 }
 
