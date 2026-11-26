@@ -263,3 +263,11 @@ What follows from it:
 
 - **The two tunes scored alone** (200 takes as jazz, 66 of them measured): Maiden Voyage mean 35% to 28%, in target 24% to 61% of takes, the highest take 49% to 42%; Blue in Green (not in the library, #2319) 36% to 23%, in target 14% to 91%, the highest 53% to 39%.
 - **The two targets, read again.** Jazz stays at most 30%: over its charts it reads 10.7% (worst take 20%), and the bound is Maiden Voyage's, a piano he passed by ear that reads 28% alone. The blues goes from at most 25% to at most 20%: it reads 7.4%, worst take 14%, where the old count was written down at 12% with a worst take of 35%. Both are in target in every measured take, as before.
+
+## his ear on Blue in Green (2026-11-26, #2319)
+
+"i think we're good to get that merged - i'm done listening", after listening to `out/blue-in-green/`. The page: the chart as jazz at 66, the band alone on seed 1 for three passes and with the alto on seeds 1 and 2 for four, with the chart's readings alone and jazz's scorecard beside the clips. Rendered from the branch that merged as b1bdfbec; he listened before it merged.
+
+- **Passed by ear, the scorecard's drops accepted, and #2319 closed.** Jazz's baseline was accepted on the branch before he listened, so the scorecard as it stood at the merge is the band he heard: seven measures past tolerance by takes in target (`docs/decisions/engine.md`, "Blue in Green joins the library"), and `solo.displaced-early` 56% and `band.takes-thinned` 11% outside what he had passed.
+- **What the page told him of the chart alone**: the piano's top voice moving by a third or a fourth in 43% of its moves (at most 30% asked), the piano on the soloist's very note 28% of the time (at most 15% asked), `solo.builds` in target in 21% of takes. He passed it with those beside the clips; nothing is filed for them.
+- **What the pass covers on the scorecard**: jazz's over all 23 charts, where the page played the one new chart. It is his first pass of a jazz band since `chords.in-the-soloists-register-with-room` (#2329), `chords.flat-13-against-the-fifth` (#2325) and `chords.over-the-line` (#2327) were brought, so it is the first to vouch for them.
