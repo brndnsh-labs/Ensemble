@@ -479,24 +479,31 @@ function leadOf(take: Take): { lead: number; notes: number; sounding: number } {
 /**
  * The least a style's soloist plays of its lead, over its own charts at their own tempo
  * with the band's own arc (a jam of four passes: the band, then a solo of three choruses):
- * notes a second, and the share of its lead some note of it sounds. Set between what it
- * played when it was first written and what it plays now (`scripts/solo-density.ts`).
+ * notes a second, and the share of its lead some note of it sounds, each in the middle take
+ * of them. By take, so a floor does not move with how many slow charts a style has: pooled
+ * over all the seconds of lead, a second ballad lowered jazz's by arithmetic (#2319). Each
+ * keeps the margin its pooled floor had under what the style plays (`docs/decisions/soloist.md`).
  */
 const PLAYS: Readonly<Record<string, { readonly perSecond: number; readonly sounding: number }>> = {
-  blues: { perSecond: 1.65, sounding: 0.695 },
-  funk: { perSecond: 1.69, sounding: 0.37 },
-  jazz: { perSecond: 2.45, sounding: 0.63 },
-  rock: { perSecond: 1.77, sounding: 0.715 },
-  disco: { perSecond: 2.23, sounding: 0.66 },
-  neosoul: { perSecond: 1.14, sounding: 0.58 },
-  reggae: { perSecond: 0.9, sounding: 0.557 },
-  acoustic: { perSecond: 1.27, sounding: 0.648 },
-  // Set when it was written, a margin under what it plays: 2.04 notes a second and 0.756 sounding
-  // on the full run (2.09 and 0.770 on a push).
-  country: { perSecond: 1.9, sounding: 0.7 },
+  blues: { perSecond: 1.65, sounding: 0.663 },
+  funk: { perSecond: 1.71, sounding: 0.356 },
+  jazz: { perSecond: 2.44, sounding: 0.625 },
+  rock: { perSecond: 1.81, sounding: 0.692 },
+  disco: { perSecond: 2.18, sounding: 0.656 },
+  neosoul: { perSecond: 1.03, sounding: 0.576 },
+  reggae: { perSecond: 0.89, sounding: 0.553 },
+  acoustic: { perSecond: 1.32, sounding: 0.609 },
+  country: { perSecond: 1.95, sounding: 0.692 },
 };
 
-test("the soloist is not sparse: over a style's own charts at their own tempo, with the band's own arc, it plays at least the style's notes a second while it has the lead, and some note of it sounds through at least the style's share of the lead", () => {
+/** The middle of a list of numbers: of an even count, halfway between its middle two. */
+function middle(values: readonly number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const half = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1 ? sorted[half]! : (sorted[half - 1]! + sorted[half]!) / 2;
+}
+
+test("the soloist is not sparse: over a style's own charts at their own tempo, with the band's own arc, the middle take of them has at least the style's notes a second while the soloist has the lead, and the middle take some note of it sounding through at least the style's share of the lead", () => {
   for (const style of STYLES) {
     const floor = PLAYS[style.id];
     if (!floor) continue;
@@ -509,21 +516,16 @@ test("the soloist is not sparse: over a style's own charts at their own tempo, w
         jam.options.energy === undefined,
     );
     assert.ok(own.length >= 6, `${style.id}: only ${own.length} takes`);
-    const sum = { lead: 0, notes: 0, sounding: 0 };
-    for (const { take } of own) {
-      const played = leadOf(take);
-      sum.lead += played.lead;
-      sum.notes += played.notes;
-      sum.sounding += played.sounding;
-    }
-    const [perSecond, sounding] = [sum.notes / sum.lead, sum.sounding / sum.lead];
+    const played = own.map(({ take }) => leadOf(take));
+    const perSecond = middle(played.map((one) => one.notes / one.lead));
+    const sounding = middle(played.map((one) => one.sounding / one.lead));
     assert.ok(
       perSecond >= floor.perSecond,
-      `${style.id}: ${perSecond.toFixed(2)} notes a second, under ${floor.perSecond}`,
+      `${style.id}: ${perSecond.toFixed(2)} notes a second in the middle take, under ${floor.perSecond}`,
     );
     assert.ok(
       sounding >= floor.sounding,
-      `${style.id}: sounding through ${sounding.toFixed(3)} of the lead, under ${floor.sounding}`,
+      `${style.id}: sounding through ${sounding.toFixed(3)} of the lead in the middle take, under ${floor.sounding}`,
     );
   }
 });
