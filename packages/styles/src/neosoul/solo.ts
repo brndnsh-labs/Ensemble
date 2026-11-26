@@ -161,6 +161,7 @@ export const neosoulSolo: SoloStyle = {
     // The pentatonic on each chord's own root (ST-neosoul-29): major 1 2 3 5 6, a dominant the
     // same with its flat 7th, minor 1 b3 4 5 b7. The chord's own tones are always in, so only
     // the 2nd and 6th (the 4th on a minor chord) are added. A suspended chord takes the 2nd.
+    // The engine leaves out one the chord's own scale lacks: both over a V going to a minor chord.
     chordScale: false,
     overRoot: { major: [2, 9], dominant: [2, 9], minor: [5], suspended: [2] },
     key: { major: [], minor: [] },

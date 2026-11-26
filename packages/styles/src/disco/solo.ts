@@ -171,6 +171,8 @@ export const discoSolo: SoloStyle = {
     // same with its flat 7th, minor 1 2 b3 4 5 b7. The chord's own tones are always in, so
     // only the 2nd and 6th (the 2nd and 4th on a minor chord) are added. A suspended chord
     // takes the 2nd; anything else (diminished, half-diminished, augmented) its own tones.
+    // The engine leaves out one the chord's own scale lacks: both over a V going to a minor
+    // chord, the 2nd on the iii of a major key.
     chordScale: false,
     overRoot: { major: [2, 9], dominant: [2, 9], minor: [2, 5], suspended: [2] },
     key: { major: [], minor: [] },

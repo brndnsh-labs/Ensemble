@@ -1785,7 +1785,7 @@ test("a dominant with a written b9 or #9 over its natural fifth, on its way down
   let chords = 0;
   let judged = 0;
   const wrong: string[] = [];
-  for (const { style, chart, options, take } of takes()) {
+  for (const { chart, options, take } of takes()) {
     const harmony = harmonyOf(take);
     const bars = take.plan.bars;
     const toMinor = harmony.filter((arrival) => {
@@ -1806,10 +1806,7 @@ test("a dominant with a written b9 or #9 over its natural fifth, on its way down
     if (toMinor.length === 0) continue;
     chords += toMinor.length;
     for (const seat of ["solo", "bass", "chords"] as const) {
-      // A soloist who plays a pentatonic on each chord's own root still plays its 2nd and 6th
-      // over these chords (#2324): held to the #11 alone until that is built.
-      const moved = seat === "solo" && style.solo.notes.overRoot?.dominant !== undefined;
-      const out = moved ? [6] : seat === "solo" ? [2, 6, 9] : [2, 3, 6, 9];
+      const out = seat === "solo" ? [2, 6, 9] : [2, 3, 6, 9];
       const line = notesOf(take, seat);
       line.forEach((note, i) => {
         const over = toMinor.find(
