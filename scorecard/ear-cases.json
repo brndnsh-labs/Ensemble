@@ -882,6 +882,19 @@
       "seat": "band",
       "styles": ["jazz"],
       "heard": "out/standards-two/: standard-someday-my-prince-will-come and standard-maiden-voyage as jazz at the chart's tempo, seed 1, the band alone (two passes) and with the alto (three). Rendered from the branch that merged as 942c351b."
+    },
+    {
+      "id": "blue-in-green-pass",
+      "date": "2026-11-26",
+      "words": "i think we're good to get that merged - i'm done listening",
+      "source": "docs/decisions/critic.md: his ear on Blue in Green (2026-11-26, #2319)",
+      "kind": "passed",
+      "medium": "notes",
+      "recorded": "9d2a44c0",
+      "doubt": "His words are about merging, said after listening; he did not say which of the three clips he played or on what. The page played the one new chart on two seeds, and the measures that left his range are jazz's over all 23 charts, moved partly by which seeds fall on which chart. He listened before the merge, to the branch as it merged.",
+      "seat": "band",
+      "styles": ["jazz"],
+      "heard": "out/blue-in-green/: standard-blue-in-green as jazz at 66, the band alone on seed 1 (three passes) and with the alto on seeds 1 and 2 (four). Rendered from the branch that merged as b1bdfbec."
     }
   ],
   "leftOut": [
