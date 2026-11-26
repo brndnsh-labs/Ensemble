@@ -203,21 +203,25 @@ export const conversationMeasures: readonly Measure[] = [
     },
   },
   {
-    id: "chords.in-the-soloists-register",
+    id: "chords.in-the-soloists-register-with-room",
     seat: "chords",
-    says: "Of the piano's notes that sound under the line, few are at or above the lowest note the soloist is sounding: the soloist has the top of the band to itself.",
+    says: "Of the piano's notes that sound under the line, few are at or above the lowest note the soloist is sounding, where the hand had room to be lower: the soloist has the top of the band to itself.",
     unit: "share",
-    of(take) {
+    of(take, style) {
       const reading = read(take);
       if (!reading) return null;
+      // The hand makes room only as far down as its own slot goes (CH-63), and the voicing
+      // critic asks no more of it: under a line lower than that there is no room, and a note
+      // the hand could not have moved is not counted against it.
+      const room = style.chords.register.target - style.chords.register.reach;
       let notes = 0;
       let above = 0;
       for (const hit of reading.hits) {
         const over = reading.line.filter((note) => note.tick < hit.ends && note.ends > hit.tick);
         if (over.length === 0) continue;
-        const lowest = Math.min(...over.map((note) => note.pitch));
+        const from = Math.max(room, Math.min(...over.map((note) => note.pitch)));
         notes += hit.pitches.length;
-        above += hit.pitches.filter((pitch) => pitch >= lowest).length;
+        above += hit.pitches.filter((pitch) => pitch >= from).length;
       }
       return share(above, notes);
     },

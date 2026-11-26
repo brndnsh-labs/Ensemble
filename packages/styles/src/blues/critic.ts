@@ -134,8 +134,9 @@ export const bluesCritic: CriticStyle = {
     // under the vibraphone (deaf 30%). Under the alto sax, which lives in the piano's
     // register and lands on 3rds and 7ths the hand may not give up, 20% (deaf 37%).
     "chords.on-the-soloists-note": { max: 0.15, kind: "intent", minCases: 20 },
-    // Notes at or above the line's lowest: 12% (deaf 29%, worst take 35%).
-    "chords.in-the-soloists-register": { max: 0.25, kind: "measured", minCases: 40 },
+    // Notes at or above the line's lowest, where the hand had room to be lower (CH-63): 7%,
+    // worst take 14%. Counted room or no, as it first was: 12% (deaf 29%, worst take 35%).
+    "chords.in-the-soloists-register-with-room": { max: 0.2, kind: "measured", minCases: 40 },
     // Strikes under a sounding note: 64% (deaf 67%, first plan 69%). By take the line's own
     // density decides most of it, so the bound is loose; read it beside the next one.
     "chords.overlap": { max: 0.78, kind: "measured", minCases: 20 },

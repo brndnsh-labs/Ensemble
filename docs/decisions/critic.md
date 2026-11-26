@@ -241,3 +241,25 @@ What follows from it:
 - **What it reads** (each style's 200 takes; a style with no such chord has nothing to read and no line): jazz 16% of such strikes (by take: the middle one 11%, one in ten over 43%, the highest 65%, Autumn Leaves), the blues 12% (the middle take none, one in ten over 29%, the highest 83%, the minor blues), neo-soul 3% (the middle take none). Neo-soul reads low because its bass's fifth there is a brush: in Slow Six, seed 1, bar 7, `2la G1 5 0.92` lasts 0.92 of an eighth under the Rhodes' `Ab4:b13*`.
 - **Checked** against a count made another way, note by note from the harmony, over each style's takes on six seeds: 509 of 3,117 in jazz and 102 of 751 in the blues from both; in neo-soul 129 of 2,039 against 129 of 2,036.
 - **Nothing else moved**: no golden, and no other measure on any scorecard. The three baselines gain the one line. No pass of his vouches for the measure yet, so a change that moves it goes to his ear until one does.
+
+## the register measure counts only where the hand had room, under a new name (#2329, 2026-11-26)
+
+- **His word** (2026-11-26, `/unblock`): "Build it", on the card "redefine the scorecard's chords.in-the-soloists-register so it stops counting piano notes the hand had no room to move under a low line". The pull request stays open for him with the figures below.
+- **The call.** The scorecard's measure counted every piano note at or above the lowest note the soloist was sounding. It now counts one only when it is also at or above the style's `register.target - register.reach` (F#4 for jazz, G#4 for the blues): the part of the keyboard the hand could have left. That is where the voicing critic's own feature stops counting (`packages/engine/src/players/chords/voicing.ts`, "in-the-soloists-register", CH-63: under a lower line "there is no room"), so the hand is no longer read as out of target for doing what it was told. Every note under the line is still in the count's whole. No player changed: no golden moved, and no other measure moved on any scorecard.
+- **A new name: `chords.in-the-soloists-register-with-room`.** A measure's name is its count. What he has passed by ear is read from the scorecards as they stood in git (`packages/cli/src/passed.ts`), and under the old name those are the old count: left as it was, jazz's 11% would sit under a range of 16% to 25% for good, and the next pass would stretch one range over two counts. Under a new name no pass vouches for it yet, so a change that moves it goes to his ear until one does, as `chords.over-the-line` (#2327) stands today. No ear case names the measure.
+- **The figures, old count to new** (each style's 200 takes; the mean, then one take in ten below and above):
+
+  | style | mean | 1 in 10 below | 1 in 10 above |
+  |---|---|---|---|
+  | blues | 10.8% to 7.4% | 3.7% to 1.3% | 17.1% to 11.8% |
+  | funk | 17.5% to 14.4% | 11.6% to 10.0% | 24.2% to 19.3% |
+  | jazz | 20.4% to 10.7% | 12.0% to 2.4% | 26.8% to 17.4% |
+  | rock | 1.7% to 1.6% | 0.5% to 0.5% | 2.7% to 2.6% |
+  | disco | 38.5% to 29.5% | 34.1% to 25.4% | 45.2% to 35.6% |
+  | neo-soul | 10.5% to 7.9% | 5.2% to 3.0% | 17.6% to 14.0% |
+  | reggae | 35.0% to 24.8% | 27.8% to 19.5% | 42.0% to 36.2% |
+  | acoustic | 5.1% to 5.1% | 2.4% to 2.4% | 8.2% to 8.2% |
+  | country | 6.3% to 6.2% | 4.0% to 4.0% | 8.7% to 7.8% |
+
+- **The two tunes scored alone** (200 takes as jazz, 66 of them measured): Maiden Voyage mean 35% to 28%, in target 24% to 61% of takes, the highest take 49% to 42%; Blue in Green (not in the library, #2319) 36% to 23%, in target 14% to 91%, the highest 53% to 39%.
+- **The two targets, read again.** Jazz stays at most 30%: over its charts it reads 10.7% (worst take 20%), and the bound is Maiden Voyage's, a piano he passed by ear that reads 28% alone. The blues goes from at most 25% to at most 20%: it reads 7.4%, worst take 14%, where the old count was written down at 12% with a worst take of 35%. Both are in target in every measured take, as before.
