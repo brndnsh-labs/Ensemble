@@ -588,6 +588,38 @@ const idioms = new WeakMap<Guitar, InstrumentIdiom>();
 export function guitar(style: Guitar): InstrumentIdiom {
   const known = idioms.get(style);
   if (known) return known;
+  // The grips of a chord are the same each time it comes round, in every take this guitar
+  // plays: they are found once and kept, and each asker is handed its own copy of the list.
+  const gripsFor = new Map<string, readonly Voicing[]>();
+  const search = (tones: readonly FittedTone[], root: number, floor: number): Voicing[] => {
+    let wanted = [...tones];
+    // A grip that stands on its root cannot give the root up.
+    const givenUp = GIVEN_UP.filter((tone) => !(style.rootOnBottom && tone === "R"));
+    const nut = style.openPosition;
+    for (;;) {
+      const most = Math.min(OPEN_STRINGS.length, Math.max(style.strings, wanted.length));
+      // In open position the chord is whichever shape it has at the nut, on however many
+      // strings that is (CH-24): every count is looked at, and a shape at the nut wins.
+      const all: Voicing[] = [];
+      const least = wanted.filter((tone) => !tone.free).length;
+      for (let count = most; count >= least && count > 0; count--) {
+        const found = grips(style, wanted, root, floor, count);
+        if (nut === undefined && found.length > 0) return found.sort(tighter);
+        all.push(...found);
+      }
+      if (nut !== undefined && all.length > 0) {
+        const atNut = all.filter((grip) =>
+          fretsOf(grip.strings ?? [], grip.pitches).every((fret) => fret <= nut),
+        );
+        return (atNut.length > 0 ? atNut : all).sort(tighter);
+      }
+      const spare = givenUp
+        .map((tone) => wanted.findIndex((w) => w.tone === tone))
+        .find((index) => index >= 0);
+      if (spare === undefined) return [];
+      wanted = wanted.filter((_, i) => i !== spare);
+    }
+  };
   const idiom: InstrumentIdiom = {
     // A guitarist holds a grip until the chord changes and moves only then (CH-31).
     holds: true,
@@ -603,33 +635,13 @@ export function guitar(style: Guitar): InstrumentIdiom {
      * its root, then its fifth, then colour, never a guide tone (X-B-13).
      */
     candidates(tones, root, register) {
-      let wanted = [...tones];
-      // A grip that stands on its root cannot give the root up.
-      const givenUp = GIVEN_UP.filter((tone) => !(style.rootOnBottom && tone === "R"));
-      const nut = style.openPosition;
-      for (;;) {
-        const most = Math.min(OPEN_STRINGS.length, Math.max(style.strings, wanted.length));
-        // In open position the chord is whichever shape it has at the nut, on however many
-        // strings that is (CH-24): every count is looked at, and a shape at the nut wins.
-        const all: Voicing[] = [];
-        const least = wanted.filter((tone) => !tone.free).length;
-        for (let count = most; count >= least && count > 0; count--) {
-          const found = grips(style, wanted, root, register.floor, count);
-          if (nut === undefined && found.length > 0) return found.sort(tighter);
-          all.push(...found);
-        }
-        if (nut !== undefined && all.length > 0) {
-          const atNut = all.filter((grip) =>
-            fretsOf(grip.strings ?? [], grip.pitches).every((fret) => fret <= nut),
-          );
-          return (atNut.length > 0 ? atNut : all).sort(tighter);
-        }
-        const spare = givenUp
-          .map((tone) => wanted.findIndex((w) => w.tone === tone))
-          .find((index) => index >= 0);
-        if (spare === undefined) return [];
-        wanted = wanted.filter((_, i) => i !== spare);
+      const key = `${root} ${register.floor} ${JSON.stringify(tones)}`;
+      let found = gripsFor.get(key);
+      if (!found) {
+        found = search(tones, root, register.floor);
+        gripsFor.set(key, found);
       }
+      return [...found];
     },
 
     /**
