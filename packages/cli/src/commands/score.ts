@@ -10,8 +10,8 @@
 // The change is what moved since the branch left main (or since --since).
 //
 // With --meter, the same takes are played in that meter (`ensemble render --meter`), on the
-// charts that read in it, and two measures more are set beside the same takes in the charts'
-// own meter: how often a seat's bar is the bar a pass earlier, and its strikes a pulse. That
+// style's 4/4 charts that read in it, and two measures more are set beside the same takes in
+// 4/4: how often a seat's bar is the bar a pass earlier, and its strikes a pulse. That
 // run is read, not kept: no baseline is compared or written in a meter asked for.
 
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -154,11 +154,17 @@ function scoreStyle(
     if (named.length === 0) throw new UsageError(`no charts for style "${styleId}"`);
     const texts = named
       .map((path) => ({ path, text: readFileSync(path, "utf8") }))
-      .filter(({ text }) => !meter || fits(parse(text).chart, meter).ok);
+      // In a meter asked for: the charts written in 4/4 that read in it, so the meter is set
+      // beside four and nothing else.
+      .filter(({ text }) => {
+        if (!meter) return true;
+        const chart = parse(text).chart;
+        return meterName(chart.meter) === "4/4" && fits(chart, meter).ok;
+      });
     const charts = texts.map(({ path }) => path);
     if (meter) {
       if (texts.length === 0)
-        throw new UsageError(`no chart for style "${styleId}" reads in ${meterName(meter)}`);
+        throw new UsageError(`no 4/4 chart for style "${styleId}" reads in ${meterName(meter)}`);
       return { code: inMeter(style, texts, seeds, meter, values.json) };
     }
 
@@ -205,8 +211,8 @@ function scoreStyle(
 }
 
 /**
- * A style's scorecard on its charts played in a meter, with the measures of a seat in a meter
- * beside the same takes in the charts' own. Read, not kept.
+ * A style's scorecard on its 4/4 charts played in a meter, with the measures of a seat in a
+ * meter beside the same takes in 4/4. Read, not kept.
  */
 function inMeter(
   style: NonNullable<ReturnType<typeof styleById>>,
@@ -232,12 +238,12 @@ function inMeter(
   }
   console.log(report(`${style.name} in ${meterName(meter)}`, played.length, texts.length, lines));
   const there = new Map(lines.map((line) => [line.id, line]));
-  console.log(`\nin ${meterName(meter)}, beside the same takes in the charts' own meter:`);
+  console.log(`\nin ${meterName(meter)}, beside the same takes in 4/4:`);
   for (const line of beside) {
     const now = there.get(line.id);
     const f = (value: number | undefined) =>
       value === undefined ? "not measured" : format(value, line.unit);
-    console.log(`  ${line.id}: ${f(now?.mean)}, and ${f(line.mean)} in their own`);
+    console.log(`  ${line.id}: ${f(now?.mean)}, and ${f(line.mean)} in 4/4`);
   }
   console.log("\nnot set against a baseline: nothing is accepted in a meter asked for");
   return 0;

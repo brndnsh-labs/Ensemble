@@ -90,7 +90,7 @@ export function derives(meter: Meter): boolean {
 }
 
 /** The cut for a meter. `twelve`: the seat has a part written for 12/8. */
-export function cutOf(meter: Meter, twelve: boolean): Cut {
+function cutOf(meter: Meter, twelve: boolean): Cut {
   const ticks = pulseTicks(meter);
   const dotted = ticks.map((length) => length === PPQ * 1.5);
   const allDotted = dotted.every(Boolean);
@@ -310,7 +310,7 @@ export function cutLine(
 }
 
 /** A new bar's symbols as a grid, a pulse to a group. */
-export function grouped(line: readonly string[], cut: Cut): string {
+export function gridOf(line: readonly string[], cut: Cut): string {
   return cut.pulses
     .map((pulse) => line.slice(pulse.start, pulse.start + pulse.steps).join(""))
     .join(" ");

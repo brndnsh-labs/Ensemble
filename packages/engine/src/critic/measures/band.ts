@@ -277,12 +277,54 @@ const strikesAPulse = (seat: "drums" | "bass" | "chords"): Measure => ({
   },
 });
 
+/** The bars of music the soloist has the lead in and plays a note in, short of the ending. */
+function soloBars(take: Take) {
+  const notes = notesOf(take, "solo");
+  return musicBars(take)
+    .filter((bar) => bar.solo !== null && !bar.ending)
+    .map((bar) => ({ bar, struck: notesIn(notes, bar) }))
+    .filter(({ struck }) => struck.length > 0);
+}
+
+const soloInAMeter: readonly Measure[] = [
+  {
+    id: "solo.strikes-a-pulse",
+    seat: "solo",
+    says: "How many notes the soloist strikes in a pulse, over the bars it plays in: beside the same charts in four, whether the rhythms made for a meter have left the line thinner than the style writes it.",
+    unit: "per beat",
+    of(take) {
+      let [strikes, pulses] = [0, 0];
+      for (const { bar, struck } of soloBars(take)) {
+        strikes += new Set(struck.map((note) => note.tick)).size;
+        pulses += pulseTicks(bar.meter).length;
+      }
+      return pulses === 0 ? null : { value: strikes / pulses, cases: pulses };
+    },
+  },
+  {
+    id: "solo.bars-of-one-note",
+    seat: "solo",
+    says: "How many of the bars the soloist plays in have one note and no more: a long note now and then ends a phrase, and bar after bar of them is a line that has lost its rhythm.",
+    unit: "share",
+    lowerIsBetter: true,
+    of(take) {
+      const bars = soloBars(take);
+      return share(bars.filter(({ struck }) => struck.length === 1).length, bars.length);
+    },
+  },
+];
+
 /**
  * What is read of a seat in a meter beside the same charts in four (`ensemble score --meter`):
- * the two faults a made-up bar has, the same bar every time round and a strike on every pulse.
+ * the two faults a made-up bar has, the same bar every time round and a strike on every pulse,
+ * and of the soloist how thin its line is.
  * Reported there and nowhere else: no scorecard keeps them, and nothing is accepted in a meter
  * a style has not written until it has been heard (#2244).
  */
-export const meterMeasures: readonly Measure[] = (["drums", "bass", "chords"] as const).flatMap(
-  (seat) => [barAgain(seat), strikesAPulse(seat)],
-);
+export const meterMeasures: readonly Measure[] = [
+  ...(["drums", "bass", "chords"] as const).flatMap((seat) => [
+    barAgain(seat),
+    strikesAPulse(seat),
+  ]),
+  ...soloInAMeter,
+];

@@ -15,7 +15,7 @@
 import type { Meter } from "../../chart/types.ts";
 import { STEP } from "../../perform/grid.ts";
 import type { Cut, Symbols } from "../../style/cut.ts";
-import { cutLine, cutTail, grouped, partIn } from "../../style/cut.ts";
+import { cutLine, cutTail, gridOf, partIn } from "../../style/cut.ts";
 import type { PerTier, Tier } from "../../style/types.ts";
 import type { BassLine, BassStyle, Figure } from "./style.ts";
 import { DEAD_NOTE, RIFF_TONES } from "./style.ts";
@@ -70,7 +70,7 @@ function figureIn(figure: Figure, cut: Cut): Figure {
   });
   const plain = kept.every((place, i) => place === i);
   const { places: _, ...rest } = figure;
-  return { ...rest, grid: grouped(made.line, cut), ...(plain ? {} : { places: kept }) };
+  return { ...rest, grid: gridOf(made.line, cut), ...(plain ? {} : { places: kept }) };
 }
 
 /** A turn counted back from the barline in the new bar's pulses; nothing where the bar is too short for it. */

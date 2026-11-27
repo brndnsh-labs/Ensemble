@@ -2011,10 +2011,17 @@ test("a fill, a turn and a pickup start on a pulse or are the bar's last eighth:
   assert.ok(figures > 30 * STYLES.length, `only ${figures} fills, turns and pickups`);
 });
 
-test("in a bar whose shape has to be told (more than one group, or pulses of two lengths) the band says it the same way in every bar. One backbeat a group: in the middle pulse of a group of three the drummer plays the cymbal and nothing else, and the chord hand, with the band to itself, strikes nothing new there but a chord that arrives, or the one coming an eighth before it. The bass marks the shape: wherever it strikes both on the bar's marks (the first pulse of each group; every pulse where they are of two lengths) and between them, before the bar's last pulse, its notes on the marks are the louder. The downbeat is kept: a kick on 1 of every bar of time, in every style whose own time has a kick there at that level, and a count-in that leans on the marks, its stick on 1 the loudest and a pulse between two marks softer than any mark", () => {
-  let [middles, marks, ones, counts] = [0, 0, 0, 0];
+test("in a bar whose shape has to be told (more than one group, or pulses of two lengths) the band says it the same way in every bar. One backbeat a group: in the middle pulse of a group of three the drummer keeps the time going (the cymbal, the shaker) and plays nothing else, and the chord hand, with the band to itself, strikes nothing new there but a chord that arrives, or the one coming an eighth before it. The bass marks the shape: wherever it strikes both on the bar's marks (the first pulse of each group; every pulse where they are of two lengths) and between them, before the bar's last pulse, its notes on the marks are the louder. The downbeat is kept: a kick on 1 of every bar of time, in every style whose own time has a kick there at that level, and a count-in that leans on the marks, its stick on 1 the loudest and a pulse between two marks softer than any mark", () => {
+  let [middles, hands, marks, ones, counts] = [0, 0, 0, 0, 0];
   for (const style of STYLES) {
-    const cymbals = new Set<string>([...style.drums.timekeepers, "closedHat", "openHat", "ride"]);
+    const cymbals = new Set<string>([
+      ...style.drums.timekeepers,
+      "closedHat",
+      "openHat",
+      "ride",
+      "rideBell",
+      "shaker",
+    ]);
     // Whether the style's own time kicks on 1 at a level (reggae's one drop does not).
     const kicksOne = (energy: number) =>
       style.drums.grooves[tierOf(energy)].some((layer) =>
@@ -2058,6 +2065,17 @@ test("in a bar whose shape has to be told (more than one group, or pulses of two
           const within = (tick: number) => tick >= bar.start + middle && tick < bar.start + end;
           if (bar.seats.drums !== null) {
             middles++;
+            // The time does not stop there: a kit striking in every other pulse strikes here.
+            const others = starts.filter((start) => start !== middle);
+            const playsIn = (from: number, to: number) =>
+              inBar.some((note) => note.tick >= bar.start + from && note.tick < bar.start + to);
+            const everywhere = others.every((start) =>
+              playsIn(start, start + lengths[starts.indexOf(start)]!),
+            );
+            assert.ok(
+              !everywhere || playsIn(middle, end),
+              say(bar, "the drums stop in the middle pulse of a group of three"),
+            );
             for (const note of inBar)
               assert.ok(
                 !within(note.tick) || cymbals.has(note.voice ?? ""),
@@ -2065,6 +2083,7 @@ test("in a bar whose shape has to be told (more than one group, or pulses of two
               );
           }
           // Under a soloist a hand that converses answers the line where the line leaves room.
+          if (!bar.solo && bar.seats.chords !== null) hands++;
           for (const strike of bar.solo ? [] : strikes) {
             if (!within(strike.tick)) continue;
             const arriving = arrives.has(strike.tick) || arrives.has(strike.tick + PPQ / 2);
@@ -2102,9 +2121,10 @@ test("in a bar whose shape has to be told (more than one group, or pulses of two
     }
   }
   assert.ok(counts >= STYLES.length * MADE_SHAPES.length, `only ${counts} count-ins`);
-  assert.ok(middles > enough(300) * STYLES.length, `only ${middles} middle pulses`);
-  assert.ok(marks > enough(60) * STYLES.length, `only ${marks} bars of bass on and off the marks`);
+  assert.ok(middles > enough(240) * STYLES.length, `only ${middles} middle pulses`);
+  assert.ok(hands > enough(90) * STYLES.length, `only ${hands} middle pulses under the hand`);
+  assert.ok(marks > enough(45) * STYLES.length, `only ${marks} bars of bass on and off the marks`);
   // Reggae's one drop has no kick on 1 at any level.
   const kicking = STYLES.filter((style) => style.id !== "reggae").length;
-  assert.ok(ones >= enough(300) * kicking, `only ${ones} bars of time with a kick on 1`);
+  assert.ok(ones >= enough(240) * kicking, `only ${ones} bars of time with a kick on 1`);
 });

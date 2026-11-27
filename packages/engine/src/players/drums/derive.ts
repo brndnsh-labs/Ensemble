@@ -18,6 +18,7 @@ import type { Cut, Symbols } from "../../style/cut.ts";
 import { cutLine, cutTail, partIn } from "../../style/cut.ts";
 import type { PerTier, Tier } from "../../style/types.ts";
 import { shapesFor } from "./fill.ts";
+import type { DrumVoice } from "./kit.ts";
 import type {
   DrumFills,
   DrumStyle,
@@ -43,6 +44,13 @@ const DRUMS: Symbols = {
 
 const cellsOf = (text: string): string[] => [...text.replace(/\s+/g, "")];
 
+/**
+ * The pieces that keep time and are neither a kick nor a backbeat: in the middle pulse of a
+ * group of three they play on (one backbeat a group). The hat closed with the foot is not
+ * among them: where a style plays it, it is the backbeat.
+ */
+const TIME: readonly DrumVoice[] = ["closedHat", "openHat", "ride", "rideBell", "shaker"];
+
 const NO_LENGTH = { low: 0, mid: 0, high: 0 } as const;
 const NO_FILLS: DrumFills = {
   length: { phrase: NO_LENGTH, section: NO_LENGTH },
@@ -64,7 +72,8 @@ export function drumTimeIn(drums: DrumStyle, meter: Meter): DrumTime | undefined
 
 function derived(drums: DrumStyle, cut: Cut): DrumTime | undefined {
   const source: DrumTime = cut.source === "12/8" ? (drums.meters?.["12/8"] ?? drums) : drums;
-  const cymbals = new Set<string>([...drums.timekeepers, "closedHat", "openHat", "ride"]);
+  // What keeps the time going: the style's own timekeepers, and any cymbal or shaker.
+  const cymbals = new Set<string>([...drums.timekeepers, ...TIME]);
   const sound = (time: DrumTime): boolean =>
     validateTime(time, cut.meter, (names) => names.includes(cut.name)).length === 0;
 
@@ -81,7 +90,7 @@ function derived(drums: DrumStyle, cut: Cut): DrumTime | undefined {
             ...cutLine(cellsOf(text), cut, DRUMS, { turn: layer.audible === true }).line,
           ];
           // One backbeat a group: in the middle pulse of a group of three the drums keep time
-          // and play neither the kick nor the backbeat.
+          // (the cymbal, the shaker) and play neither the kick nor the backbeat.
           if (!cymbals.has(voice))
             for (const pulse of cut.pulses)
               if (pulse.weak) line.fill(".", pulse.start, pulse.start + pulse.steps);
