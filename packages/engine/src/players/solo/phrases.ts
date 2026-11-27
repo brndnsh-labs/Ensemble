@@ -11,7 +11,7 @@
 
 import { swing } from "../../perform/feel.ts";
 import { cells, STEP } from "../../perform/grid.ts";
-import { isCompound, lastPulse, onPulse, pulseTicks } from "../../perform/meter.ts";
+import { isCompound, lastPulse, onPulse } from "../../perform/meter.ts";
 import type { Plan, PlanBar } from "../../plan/types.ts";
 import type { Rng } from "../../rng.ts";
 import type { ToneRole } from "../../theory/chord.ts";
@@ -512,9 +512,19 @@ export function phrasesFor(
     if (roles && !roles.includes(role)) return 0;
     const draw = rng.fork("displace");
     if (!draw.chance(chance)) return 0;
-    const pulse = Math.round(pulseTicks(slot.bars[0]!.meter)[0]! / STEP);
-    return draw.fork("early").chance(early) ? -pulse : pulse;
+    // A pulse late or early as the slot says (`Slot.displace`): in a bar of uneven pulses the
+    // soloist has rhythms for, its first pulse late and its last early.
+    return draw.fork("early").chance(early)
+      ? -Math.round(slot.displace.early / STEP)
+      : Math.round(slot.displace.late / STEP);
   })();
+  // The other way a pulse, which in a bar of uneven pulses is another length.
+  const otherWay =
+    shift === 0
+      ? 0
+      : shift > 0
+        ? -Math.round(slot.displace.early / STEP)
+        : Math.round(slot.displace.late / STEP);
   // A section's last bar keeps its landing where the band turns: not pushed late there.
   // (The first draw is drawn by the style's share; the other way is tried where it fails.)
   const closing = slot.bars.at(-1)!;
@@ -692,7 +702,7 @@ export function phrasesFor(
     const may = (by: number) => (by < 0 ? early > 0 : lateAllowed && early < 1);
     const twin = (newly: boolean) =>
       (may(shift) ? displaced(kind, plans, ask, shift, phrase, newly) : null) ??
-      (may(-shift) ? displaced(kind, plans, ask, -shift, phrase, newly) : null);
+      (may(-shift) ? displaced(kind, plans, ask, otherWay, phrase, newly) : null);
     // The idea moved as main moves it; and where the style holds a note over the barline,
     // the idea moved by the stricter rules, offered only if main's is refused (`soloPart`).
     const old = twin(false);

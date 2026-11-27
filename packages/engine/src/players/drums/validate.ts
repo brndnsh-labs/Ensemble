@@ -1,6 +1,7 @@
 // Checks a drum style's meaning. The compiler has already checked its shape;
 // this reads it the way the drummer will and says what he could not play.
 
+import type { Meter } from "../../chart/types.ts";
 import { cells, LEVELS, STEP } from "../../perform/grid.ts";
 import { barSteps, pulseTicks } from "../../perform/meter.ts";
 import { readMeter } from "../../style/meters.ts";
@@ -50,10 +51,13 @@ function voiceOf(name: string, where: string, problems: string[]): void {
   if (!(name in KIT)) problems.push(`${where}: "${name}" is not a piece of the kit.`);
 }
 
-/** The problems in what is written as a bar: the grooves, the touches, the fills, for a bar of one meter. */
-function validateTime(
+/**
+ * The problems in what is written as a bar: the grooves, the touches, the fills, for a bar of
+ * one meter. A part made for a meter is asked this too, a layer and a fill at a time (`derive.ts`).
+ */
+export function validateTime(
   drums: DrumTime,
-  meter: { beats: number; unit: 2 | 4 | 8 },
+  meter: Meter,
   /** Whether a layer naming these meters could ever play in a bar this part is played in. */
   playsIn: (names: readonly string[]) => boolean,
 ): string[] {
@@ -128,6 +132,13 @@ function validateTime(
       }
     }
   }
+
+  const pulseCount = pulseTicks(meter).length;
+  if (
+    drums.countIn &&
+    (drums.countIn.length !== pulseCount || drums.countIn.some((share) => !(share > 0)))
+  )
+    problems.push(`count-in: a share more than zero for each of the bar's ${pulseCount} pulses.`);
 
   drums.touches.forEach((touch, i) => {
     const where = `touch ${i + 1}`;

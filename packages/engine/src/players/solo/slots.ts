@@ -8,10 +8,11 @@ import { PPQ } from "../../chart/types.ts";
 import { cells, STEP } from "../../perform/grid.ts";
 import type { Arrival } from "../../perform/harmony.ts";
 import { arrivals } from "../../perform/harmony.ts";
-import { meterName, pulseTicks, writtenFor } from "../../perform/meter.ts";
+import { meterName, pulseTicks } from "../../perform/meter.ts";
 import type { Plan, PlanBar } from "../../plan/types.ts";
 import type { FeelStyle, StylePack } from "../../style/types.ts";
 import { tierOf } from "../../style/types.ts";
+import { soloTimeIn } from "./derive.ts";
 import type { Pool } from "./harmony.ts";
 import { EIGHTH, isChordTone, poolOf } from "./harmony.ts";
 import { SOLO_INSTRUMENTS } from "./instruments.ts";
@@ -86,17 +87,31 @@ export interface Slot {
   readonly high: number;
   /** The solo's one top note may be this high and no higher (SO-07). */
   readonly top: number;
+  /**
+   * How far, in ticks, an idea is moved "a pulse" late and early here. In a bar the soloist has
+   * rhythms for (written, or made for the meter), late is the bar's first pulse and early its
+   * last, so the downbeat goes to a pulse either way; where the line takes the front of a 4/4
+   * rhythm, the first pulse both ways.
+   */
+  readonly displace: { readonly late: number; readonly early: number };
+}
+
+/** `Slot.displace` for a phrase in bars of this meter. */
+export function displaceOf(solo: SoloStyle, meter: Meter): Slot["displace"] {
+  const pulses = pulseTicks(meter);
+  const own = soloTimeIn(solo, meter) !== undefined;
+  return { late: pulses[0]!, early: own ? pulses.at(-1)! : pulses[0]! };
 }
 
 const inMeter = new WeakMap<SoloStyle, Map<string, SoloStyle>>();
 
 /**
  * The soloist's style as it is in a bar of a meter: with what it has written
- * for that meter in place of its 4/4 rhythms, or as it stands where it has
- * written nothing.
+ * for that meter, or what is made for it, in place of its 4/4 rhythms; as it
+ * stands where it has neither.
  */
 export function soloIn(solo: SoloStyle, meter: Meter): SoloStyle {
-  const written = writtenFor(solo.meters, meter);
+  const written = soloTimeIn(solo, meter);
   if (!written) return solo;
   let known = inMeter.get(solo);
   if (!known) {
@@ -441,6 +456,7 @@ function slotsOf(plan: Plan, solo: SoloStyle, instrument: SoloInstrument): Slot[
       low: Math.round(low),
       high: Math.round(high),
       top,
+      displace: displaceOf(solo, bars[0]!.meter),
     });
   });
   return slots;

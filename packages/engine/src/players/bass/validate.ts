@@ -1,6 +1,7 @@
 // Checks a bass style's meaning. The compiler has already checked its shape;
 // this reads it the way the bassist will and says what he could not play.
 
+import type { Meter } from "../../chart/types.ts";
 import { cells, STEP } from "../../perform/grid.ts";
 import { barSteps, pulseTicks } from "../../perform/meter.ts";
 import { readMeter } from "../../style/meters.ts";
@@ -22,8 +23,21 @@ const HOLDS: readonly Hold[] = ["song", "section", "pass", "phrase", "bar"];
 /** The ending's button is this much harder than its chord, and must still be a MIDI level. */
 const LOUDEST_ENDING = 115;
 
-/** Every problem in a bass style, in words. An empty list means the data is sound. */
-export function validateBassStyle(bass: BassStyle): string[] {
+/** A turn's lengths in a meter, in sixteenths: the bar's last pulse, or its last two. */
+function turnLengths(meter: Meter): readonly number[] {
+  const steps = pulseTicks(meter).map((ticks) => Math.round(ticks / STEP));
+  return [steps.at(-1)!, steps.at(-1)! + (steps.at(-2) ?? steps.at(-1)!)];
+}
+
+/**
+ * Every problem in a bass style, in words. An empty list means the data is sound. With `only`,
+ * the problems in those lines alone, as lines written for that meter: what a part made for a
+ * meter is asked (`derive.ts`).
+ */
+export function validateBassStyle(
+  bass: BassStyle,
+  only?: { readonly lines: BassStyle["lines"]; readonly meter: Meter },
+): string[] {
   const problems: string[] = [];
   const share = (value: number, where: string) => {
     if (!(value > 0 && value <= 1))
@@ -67,7 +81,7 @@ export function validateBassStyle(bass: BassStyle): string[] {
 
   // The bar the lines being checked are written for: its sixteenths, and a pulse of it.
   let figureSteps = FIGURE_STEPS;
-  let pulseSteps = 4;
+  let turnSteps: readonly number[] = [4, 8];
   let draws = new Map<string, string>();
   const checkLines = (lines: BassStyle["lines"], label: string) => {
     for (const tier of TIERS) {
@@ -79,6 +93,12 @@ export function validateBassStyle(bass: BassStyle): string[] {
         );
     }
   };
+  if (only) {
+    figureSteps = barSteps(only.meter);
+    turnSteps = turnLengths(only.meter);
+    checkLines(only.lines, "");
+    return problems;
+  }
   checkLines(bass.lines, "");
   for (const [name, lines] of Object.entries(bass.meters ?? {})) {
     const meter = readMeter(name);
@@ -87,12 +107,12 @@ export function validateBassStyle(bass: BassStyle): string[] {
       continue;
     }
     figureSteps = barSteps(meter);
-    pulseSteps = Math.round(pulseTicks(meter)[0]! / STEP);
+    turnSteps = turnLengths(meter);
     draws = new Map();
     checkLines(lines, `in ${name}, `);
   }
   figureSteps = FIGURE_STEPS;
-  pulseSteps = 4;
+  turnSteps = [4, 8];
 
   /** A figure's or a turn's grid, symbol by symbol. Returns its cells. */
   function checkGrid(figure: Figure, line: BassLine, at: string): readonly string[] {
@@ -108,6 +128,13 @@ export function validateBassStyle(bass: BassStyle): string[] {
     }
     if (!grid.some((symbol) => symbol === "x" || symbol in RIFF_TONES))
       problems.push(`${at}: it never plays a tone (x, or a tone by name).`);
+    if (figure.places) {
+      const xs = grid.filter((symbol) => symbol === "x").length;
+      if (figure.places.length !== xs)
+        problems.push(`${at}: it places ${figure.places.length} tones and has ${xs} x.`);
+      if (figure.places.some((place) => !Number.isInteger(place) || place < -1))
+        problems.push(`${at}: a place is a tone of the sequence from 0, or -1 for the root.`);
+    }
     let sounding = false;
     let tone = false;
     grid.forEach((symbol, step) => {
@@ -141,6 +168,8 @@ export function validateBassStyle(bass: BassStyle): string[] {
   }
 
   function checkLine(line: BassLine, where: string): void {
+    if (line.marks?.some((tick) => !(tick >= 0 && tick < figureSteps * STEP)))
+      problems.push(`${where}: a mark is outside the bar.`);
     // Tones.
     if (line.tones.length === 0) problems.push(`${where}: there are no tones to play.`);
     else if (line.tones[line.tones.length - 1]!.when !== undefined)
@@ -210,9 +239,9 @@ export function validateBassStyle(bass: BassStyle): string[] {
       turns.options.forEach((turn, i) => {
         const at = `${where}, turn ${turn.name ?? i + 1} "${turn.grid}"`;
         const grid = checkGrid(turn, line, at);
-        if (grid.length !== pulseSteps && grid.length !== 2 * pulseSteps)
+        if (!turnSteps.includes(grid.length))
           problems.push(
-            `${at}: it has ${grid.length} steps; a turn is one beat or two, ${pulseSteps} sixteenths or ${2 * pulseSteps}.`,
+            `${at}: it has ${grid.length} steps; a turn is one beat or two, ${turnSteps[0]} sixteenths or ${turnSteps[1]}.`,
           );
       });
     }

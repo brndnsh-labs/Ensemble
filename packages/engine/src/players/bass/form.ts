@@ -3,13 +3,14 @@
 
 import type { ChartChord } from "../../chart/types.ts";
 import { arrivals, contextOf, heldCount } from "../../perform/harmony.ts";
-import { pulseTicks, writtenFor } from "../../perform/meter.ts";
+import { pulseTicks } from "../../perform/meter.ts";
 import type { Plan, PlanBar } from "../../plan/types.ts";
 import { planBar } from "../../plan/types.ts";
 import type { Tier } from "../../style/types.ts";
 import { tierOf } from "../../style/types.ts";
 import type { ChordScale } from "../../theory/scale.ts";
 import { chordScale } from "../../theory/scale.ts";
+import { bassLinesIn } from "./derive.ts";
 import type { BassLine, BassStyle } from "./style.ts";
 import { bassPitchClass } from "./tones.ts";
 
@@ -127,14 +128,14 @@ export function tierAt(piece: Piece): Tier {
   return piece.tier;
 }
 
-/** The line the bass plays in a piece: its tier's, as written for the bar's meter where the style has. */
+/** The line the bass plays in a piece: its tier's, as written for the bar's meter or made for it. */
 export function lineAt(bass: BassStyle, piece: Piece): BassLine {
-  return (writtenFor(bass.meters, piece.bar.meter) ?? bass.lines)[piece.tier];
+  return (bassLinesIn(bass, piece.bar.meter) ?? bass.lines)[piece.tier];
 }
 
 /**
- * Every line a performance can draw on: the 4/4 lines, and those written for
- * a meter it has a bar of.
+ * Every line a performance can draw on: the 4/4 lines, and those written or
+ * made for a meter it has a bar of.
  */
 export function linesIn(bass: BassStyle, form: readonly Piece[]): BassLine[] {
   const lines = new Set([bass.lines.low, bass.lines.mid, bass.lines.high]);
@@ -142,7 +143,7 @@ export function linesIn(bass: BassStyle, form: readonly Piece[]): BassLine[] {
   for (const piece of form) {
     if (seen.has(piece.bar.meter)) continue;
     seen.add(piece.bar.meter);
-    const written = writtenFor(bass.meters, piece.bar.meter);
+    const written = bassLinesIn(bass, piece.bar.meter);
     if (written) for (const line of [written.low, written.mid, written.high]) lines.add(line);
   }
   return [...lines];

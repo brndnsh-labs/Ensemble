@@ -11,7 +11,7 @@ import { score } from "../../critic/choose.ts";
 import { swing } from "../../perform/feel.ts";
 import { cells, STEP } from "../../perform/grid.ts";
 import type { Arrival } from "../../perform/harmony.ts";
-import { onAnd, onPulse, pulseTicks } from "../../perform/meter.ts";
+import { onAnd, onPulse, pulseAt, pulseTicks } from "../../perform/meter.ts";
 import type { Player, PlayerContext, WrittenNote } from "../../perform/notes.ts";
 import { heldRng } from "../../perform/notes.ts";
 import type { GlidePoint, PitchMove } from "../../perform/pitch.ts";
@@ -31,7 +31,7 @@ import { placeOf, spotsOf } from "./line.ts";
 import type { Memory, PassPickup, Phrase } from "./phrases.ts";
 import { opensPass, passPickup, phrasesFor } from "./phrases.ts";
 import type { Slot, World } from "./slots.ts";
-import { doubleChanceOf, fourPulses, levelIndex, worldOf } from "./slots.ts";
+import { displaceOf, doubleChanceOf, fourPulses, levelIndex, worldOf } from "./slots.ts";
 import type { Form, Role } from "./style.ts";
 
 /**
@@ -449,7 +449,7 @@ function asLong(was: readonly SoloNote[], now: readonly SoloNote[]): boolean {
   return to.every((note, i) => {
     const before = from[i]!;
     const last = i === to.length - 1;
-    const give = last ? pulseTicks(note.bar.meter)[0]! : 0;
+    const give = last ? pulseAt(note.bar.meter, note.tick - note.bar.start).ticks : 0;
     const shaken = before.move?.vibrato === undefined || note.move?.vibrato !== undefined;
     return note.duration >= before.duration - give && shaken;
   });
@@ -465,7 +465,7 @@ function keepsLengths(was: readonly SoloNote[], now: readonly SoloNote[]): boole
   return to.every((note, i) => {
     const before = from[i]!;
     const last = i === to.length - 1;
-    const give = last ? pulseTicks(note.bar.meter)[0]! : 0;
+    const give = last ? pulseAt(note.bar.meter, note.tick - note.bar.start).ticks : 0;
     const shaken = before.move?.vibrato === undefined || note.move?.vibrato !== undefined;
     // Neither shorter nor longer: within a sixteenth of it, both ways.
     return (
@@ -801,6 +801,7 @@ function realiseLead(world: World, lead: PassPickup, bar: PlanBar): SoloNote[] {
     low: lead.first,
     high: lead.first,
     top: lead.first,
+    displace: displaceOf(world.solo, bar.meter),
   };
   const phrase: Phrase = {
     kind: "pickup",

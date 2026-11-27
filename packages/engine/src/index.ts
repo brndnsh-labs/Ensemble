@@ -17,7 +17,7 @@ export { BAND_METERS, fits, remeter, sameMeter, tempoIn } from "./chart/remeter.
 export { transpose } from "./chart/transpose.ts";
 export * from "./chart/types.ts";
 export * from "./critic/choose.ts";
-export { MEASURES } from "./critic/measures/index.ts";
+export { MEASURES, METER_MEASURES } from "./critic/measures/index.ts";
 export type { BurstPhrase, DisplacedPhrase } from "./critic/measures/solo.ts";
 export { burstPhrases, displacedPhrases } from "./critic/measures/solo.ts";
 export * from "./critic/read.ts";
@@ -67,6 +67,7 @@ export type { Slot } from "./players/solo/slots.ts";
 export type * from "./players/solo/style.ts";
 export { validateSoloStyle } from "./players/solo/validate.ts";
 export * from "./rng.ts";
+export { styleIn } from "./style/derive.ts";
 export * from "./style/meters.ts";
 export * from "./style/types.ts";
 export * from "./style/validate.ts";

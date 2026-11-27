@@ -4,7 +4,7 @@
 // written, so a lead-in always lands on the note it promised (BA-05 to BA-07).
 
 import { PPQ } from "../../chart/types.ts";
-import { isCompound, writtenFor } from "../../perform/meter.ts";
+import { isCompound } from "../../perform/meter.ts";
 import type { Player, PlayerContext, WrittenNote } from "../../perform/notes.ts";
 import { heldRng } from "../../perform/notes.ts";
 import type { PlanBar } from "../../plan/types.ts";
@@ -12,6 +12,7 @@ import type { Rng } from "../../rng.ts";
 import { GHOST_BELOW } from "../drums/kit.ts";
 import type { BassPick } from "./critique.ts";
 import { byBassCritic } from "./critique.ts";
+import { bassLinesIn } from "./derive.ts";
 import { finalNotes, strikeBefore } from "./ending.ts";
 import type { Piece } from "./form.ts";
 import { lineAt, pieces, tierAt } from "./form.ts";
@@ -406,8 +407,7 @@ function soundingBefore(
  */
 function leadInIn(bass: BassStyle, bar: PlanBar): BassStyle["leadIn"] {
   const policy = bass.leadIn;
-  if (!policy.inDotted || !isCompound(bar.meter) || !writtenFor(bass.meters, bar.meter))
-    return policy;
+  if (!policy.inDotted || !isCompound(bar.meter) || !bassLinesIn(bass, bar.meter)) return policy;
   return { ...policy, at: policy.inDotted };
 }
 

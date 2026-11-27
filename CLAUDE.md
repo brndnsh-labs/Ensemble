@@ -81,6 +81,7 @@ pnpm -s ensemble replay take.json --out take.mid
 pnpm -s ensemble read   library/blues-12-bar-a.chart [the take flags of render] [--bars 13-24] [--seats solo,bass] [--timing]
                         # the take as a transcription: each bar, each seat's notes, roles and moves, for reading
 pnpm -s ensemble score  [chart...] [--style blues] [--seeds 200] [--update | --check]
+pnpm -s ensemble score  --style rock --meter "7/8 (3+2+2)"   # a style's charts played in a meter, read and not kept
 ```
 
 A take is its chart, style, options, and seed: the same four always give the same MIDI file. `score --update` accepts the current scorecard as the baseline in `scorecard/<style>.json`.

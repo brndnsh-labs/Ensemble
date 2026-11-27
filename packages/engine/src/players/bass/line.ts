@@ -66,6 +66,8 @@ interface Onset {
   readonly under?: boolean;
   /** The tone is taken in the octave nearest the note before it. */
   readonly near?: boolean;
+  /** The place in the bar's sequence this `x` takes, where its figure says (`Figure.places`). */
+  readonly place?: number;
 }
 
 /** What a piece is played with beyond its line: the plan's turn, and the drummer's kicks. */
@@ -81,12 +83,14 @@ function strokesOf(grid: readonly string[], from = 0, figure?: Figure): Onset[] 
   const notes: Onset[] = [];
   const under = figure?.under === true;
   const near = figure?.near === true;
+  let xs = 0;
   grid.forEach((symbol, step) => {
     const named = RIFF_TONES[symbol];
     const tone = named === "b7" && figure?.seventh === "own" ? "7" : named;
     if (symbol !== "x" && symbol !== "o" && symbol !== DEAD_NOTE && !tone) return;
     let length = 1;
     while (grid[step + length] === "-") length++;
+    const place = symbol === "x" ? figure?.places?.[xs++] : undefined;
     notes.push({
       tick: from + step * STEP,
       space: length * STEP,
@@ -96,6 +100,7 @@ function strokesOf(grid: readonly string[], from = 0, figure?: Figure): Onset[] 
       ...(under && symbol !== "o" && symbol !== DEAD_NOTE ? { under: true } : {}),
       ...(tone && tone !== "8" && near ? { near: true } : {}),
       ...(symbol === DEAD_NOTE ? { dead: true } : {}),
+      ...(place !== undefined ? { place } : {}),
     });
   });
   return notes;
@@ -247,6 +252,9 @@ export function lineOf(
     : (shape.bars[piece.cycle % shape.bars.length] ?? []);
   const notes: LineNote[] = [];
   let count = 0;
+  // A figure that says each `x`'s place keeps it, counted from the tone the first of them
+  // would have taken here.
+  let base: number | undefined;
   let pitch = root;
   inside.forEach((onset, i) => {
     // A re-strike needs a note to repeat: the first note of a piece is always a tone.
@@ -257,7 +265,14 @@ export function lineOf(
     if (!echo) {
       // A dead note is struck where the hand is: on the root.
       const own = dead ? "R" : onset.tone;
-      const tone = arrival ? "R" : (own ?? tones[count % tones.length] ?? "R");
+      let at = count;
+      // Place -1: the root, whatever the sequence has there (it still takes its turn in the count).
+      const rooted = own === undefined && onset.place === -1;
+      if (own === undefined && onset.place !== undefined && !rooted) {
+        base ??= count - onset.place;
+        at = base + onset.place;
+      }
+      const tone = arrival || rooted ? "R" : (own ?? tones[at % tones.length] ?? "R");
       const before = pitch;
       pitch = tonePitch(tone, chord, scale, root, line.ceiling);
       if (onset.near && !arrival) pitch = nearest(pitch, before, line.ceiling);
@@ -281,7 +296,7 @@ export function lineOf(
             ? "dead"
             : !echo && onset.tone === "8" && line.velocity.octave !== undefined
               ? "octave"
-              : isStrong(bar, onset.tick)
+              : isStrong(bar, onset.tick) || line.marks?.includes(onset.tick)
                 ? "strong"
                 : offLevel && !onPulse(bar, onset.tick)
                   ? "off"

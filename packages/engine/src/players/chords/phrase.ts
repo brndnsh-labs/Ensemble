@@ -17,7 +17,7 @@
 import { cells } from "../../perform/grid.ts";
 import type { Arrival } from "../../perform/harmony.ts";
 import { sameChord } from "../../perform/harmony.ts";
-import { barSteps, writtenFor } from "../../perform/meter.ts";
+import { barSteps, meterName } from "../../perform/meter.ts";
 import type { PlayerContext } from "../../perform/notes.ts";
 import { heldRng } from "../../perform/notes.ts";
 import type { PlanBar } from "../../plan/types.ts";
@@ -28,6 +28,7 @@ import { barStrikes, EIGHTH, landing } from "./bar.ts";
 import type { Hearing, PhraseHarmony } from "./converse.ts";
 import { hear, waysOf } from "./converse.ts";
 import type { PhraseCandidate, Pick } from "./critique.ts";
+import { rhythmBookIn } from "./derive.ts";
 import type { FigureStroke } from "./figure.ts";
 import { strokesOf } from "./figure.ts";
 import { lineOf } from "./line.ts";
@@ -38,10 +39,10 @@ import { barRhythm } from "./rhythm.ts";
 import type { Strike } from "./strike.ts";
 import type { ChordStyle, CompFigure, RhythmBook, RhythmTier } from "./style.ts";
 
-/** The rhythm book a bar is comped from: the style's in 4/4, or the one written for the bar's meter. */
+/** The rhythm book a bar is comped from: the style's in 4/4, or the one written for the bar's meter or made for it. */
 export function bookFor(chords: ChordStyle, bar: PlanBar): RhythmBook | null {
-  if (bar.meter.beats === 4 && bar.meter.unit === 4) return chords.rhythm;
-  return writtenFor(chords.meters, bar.meter) ?? null;
+  if (meterName(bar.meter) === "4/4") return chords.rhythm;
+  return rhythmBookIn(chords, bar.meter) ?? null;
 }
 
 /**

@@ -4,11 +4,12 @@
 import type { Meter } from "../../chart/types.ts";
 import { cells, LEVELS, STEP } from "../../perform/grid.ts";
 import { arrivals } from "../../perform/harmony.ts";
-import { barSteps, meterName, pulseTicks, writtenFor } from "../../perform/meter.ts";
+import { barSteps, meterName, pulseTicks } from "../../perform/meter.ts";
 import type { PlayerContext } from "../../perform/notes.ts";
 import { heldRng } from "../../perform/notes.ts";
 import type { Plan, PlanBar } from "../../plan/types.ts";
 import { tierOf } from "../../style/types.ts";
+import { drumTimeIn } from "./derive.ts";
 import { type DrumVoice, GHOST_BELOW, voiceName } from "./kit.ts";
 import type { DrumStyle, DrumTime, GrooveLayer, GrooveOption, Lines, When } from "./style.ts";
 
@@ -147,9 +148,9 @@ export function pulses(meter: Meter): number[] {
   return pulseTicks(meter).map((ticks) => ticks / STEP);
 }
 
-/** What the drummer has for a bar: the part written for its meter, or the 4/4 one to be fitted. */
+/** What the drummer has for a bar: the part written for its meter or made for it, or the 4/4 one to be fitted. */
 export function timeOf(drums: DrumStyle, bar: PlanBar): DrumTime {
-  return writtenFor(drums.meters, bar.meter) ?? drums;
+  return drumTimeIn(drums, bar.meter) ?? drums;
 }
 
 /** The bar of time the drummer plays under this bar, before any fill or crash. */
@@ -161,8 +162,8 @@ export function grooveBar(
   rng: PlayerContext["rng"],
 ): BarPart {
   const part: BarPart = {};
-  // A part written for the bar's meter is the bar; the 4/4 part is fitted to it.
-  const written = writtenFor(drums.meters, bar.meter);
+  // A part written for the bar's meter, or made for it, is the bar; the 4/4 part is fitted to it.
+  const written = drumTimeIn(drums, bar.meter);
   const time = written ?? drums;
   const steps = written ? barSteps(bar.meter) : GROOVE_STEPS;
   const dotted = pulses(bar.meter).some((pulse) => pulse > BEAT);

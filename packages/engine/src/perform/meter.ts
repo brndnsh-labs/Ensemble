@@ -145,6 +145,46 @@ export function strongPulses(meter: Meter): number[] {
   return strong;
 }
 
+/**
+ * Whether a bar's shape has to be told: it has more than one group, or pulses of two lengths
+ * (5/4, 7/4, 7/8). In 4/4 nobody has to be told; in a part made for a bar like these the band
+ * says the shape the same way in every bar (#2244, "telling the shape").
+ */
+export function shapeToTell(meter: Meter): boolean {
+  return pulseGroups(meter).length > 1 || new Set(pulseTicks(meter)).size > 1;
+}
+
+/**
+ * Where a bar's shape is marked, as ticks from the barline: every pulse where the pulses are
+ * of two lengths (7/8), the first pulse of each group elsewhere (5/4: 1 and 4).
+ */
+export function barMarks(meter: Meter): number[] {
+  const starts = pulseStarts(meter);
+  if (new Set(pulseTicks(meter)).size > 1) return starts;
+  const marks: number[] = [];
+  let at = 0;
+  for (const size of pulseGroups(meter)) {
+    marks.push(starts[at]!);
+    at += size;
+  }
+  return marks;
+}
+
+/**
+ * The middle pulse of each of the bar's groups of three, as ticks from the barline: where a
+ * band telling the bar's shape keeps time and plays no backbeat (one backbeat a group).
+ */
+export function middlePulses(meter: Meter): number[] {
+  const starts = pulseStarts(meter);
+  const middles: number[] = [];
+  let at = 0;
+  for (const size of pulseGroups(meter)) {
+    if (size === 3) middles.push(starts[at + 1]!);
+    at += size;
+  }
+  return middles;
+}
+
 /** The pulse a tick from the barline falls in: which one, where it starts and how long it is. */
 export function pulseAt(
   meter: Meter,
