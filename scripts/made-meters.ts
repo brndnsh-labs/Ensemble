@@ -264,9 +264,13 @@ four passes, with the same chart in 4/4 in brackets: how often a seat's bar is t
 same place a pass earlier, how many times it strikes in a pulse, and of the soloist how many
 of its bars are one note and no more.</p>
 <p><b>The soloist is thinner in 7/8.</b> A bar of 7/8 takes beats 1, 2 and 4 of a 4/4 rhythm,
-and a sparse rhythm rests on 4, so the long beat is often empty. Over 48 takes funk's soloist
-has one note and no more in 20% of its bars, against 14% of the same takes in 4/4; rock's 19%
-against 13%.</p>
+and a sparse rhythm rests on 4, so the long beat is often empty and a phrase is often one bar.
+The share of the soloist's bars that are one note and no more, over 48 takes of each style's
+4/4 charts (\`ensemble score --meter 7/8 --seeds 48\`), with the same takes in 4/4 after it:
+funk 20% and 14%, rock 19% and 13%, blues 26% and 22%, acoustic 20% and 18%, disco 13% and
+10%, neo-soul 10% and 6%. In 5/4 it does not show: blues 18% and 22%, jazz 8% and 7% (200
+takes). A reading of single takes found it plainer than these means in places: funk's first
+solo chorus on seed 1.</p>
 <p><b>What this page asks you:</b></p>
 <ol>
 <li>Is the built band good enough to put 5/4 and 7/8 in the meter list, an entry a grouping?
