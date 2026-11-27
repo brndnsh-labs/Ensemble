@@ -2,6 +2,7 @@
 
 import { PPQ } from "../../chart/types.ts";
 import { STEP } from "../../perform/grid.ts";
+import { pulseTicks } from "../../perform/meter.ts";
 import type { NoteEvent } from "../../perform/notes.ts";
 import type { PlanBar } from "../../plan/types.ts";
 import { DEAD_VOICE } from "../../players/bass/line.ts";
@@ -219,3 +220,69 @@ export const bandMeasures: readonly Measure[] = [
     },
   },
 ];
+
+// ── a seat in another meter, beside itself in four ──────────────────────────
+
+/** A seat's bars of music it plays in, short of the ending, each with its place in its pass. */
+function placedBars(take: Take, seat: "drums" | "bass" | "chords") {
+  const place = new Map<number, number>();
+  return musicBars(take).flatMap((bar) => {
+    if (bar.ending) return [];
+    const at = place.get(bar.pass) ?? 0;
+    place.set(bar.pass, at + 1);
+    return bar.seats[seat] === null ? [] : [{ bar, at }];
+  });
+}
+
+const OWNER = { drums: "the drums'", bass: "the bass's", chords: "the comp's" } as const;
+
+const barAgain = (seat: "drums" | "bass" | "chords"): Measure => ({
+  id: `${seat}.bar-of-a-pass-before`,
+  seat,
+  says: `How often ${OWNER[seat]} bar is note for note the bar at the same place a pass earlier: a player with a part to play from says a chorus differently the next time round, and one playing a plain bar says it again.`,
+  unit: "share",
+  lowerIsBetter: true,
+  of(take) {
+    const notes = notesOf(take, seat);
+    const said = new Map<string, string>();
+    let [same, compared] = [0, 0];
+    for (const { bar, at } of placedBars(take, seat)) {
+      const says = notesIn(notes, bar)
+        .map((note) => `${note.tick - bar.start}:${note.pitch}`)
+        .sort()
+        .join(" ");
+      said.set(`${bar.pass}:${at}`, says);
+      const before = said.get(`${bar.pass - 1}:${at}`);
+      if (before === undefined) continue;
+      compared++;
+      if (before === says) same++;
+    }
+    return share(same, compared);
+  },
+});
+
+const strikesAPulse = (seat: "drums" | "bass" | "chords"): Measure => ({
+  id: `${seat}.strikes-a-pulse`,
+  seat,
+  says: `How many times ${seat === "chords" ? "the comp strikes" : `the ${seat} strike${seat === "bass" ? "s" : ""}`} in a pulse, over the bars it plays: beside the same charts in four, whether a meter has made the seat busier or left it bare.`,
+  unit: "per beat",
+  of(take) {
+    const notes = notesOf(take, seat);
+    let [strikes, pulses] = [0, 0];
+    for (const { bar } of placedBars(take, seat)) {
+      strikes += new Set(notesIn(notes, bar).map((note) => note.tick)).size;
+      pulses += pulseTicks(bar.meter).length;
+    }
+    return pulses === 0 ? null : { value: strikes / pulses, cases: pulses };
+  },
+});
+
+/**
+ * What is read of a seat in a meter beside the same charts in four (`ensemble score --meter`):
+ * the two faults a made-up bar has, the same bar every time round and a strike on every pulse.
+ * Reported there and nowhere else: no scorecard keeps them, and nothing is accepted in a meter
+ * a style has not written until it has been heard (#2244).
+ */
+export const meterMeasures: readonly Measure[] = (["drums", "bass", "chords"] as const).flatMap(
+  (seat) => [barAgain(seat), strikesAPulse(seat)],
+);

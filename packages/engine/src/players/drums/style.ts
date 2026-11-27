@@ -179,6 +179,11 @@ export interface DrumTime {
   /** Touches laid over the groove after it is built (not over fills or the ending). */
   readonly touches: readonly Touch[];
   readonly fills: DrumFills;
+  /**
+   * The count-in's stick on each of the bar's pulses, as a share of its level. Left out, every
+   * stick the same. A part made for a bar whose shape has to be told leans on its marks.
+   */
+  readonly countIn?: readonly number[];
 }
 
 export interface DrumStyle extends DrumTime {

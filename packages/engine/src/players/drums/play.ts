@@ -36,10 +36,11 @@ export const playDrums: Player = ({ plan, style, rng }) => {
 
     if (bar.kind === "count-in") {
       let step = 0;
-      for (const pulse of pulses(bar.meter)) {
-        notes.push(stroke(bar, "sticks", step * STEP, LEVELS.x));
+      const lean = timeOf(drums, bar).countIn;
+      pulses(bar.meter).forEach((pulse, i) => {
+        notes.push(stroke(bar, "sticks", step * STEP, Math.min(127, LEVELS.x * (lean?.[i] ?? 1))));
         step += pulse;
-      }
+      });
       continue;
     }
 

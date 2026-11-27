@@ -177,6 +177,13 @@ export interface Figure {
    * (ST-neosoul-14).
    */
   readonly seventh?: "flat" | "own";
+  /**
+   * Which tone of the bar's sequence each `x` takes, in order, from 0; -1 for the root,
+   * whatever the sequence has there. Left out, each `x` takes the next. A figure made for
+   * another meter from a written one keeps each `x`'s place in the written bar, so a beat
+   * played twice plays its tone twice (a tone travels with its cell, #2244).
+   */
+  readonly places?: readonly number[];
 }
 
 /** The tones a figure can name in its grid, by the character that names each. */
@@ -306,6 +313,11 @@ export interface BassLine {
    * from the downbeat.
    */
   readonly otherMeters: "pulses" | "downbeat";
+  /**
+   * Ticks from the barline where the bar's shape is marked, in a line made for a bar whose
+   * shape has to be told (#2244): a note there is played at the `strong` level.
+   */
+  readonly marks?: readonly number[];
   /** The highest note of the line (MIDI). A tone that would sit above it is played an octave lower. */
   readonly ceiling: number;
   /** How long a note sounds, as a share of the space the figure gives it. */

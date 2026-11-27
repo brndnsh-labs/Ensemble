@@ -2,20 +2,23 @@
 // is played at in a meter.
 
 import type { Meter } from "../chart/types.ts";
-import { isCompound, writtenFor } from "../perform/meter.ts";
+import { grouped, isCompound, writtenFor } from "../perform/meter.ts";
 import type { StylePack, TempoRange } from "./types.ts";
 
 /**
- * The meter a style has written parts for, from its name ("12/8"). Null for
- * anything a chart could not write, and for 4/4, which is the style itself.
+ * The meter a style has written parts for, from its name ("12/8", "7/8 (3+2+2)"). Null for
+ * anything a chart could not write, for 4/4, which is the style itself, and for a meter named
+ * with its usual grouping, which is filed under the meter alone.
  */
 export function readMeter(name: string): Meter | null {
-  const match = /^(\d{1,2})\/(2|4|8)$/.exec(name);
+  const match = /^(\d{1,2})\/(2|4|8)(?: \((\d(?:\+\d)*)\))?$/.exec(name);
   if (!match) return null;
   const beats = Number(match[1]);
   const unit = Number(match[2]) as 2 | 4 | 8;
   if (beats < 1 || beats > 32 || (beats === 4 && unit === 4)) return null;
-  return { beats, unit };
+  if (match[3] === undefined) return { beats, unit };
+  const meter = grouped({ beats, unit }, match[3].split("+").map(Number));
+  return meter?.groups ? meter : null;
 }
 
 /**

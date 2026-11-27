@@ -1,5 +1,5 @@
 import type { Measure } from "../types.ts";
-import { bandMeasures } from "./band.ts";
+import { bandMeasures, meterMeasures } from "./band.ts";
 import { bassMeasures } from "./bass.ts";
 import { chordMeasures } from "./chords.ts";
 import { compingMeasures } from "./comping.ts";
@@ -17,3 +17,6 @@ export const MEASURES: readonly Measure[] = [
   ...soloMeasures,
   ...bandMeasures,
 ];
+
+/** What `ensemble score --meter` reads besides: a seat in a meter, set against itself in four. */
+export const METER_MEASURES: readonly Measure[] = meterMeasures;

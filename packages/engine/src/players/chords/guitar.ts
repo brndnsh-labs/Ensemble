@@ -5,9 +5,10 @@
 // read from where it falls (CH-27); a stroke rolls across the strings (CH-29);
 // and a scratch is the same stroke with the fretting hand let go (CH-28).
 
+import type { Meter } from "../../chart/types.ts";
 import { PPQ } from "../../chart/types.ts";
 import { heldCount } from "../../perform/harmony.ts";
-import { isCompound, onAnd } from "../../perform/meter.ts";
+import { isCompound, onAnd, pulseAt } from "../../perform/meter.ts";
 import type { WrittenNote } from "../../perform/notes.ts";
 import type { Plan } from "../../plan/types.ts";
 import type { Chord } from "../../theory/chord.ts";
@@ -690,8 +691,13 @@ export function guitar(style: Guitar): InstrumentIdiom {
         const bar = plan.bars[strike.bar];
         const inBar = strike.tick - (bar?.start ?? 0);
         const dotted = grid === "eighth" && bar !== undefined && isCompound(bar.meter);
+        // In a bar of uneven pulses (7/8, 3+2+2) the pendulum swings from
+        // each pulse's start, so the long pulse's steady eighths go down, up, down and the
+        // next pulse starts down. In a bar of even pulses this is the bar's own count.
+        const into =
+          bar !== undefined && bar.meter.unit !== 4 && !dotted ? inPulse(bar.meter, inBar) : inBar;
         const upstroke =
-          !strike.down && (dotted ? onAnd(bar.meter, inBar) : inBar % pair >= pair / 2);
+          !strike.down && (dotted ? onAnd(bar.meter, inBar) : into % pair >= pair / 2);
         const strings = voicing.strings ?? voicing.pitches.map((_, string) => string);
         const from = soundsFrom(voicing, strike, upstroke ? up : null);
         const [lowest, highest] = [strings[from]!, strings.at(-1)!];
@@ -745,4 +751,9 @@ export function guitar(style: Guitar): InstrumentIdiom {
   };
   idioms.set(style, idiom);
   return idiom;
+}
+
+/** Ticks from the start of the pulse a tick from the barline falls in. */
+function inPulse(meter: Meter, tickInBar: number): number {
+  return tickInBar - pulseAt(meter, tickInBar).start;
 }

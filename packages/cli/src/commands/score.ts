@@ -8,11 +8,27 @@
 // Brandon has passed by ear (`../passed.ts`): inside every measure's range, or
 // the measures it took outside one, which is what sends a change to his ear.
 // The change is what moved since the branch left main (or since --since).
+//
+// With --meter, the same takes are played in that meter (`ensemble render --meter`), on the
+// charts that read in it, and two measures more are set beside the same takes in the charts'
+// own meter: how often a seat's bar is the bar a pass earlier, and its strikes a pulse. That
+// run is read, not kept: no baseline is compared or written in a meter asked for.
 
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
-import type { Baseline, ScoredTake, ScoreLine, TakeOptions } from "@ensemble/engine";
-import { MEASURES, regressions, render, scorecard, toBaseline } from "@ensemble/engine";
+import type { Baseline, Meter, ScoredTake, ScoreLine, TakeOptions } from "@ensemble/engine";
+import {
+  fits,
+  MEASURES,
+  METER_MEASURES,
+  meterName,
+  parse,
+  parseMeterChoice,
+  regressions,
+  render,
+  scorecard,
+  toBaseline,
+} from "@ensemble/engine";
 import { STYLES, styleById, styleIds } from "@ensemble/styles";
 import type { Command } from "../command.ts";
 import { UsageError } from "../command.ts";
@@ -49,7 +65,7 @@ type Passed =
 export const scoreCommand: Command = {
   summary: "the critic's scorecard across many seeds",
   usage:
-    "[chart...] [--style S] [--seeds N] [--baseline file.json] [--since ref] [--check | --update] [--json]",
+    "[chart...] [--style S] [--seeds N] [--meter 7/8] [--baseline file.json] [--since ref] [--check | --update] [--json]",
   run(args) {
     const { positionals, values } = parseArgs({
       args,
@@ -57,6 +73,7 @@ export const scoreCommand: Command = {
       options: {
         style: { type: "string", short: "s" },
         seeds: { type: "string", short: "n", default: String(SEEDS) },
+        meter: { type: "string" },
         baseline: { type: "string", short: "b" },
         since: { type: "string" },
         check: { type: "boolean", default: false },
@@ -69,6 +86,12 @@ export const scoreCommand: Command = {
     if (values.style && !styleById(values.style)) {
       throw new UsageError(`no style "${values.style}" (styles: ${styleIds().join(", ")})`);
     }
+    const meter = values.meter === undefined ? undefined : parseMeterChoice(values.meter);
+    if (meter === null) throw new UsageError(`--meter: "${values.meter}" is not a meter`);
+    if (meter && (values.check || values.update || values.baseline))
+      throw new UsageError(
+        "--meter is read, not kept: it takes no --check, --update or --baseline",
+      );
     // No style named: every style that ships, each on its own charts and against its own
     // baseline. Charts named without a style are scored as the first style plays them.
     const ids = values.style
@@ -77,13 +100,14 @@ export const scoreCommand: Command = {
         ? [STYLES[0]!.id]
         : STYLES.map((style) => style.id);
     // Only the run the accepted scorecards are made from can be set against them.
-    const whole = positionals.length === 0 && !values.baseline && seeds === SEEDS && !values.json;
+    const whole =
+      positionals.length === 0 && !values.baseline && seeds === SEEDS && !values.json && !meter;
     const passed = whole ? passedFrom(values.since) : null;
     let worst = 0;
     const sorted: Sorted[] = [];
     for (const id of ids) {
       if (id !== ids[0]) console.log("");
-      const scored = scoreStyle(id, positionals, seeds, values, passed);
+      const scored = scoreStyle(id, positionals, seeds, values, passed, meter);
       worst = Math.max(worst, scored.code);
       if (scored.sorted) sorted.push(scored.sorted);
     }
@@ -121,13 +145,22 @@ function scoreStyle(
   seeds: number,
   values: { baseline?: string; check: boolean; update: boolean; json: boolean },
   passed: Passed | null,
+  meter?: Meter,
 ): { code: number; sorted?: Sorted } {
   const style = styleById(styleId)!;
   {
     // No charts named: every library chart written for this style.
-    const charts = positionals.length > 0 ? positionals : libraryChartsFor(styleId);
-    if (charts.length === 0) throw new UsageError(`no charts for style "${styleId}"`);
-    const texts = charts.map((path) => ({ path, text: readFileSync(path, "utf8") }));
+    const named = positionals.length > 0 ? positionals : libraryChartsFor(styleId);
+    if (named.length === 0) throw new UsageError(`no charts for style "${styleId}"`);
+    const texts = named
+      .map((path) => ({ path, text: readFileSync(path, "utf8") }))
+      .filter(({ text }) => !meter || fits(parse(text).chart, meter).ok);
+    const charts = texts.map(({ path }) => path);
+    if (meter) {
+      if (texts.length === 0)
+        throw new UsageError(`no chart for style "${styleId}" reads in ${meterName(meter)}`);
+      return { code: inMeter(style, texts, seeds, meter, values.json) };
+    }
 
     // Seeds are spread across the charts, so the count is the number of takes.
     const takes: ScoredTake[] = [];
@@ -169,6 +202,45 @@ function scoreStyle(
     console.log(`\n${byEar(sorted, lines, passed.base)}`);
     return { code, sorted };
   }
+}
+
+/**
+ * A style's scorecard on its charts played in a meter, with the measures of a seat in a meter
+ * beside the same takes in the charts' own. Read, not kept.
+ */
+function inMeter(
+  style: NonNullable<ReturnType<typeof styleById>>,
+  texts: readonly { readonly path: string; readonly text: string }[],
+  seeds: number,
+  meter: Meter,
+  json: boolean,
+): number {
+  const played: ScoredTake[] = [];
+  const own: ScoredTake[] = [];
+  for (let seed = 1; seed <= seeds; seed++) {
+    const chart = texts[(seed - 1) % texts.length]!;
+    const kind = KINDS[Math.floor((seed - 1) / texts.length) % KINDS.length]!;
+    const label = `${chart.path} seed ${seed} (${kind.name})`;
+    played.push({ label, take: render(chart.text, style, { ...kind.options, seed, meter }) });
+    own.push({ label, take: render(chart.text, style, { ...kind.options, seed }) });
+  }
+  const lines = scorecard(played, [...MEASURES, ...METER_MEASURES], style);
+  const beside = scorecard(own, METER_MEASURES, style);
+  if (json) {
+    console.log(JSON.stringify({ meter: meterName(meter), lines, own: beside }, null, 2));
+    return 0;
+  }
+  console.log(report(`${style.name} in ${meterName(meter)}`, played.length, texts.length, lines));
+  const there = new Map(lines.map((line) => [line.id, line]));
+  console.log(`\nin ${meterName(meter)}, beside the same takes in the charts' own meter:`);
+  for (const line of beside) {
+    const now = there.get(line.id);
+    const f = (value: number | undefined) =>
+      value === undefined ? "not measured" : format(value, line.unit);
+    console.log(`  ${line.id}: ${f(now?.mean)}, and ${f(line.mean)} in their own`);
+  }
+  console.log("\nnot set against a baseline: nothing is accepted in a meter asked for");
+  return 0;
 }
 
 function libraryChartsFor(styleId: string): string[] {
