@@ -12,11 +12,13 @@ import {
   fretsOf,
   isCompound,
   lastPulse,
+  middlePulses,
   onAnd,
   PICKED,
   PPQ,
   pitchClass,
   pulseStarts,
+  pulseTicks,
   render,
   STEP,
   scaleHas,
@@ -42,6 +44,7 @@ import {
   heldTakes,
   homeTakes,
   LIBRARY,
+  made,
   notesOf,
   only,
   ownCharts,
@@ -286,13 +289,32 @@ function strikesByBar(take: Take): Map<number, Strike[]> {
 
 /**
  * A bar where the hand hammers every eighth of its harmony is a groove (the pump), with its
- * own rules at a change: it plays through, and strikes a pushed chord again on the beat.
+ * own rules at a change: it plays through, and strikes a pushed chord again on the beat. In a
+ * bar whose shape the band tells (`told`: a part made for 5/4, 7/8 and their like) the pump
+ * leaves the middle pulse of a group of three alone, and hammers every eighth outside it.
  */
-function hammered(bar: PlanBar | undefined, strikes: readonly Strike[] | undefined): boolean {
+function hammered(
+  bar: PlanBar | undefined,
+  strikes: readonly Strike[] | undefined,
+  told = false,
+): boolean {
   if (!bar || !strikes) return false;
+  const lengths = pulseTicks(bar.meter);
+  const starts = pulseStarts(bar.meter);
+  const quiet = (told ? middlePulses(bar.meter) : []).map((start) => ({
+    start,
+    end: start + lengths[starts.indexOf(start)]!,
+  }));
   const chorded = bar.spans
     .filter((span) => span.chord !== null)
-    .reduce((ticks, span) => ticks + span.duration, 0);
+    .reduce((ticks, span) => {
+      const left = quiet.reduce((sum, pulse) => {
+        const over =
+          Math.min(pulse.end, span.start + span.duration) - Math.max(pulse.start, span.start);
+        return sum - Math.max(0, over);
+      }, span.duration);
+      return ticks + left;
+    }, 0);
   return chorded > 0 && strikes.length >= chorded / (PPQ / 2);
 }
 
@@ -302,6 +324,7 @@ test("the eighth before a change belongs to the chord coming: a strike there tha
     // A comp that keeps a figure going plays it up to the change; one that converses leaves
     // the stab out, because the old chord just before the new one is heard as a wrong chord.
     const groove = style.chords.anticipation.otherwise === "stay";
+    const told = made({ style, chart });
     const byBar = strikesByBar(take);
     const harmony = harmonyOf(take);
     for (const arrival of harmony) {
@@ -320,7 +343,7 @@ test("the eighth before a change belongs to the chord coming: a strike there tha
       const where = `${chart.file} seed ${options.seed}: into ${chord.text} in bar ${landing.index}`;
       const own = byBar.get(bar.index) ?? [];
       // A groove plays through the change on whichever chord it is on.
-      if (hammered(bar, own)) continue;
+      if (hammered(bar, own, told)) continue;
       const early = own.filter(
         (strike) => strike.tick >= arrival.tick - PPQ / 2 && strike.tick < arrival.tick,
       );
@@ -354,7 +377,7 @@ test("the eighth before a change belongs to the chord coming: a strike there tha
             `${where}: the old chord on the beat, the new one right after`,
           );
         }
-        if (!groove && hammered(landing, byBar.get(landing.index))) continue;
+        if (!groove && hammered(landing, byBar.get(landing.index), told)) continue;
         const again: Strike[] = (byBar.get(landing.index) ?? []).filter(
           (other) => other.tick >= arrival.tick && other.tick < arrival.tick + PPQ / 2,
         );

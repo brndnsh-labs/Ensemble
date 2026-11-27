@@ -28,6 +28,7 @@ import {
   heldTakes,
   type Jam,
   LIBRARY,
+  made,
   notesOf,
   only,
   ownCharts,
@@ -856,9 +857,11 @@ test("a button ending is the whole band's: where the bass plays the short last h
 
 // ── a fitted meter ──────────────────────────────────────────────────────────
 
-/** A take in a meter its style's drummer has no part written for: the bar is fitted from 4/4's. */
+/** A take in a meter its style's drummer has no part written for, and the band makes none for: the bar is fitted from 4/4's. */
 const fitted = (jam: Pick<Jam, "style" | "chart">) =>
-  jam.chart.meter !== "4/4" && jam.style.drums.meters?.[jam.chart.meter as "6/8"] === undefined;
+  jam.chart.meter !== "4/4" &&
+  !made(jam) &&
+  jam.style.drums.meters?.[jam.chart.meter as "6/8"] === undefined;
 
 /**
  * Where a sixteenth of the 4/4 bar is played in a fitted bar (DR-10): beat 1 on the One, beat 2

@@ -4,7 +4,7 @@
 
 import { readdirSync, readFileSync } from "node:fs";
 import type { NoteEvent, Seat, StylePack, Take, TakeOptions } from "@ensemble/engine";
-import { isCompound, parse, parseMeter, render, tempoRange } from "@ensemble/engine";
+import { fits, isCompound, parse, parseMeterChoice, render, tempoRange } from "@ensemble/engine";
 import { STYLES as SHIPPING, styleById } from "@ensemble/styles";
 
 /**
@@ -79,6 +79,17 @@ export const WRITTEN: Readonly<Record<string, readonly string[]>> = {
 /** A take whose chart is in 4/4 or in a meter its style has written. */
 export const written = (jam: Pick<JamSpec, "style" | "chart">): boolean =>
   jam.chart.meter === "4/4" || (WRITTEN[jam.style.id] ?? []).includes(jam.chart.meter);
+
+/**
+ * The meters a seat with nothing written still fits its 4/4 bar to, as the band has been heard
+ * in them. In every other meter a seat that has written nothing plays a part made from the one
+ * it wrote (docs/decisions/meters.md, "every style in every meter").
+ */
+const FITTED: readonly string[] = ["3/4", "6/8", "12/8", "6/4"];
+
+/** A take in a meter the band makes its part for: not 4/4, not one its style wrote, not one it still fits. */
+export const made = (jam: Pick<JamSpec, "style" | "chart">): boolean =>
+  !written(jam) && !FITTED.includes(jam.chart.meter);
 
 /** What a take is made from, before it is rendered. */
 export interface JamSpec {
@@ -235,6 +246,8 @@ const REMETERED: readonly { readonly file: string; readonly meter: string }[] = 
   { file: "jazz-two-five-one-c.chart", meter: "6/4" },
   { file: "funk-intro-outro-c.chart", meter: "12/8" },
   { file: "jazz-waltz-f.chart", meter: "4/4" },
+  { file: "jazz-two-five-one-c.chart", meter: "5/4" },
+  { file: "funk-intro-outro-c.chart", meter: "7/8" },
 ];
 
 const REMETERED_KINDS: readonly TakeOptions[] = FULL
@@ -248,7 +261,7 @@ const REMETERED_KINDS: readonly TakeOptions[] = FULL
 const REMETERED_SPECS: readonly JamSpec[] = STYLES.flatMap((style) =>
   REMETERED.flatMap(({ file, meter: name }) => {
     const chart = LIBRARY.find((one) => one.file === file);
-    const meter = parseMeter(name);
+    const meter = parseMeterChoice(name);
     if (!chart || !meter) throw new Error(`REMETERED: no ${file}, or no meter ${name}`);
     // A chart written for another style at this style's usual tempo in the meter played, as the
     // app plays it; in its own, the chart's tempo counted in the new pulse.
@@ -261,6 +274,44 @@ const REMETERED_SPECS: readonly JamSpec[] = STYLES.flatMap((style) =>
     }));
   }),
 );
+
+/**
+ * The shapes the made part is held to: 5/4 and 7/8 in each grouping a player may ask for, the
+ * usual one first.
+ */
+export const MADE_SHAPES: readonly string[] = [
+  "5/4",
+  "5/4 (2+3)",
+  "7/8",
+  "7/8 (3+2+2)",
+  "7/8 (2+3+2)",
+];
+
+/**
+ * A style in each of the made shapes: the first of its own 4/4 charts that reads in the shape,
+ * as a jam of three passes with the soloist, on seed 1; the full run adds seed 2 and the chart
+ * as a song.
+ */
+export function madeTakes(style: StylePack): Jam[] {
+  const kinds: readonly TakeOptions[] = FULL
+    ? [
+        { mode: "jam", passes: 3, solo: true, seed: 1 },
+        { mode: "jam", passes: 3, solo: true, seed: 2 },
+        { mode: "song", seed: 1 },
+      ]
+    : [{ mode: "jam", passes: 3, solo: true, seed: 1 }];
+  return MADE_SHAPES.flatMap((name) => {
+    const meter = parseMeterChoice(name);
+    if (!meter) throw new Error(`MADE_SHAPES: no meter ${name}`);
+    const chart = ownCharts(style).find(
+      (one) => one.meter === "4/4" && fits(parse(one.text).chart, meter).ok,
+    );
+    if (!chart) throw new Error(`${style.id}: no chart of its own reads in ${name}`);
+    return kinds.map((kind) =>
+      render1({ style, chart: { ...chart, meter: name }, options: { ...kind, meter } }),
+    );
+  });
+}
 
 /** A held take's seeds: one on a push, two on the full run. Every style that writes a meter holds every chart in it at three levels, and that had become the push suite's last second. */
 const HELD_SEEDS: readonly number[] = FULL ? [1, 2] : [1];

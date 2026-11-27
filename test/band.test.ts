@@ -4,26 +4,41 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { Plan, PlanBar, PlanOptions, StylePack, Take, TakeOptions } from "@ensemble/engine";
+import type {
+  FillShape,
+  Plan,
+  PlanBar,
+  PlanOptions,
+  StylePack,
+  Take,
+  TakeOptions,
+  Tier,
+} from "@ensemble/engine";
 import {
   arrangedLines,
   BREATHE_MOST,
+  barMarks,
   breatheAmount,
   burstPhrases,
   chordFamily,
   chordTones,
   contextOf,
   isCompound,
+  middlePulses,
   onPulse,
   PPQ,
   parse,
+  parseMeterChoice,
   pitchClass,
   plan,
   pulseStarts,
+  pulseTicks,
   render,
+  STEP,
   seconds,
   secondsAt,
   strongPulses,
+  styleIn,
   TEMPO_STEP,
   tempoRange,
   tickAt,
@@ -35,13 +50,15 @@ import {
 } from "@ensemble/engine";
 import { styleIds } from "@ensemble/styles";
 import { corpus } from "./corpus.ts";
-import { barAt, bluesWritten, harmonyOf, POCKET } from "./reading.ts";
+import { barAt, bluesWritten, harmonyOf, POCKET, strikesOf } from "./reading.ts";
 import type { Jam, LibraryChart } from "./takes.ts";
 import {
   enough,
   FULL,
   heldTakes,
   LIBRARY,
+  MADE_SHAPES,
+  madeTakes,
   notesOf,
   only,
   ownCharts,
@@ -54,8 +71,19 @@ import {
   takes,
 } from "./takes.ts";
 
-test("every style that ships is sound data", () => {
-  for (const style of STYLES) assert.deepEqual(validateStyle(style), [], style.id);
+test("every style that ships is sound data, and so is the part made for each seat in a meter it has not written: in 5/4 and 7/8, in each of their groupings, every style has a part for all four seats and each is what a written one must be", () => {
+  for (const style of STYLES) {
+    assert.deepEqual(validateStyle(style), [], style.id);
+    for (const shape of MADE_SHAPES) {
+      const made = styleIn(style, parseMeterChoice(shape)!);
+      for (const seat of ["drums", "bass", "chords", "solo"] as const)
+        assert.ok(
+          (made[seat].meters as Record<string, unknown> | undefined)?.[shape],
+          `${style.id} in ${shape}: no part made for the ${seat}`,
+        );
+      assert.deepEqual(validateStyle(made), [], `${style.id} in ${shape}`);
+    }
+  }
 });
 
 test("the same chart, style, options, and seed give the identical performance, down to the MIDI bytes", () => {
@@ -1855,4 +1883,228 @@ test("a dominant with a written b9 or #9 over its natural fifth, on its way down
   if (STYLES.some((style) => ownCharts(style).some((one) => /7[b#]9/.test(one.text)))) {
     assert.ok(chords > 0 && judged > 0, `${chords} such chords, ${judged} notes over them`);
   }
+});
+
+// ── a meter no style has written ────────────────────────────────────────────
+//
+// In 5/4, 7/8 and their like each seat plays a part made from the one its style wrote
+// (docs/decisions/meters.md, "every style in every meter: the design"). These hold of the
+// made part in every style, in each grouping of the two meters.
+
+/** Where each voice of a seat strikes in each bar of a take: ticks from the barline, by the bar's index and the voice. */
+function struckByBar(
+  take: Take,
+  seat: "drums" | "bass" | "chords",
+): Map<number, Map<string, Set<number>>> {
+  const struck = new Map<number, Map<string, Set<number>>>();
+  for (const note of notesOf(take, seat)) {
+    const bar = barAt(take.plan.bars, note.tick);
+    if (!bar) continue;
+    const voices = struck.get(bar.index) ?? new Map<string, Set<number>>();
+    // The kit is its pieces; a bass or a chord hand is one voice, however it sounds a note.
+    const voice = seat === "drums" ? (note.voice ?? "") : seat;
+    const ticks = voices.get(voice) ?? new Set<number>();
+    ticks.add(note.tick - bar.start);
+    voices.set(voice, ticks);
+    struck.set(bar.index, voices);
+  }
+  return struck;
+}
+
+test("in a bar of uneven pulses the eighth is steady through the long beat: a piece of the kit (where no fill has the hands), the bass or the chord hand that plays every eighth of the bar's short beats, and strikes the long beat's first eighth and its last, strikes the one between them too, so a beat and a half is three eighths and never a lope (into a change of chord the end of the beat is the chord coming's, and the hand and the bass may leave the eighth before it)", () => {
+  const EIGHTH = PPQ / 2;
+  let [bars, long] = [0, 0];
+  for (const style of STYLES) {
+    for (const { chart, take } of madeTakes(style)) {
+      const changes = new Set(
+        harmonyOf(take)
+          .filter((arrival) => arrival.changed)
+          .map((arrival) => arrival.tick),
+      );
+      for (const seat of ["drums", "bass", "chords"] as const) {
+        const struck = struckByBar(take, seat);
+        for (const bar of take.plan.bars) {
+          if (bar.kind !== "music" || bar.ending || bar.seats[seat] === null) continue;
+          if (seat === "drums" && bar.fill) continue;
+          const lengths = pulseTicks(bar.meter);
+          if (new Set(lengths).size === 1) continue;
+          bars++;
+          const pulses = pulseStarts(bar.meter);
+          const short = pulses.filter((_, i) => lengths[i] === PPQ);
+          const starts = pulses.filter((_, i) => lengths[i] !== PPQ);
+          for (const [voice, ticks] of struck.get(bar.index) ?? []) {
+            // A voice keeping the eighths: every eighth of the bar's short beats.
+            if (!short.every((start) => ticks.has(start) && ticks.has(start + EIGHTH))) continue;
+            for (const start of starts) {
+              if (!ticks.has(start) || !ticks.has(start + 2 * EIGHTH)) continue;
+              // Into a change of chord the beat's end is the chord coming's (a push, a lead-in).
+              if (seat !== "drums" && changes.has(bar.start + start + 3 * EIGHTH)) continue;
+              long++;
+              assert.ok(
+                ticks.has(start + EIGHTH),
+                `${style.id} ${chart.file} in ${chart.meter} bar ${bar.index}: the ${voice} lopes through the long beat at ${start / PPQ + 1}`,
+              );
+            }
+          }
+        }
+      }
+    }
+  }
+  assert.ok(bars > enough(450) * STYLES.length, `only ${bars} bars of uneven pulses`);
+  // Jazz's ride and reggae's kit keep no eighths through a bar like this, nor do their hands.
+  const keeping = STYLES.filter((style) => style.id !== "jazz" && style.id !== "reggae").length;
+  assert.ok(long >= enough(21) * keeping, `only ${long} long beats under a voice keeping eighths`);
+});
+
+test("a fill, a turn and a pickup start on a pulse or are the bar's last eighth: in the part made for a meter, every fill the drummer has and every length asked of one, every turn of the bass and every pickup of the soloist is as long as the bar's last pulse or its last two (and so on), or an eighth or less; and in a bar whose shape has to be told no fill is longer than the last pulse, so the downbeat's kick is never lost to one", () => {
+  let figures = 0;
+  for (const style of STYLES) {
+    for (const shape of MADE_SHAPES) {
+      const meter = parseMeterChoice(shape)!;
+      const made = styleIn(style, meter);
+      const where = `${style.id} in ${shape}`;
+      const pulses = pulseTicks(meter).map((ticks) => ticks / STEP);
+      // The lengths that start on a pulse, counted back from the barline; an eighth or less.
+      const fromPulse = new Set<number>([1, 2]);
+      let back = 0;
+      for (const pulse of [...pulses].reverse()) {
+        back += pulse;
+        fromPulse.add(back);
+      }
+      const ok = (steps: number, what: string, most = Number.POSITIVE_INFINITY) => {
+        figures++;
+        assert.ok(
+          fromPulse.has(steps),
+          `${where}: ${what} of ${steps} sixteenths is off the pulse`,
+        );
+        assert.ok(steps <= most, `${where}: ${what} of ${steps} sixteenths is longer than ${most}`);
+      };
+      const length = (grid: string) => grid.replace(/\s+/g, "").length;
+
+      const drums = (made.drums.meters as Record<string, typeof made.drums>)[shape]!;
+      // 5/4 and 7/8 have a shape to tell, in every grouping: no fill is longer than the last pulse.
+      const lastPulse = pulses.at(-1)!;
+      for (const boundary of ["phrase", "section"] as const)
+        for (const tier of ["low", "mid", "high"] as const) {
+          const asked = drums.fills.length[boundary][tier];
+          if (asked > 0) ok(asked, `a ${tier} ${boundary} fill`, lastPulse);
+        }
+      for (const list of ["phrase", "section", "top"] as const) {
+        const shapes = drums.fills[list];
+        const all = Array.isArray(shapes)
+          ? (shapes as readonly FillShape[])
+          : (["low", "mid", "high"] as const).flatMap(
+              (tier) => (shapes as Record<Tier, readonly FillShape[]>)[tier],
+            );
+        for (const fill of all)
+          ok(Math.max(...Object.values(fill.lines).map(length)), `a ${list} fill`, lastPulse);
+      }
+      const bass = (made.bass.meters as Record<string, typeof made.bass.lines>)[shape]!;
+      for (const tier of ["low", "mid", "high"] as const)
+        for (const turn of bass[tier].turns?.options ?? []) ok(length(turn.grid), "a bass turn");
+      const solo = (made.solo.meters as Record<string, { pickups: readonly { cell: string }[] }>)[
+        shape
+      ]!;
+      for (const pickup of solo.pickups) ok(length(pickup.cell), "a pickup");
+    }
+  }
+  assert.ok(figures > 30 * STYLES.length, `only ${figures} fills, turns and pickups`);
+});
+
+test("in a bar whose shape has to be told (more than one group, or pulses of two lengths) the band says it the same way in every bar. One backbeat a group: in the middle pulse of a group of three the drummer plays the cymbal and nothing else, and the chord hand, with the band to itself, strikes nothing new there but a chord that arrives, or the one coming an eighth before it. The bass marks the shape: wherever it strikes both on the bar's marks (the first pulse of each group; every pulse where they are of two lengths) and between them, before the bar's last pulse, its notes on the marks are the louder. The downbeat is kept: a kick on 1 of every bar of time, in every style whose own time has a kick there at that level, and a count-in that leans on the marks, its stick on 1 the loudest and a pulse between two marks softer than any mark", () => {
+  let [middles, marks, ones, counts] = [0, 0, 0, 0];
+  for (const style of STYLES) {
+    const cymbals = new Set<string>([...style.drums.timekeepers, "closedHat", "openHat", "ride"]);
+    // Whether the style's own time kicks on 1 at a level (reggae's one drop does not).
+    const kicksOne = (energy: number) =>
+      style.drums.grooves[tierOf(energy)].some((layer) =>
+        layer.options.some((option) => /^[^.\-\s]/.test(option.lines.kick ?? ".")),
+      );
+    for (const { chart, take } of madeTakes(style)) {
+      const say = (bar: PlanBar, what: string) =>
+        `${style.id} ${chart.file} in ${chart.meter} bar ${bar.index}: ${what}`;
+      const harmony = harmonyOf(take);
+      const arrives = new Set(harmony.filter((one) => one.chord).map((one) => one.tick));
+      const bass = notesOf(take, "bass");
+      const strikes = strikesOf(take);
+      const drums = notesOf(take, "drums");
+      for (const bar of take.plan.bars) {
+        const inBar = drums.filter(
+          (note) => note.tick >= bar.start && note.tick < bar.start + bar.ticks,
+        );
+        const lengths = pulseTicks(bar.meter);
+        const starts = pulseStarts(bar.meter);
+        const told = barMarks(bar.meter);
+        if (bar.kind === "count-in") {
+          counts++;
+          const stick = (tick: number) => inBar.find((note) => note.tick - bar.start === tick);
+          const levels = starts.map((tick) => stick(tick)?.velocity ?? 0);
+          const marked = starts.map((tick) => told.includes(tick));
+          assert.ok(
+            levels.every((level, i) => i === 0 || level < levels[0]!),
+            say(bar, `the count-in's sticks ${levels.join(" ")} do not lean on 1`),
+          );
+          const softest = Math.min(...levels.filter((_, i) => marked[i]));
+          assert.ok(
+            levels.every((level, i) => marked[i] || level < softest),
+            say(bar, `the count-in's sticks ${levels.join(" ")} do not lean on the marks`),
+          );
+          continue;
+        }
+        if (bar.kind !== "music" || bar.ending) continue;
+        // One backbeat a group.
+        for (const middle of middlePulses(bar.meter)) {
+          const end = middle + lengths[starts.indexOf(middle)]!;
+          const within = (tick: number) => tick >= bar.start + middle && tick < bar.start + end;
+          if (bar.seats.drums !== null) {
+            middles++;
+            for (const note of inBar)
+              assert.ok(
+                !within(note.tick) || cymbals.has(note.voice ?? ""),
+                say(bar, `the ${note.voice} in the middle pulse of a group of three`),
+              );
+          }
+          // Under a soloist a hand that converses answers the line where the line leaves room.
+          for (const strike of bar.solo ? [] : strikes) {
+            if (!within(strike.tick)) continue;
+            const arriving = arrives.has(strike.tick) || arrives.has(strike.tick + PPQ / 2);
+            assert.ok(arriving, say(bar, "a chord struck in the middle pulse of a group of three"));
+          }
+        }
+        // The bass marks the shape. The bar's last pulse is left out: a lead-in or a turn
+        // there has a weight of its own.
+        const last = bar.ticks - lengths.at(-1)!;
+        const lines = bass.filter((note) => note.tick >= bar.start && note.tick < bar.start + last);
+        const level = (notes: typeof lines) =>
+          notes.reduce((sum, note) => sum + note.velocity, 0) / notes.length;
+        const on = lines.filter((note) => told.includes(note.tick - bar.start));
+        const between = lines.filter((note) => !told.includes(note.tick - bar.start));
+        if (bar.seats.bass !== null && on.length > 0 && between.length > 0) {
+          marks++;
+          assert.ok(
+            level(on) > level(between),
+            say(
+              bar,
+              `the bass is no louder on the marks (${level(on)}) than between them (${level(between)})`,
+            ),
+          );
+        }
+        // The downbeat kept.
+        const energy = bar.seats.drums;
+        if (energy !== null && kicksOne(energy)) {
+          ones++;
+          assert.ok(
+            inBar.some((note) => note.voice === "kick" && note.tick === bar.start),
+            say(bar, "no kick on 1"),
+          );
+        }
+      }
+    }
+  }
+  assert.ok(counts >= STYLES.length * MADE_SHAPES.length, `only ${counts} count-ins`);
+  assert.ok(middles > enough(300) * STYLES.length, `only ${middles} middle pulses`);
+  assert.ok(marks > enough(60) * STYLES.length, `only ${marks} bars of bass on and off the marks`);
+  // Reggae's one drop has no kick on 1 at any level.
+  const kicking = STYLES.filter((style) => style.id !== "reggae").length;
+  assert.ok(ones >= enough(300) * kicking, `only ${ones} bars of time with a kick on 1`);
 });
