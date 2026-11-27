@@ -12,8 +12,8 @@ export interface PlanOptions {
   /** Overrides the chart's tempo, which overrides the style's default. Pulses a minute, as `Plan.tempo`. */
   readonly tempo?: number;
   /**
-   * Play the chart in another of the band's meters (`BAND_METERS`): it is read as if its header
-   * said this one (`remeter`), and refused where it does not fit (`fits`). Its written tempo is
+   * Play the chart in another meter, which may say how its bar groups (5/4 as 2+3): it is read
+   * as if its header said this one (`remeter`), and refused where it does not fit (`fits`). Its written tempo is
    * counted in the new meter's pulse, the eighth note at the speed it had, and held inside the
    * style's range there. Left out, or the chart's own: the chart's meter, the take it always was.
    */

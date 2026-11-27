@@ -1,5 +1,6 @@
 // The values of header fields: keys, meters, tempos, and section labels.
 
+import { grouped } from "../perform/meter.ts";
 import type { Key, Letter } from "../theory/pitch.ts";
 import { plainSigns } from "./symbol.ts";
 import type { Meter, SectionRole } from "./types.ts";
@@ -28,6 +29,18 @@ export function parseMeter(text: string): Meter | null {
   const unit = Number(match[2]);
   if (beats < 1 || beats > 32 || (unit !== 2 && unit !== 4 && unit !== 8)) return null;
   return { beats, unit };
+}
+
+/**
+ * A meter as a player asks for it, which may say how the bar groups: `5/4 (2+3)`,
+ * `7/8 (3+2+2)`. The chart format's own `meter:` line is `parseMeter`. Null where the meter or
+ * the grouping is not one (`grouped`); a grouping that is the meter's usual one is the meter alone.
+ */
+export function parseMeterChoice(text: string): Meter | null {
+  const match = /^([^(]+?)\s*(?:\(\s*(\d(?:\s*\+\s*\d)*)\s*\))?$/.exec(text.trim());
+  const meter = match ? parseMeter(match[1]!) : null;
+  if (!match || !meter) return null;
+  return match[2] === undefined ? meter : grouped(meter, match[2].split("+").map(Number));
 }
 
 export const meterToString = (meter: Meter): string => `${meter.beats}/${meter.unit}`;

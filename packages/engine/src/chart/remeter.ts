@@ -5,14 +5,24 @@
 // fit means the chart does not fit the meter, and it is refused, not squeezed.
 // See docs/decisions/engine.md, "a chart can be played in another meter".
 
-import { onPulse, pulseStarts, tempoPulse } from "../perform/meter.ts";
+import {
+  meterName,
+  onPulse,
+  pulseGroups,
+  pulseStarts,
+  pulseTicks,
+  tempoPulse,
+} from "../perform/meter.ts";
 import { validSlotCount } from "./expand.ts";
 import { meterToString } from "./fields.ts";
 import type { Bar, BarToken, Chart, ChartField, RepeatItem, Section, UnreadLine } from "./model.ts";
 import type { Meter, SourceRange } from "./types.ts";
-import { barTicks } from "./types.ts";
+import { barTicks, PPQ } from "./types.ts";
 
-/** The meters the band plays a chart in: those a style has parts written for. */
+/**
+ * The meters a player is offered for a chart: those a style has parts written for. The engine
+ * plays a chart in any meter it fits (`fits`); this is what is listed (#2298, #2338).
+ */
 export const BAND_METERS: readonly Meter[] = [
   { beats: 4, unit: 4 },
   { beats: 3, unit: 4 },
@@ -21,7 +31,15 @@ export const BAND_METERS: readonly Meter[] = [
   { beats: 6, unit: 4 },
 ];
 
-export const sameMeter = (a: Meter, b: Meter): boolean => a.beats === b.beats && a.unit === b.unit;
+/** One meter and one shape: 5/4 and 5/4 (2+3) are two, and 5/4 and 5/4 (3+2) are one. */
+export const sameMeter = (a: Meter, b: Meter): boolean =>
+  a.beats === b.beats &&
+  a.unit === b.unit &&
+  (a.groups === b.groups ||
+    (same(pulseTicks(a), pulseTicks(b)) && same(pulseGroups(a), pulseGroups(b))));
+
+const same = (a: readonly number[], b: readonly number[]): boolean =>
+  a.length === b.length && a.every((n, i) => n === b[i]);
 
 /** Whether a chart can be read in a meter, and if not, why: the bar that stops it, named. */
 export type Fit =
@@ -80,27 +98,52 @@ function readBar(bar: Bar, from: Meter, to: Meter): readonly BarToken[] | "same"
     })
   )
     return "same";
-  const pulses = pulseStarts(to).length;
+  const begins = pulseStarts(to);
+  const pulses = begins.length;
   const keep = bar.tokens.filter((token) => token.kind === "annotation");
   const hold = (): BarToken => ({ kind: "hold", range: bar.range });
   const parts = [slots[0]!, ...changes.map((at) => slots[at]!)];
-  // (c) One change: to where the bar splits, the long part first. The half where its pulses
-  // halve (beat 3 of four, the second pulse of six-eight); beat 3 of three.
+  // A chord on each of these pulses, held to the next. A slot a pulse where the pulses are one
+  // length; where they are not (7/8), a slot an eighth, since a bar takes no slot a pulse there.
+  const even = new Set(pulseTicks(to)).size === 1;
+  const onPulses = (at: readonly number[]): BarToken[] => {
+    const slot = even ? pulseTicks(to)[0]! : EIGHTH;
+    const where = new Map(at.map((pulse, i) => [begins[pulse]! / slot, parts[i]!]));
+    return [...keep, ...Array.from({ length: toTicks / slot }, (_, i) => where.get(i) ?? hold())];
+  };
+  // (c) One change: to where the bar splits. Between its groups where it has two or more (beat
+  // 4 of 5/4, beat 3 of 5/4 as 2+3), at the boundary nearest the middle. In a bar of one group,
+  // where its pulses halve by count (beat 3 of four, the second pulse of six-eight), and the
+  // part of more pulses first where they do not (beat 3 of three, the third pulse of 7/8).
   if (changes.length === 1) {
-    if (pulses % 2 === 0) return [...keep, parts[0]!, parts[1]!];
-    const split = Math.ceil(pulses / 2);
-    return [
-      ...keep,
-      parts[0]!,
-      ...Array.from({ length: split - 1 }, hold),
-      parts[1]!,
-      ...Array.from({ length: pulses - split - 1 }, hold),
-    ];
+    // A bar of one pulse has nowhere to change (rule d).
+    if (pulses < 2) return { chords: parts.length, pulses };
+    const split = splitOf(to, pulses);
+    // Two slots where the bar halves and takes two (3/2 halves and does not: a slot a pulse).
+    if (even && split * 2 === pulses && validSlotCount(2, to))
+      return [...keep, parts[0]!, parts[1]!];
+    return onPulses([0, split]);
   }
   // (c2) As many chords as the new meter has pulses: a chord a pulse.
-  if (parts.length === pulses) return [...keep, ...parts];
+  if (parts.length === pulses)
+    return even ? [...keep, ...parts] : onPulses(begins.map((_, i) => i));
   // (d) It does not fit.
   return { chords: parts.length, pulses };
+}
+
+const EIGHTH = PPQ / 2;
+
+/** The pulse a bar of one change changes on: where the bar splits (rule c of `fits`). */
+function splitOf(meter: Meter, pulses: number): number {
+  const groups = pulseGroups(meter);
+  if (groups.length < 2) return Math.ceil(pulses / 2);
+  let at = 0;
+  let best = 0;
+  for (const size of groups.slice(0, -1)) {
+    at += size;
+    if (Math.abs(at - pulses / 2) <= Math.abs(best - pulses / 2)) best = at;
+  }
+  return best;
 }
 
 /** The section of a chart whose meter is not the chart's, if any: such a chart keeps its meters. */
@@ -146,14 +189,16 @@ const typed = (bar: Bar): string =>
 
 /**
  * Whether a chart can be played in a meter, and if not, the reason, naming the
- * bar. A chart fits its own meter. It fits another of the band's meters when
+ * bar. A chart fits its own meter. It fits any other meter a chart can write when
  * none of its sections is in a meter of its own and every bar reads:
  *
  * - (a) a bar of one chord fits any meter;
  * - (b) a bar whose slots are a count the meter takes (CHART_FORMAT 4.1), with
  *   every change on one of its pulses, is read as written;
  * - (c) a bar of one change, on a pulse where it was written, splits where the
- *   bar does, the long part first: halves where the pulses halve, 2+1 in 3/4;
+ *   bar does: between its groups (beat 4 of 5/4), halves where the pulses halve
+ *   by count, and otherwise the part of more pulses first (2+1 in 3/4, the third
+ *   pulse of 7/8); a bar of one pulse has nowhere to change, and is (d);
  * - (c2) a bar with as many chords as the meter has pulses, each change on a
  *   pulse where it was written, is a chord a pulse;
  * - (d) any other bar does not fit, and nor does the chart.
@@ -163,12 +208,6 @@ const typed = (bar: Bar): string =>
  */
 export function fits(chart: Chart, meter: Meter): Fit {
   if (sameMeter(chart.meter, meter)) return { ok: true };
-  if (!BAND_METERS.some((one) => sameMeter(one, meter)))
-    return {
-      ok: false,
-      reason: `The band plays a chart in ${BAND_METERS.map(meterToString).join(", ")}, not in ${meterToString(meter)}.`,
-      range: null,
-    };
   const own = ownMeter(chart);
   if (own)
     return {
@@ -176,7 +215,7 @@ export function fits(chart: Chart, meter: Meter): Fit {
       reason: `The section ${own.label ? `[${own.label}] ` : ""}is in ${meterToString(own.meter)} of its own, so the chart keeps its meters.`,
       range: own.range,
     };
-  const name = meterToString(meter);
+  const name = meterName(meter);
   for (const section of playedSections(chart)) {
     for (const bar of barsOf(section)) {
       const read = readBar(bar, chart.meter, meter);

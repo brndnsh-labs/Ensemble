@@ -16,8 +16,10 @@ import {
   meterName,
   onPulse,
   parse,
-  parseMeter,
+  parseMeterChoice,
   plan,
+  pulseGroups,
+  pulseStarts,
   remeter,
   render,
   sameMeter,
@@ -95,8 +97,61 @@ const MUST: readonly { readonly name: string; readonly meter: string; readonly f
   { name: "a two", meter: "4/4", fits: true },
   { name: "a two, off its beat", meter: "4/4", fits: false },
   { name: "funk-intro-outro-c.chart", meter: "3/4", fits: true },
+  // Meters the band has no parts for: a chart fits them as it fits any other.
+  { name: "blues-12-bar-a.chart", meter: "5/4", fits: true },
+  { name: "funk-vamp-a.chart", meter: "7/8 (3+2+2)", fits: true },
+  { name: "a chord a beat", meter: "5/4", fits: false },
+  { name: "a five, a chord a beat", meter: "5/4 (2+3)", fits: true },
+  { name: "funk-vamp-a.chart", meter: "3/2", fits: true },
+  { name: "funk-vamp-a.chart", meter: "3/8", fits: false },
   { name: "standard-body-and-soul.chart", meter: "6/8", fits: false },
 ];
+
+/**
+ * The meters a chart is read in: the five the band has parts for, and meters it has none for,
+ * in each grouping a player may ask for (#2338). A bar's shape is its pulses in groups. 3/2
+ * halves and takes no two slots; a bar of 3/8 is one pulse, and has nowhere to change.
+ */
+const READ_IN: readonly Meter[] = [
+  ...BAND_METERS,
+  ...["5/4", "5/4 (2+3)", "7/4", "7/8", "7/8 (3+2+2)", "7/8 (2+3+2)", "3/2", "3/8"].map(
+    (name) => parseMeterChoice(name)!,
+  ),
+];
+
+/**
+ * Where a bar of two chords changes when it is read in a meter that moves the change, in
+ * quarter notes from the barline: the shapes as a player counts them, written out here and not
+ * asked of the engine. (3/2 as the band counts it: six quarters in two threes.)
+ */
+const CHANGES: readonly (readonly [meter: string, quarters: number])[] = [
+  ["3/4", 2],
+  ["6/4", 3],
+  ["5/4", 3],
+  ["5/4 (2+3)", 2],
+  ["7/4", 4],
+  ["7/4 (3+4)", 3],
+  ["7/8", 2],
+  ["7/8 (3+2+2)", 2.5],
+  ["7/8 (2+3+2)", 2.5],
+  ["3/2", 3],
+];
+
+/** How many of a bar's pulses begin in a stretch of it. */
+const pulsesIn = (meter: Meter, from: number, to: number): number =>
+  pulseStarts(meter).filter((tick) => tick >= from && tick < to).length;
+
+/** Ticks from the barline where a bar's second and later groups begin. */
+function groupStarts(meter: Meter): number[] {
+  const starts = pulseStarts(meter);
+  let at = 0;
+  return pulseGroups(meter)
+    .slice(0, -1)
+    .map((size) => {
+      at += size;
+      return starts[at]!;
+    });
+}
 
 const PARSED = SOURCES.map((source) => ({ ...source, chart: parse(source.text).chart }));
 
@@ -109,12 +164,12 @@ const harmony = (bar: FlatBar): string[] =>
 /** The style a chart is planned in where any will do: its own, or the first. */
 const styleFor = (chart: Chart) => styleById(chart.styleId ?? "") ?? STYLES[0]!;
 
-test("a chart read in another meter keeps its chords in order, bar for bar; each bar is a bar of that meter and every change of chord lands on one of its pulses; a bar of two chords that moves puts the long part first", () => {
+test("a chart read in another meter keeps its chords in order, bar for bar; each bar is a bar of that meter and every change of chord lands on one of its pulses; a bar of two chords that moves changes between the bar's groups where it has more than one (beat 4 of 5/4, beat 3 of 5/4 as 2+3), and otherwise gives the first chord the larger half of its pulses", () => {
   let read = 0;
   let moved = 0;
   for (const { name, chart } of PARSED) {
     const written = expand(chart).song;
-    for (const meter of BAND_METERS) {
+    for (const meter of READ_IN) {
       // In its own meter a chart is as written (the next property but one).
       if (sameMeter(meter, chart.meter) || !fits(chart, meter).ok) continue;
       const where = `${name} in ${meterName(meter)}`;
@@ -146,19 +201,32 @@ test("a chart read in another meter keeps its chords in order, bar for bar; each
         const share = (one: FlatBar) => one.spans.map((span) => span.duration / one.ticks);
         if (bar.spans.length === 2 && share(bar)[0] !== share(was)[0]) {
           moved++;
-          assert.ok(
-            bar.spans[0]!.duration >= bar.spans[1]!.duration,
-            `${here}: a bar of two chords that moves puts the long part first`,
-          );
+          const between = groupStarts(meter);
+          if (between.length > 0)
+            assert.ok(
+              between.includes(bar.spans[1]!.start),
+              `${here}: a bar of two chords that moves changes between the bar's groups`,
+            );
+          else
+            assert.ok(
+              pulsesIn(meter, 0, bar.spans[1]!.start) >=
+                pulsesIn(meter, bar.spans[1]!.start, bar.ticks),
+              `${here}: a bar of two chords that moves gives the first the larger half of its pulses`,
+            );
         }
       });
     }
   }
   assert.ok(read > 5_000 && moved > 100, `only ${read} bars read, ${moved} of them moved`);
+  const two = parse("title: X\nkey: C\n\n| C F | G |\n").chart;
+  for (const [name, quarters] of CHANGES) {
+    const bar = expand(remeter(two, parseMeterChoice(name)!)).song[0]!;
+    assert.equal(bar.spans[1]!.start, quarters * 480, `a bar of two chords in ${name}`);
+  }
   for (const must of MUST) {
     const source = PARSED.find((one) => one.name === must.name);
     assert.ok(source, must.name);
-    const fit = fits(source.chart, parseMeter(must.meter)!);
+    const fit = fits(source.chart, parseMeterChoice(must.meter)!);
     assert.equal(
       fit.ok,
       must.fits,
@@ -167,11 +235,23 @@ test("a chart read in another meter keeps its chords in order, bar for bar; each
   }
 });
 
-test("a chart that does not fit a meter is refused, by `fits` and by a plan and a take alike, with the same reason naming a bar or a section; one that fits is planned in it", () => {
+test("a chart that does not fit a meter is refused, by `fits` and by a plan and a take alike, with the same reason naming a bar or a section; one that fits is planned in it; a grouping that is not one of its meter's is no meter, and the meter's usual grouping is the meter itself", () => {
+  for (const not of ["5/4 (4+2)", "5/4 (5)", "7/8 (4+3)", "7/8 (2+2+2+1)", "4/4 (2+2", "3/2 (3+3)"])
+    assert.equal(parseMeterChoice(not), null, `${not} is not a grouping of its meter`);
+  for (const [said, meter, groups] of [
+    ["5/4 (3+2)", "5/4", [3, 2]],
+    ["7/4 (4+3)", "7/4", [4, 3]],
+    ["7/8 (2+2+3)", "7/8", [2, 2, 3]],
+    ["12/8 (3+3+3+3)", "12/8", [3, 3, 3, 3]],
+  ] as const) {
+    assert.deepEqual(parseMeterChoice(said), parseMeterChoice(meter), `${said} is ${meter}`);
+    // A meter that states its usual grouping is filed under the meter's own name.
+    assert.equal(meterName({ ...parseMeterChoice(meter)!, groups }), meter, said);
+  }
   const refusedFor = new Set<string>();
   for (const { name, text, chart } of PARSED) {
     const style = styleFor(chart);
-    for (const meter of [...BAND_METERS, { beats: 5, unit: 4 } as Meter]) {
+    for (const meter of READ_IN) {
       if (sameMeter(meter, chart.meter)) continue;
       const where = `${name} in ${meterName(meter)}`;
       const fit = fits(chart, meter);
@@ -183,7 +263,7 @@ test("a chart that does not fit a meter is refused, by `fits` and by a plan and 
         continue;
       }
       refusedFor.add(name);
-      if (meterName(meter) !== "5/4") assert.ok(fit.range !== null, `${where}: names where`);
+      assert.ok(fit.range !== null, `${where}: names where`);
       assert.throws(() => plan(chart, style, options), { message: fit.reason }, where);
       assert.throws(() => render(text, style, options), { message: fit.reason }, where);
       assert.throws(() => remeter(chart, meter), { message: fit.reason }, where);

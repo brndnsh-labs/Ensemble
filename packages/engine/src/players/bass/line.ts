@@ -7,6 +7,7 @@
 
 import { PPQ } from "../../chart/types.ts";
 import { cells, STEP } from "../../perform/grid.ts";
+import { strongPulses } from "../../perform/meter.ts";
 import type { WrittenNote } from "../../perform/notes.ts";
 import { heldRng } from "../../perform/notes.ts";
 import type { PlanBar } from "../../plan/types.ts";
@@ -147,13 +148,9 @@ function onsetsOf(line: BassLine, tier: Tier, bar: PlanBar, rng: Rng): Onsets {
   return { notes, plain: true };
 }
 
-/** The bar's first pulse and, in a bar that divides in two, its middle one. */
+/** Whether a tick from the barline is one of the bar's strong pulses: the first of each of its groups, and the middle of a group of four. */
 export function isStrong(bar: PlanBar, tickInBar: number): boolean {
-  if (tickInBar === 0) return true;
-  const beats = pulses(bar);
-  if (beats.length < 4 || beats.length % 2 === 1) return false;
-  const middle = beats.slice(0, beats.length / 2).reduce((sum, beat) => sum + beat, 0);
-  return tickInBar === middle;
+  return strongPulses(bar.meter).includes(tickInBar);
 }
 
 /** Whether a tick from the barline is the start of one of the bar's pulses. */

@@ -6,7 +6,7 @@ export { chartContent, sameChart } from "./chart/compare.ts";
 export type { ChordParts } from "./chart/display.ts";
 export { chordParts, chordText } from "./chart/display.ts";
 export { expand, runsOf } from "./chart/expand.ts";
-export { parseKey, parseMeter } from "./chart/fields.ts";
+export { parseKey, parseMeter, parseMeterChoice } from "./chart/fields.ts";
 export type { Cell, Row } from "./chart/layout.ts";
 export { flow } from "./chart/layout.ts";
 export type * from "./chart/model.ts";
