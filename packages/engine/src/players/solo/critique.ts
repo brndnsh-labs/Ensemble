@@ -16,6 +16,7 @@ import type { FeelStyle } from "../../style/types.ts";
 import { mod12 } from "../../theory/pitch.ts";
 import { isChordTone, ranked } from "./harmony.ts";
 import type { Slot, World } from "./slots.ts";
+import { displaceIn } from "./slots.ts";
 import type { SoloStyle } from "./style.ts";
 
 /** A note of the solo as it sounds: where it is struck on the grid and when it stops. */
@@ -345,14 +346,15 @@ export function likeness(a: Heard, b: Heard, moved = false): number {
   const [whole, other] = [body(a), body(b)];
   const ticks = whole[0]!.bar.ticks;
   if ([...whole, ...other].some((note) => note.bar.ticks !== ticks)) return inPlace;
-  const pulse = pulseTicks(whole[0]!.bar.meter)[0]!;
+  // PROTOTYPE (#2244): a pulse late and early as the slot moves it (`Slot.displace`).
+  const pulse = displaceIn(a.slot);
   const along = (bar: number, step: number) => bar * ticks + step;
   const [these, those] = [moves(whole), moves(other)];
   const placed = placedBy(these, along);
   return Math.max(
     inPlace,
-    best(these, placed, those, along, pulse),
-    best(these, placed, those, along, -pulse),
+    best(these, placed, those, along, pulse.late),
+    best(these, placed, those, along, -pulse.early),
   );
 }
 
@@ -444,8 +446,9 @@ export function rhythmsAgain(
 ): RhythmAgain[] {
   const said = body(heard);
   if (said.length === 0) return [];
-  const { meter, ticks } = said[0]!.bar;
-  const pulse = pulseTicks(meter)[0]!;
+  const { ticks } = said[0]!.bar;
+  // PROTOTYPE (#2244): a pulse late and early as the slot moves it (`Slot.displace`).
+  const pulse = displaceIn(heard.slot);
   const at = new Map(all.map((note) => [note.tick, note]));
   const contour = (notes: readonly Sounding[]) =>
     notes.slice(1).map((note, i) => Math.sign(note.pitch - notes[i]!.pitch));
@@ -463,7 +466,7 @@ export function rhythmsAgain(
       const [shape, was] = [contour(notes), contour(source)];
       const same = shape.filter((move, i) => move * was[i]! >= 0).length;
       const inBar = ((moved % ticks) + ticks) % ticks;
-      const by = inBar === pulse ? 1 : inBar === ticks - pulse ? -1 : null;
+      const by = inBar === pulse.late ? 1 : inBar === ticks - pulse.early ? -1 : null;
       found.push({ of: other, source, notes, inBar, by, line: same * 5 >= shape.length * 4 });
     }
   }

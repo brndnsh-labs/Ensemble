@@ -7,6 +7,7 @@
 
 import { PPQ } from "../../chart/types.ts";
 import { cells, STEP } from "../../perform/grid.ts";
+import { strongPulses } from "../../perform/meter.ts";
 import type { WrittenNote } from "../../perform/notes.ts";
 import { heldRng } from "../../perform/notes.ts";
 import type { PlanBar } from "../../plan/types.ts";
@@ -65,6 +66,8 @@ interface Onset {
   readonly under?: boolean;
   /** The tone is taken in the octave nearest the note before it. */
   readonly near?: boolean;
+  /** PROTOTYPE (#2244): the place in the bar's sequence this `x` takes (`Figure.places`). */
+  readonly place?: number;
 }
 
 /** What a piece is played with beyond its line: the plan's turn, and the drummer's kicks. */
@@ -80,12 +83,14 @@ function strokesOf(grid: readonly string[], from = 0, figure?: Figure): Onset[] 
   const notes: Onset[] = [];
   const under = figure?.under === true;
   const near = figure?.near === true;
+  let xs = 0;
   grid.forEach((symbol, step) => {
     const named = RIFF_TONES[symbol];
     const tone = named === "b7" && figure?.seventh === "own" ? "7" : named;
     if (symbol !== "x" && symbol !== "o" && symbol !== DEAD_NOTE && !tone) return;
     let length = 1;
     while (grid[step + length] === "-") length++;
+    const place = symbol === "x" ? figure?.places?.[xs++] : undefined;
     notes.push({
       tick: from + step * STEP,
       space: length * STEP,
@@ -95,6 +100,7 @@ function strokesOf(grid: readonly string[], from = 0, figure?: Figure): Onset[] 
       ...(under && symbol !== "o" && symbol !== DEAD_NOTE ? { under: true } : {}),
       ...(tone && tone !== "8" && near ? { near: true } : {}),
       ...(symbol === DEAD_NOTE ? { dead: true } : {}),
+      ...(place !== undefined ? { place } : {}),
     });
   });
   return notes;
@@ -147,9 +153,15 @@ function onsetsOf(line: BassLine, tier: Tier, bar: PlanBar, rng: Rng): Onsets {
   return { notes, plain: true };
 }
 
-/** The bar's first pulse and, in a bar that divides in two, its middle one. */
-export function isStrong(bar: PlanBar, tickInBar: number): boolean {
+/**
+ * The bar's first pulse and, in a bar that divides in two, its middle one. PROTOTYPE (#2244):
+ * in a bar the line is written for (`shaped`), the bar's strong pulses as its groups give them
+ * (`strongPulses`), which are the same in every meter a style has written; in a bar played
+ * plainly, as before, so the fit's takes stay as they were.
+ */
+export function isStrong(bar: PlanBar, tickInBar: number, shaped = false): boolean {
   if (tickInBar === 0) return true;
+  if (shaped) return strongPulses(bar.meter).includes(tickInBar);
   const beats = pulses(bar);
   if (beats.length < 4 || beats.length % 2 === 1) return false;
   const middle = beats.slice(0, beats.length / 2).reduce((sum, beat) => sum + beat, 0);
@@ -250,6 +262,9 @@ export function lineOf(
     : (shape.bars[piece.cycle % shape.bars.length] ?? []);
   const notes: LineNote[] = [];
   let count = 0;
+  // PROTOTYPE (#2244): a figure that says each `x`'s place keeps it, counted from the tone the
+  // first of them would have taken here.
+  let base: number | undefined;
   let pitch = root;
   inside.forEach((onset, i) => {
     // A re-strike needs a note to repeat: the first note of a piece is always a tone.
@@ -260,7 +275,14 @@ export function lineOf(
     if (!echo) {
       // A dead note is struck where the hand is: on the root.
       const own = dead ? "R" : onset.tone;
-      const tone = arrival ? "R" : (own ?? tones[count % tones.length] ?? "R");
+      let at = count;
+      // Place -1: the root, whatever the sequence has there (it still takes its turn in the count).
+      const rooted = own === undefined && onset.place === -1;
+      if (own === undefined && onset.place !== undefined && !rooted) {
+        base ??= count - onset.place;
+        at = base + onset.place;
+      }
+      const tone = arrival || rooted ? "R" : (own ?? tones[at % tones.length] ?? "R");
       const before = pitch;
       pitch = tonePitch(tone, chord, scale, root, line.ceiling);
       if (onset.near && !arrival) pitch = nearest(pitch, before, line.ceiling);
@@ -284,7 +306,7 @@ export function lineOf(
             ? "dead"
             : !echo && onset.tone === "8" && line.velocity.octave !== undefined
               ? "octave"
-              : isStrong(bar, onset.tick)
+              : isStrong(bar, onset.tick, !figure.plain) || line.marks?.includes(onset.tick)
                 ? "strong"
                 : offLevel && !onPulse(bar, onset.tick)
                   ? "off"

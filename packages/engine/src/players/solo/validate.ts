@@ -20,15 +20,8 @@ export function validateSoloStyle(solo: SoloStyle): string[] {
   const chance = (value: number, where: string) =>
     say(value >= 0 && value <= 1, `${where}: ${value} is not a chance from 0 to 1.`);
   const rhythm = (cell: Cell, where: string, steps = STEPS) => {
-    const symbols = cells(cell);
-    say(symbols.length === steps, `${where}: "${cell}" is not ${steps} sixteenths long.`);
-    say(
-      symbols.every((symbol) => "x-.".includes(symbol)),
-      `${where}: "${cell}" has a symbol that is not x, - or a dot.`,
-    );
-    say(symbols.includes("x"), `${where}: "${cell}" strikes no note.`);
-    say(symbols[0] !== "-", `${where}: "${cell}" opens by holding a note nobody struck.`);
-    return symbols;
+    problems.push(...rhythmProblems(cell, where, steps));
+    return cells(cell);
   };
 
   say(
@@ -97,15 +90,7 @@ export function validateSoloStyle(solo: SoloStyle): string[] {
 
   say(solo.endings.length > 0, "endings: there are none.");
   for (const cell of [...solo.endings, solo.arc.peak.ending]) {
-    const symbols = rhythm(cell, "endings");
-    // A phrase leaves its last beat unstruck: a note there is the next phrase's pickup.
-    say(
-      !symbols.slice(STEPS - 4).includes("x"),
-      `endings: "${cell}" strikes a note in the last beat, which belongs to the next phrase.`,
-    );
-    const last = symbols.lastIndexOf("x");
-    const held = symbols.slice(last + 1).filter((symbol) => symbol === "-").length + 1;
-    say(held >= 4, `endings: "${cell}" does not finish on a long note.`);
+    problems.push(...endingProblems(cell, "endings", STEPS, 4));
   }
 
   // A solo's first chorus opens on a statement, whatever its length: every length of form
@@ -268,19 +253,19 @@ export function validateSoloStyle(solo: SoloStyle): string[] {
   chance(solo.habits.enclosure, "habits, enclosure");
   chance(solo.habits.pickup.chance, "habits, pickup");
   chance(solo.habits.pickup.rising, "habits, pickup rising");
-  const pickups = (figures: SoloTime["pickups"], where: string, steps: number, pulse: number) => {
+  const pickups = (
+    figures: SoloTime["pickups"],
+    where: string,
+    steps: number,
+    pulses: readonly number[],
+  ) => {
     for (const figure of figures) {
-      const length = cells(figure.cell).length;
-      say(
-        length > 0 && length % pulse === 0 && length <= steps / 2,
-        `${where}: "${figure.cell}" is not a whole number of the bar's pulses, half the bar at most.`,
-      );
-      if (length > 0) rhythm(figure.cell, where, length);
+      problems.push(...pickupProblems(figure.cell, where, steps, pulses));
       say(figure.weight > 0, `${where}: "${figure.cell}" has no weight.`);
       for (const level of figure.levels ?? []) known(level, `${where} "${figure.cell}"`);
     }
   };
-  pickups(solo.habits.pickup.figures, "habits, pickup", STEPS, 4);
+  pickups(solo.habits.pickup.figures, "habits, pickup", STEPS, [4, 4, 4, 4]);
   const { displace } = solo.habits;
   chance(displace.chance, "habits, displace");
   chance(displace.early, "habits, displace early");
@@ -366,17 +351,72 @@ export function validateSoloStyle(solo: SoloStyle): string[] {
     }
     say(written.endings.length > 0, `${where}, endings: there are none.`);
     for (const cell of [...written.endings, written.peak]) {
-      const symbols = rhythm(cell, `${where}, endings`, steps);
-      say(
-        !symbols.slice(steps - pulse).includes("x"),
-        `${where}, endings: "${cell}" strikes a note in the last beat, which belongs to the next phrase.`,
-      );
-      const last = symbols.lastIndexOf("x");
-      const held = symbols.slice(last + 1).filter((symbol) => symbol === "-").length + 1;
-      say(held >= 4, `${where}, endings: "${cell}" does not finish on a long note.`);
+      problems.push(...endingProblems(cell, `${where}, endings`, steps, pulse));
     }
-    pickups(written.pickups, `${where}, pickup`, steps, pulse);
+    pickups(
+      written.pickups,
+      `${where}, pickup`,
+      steps,
+      pulseTicks(meter).map((ticks) => Math.round(ticks / STEP)),
+    );
   }
 
+  return problems;
+}
+
+// PROTOTYPE (#2244): the checks of one rhythm, one ending and one pickup, split out of
+// `validateSoloStyle` so a derived one can be asked what a written one is.
+
+/** What is wrong with one rhythm of `steps` sixteenths. */
+export function rhythmProblems(cell: Cell, where: string, steps: number): string[] {
+  const problems: string[] = [];
+  const say = (ok: boolean, message: string) => {
+    if (!ok) problems.push(message);
+  };
+  const symbols = cells(cell);
+  say(symbols.length === steps, `${where}: "${cell}" is not ${steps} sixteenths long.`);
+  say(
+    symbols.every((symbol) => "x-.".includes(symbol)),
+    `${where}: "${cell}" has a symbol that is not x, - or a dot.`,
+  );
+  say(symbols.includes("x"), `${where}: "${cell}" strikes no note.`);
+  say(symbols[0] !== "-", `${where}: "${cell}" opens by holding a note nobody struck.`);
+  return problems;
+}
+
+/** What is wrong with one ending (or the top note's bar) of `steps` sixteenths whose last pulse has `pulse`. */
+export function endingProblems(cell: Cell, where: string, steps: number, pulse: number): string[] {
+  const problems = rhythmProblems(cell, where, steps);
+  const symbols = cells(cell);
+  // A phrase leaves its last beat unstruck: a note there is the next phrase's pickup.
+  if (symbols.slice(steps - pulse).includes("x"))
+    problems.push(
+      `${where}: "${cell}" strikes a note in the last beat, which belongs to the next phrase.`,
+    );
+  const last = symbols.lastIndexOf("x");
+  const held = symbols.slice(last + 1).filter((symbol) => symbol === "-").length + 1;
+  if (held < 4) problems.push(`${where}: "${cell}" does not finish on a long note.`);
+  return problems;
+}
+
+/**
+ * What is wrong with one pickup in a bar of `steps` sixteenths whose pulses are `pulses`
+ * sixteenths each: it is the bar's last so many pulses, half the bar at most.
+ */
+export function pickupProblems(
+  cell: Cell,
+  where: string,
+  steps: number,
+  pulses: readonly number[],
+): string[] {
+  const problems: string[] = [];
+  const length = cells(cell).length;
+  let whole = 0;
+  for (let i = pulses.length - 1; i >= 0 && whole < length; i--) whole += pulses[i]!;
+  if (!(length > 0 && whole === length && length <= steps / 2))
+    problems.push(
+      `${where}: "${cell}" is not a whole number of the bar's pulses, half the bar at most.`,
+    );
+  if (length > 0) problems.push(...rhythmProblems(cell, where, length));
   return problems;
 }

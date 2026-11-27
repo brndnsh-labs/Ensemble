@@ -1,5 +1,6 @@
 // The values of header fields: keys, meters, tempos, and section labels.
 
+import { grouped, meterName } from "../perform/meter.ts";
 import type { Key, Letter } from "../theory/pitch.ts";
 import { plainSigns } from "./symbol.ts";
 import type { Meter, SectionRole } from "./types.ts";
@@ -22,15 +23,19 @@ export function parseKey(text: string): Key | null {
 
 /** `n/d` with `d` one of 2, 4, 8 and `n` from 1 to 32. Null otherwise. */
 export function parseMeter(text: string): Meter | null {
-  const match = /^(\d{1,2})\s*\/\s*(\d{1,2})$/.exec(text.trim());
+  // PROTOTYPE (#2244): the grouping after the meter, "7/8 (3+2+2)".
+  const match = /^(\d{1,2})\s*\/\s*(\d{1,2})(?:\s*\(\s*(\d(?:\s*\+\s*\d)*)\s*\))?$/.exec(
+    text.trim(),
+  );
   if (!match) return null;
   const beats = Number(match[1]);
   const unit = Number(match[2]);
   if (beats < 1 || beats > 32 || (unit !== 2 && unit !== 4 && unit !== 8)) return null;
-  return { beats, unit };
+  if (match[3] === undefined) return { beats, unit };
+  return grouped({ beats, unit }, match[3].split("+").map(Number));
 }
 
-export const meterToString = (meter: Meter): string => `${meter.beats}/${meter.unit}`;
+export const meterToString = (meter: Meter): string => meterName(meter);
 
 /** Beats per minute: a whole number from 1 to 999. Null otherwise. */
 export function parseTempo(text: string): number | null {

@@ -96,6 +96,8 @@ async function perform(): Promise<Performance> {
     ...(params.has("meter") && parseMeter(params.get("meter")!)
       ? { meter: parseMeter(params.get("meter")!)! }
       : {}),
+    ...(params.has("clear") ? { clear: params.get("clear")! } : {}),
+    ...(params.has("floor") ? { floor: params.get("floor") as "fit" | "cut" | "lope" } : {}),
     // `without=bass` leaves seats out of the band, as the CLI's --without does.
     ...(params.has("without") ? { without: params.get("without")!.split(",") as Seat[] } : {}),
   });

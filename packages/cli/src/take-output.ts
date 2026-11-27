@@ -37,6 +37,8 @@ export const TAKE_FLAGS = {
   energy: { type: "string", short: "e" },
   key: { type: "string", short: "k" },
   meter: { type: "string" },
+  floor: { type: "string" },
+  clear: { type: "string" },
   without: { type: "string" },
   "no-count-in": { type: "boolean", default: false },
 } as const;
@@ -61,6 +63,8 @@ export interface TakeFlags {
   readonly energy?: string | undefined;
   readonly key?: string | undefined;
   readonly meter?: string | undefined;
+  readonly floor?: string | undefined;
+  readonly clear?: string | undefined;
   readonly without?: string | undefined;
   readonly "no-count-in"?: boolean | undefined;
 }
@@ -150,6 +154,8 @@ export function takeOf(
     ...(energy === undefined ? {} : { energy }),
     ...(key ? { key } : {}),
     ...(meter ? { meter } : {}),
+    ...(values.floor ? { floor: values.floor as "fit" | "cut" | "lope" } : {}),
+    ...(values.clear ? { clear: values.clear } : {}),
   };
 
   // The style named on the command line, else the chart's own, else the first that ships.

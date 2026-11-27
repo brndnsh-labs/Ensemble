@@ -11,7 +11,7 @@
 
 import { swing } from "../../perform/feel.ts";
 import { cells, STEP } from "../../perform/grid.ts";
-import { isCompound, lastPulse, onPulse, pulseTicks } from "../../perform/meter.ts";
+import { isCompound, lastPulse, onPulse } from "../../perform/meter.ts";
 import type { Plan, PlanBar } from "../../plan/types.ts";
 import type { Rng } from "../../rng.ts";
 import type { ToneRole } from "../../theory/chord.ts";
@@ -23,7 +23,7 @@ import { climb, EIGHTH, isChordTone, landing, onlyPasses } from "./harmony.ts";
 import type { LineBar, Spot } from "./line.ts";
 import { contourOf, settled, spotsOf, writeBends, writeLine } from "./line.ts";
 import type { Part, Slot, World } from "./slots.ts";
-import { breathed, fitShape, levelIndex, lungsOf, soloIn } from "./slots.ts";
+import { breathed, displaceIn, fitShape, levelIndex, lungsOf, soloIn } from "./slots.ts";
 import type { Cell, Contour, Idea, Role, Way } from "./style.ts";
 import { CONTOURS } from "./style.ts";
 
@@ -512,8 +512,18 @@ export function phrasesFor(
     if (roles && !roles.includes(role)) return 0;
     const draw = rng.fork("displace");
     if (!draw.chance(chance)) return 0;
-    const pulse = Math.round(pulseTicks(slot.bars[0]!.meter)[0]! / STEP);
-    return draw.fork("early").chance(early) ? -pulse : pulse;
+    // PROTOTYPE (#2244): a pulse late and early as the slot says (`Slot.displace`): in a bar of
+    // uneven pulses the soloist has a part for, its first pulse late and its last early.
+    const moves = displaceIn(slot);
+    return draw.fork("early").chance(early)
+      ? -Math.round(moves.early / STEP)
+      : Math.round(moves.late / STEP);
+  })();
+  // PROTOTYPE (#2244): the other way a pulse, which in a bar of uneven pulses is another length.
+  const otherWay = ((): number => {
+    if (shift === 0) return 0;
+    const moves = displaceIn(slot);
+    return shift > 0 ? -Math.round(moves.early / STEP) : Math.round(moves.late / STEP);
   })();
   // A section's last bar keeps its landing where the band turns: not pushed late there.
   // (The first draw is drawn by the style's share; the other way is tried where it fails.)
@@ -692,7 +702,7 @@ export function phrasesFor(
     const may = (by: number) => (by < 0 ? early > 0 : lateAllowed && early < 1);
     const twin = (newly: boolean) =>
       (may(shift) ? displaced(kind, plans, ask, shift, phrase, newly) : null) ??
-      (may(-shift) ? displaced(kind, plans, ask, -shift, phrase, newly) : null);
+      (may(-shift) ? displaced(kind, plans, ask, otherWay, phrase, newly) : null);
     // The idea moved as main moves it; and where the style holds a note over the barline,
     // the idea moved by the stricter rules, offered only if main's is refused (`soloPart`).
     const old = twin(false);

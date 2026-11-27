@@ -139,7 +139,7 @@ function ownRhythm(grid: string, piece: Piece): LineNote[] | null {
           ? piece.struck
             ? "arrival"
             : "strong"
-          : isStrong(bar, tick)
+          : isStrong(bar, tick, true)
             ? "strong"
             : "weak",
     });

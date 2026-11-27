@@ -30,6 +30,7 @@ import {
   PPQ,
   pitchClass,
   planBar,
+  pulseAt,
   pulseTicks,
   SOLO_INSTRUMENTS,
   spellPitchClass,
@@ -124,7 +125,20 @@ export function position(meter: Meter, tickInBar: number): string {
       600: "li+",
     };
     if (into in dotted) return `${n}${dotted[into]}`;
+  } else if (length === PPQ * 1.5) {
+    // PROTOTYPE (#2244): the long beat of a bar of uneven pulses (7/8's third) is counted in
+    // its steady eighths, `3 3& 3&&`, and a sixteenth after any of them `+`.
+    const long: Record<number, string> = {
+      0: "",
+      120: "+",
+      240: "&",
+      360: "&+",
+      480: "&&",
+      600: "&&+",
+    };
+    if (into in long) return `${n}${long[into]}`;
   }
+  if (into === 0) return `${n}`;
   const whole = Math.round(into);
   const d = gcd(whole, length);
   return `${n}+${whole / d}/${length / d}`;
@@ -364,7 +378,8 @@ export function transcription(take: Take, style: StylePack, read: ReadOptions): 
     for (const bar of plan.bars) {
       for (const { note } of placed.get(bar.index) ?? []) {
         if (note.seat !== "solo") continue;
-        if (note.tick - end >= pulseTicks(bar.meter)[0]!) phrase++;
+        // PROTOTYPE (#2244): a beat is the pulse the rest ends in, in a bar of uneven pulses.
+        if (note.tick - end >= pulseAt(bar.meter, note.tick - bar.start).ticks) phrase++;
         phraseOf.set(note, phrase);
         if (before) beforeOf.set(note, before);
         before = note;
@@ -411,10 +426,18 @@ export function transcription(take: Take, style: StylePack, read: ReadOptions): 
       `timing: @+N after a note is where it was played, in ticks from the grid; a tick is ${Number(ms.toFixed(3))} ms (${PPQ} to the quarter)`,
     );
   }
+  const uneven = new Set(pulseTicks(meter)).size > 1;
   out.push(
     isCompound(meter)
       ? "count: pulses 1 2 (dotted quarters), eighths 1 1la 1li, a sixteenth after any +; 1+2/9 is off that grid; lengths in eighths"
-      : "count: beats 1 2 3 4, sixteenths 1e 1& 1a, triplet eighths 1t 1l; 3+5/12 is off that grid; lengths in quarters",
+      : uneven
+        ? // PROTOTYPE (#2244): a bar of uneven pulses.
+          `count: pulses ${pulseTicks(meter)
+            .map((ticks, i) => (ticks === PPQ ? `${i + 1}` : `${i + 1}.`))
+            .join(
+              " ",
+            )} (a dot: a dotted quarter); in a quarter 1e 1& 1a, triplet eighths 1t 1l; in a dotted quarter its steady eighths 3 3& 3&&, a sixteenth after any +; 3+5/12 is off that grid; lengths in quarters`
+        : "count: beats 1 2 3 4, sixteenths 1e 1& 1a, triplet eighths 1t 1l; 3+5/12 is off that grid; lengths in quarters",
   );
   out.push(
     "bar: number · pass · section bar/of · chords@where · energy · marks. bass, solo: where pitch role length (as sounded) velocity moves",

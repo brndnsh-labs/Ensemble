@@ -14,6 +14,7 @@ import { quartersAt } from "./perform/time.ts";
 import { planBars } from "./plan/plan.ts";
 import type { Plan, PlanBar, PlanOptions } from "./plan/types.ts";
 import type { MovedIdea } from "./players/solo/play.ts";
+import { styleIn } from "./style/derive.ts";
 import { tempoRange } from "./style/meters.ts";
 import type { Seat, StylePack } from "./style/types.ts";
 import type { Key } from "./theory/pitch.ts";
@@ -100,13 +101,30 @@ export function chartIn(chart: Chart, style: StylePack, options: PlanOptions): C
   return { ...read, tempo: Math.min(max, Math.max(min, read.tempo)) };
 }
 
+/** PROTOTYPE (#2244): the style with a part for each of the chart's meters, derived where it wrote none. */
+function inMeters(style: StylePack, chart: Chart, options: PlanOptions): StylePack {
+  return styleIn(
+    style,
+    [chart.meter, ...chart.sections.map((section) => section.meter)],
+    options.floor,
+    options.clear,
+  );
+}
+
 /** The roadmap of a performance, without playing it. Give it the chart as written: `options.meter` is read here. */
 export function plan(chart: Chart, style: StylePack, options: PlanOptions): Plan {
   const played = chartIn(chart, style, options);
   // A chart with an arrangement of its own is played as its writer arranged it: the band lays
   // nobody out of a jam on it by itself either.
   const arranged = played.arrangement?.lines != null;
-  return planBars(expand(played), played.tempo, played.meter, style, options, arranged);
+  return planBars(
+    expand(played),
+    played.tempo,
+    played.meter,
+    inMeters(style, played, options),
+    options,
+    arranged,
+  );
 }
 
 /**
@@ -162,10 +180,11 @@ function whole(text: string, style: StylePack, options: TakeOptions): Take {
   // The chart as played, in the meter asked for: what the take says it played.
   const chart = chartIn(written, style, options);
   const roadmap = plan(chart, style, options);
+  const derived = inMeters(style, chart, options);
   const played =
     options.soloInstrument === undefined
-      ? style
-      : { ...style, solo: { ...style.solo, instrument: options.soloInstrument } };
+      ? derived
+      : { ...derived, solo: { ...derived.solo, instrument: options.soloInstrument } };
   const { events, moved } = performed(roadmap, played, options.seed);
   return { chart, diagnostics: parsed.diagnostics, plan: roadmap, events, moved };
 }

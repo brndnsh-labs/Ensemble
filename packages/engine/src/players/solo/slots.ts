@@ -8,7 +8,7 @@ import { PPQ } from "../../chart/types.ts";
 import { cells, STEP } from "../../perform/grid.ts";
 import type { Arrival } from "../../perform/harmony.ts";
 import { arrivals } from "../../perform/harmony.ts";
-import { pulseTicks, writtenFor } from "../../perform/meter.ts";
+import { meterName, pulseTicks, writtenFor } from "../../perform/meter.ts";
 import type { Plan, PlanBar } from "../../plan/types.ts";
 import type { FeelStyle, StylePack } from "../../style/types.ts";
 import { tierOf } from "../../style/types.ts";
@@ -86,6 +86,27 @@ export interface Slot {
   readonly high: number;
   /** The solo's one top note may be this high and no higher (SO-07). */
   readonly top: number;
+  /**
+   * PROTOTYPE (#2244): how far, in ticks, an idea is moved "a pulse" late and early here. In a
+   * bar the soloist has a part for (written, or derived), late is the bar's first pulse and
+   * early its last, so the downbeat goes to a pulse either way; elsewhere (the front of a 4/4
+   * rhythm) the first pulse both ways, as before. Left out, the first pulse both ways.
+   */
+  readonly displace?: { readonly late: number; readonly early: number };
+}
+
+/** PROTOTYPE (#2244): `Slot.displace` for a phrase in bars of this meter. */
+export function displaceOf(solo: SoloStyle, meter: Meter): { late: number; early: number } {
+  const pulses = pulseTicks(meter);
+  const own = writtenFor(solo.meters, meter) !== undefined;
+  return { late: pulses[0]!, early: own ? pulses.at(-1)! : pulses[0]! };
+}
+
+/** PROTOTYPE (#2244): the moves of `Slot.displace`, with what a slot left out of it. */
+export function displaceIn(slot: Slot): { late: number; early: number } {
+  if (slot.displace) return slot.displace;
+  const first = pulseTicks(slot.bars[0]!.meter)[0]!;
+  return { late: first, early: first };
 }
 
 const inMeter = new WeakMap<SoloStyle, Map<string, SoloStyle>>();
@@ -103,7 +124,8 @@ export function soloIn(solo: SoloStyle, meter: Meter): SoloStyle {
     known = new Map();
     inMeter.set(solo, known);
   }
-  const name = `${meter.beats}/${meter.unit}`;
+  // PROTOTYPE (#2244): by the meter's shape, so 7/8 and 7/8 (3+2+2) are kept apart.
+  const name = meterName(meter);
   let style = known.get(name);
   if (!style) {
     style = {
@@ -440,6 +462,7 @@ function slotsOf(plan: Plan, solo: SoloStyle, instrument: SoloInstrument): Slot[
       low: Math.round(low),
       high: Math.round(high),
       top,
+      displace: displaceOf(solo, bars[0]!.meter),
     });
   });
   return slots;

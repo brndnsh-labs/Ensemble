@@ -26,6 +26,12 @@ export interface Diagnostic {
 export interface Meter {
   readonly beats: number;
   readonly unit: 2 | 4 | 8;
+  /**
+   * How the bar groups, where that is not the meter's usual reading (#2244): in the meter's
+   * unit, adding up to `beats`. Over 4, beats to a group (5/4 as 2+3). Over 8, eighths to a
+   * pulse (7/8 as 3+2+2: a three is a dotted quarter, a two a quarter).
+   */
+  readonly groups?: readonly number[];
 }
 
 /** The length of one bar in ticks. */

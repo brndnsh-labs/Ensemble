@@ -18,6 +18,10 @@ export interface PlanOptions {
    * style's range there. Left out, or the chart's own: the chart's meter, the take it always was.
    */
   readonly meter?: Meter;
+  /** PROTOTYPE (#2244): what the band plays in a meter a seat has not written (`style/derive.ts`). */
+  readonly floor?: "fit" | "cut" | "lope";
+  /** PROTOTYPE (#2244): ways of making a derived bar's shape easier to feel, a comma list (`Clear` in `style/cut.ts`). */
+  readonly clear?: string;
   /**
    * Jam mode: how many times through the form. Wins over `minutes`. A vamp
    * shorter than eight bars is counted in choruses of several laps.

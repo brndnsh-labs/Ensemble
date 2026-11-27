@@ -264,31 +264,7 @@ export function validateChordStyle(chords: ChordStyle): string[] {
   let label = "rhythm";
   /** A grid read as a bar of comping: its length, its symbols, and what it holds. */
   const readGrid = (grid: string, articulation: Articulation, at: string, bars = 1) => {
-    const symbols = cells(grid);
-    say(
-      symbols.length === figureSteps * bars,
-      bars === 1
-        ? `${at}: ${symbols.length} steps; a figure is one bar of ${figureSteps} sixteenths.`
-        : `${at}: ${symbols.length} steps; a figure of two bars is ${figureSteps * bars} sixteenths.`,
-    );
-    // A bar of rest is written all silence; anything else that never comes down is a mistake.
-    say(
-      symbols.some((symbol) => symbol in articulation) || symbols.every((symbol) => symbol === "."),
-      `${at}: the hand never comes down, and the bar is not written as a rest.`,
-    );
-    symbols.forEach((symbol, step) => {
-      const known = symbol in articulation || symbol === HELD || symbol === ".";
-      say(known, `${at}: "${symbol}" at step ${step + 1} is not in its articulation.`);
-      const before = symbols[step - 1];
-      say(
-        symbol !== HELD || (before !== undefined && before !== "."),
-        `${at}: step ${step + 1} holds a chord that was never struck.`,
-      );
-      say(
-        symbol !== HELD || before === undefined || !articulation[before]?.muted,
-        `${at}: step ${step + 1} holds a scratch, which has nothing to ring.`,
-      );
-    });
+    problems.push(...figureProblems(grid, articulation, at, figureSteps, bars));
   };
   const checkBook = (book: RhythmBook) => {
     say(
@@ -497,5 +473,49 @@ export function validateChordStyle(chords: ChordStyle): string[] {
       "ending: the pulled-off note's level is a share of the strike's, more than 0 and at most 1.",
     );
   }
+  return problems;
+}
+
+/**
+ * What is wrong with one grid read as a bar of comping (or `bars` bars) of `steps` sixteenths:
+ * its length, its symbols, and what it holds. PROTOTYPE (#2244): split out of
+ * `validateChordStyle` so a derived figure can be asked what a written one is.
+ */
+export function figureProblems(
+  grid: string,
+  articulation: Articulation,
+  at: string,
+  steps: number,
+  bars = 1,
+): string[] {
+  const problems: string[] = [];
+  const say = (ok: boolean, message: string) => {
+    if (!ok) problems.push(message);
+  };
+  const symbols = cells(grid);
+  say(
+    symbols.length === steps * bars,
+    bars === 1
+      ? `${at}: ${symbols.length} steps; a figure is one bar of ${steps} sixteenths.`
+      : `${at}: ${symbols.length} steps; a figure of two bars is ${steps * bars} sixteenths.`,
+  );
+  // A bar of rest is written all silence; anything else that never comes down is a mistake.
+  say(
+    symbols.some((symbol) => symbol in articulation) || symbols.every((symbol) => symbol === "."),
+    `${at}: the hand never comes down, and the bar is not written as a rest.`,
+  );
+  symbols.forEach((symbol, step) => {
+    const known = symbol in articulation || symbol === HELD || symbol === ".";
+    say(known, `${at}: "${symbol}" at step ${step + 1} is not in its articulation.`);
+    const before = symbols[step - 1];
+    say(
+      symbol !== HELD || (before !== undefined && before !== "."),
+      `${at}: step ${step + 1} holds a chord that was never struck.`,
+    );
+    say(
+      symbol !== HELD || before === undefined || !articulation[before]?.muted,
+      `${at}: step ${step + 1} holds a scratch, which has nothing to ring.`,
+    );
+  });
   return problems;
 }
