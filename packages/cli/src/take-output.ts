@@ -8,7 +8,7 @@ import {
   meterName,
   parse,
   parseKey,
-  parseMeter,
+  parseMeterChoice,
   recipeText,
   render,
   SOLO_INSTRUMENTS,
@@ -96,11 +96,14 @@ export function takeOf(
   if (values.key !== undefined && !key)
     throw new UsageError(`--key: "${values.key}" is not a key (try Bb or F#m)`);
 
-  // Another of the band's meters, which the chart must fit: refused with the reason it does not.
+  // Another meter, with its grouping if it says one, which the chart must fit: refused with the
+  // reason it does not.
   // The chart's own meter is no option at all: the take is the one it always was, and says so.
-  const asked = values.meter === undefined ? undefined : parseMeter(values.meter);
+  const asked = values.meter === undefined ? undefined : parseMeterChoice(values.meter);
   if (values.meter !== undefined && !asked)
-    throw new UsageError(`--meter: "${values.meter}" is not a meter (try 12/8 or 3/4)`);
+    throw new UsageError(
+      `--meter: "${values.meter}" is not a meter (try 12/8, 3/4 or "7/8 (3+2+2)")`,
+    );
   const chart = parse(text).chart;
   const meter = asked && !sameMeter(asked, chart.meter) ? asked : undefined;
   if (meter) {

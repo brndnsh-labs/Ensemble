@@ -6,7 +6,7 @@
 import type { Band, BandSetup, Mix, Sound } from "@ensemble/audio";
 import { assemble, Player, renderBand, toWav } from "@ensemble/audio";
 import type { MixStyle, Seat, StylePack, TimedNote } from "@ensemble/engine";
-import { parseMeter, render, seconds, timedNotes } from "@ensemble/engine";
+import { parseMeterChoice, render, seconds, timedNotes } from "@ensemble/engine";
 import { STYLES, styleById } from "@ensemble/styles";
 
 /** Milliseconds from the page's first request to this script starting: how long the source took to arrive. */
@@ -92,9 +92,10 @@ async function perform(): Promise<Performance> {
     ...(params.get("open") === "1" ? { open: true } : {}),
     ...(params.has("endafter") ? { endAfter: Number(params.get("endafter")) } : {}),
     ...(params.has("toldat") ? { toldAt: Number(params.get("toldat")) } : {}),
-    // `meter=12/8` plays the chart in another meter it fits, as the CLI's --meter does.
-    ...(params.has("meter") && parseMeter(params.get("meter")!)
-      ? { meter: parseMeter(params.get("meter")!)! }
+    // `meter=12/8` plays the chart in another meter it fits, as the CLI's --meter does; a
+    // grouping too, `meter=7/8 (3+2+2)`.
+    ...(params.has("meter") && parseMeterChoice(params.get("meter")!)
+      ? { meter: parseMeterChoice(params.get("meter")!)! }
       : {}),
     // `without=bass` leaves seats out of the band, as the CLI's --without does.
     ...(params.has("without") ? { without: params.get("without")!.split(",") as Seat[] } : {}),

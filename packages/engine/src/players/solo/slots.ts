@@ -8,7 +8,7 @@ import { PPQ } from "../../chart/types.ts";
 import { cells, STEP } from "../../perform/grid.ts";
 import type { Arrival } from "../../perform/harmony.ts";
 import { arrivals } from "../../perform/harmony.ts";
-import { pulseTicks, writtenFor } from "../../perform/meter.ts";
+import { meterName, pulseTicks, writtenFor } from "../../perform/meter.ts";
 import type { Plan, PlanBar } from "../../plan/types.ts";
 import type { FeelStyle, StylePack } from "../../style/types.ts";
 import { tierOf } from "../../style/types.ts";
@@ -103,7 +103,8 @@ export function soloIn(solo: SoloStyle, meter: Meter): SoloStyle {
     known = new Map();
     inMeter.set(solo, known);
   }
-  const name = `${meter.beats}/${meter.unit}`;
+  // By the meter's shape: 7/8 and 7/8 (3+2+2) are kept apart.
+  const name = meterName(meter);
   let style = known.get(name);
   if (!style) {
     style = {
